@@ -16,8 +16,28 @@ MonoBehaviour:
   _displayName: Fever Damage
   _description: Start at x2.0 and gain x0.3 per level. Applies to direct and area
     damage from the next fever; round final damage up once.
-  _levelCosts: 64000000000000005802000000000000b80b000000000000
+  _levelCosts: c8000000000000009001000000000000e803000000000000b80b000000000000581b000000000000204e000000000000
+  _doubleRewardChance: 0.1
+  _handDamagePerLevel: 1
+  _handPromotionLevels: 060000000b000000
+  _handStageNames:
+  - Hand Upgrade
+  - Fist Upgrade
+  - Hammer Upgrade
+  _handFirstPromotionRadius: 1.5
+  _handRadiusPerPromotion: 1
+  _fistBaseDamage: 5
+  _fistDamagePerLevel: 1
+  _fistChancePerLevel: 0.06
   _damageBonuses: 010000000200000003000000
+  _autoAttackDamages: 010000000200000003000000
+  _autoAttackSpeeds:
+  - 1
+  - 2
+  - 3
+  _autoPromotionLevel: 6
+  _autoPromotedName: Auto Smash
+  _autoPromotionRadius: 1.5
   _areaRadii:
   - 1.5
   - 2
@@ -30,6 +50,9 @@ MonoBehaviour:
   - 2.3
   - 2.6
   - 2.9
+  - 3.2
+  - 3.5
+  - 4
   _baseFeverDamageMultiplier: 2
   _feverDamageMultiplierPerLevel: 0.3
   _rarityDistributions:

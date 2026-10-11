@@ -21,6 +21,8 @@ public sealed class MonitorCoinRain : MonoBehaviour
     [Header("References")]
     [SerializeField] private GameSession _gameSession;
     [SerializeField] private MiniGameScreenView _screenView;
+    [Tooltip("바탕화면이 있는 씬에서는 미니게임과 독립적인 공통 코인 표시 영역을 연결합니다.")]
+    [SerializeField] private RectTransform _desktopRoot;
     [SerializeField] private RectTransform _background;
     [SerializeField] private PhysicsMaterial2D _collisionMaterial;
     private RectTransform _canvasRoot;
@@ -152,12 +154,12 @@ public sealed class MonitorCoinRain : MonoBehaviour
     }
 
     /// <summary>
-    /// _screenView의 RectTransform 아래에 코인 표시용 UI 루트를 생성한다.
+    /// _desktopRoot 또는 기존 _screenView의 RectTransform 아래에 코인 표시용 UI 루트를 생성한다.
     /// 중앙 앵커와 기본 배율을 설정하고 마지막 자식으로 배치해 기존 화면 위에 코인을 표시한다.
     /// </summary>
     private void CreatePoolRoot()
     {
-        _canvasRoot = _screenView.GetComponent<RectTransform>();
+        _canvasRoot = _desktopRoot != null ? _desktopRoot : _screenView.GetComponent<RectTransform>();
         _poolRoot = new GameObject("MonitorCoinPool", typeof(RectTransform)).GetComponent<RectTransform>();
         _poolRoot.SetParent(_canvasRoot, false);
         _poolRoot.gameObject.layer = _canvasRoot.gameObject.layer;
@@ -310,7 +312,7 @@ public sealed class MonitorCoinRain : MonoBehaviour
     }
 
     /// <summary>
-    /// balance의 증가분을 활성 미니게임 캔버스 안에서 코인으로 표시한다.
+    /// balance의 증가분을 활성 모니터 공통 표시 영역 안에서 코인으로 표시한다.
     /// 증가분을 int로 변환해 단위별 대기열에 추가하며 감소한 잔액은 연출하지 않는다.
     /// </summary>
     private void HandleBalanceChanged(long balance)
@@ -357,7 +359,7 @@ public sealed class MonitorCoinRain : MonoBehaviour
     }
 
     /// <summary>
-    /// 미니게임 캔버스의 최상단 랜덤 가로 위치에서 다음 코인을 수직으로 낙하시킨다.
+    /// 모니터 공통 표시 영역의 최상단 랜덤 가로 위치에서 다음 코인을 수직으로 낙하시킨다.
     /// type의 풀에서 빈 코인을 찾아 초기화하며 생성하면 true, 풀이 모두 사용 중이면 false를 반환한다.
     /// </summary>
     private bool PlayCoin(int type)

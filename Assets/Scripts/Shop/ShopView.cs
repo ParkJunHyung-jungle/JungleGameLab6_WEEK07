@@ -21,6 +21,8 @@ namespace Game.Shop
         [SerializeField] private Text _balanceText;
         [SerializeField] private Text _toggleText;
         [SerializeField] private Button _toggleButton;
+        [Tooltip("바탕화면 팝업에서는 버튼을 닫기 전용으로 사용합니다.")]
+        [SerializeField] private bool _useWindowCloseButton;
 
         [Header("Input")]
         private bool _isInputEnabled = true;
@@ -49,7 +51,7 @@ namespace Game.Shop
 
             _gameSession.Wallet.BalanceChanged += OnBalanceChanged;
             _gameSession.Upgrades.LevelChanged += OnLevelChanged;
-            _toggleButton.onClick.AddListener(Toggle);
+            _toggleButton.onClick.AddListener(OnWindowButtonClicked);
             OnBalanceChanged(_gameSession.Wallet.Balance);
             SetOpen(IsOpen);
         }
@@ -58,7 +60,7 @@ namespace Game.Shop
         {
             _gameSession.Wallet.BalanceChanged -= OnBalanceChanged;
             _gameSession.Upgrades.LevelChanged -= OnLevelChanged;
-            _toggleButton.onClick.RemoveListener(Toggle);
+            _toggleButton.onClick.RemoveListener(OnWindowButtonClicked);
 
             for (int i = 0; i < _items.Count; i++)
             {
@@ -87,13 +89,14 @@ namespace Game.Shop
         {
             bool wasOpen = IsOpen;
 
-            if (isOpen && !wasOpen && _interactionController != null && !_interactionController.CanEnterShop)
+            if (isOpen && ((_useWindowCloseButton && !_isInputEnabled)
+                || (_interactionController != null && !_interactionController.CanEnterShop)))
             {
                 return;
             }
 
             _shopPanel.SetActive(isOpen);
-            _toggleText.text = isOpen ? "Close [Tab]" : "Shop [Tab]";
+            _toggleText.text = _useWindowCloseButton ? "X" : isOpen ? "Close [Tab]" : "Shop [Tab]";
 
             if (isOpen)
             {
@@ -107,8 +110,8 @@ namespace Game.Shop
         }
 
         /// <summary>
-        /// isEnabled를 사용하여 상점 전환 요청과 열기 및 닫기 버튼의 사용 여부를 설정한다.
-        /// 입력 허용 상태와 버튼 상태를 변경하여 연출 중에는 Toggle 요청을 차단한다.
+        /// isEnabled로 상점 열기, 구매와 창 버튼 입력 허용 여부를 설정한다.
+        /// 입력 상태와 버튼 상태를 변경하여 모니터 조작 종료 및 연출 중의 요청을 차단한다.
         /// </summary>
         public void SetInputEnabled(bool isEnabled)
         {
@@ -141,7 +144,22 @@ namespace Game.Shop
         /// </summary>
         private void OnPurchaseRequested(UpgradeId id)
         {
-            _gameSession.Upgrades.TryPurchase(id);
+            if (_isInputEnabled && IsOpen)
+                _gameSession.Upgrades.TryPurchase(id);
+        }
+
+        /// <summary>
+        /// 창 버튼의 클릭을 받아 입력이 허용된 상점의 표시 상태를 변경한다.
+        /// 팝업에서는 닫기만 수행하고 기존 전용 씬에서는 Toggle 동작을 유지한다.
+        /// </summary>
+        private void OnWindowButtonClicked()
+        {
+            if (!_isInputEnabled)
+                return;
+            if (_useWindowCloseButton)
+                SetOpen(false);
+            else
+                Toggle();
         }
 
         /// <summary>

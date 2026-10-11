@@ -22,14 +22,14 @@ namespace KeyboardModeling
         [SerializeField] private Text _idleDetails;
 
         [Header("Hacking")]
-        [SerializeField] private Image _hackingFill;
+        [SerializeField] private Slider _hackingFill;
         [SerializeField] private Text _hackingPercent;
         [SerializeField] private Text _commandLog;
 
         [Header("Target Key Mash")]
         [FormerlySerializedAs("_targetWord")]
         [SerializeField] private Text _targetKey;
-        [SerializeField] private Image _keyMashFill;
+        [SerializeField] private Slider _keyMashFill;
         [SerializeField] private Text _keyMashPercent;
         [SerializeField, Min(0.01f)] private float _pulseDuration = 0.16f;
         private Vector3 _targetKeyRestScale;
@@ -150,11 +150,11 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 해킹 진행도 막대를 갱신한다.
-        /// controller의 HackingProgress를 사용하여 _hackingFill의 채움량을 변경한다.
+        /// controller의 HackingProgress를 사용하여 _hackingFill 슬라이더의 값을 변경한다.
         /// </summary>
         private void RefreshHackingFill()
         {
-            _hackingFill.fillAmount = _controller.HackingProgress;
+            _hackingFill.value = _controller.HackingProgress;
         }
 
         /// <summary>
@@ -182,7 +182,7 @@ namespace KeyboardModeling
         private void RefreshKeyMashProgress()
         {
             _targetKey.text = _controller.TargetKeyLabel;
-            _keyMashFill.fillAmount = _controller.KeyMashProgress;
+            _keyMashFill.value = _controller.KeyMashProgress;
             _keyMashPercent.text = $"CHARGE / {_controller.KeyMashProgress * 100f:0}%";
         }
 

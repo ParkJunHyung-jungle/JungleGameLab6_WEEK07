@@ -212,6 +212,7 @@ MonoBehaviour:
   _keyboardFragmentsPrefab: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
   _controller: {fileID: 0}
   _shopView: {fileID: 641087396}
+  _monitorController: {fileID: 1068726019}
 --- !u!114 &27118946
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -914,10 +915,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 350501781}
     m_Modifications:
+    - target: {fileID: 495590650872988902, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: monitorCam
       value: 
       objectReference: {fileID: 1097689383}
+    - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: _interactionController
+      value: 
+      objectReference: {fileID: 27118945}
     - target: {fileID: 3053216567958757778, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: m_Name
       value: Monitor_16x9_ScaleUp
@@ -974,6 +983,14 @@ PrefabInstance:
       propertyPath: _interactionController
       value: 
       objectReference: {fileID: 27118945}
+    - target: {fileID: 6155192021724201980, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7372345893925918935, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7425521347323571261, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: _interactionController
       value: 
@@ -1018,11 +1035,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cbbb187652d1c4844bceb0b976dde3c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Shop.ShopView
---- !u!224 &641087397 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 8163749001187560232, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
-  m_PrefabInstance: {fileID: 641087393}
-  m_PrefabAsset: {fileID: 0}
 --- !u!114 &641087398 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4990798316346721103, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
@@ -1492,6 +1504,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 30, y: 0, z: 0}
+--- !u!224 &1025523605 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 4795096436245149845, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+  m_PrefabInstance: {fileID: 641087393}
+  m_PrefabAsset: {fileID: 0}
 --- !u!114 &1068726015 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5098958360283032277, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
@@ -1503,6 +1520,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 320dfc8c5016fb149a29786bc2bd5d3b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Economy.KeyboardRewardController
+--- !u!114 &1068726019 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+  m_PrefabInstance: {fileID: 641087393}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d26aab0785cea3438280e875d161d52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonitorController
 --- !u!1 &1097689382
 GameObject:
   m_ObjectHideFlags: 0
@@ -1546,7 +1574,7 @@ MonoBehaviour:
   Lens:
     FieldOfView: 50
     OrthographicSize: 5
-    NearClipPlane: 0.3
+    NearClipPlane: 2.0637376
     FarClipPlane: 1000
     Dutch: 0
     ModeOverride: 0
@@ -1571,13 +1599,18 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1097689382}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.052335896, y: 0, z: 0, w: 0.9986295}
-  m_LocalPosition: {x: 0, y: 1.25, z: -0.2}
+  m_LocalRotation: {x: 0.05233596, y: -0, z: -0, w: 0.9986295}
+  m_LocalPosition: {x: 0, y: 1.1185524, z: -0.10723066}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 6, y: 0, z: 0}
+--- !u!224 &1098165841 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 4648537258720617103, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+  m_PrefabInstance: {fileID: 641087393}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1162827442
 GameObject:
   m_ObjectHideFlags: 0
@@ -1825,7 +1858,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MonitorCoinRain
   _gameSession: {fileID: 641087395}
   _screenView: {fileID: 641087398}
-  _background: {fileID: 641087397}
+  _desktopRoot: {fileID: 1098165841}
+  _background: {fileID: 1025523605}
+  _collisionMaterial: {fileID: 6200000, guid: 3a1f771065c04b1b9485f2dde8d8d568, type: 2}
   _goldPrefab: {fileID: 6984344256650909965, guid: 6bb43625029d65442b254948407d438b, type: 3}
   _goldAnimation: {fileID: 7400000, guid: 2e18ef22c867ab94a90a35441523b96d, type: 2}
   _silverPrefab: {fileID: 6984344256650909965, guid: d258878d28894346adb8af5b68dc8bfa, type: 3}
@@ -1834,7 +1869,6 @@ MonoBehaviour:
   _ironAnimation: {fileID: 7400000, guid: 0b4b13a1a8d54ed6b0f6c5500384c869, type: 2}
   _copperPrefab: {fileID: 6984344256650909965, guid: be943159f4fa4f7d83a961d0b3417963, type: 3}
   _copperAnimation: {fileID: 7400000, guid: 5db05c55612946ee8196e07561a90482, type: 2}
-  _collisionMaterial: {fileID: 6200000, guid: 3a1f771065c04b1b9485f2dde8d8d568, type: 2}
   _effectEnabled: 1
   _poolSize: 24
   _spawnInterval: 0.1

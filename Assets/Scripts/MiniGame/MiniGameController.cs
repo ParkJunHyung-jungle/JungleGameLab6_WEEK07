@@ -20,6 +20,8 @@ namespace KeyboardModeling
         [SerializeField] private KeyboardInputController _keyboard;
         [SerializeField, Min(0.1f)] private float _eventInterval = 15f;
         [SerializeField] private FeverController _feverController;
+        [Tooltip("바탕화면을 사용하는 씬의 타이머와 상점 예외 정책을 연결합니다.")]
+        [SerializeField] private MonitorController _monitorController;
         private MiniGameKind _currentGame;
         private float _nextEventRemaining;
         private bool CanProcessInput => isActiveAndEnabled && _keyboard != null && _keyboard.InputEnabled && _keyboard.isActiveAndEnabled;
@@ -29,7 +31,10 @@ namespace KeyboardModeling
         public bool IsSuspended => _currentGame != MiniGameKind.Idle && IsProgressPaused;
         public bool InputAvailable => CanProcessInput;
         public bool HasKeyboard => _keyboard != null;
-        public bool IsEventTimerPaused => IsProgressPaused;
+        public bool IsEventTimerPaused => _monitorController != null
+            ? !_monitorController.CanAdvanceEventTimer || Time.timeScale == 0f
+                || (_feverController != null && _feverController.IsFeverActive)
+            : IsProgressPaused;
         public event Action StateChanged;
         public event Action Completed;
 
@@ -125,25 +130,24 @@ namespace KeyboardModeling
 
         void Update()
         {
-            if (IsProgressPaused)
-            {
-                return;
-            }
-
             if (_currentGame == MiniGameKind.Idle)
             {
+                if (IsEventTimerPaused)
+                    return;
                 _nextEventRemaining = Mathf.Max(0f, _nextEventRemaining - Time.deltaTime);
 
                 if (_nextEventRemaining == 0f)
                 {
+                    if (_monitorController != null)
+                        _monitorController.PrepareMiniGame();
                     BeginMiniGame();
                 }
             }
-            else if (_currentGame == MiniGameKind.Hacking)
+            else if (!IsProgressPaused && _currentGame == MiniGameKind.Hacking)
             {
                 _hackingProgress = Mathf.Max(0f, _hackingProgress - _progressDecayPerSecond * Time.deltaTime);
             }
-            else if (_currentGame == MiniGameKind.KeyMash)
+            else if (!IsProgressPaused && _currentGame == MiniGameKind.KeyMash)
             {
                 UpdateKeyMashProgress(Time.deltaTime);
             }

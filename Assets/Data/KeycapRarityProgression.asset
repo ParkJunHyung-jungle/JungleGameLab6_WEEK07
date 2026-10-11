@@ -31,20 +31,34 @@ MonoBehaviour:
     _distribution:
       _weights:
       - 0
-      - 100
-      - 0
+      - 80
+      - 20
       - 0
   - _requiredCompletedKeyboards: 12
     _distribution:
       _weights:
       - 0
-      - 50
-      - 50
-      - 2
+      - 20
+      - 80
+      - 0
   - _requiredCompletedKeyboards: 16
     _distribution:
       _weights:
+      - 0
+      - 0
+      - 90
+      - 10
+  - _requiredCompletedKeyboards: 20
+    _distribution:
+      _weights:
+      - 0
+      - 0
       - 50
-      - 30
-      - 15
-      - 5
+      - 50
+  - _requiredCompletedKeyboards: 24
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 100

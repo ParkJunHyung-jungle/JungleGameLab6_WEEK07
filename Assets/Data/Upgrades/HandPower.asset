@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 8
   _displayName: Hand Upgrade
-  _description: Damage upgrades with Fist promotion at Lv 6 and Hammer promotion
-    at Lv 11.
+  _description: Hand damage upgrades before Lv 6. Fist promotion unlocks a separate
+    bonus strike with an upgrade chance capped at 30%.
   _levelCosts: 6400000000000000c8000000000000002c010000000000009001000000000000f401000000000000e803000000000000bc0200000000000020030000000000008403000000000000e803000000000000d007000000000000b00400000000000014050000000000007805000000000000dc05000000000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
@@ -26,6 +26,9 @@ MonoBehaviour:
   - Hammer Upgrade
   _handFirstPromotionRadius: 1.5
   _handRadiusPerPromotion: 1
+  _fistBaseDamage: 5
+  _fistDamagePerLevel: 1
+  _fistChancePerLevel: 0.06
   _damageBonuses: 010000000200000003000000
   _autoAttackDamages: 010000000200000003000000
   _autoAttackSpeeds:

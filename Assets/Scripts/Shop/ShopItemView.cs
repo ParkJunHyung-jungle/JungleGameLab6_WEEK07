@@ -68,11 +68,15 @@ namespace Game.Shop
             if (_definition.Id == UpgradeId.HandPower)
             {
                 _levelText.text = $"Lv {_definition.GetHandStageLevel(level)}/{_definition.GetHandStageMaxLevel(level)}";
-                _nameText.text = $"{_definition.GetHandName(level)}\nDamage +{_definition.GetHandDamageBonus(level)}";
+                _nameText.text = $"{_definition.GetHandName(level)}\nHand +{_definition.GetHandDamageBonus(level)}";
+                if (_definition.GetFistDamage(level) > 0)
+                    _nameText.text += $" | Fist {_definition.GetFistDamage(level)} ({_definition.GetFistChance(level):P0})";
                 if (!isMaxLevel)
                 {
                     if (_definition.IsHandPromotion(level + 1))
                         _buttonText.text = "Promote";
+                    if (_definition.GetFistDamage(level + 1) > 0)
+                        _nameText.text += $"\nNext: Fist {_definition.GetFistDamage(level + 1)} ({_definition.GetFistChance(level + 1):P0})";
                     else
                         _nameText.text += $" -> +{_definition.GetHandDamageBonus(level + 1)}";
                 }

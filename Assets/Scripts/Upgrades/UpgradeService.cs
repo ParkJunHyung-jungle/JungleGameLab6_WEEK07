@@ -50,14 +50,34 @@ namespace Game.Upgrades
         }
 
         /// <summary>
-        /// 현재 SmashDamage 레벨과 강화 데이터로 최종 피해를 조회한다.
-        /// 계산한 추가 피해를 반환하며 강화 레벨과 지갑 상태는 변경하지 않는다.
+        /// 현재 손 강화 또는 기존 SmashDamage 레벨로 기본 손 공격의 추가 피해를 조회한다.
+        /// 주먹 피해를 제외한 보너스를 반환하며 강화 레벨과 지갑 상태는 변경하지 않는다.
         /// </summary>
         public int GetDamageBonus()
         {
             if (_definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand))
                 return hand.GetHandDamageBonus(GetLevel(UpgradeId.HandPower));
             return _definitions[UpgradeId.SmashDamage].GetDamageBonus(_levels[UpgradeId.SmashDamage]);
+        }
+
+        /// <summary>
+        /// HandPower 정의와 구매 레벨로 주먹 추가 타격 확률을 조회한다.
+        /// 미등록 또는 주먹 승급 전에는 0을 반환하며 최대 확률은 30%이다.
+        /// </summary>
+        public float GetFistChance()
+        {
+            return _definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand)
+                ? hand.GetFistChance(GetLevel(UpgradeId.HandPower)) : 0f;
+        }
+
+        /// <summary>
+        /// HandPower 정의와 구매 레벨로 기본 손 피해와 분리된 주먹 추가 피해를 조회한다.
+        /// 미등록 또는 주먹 승급 전에는 0을 반환하며 구매 상태는 변경하지 않는다.
+        /// </summary>
+        public int GetFistDamage()
+        {
+            return _definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand)
+                ? hand.GetFistDamage(GetLevel(UpgradeId.HandPower)) : 0;
         }
 
         /// <summary>

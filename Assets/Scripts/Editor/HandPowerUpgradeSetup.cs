@@ -28,7 +28,7 @@ public static class HandPowerUpgradeSetup
             SerializedObject settings = new SerializedObject(hand);
             settings.FindProperty("_id").intValue = (int)UpgradeId.HandPower;
             settings.FindProperty("_displayName").stringValue = "Hand Upgrade";
-            settings.FindProperty("_description").stringValue = "Damage upgrades with Fist promotion at Lv 6 and Hammer promotion at Lv 11.";
+            settings.FindProperty("_description").stringValue = "Hand damage upgrades before Lv 6. Fist promotion unlocks a separate bonus strike with an upgrade chance capped at 30%.";
             SerializedProperty costs = settings.FindProperty("_levelCosts");
             costs.arraySize = 15;
             for (int index = 0; index < 15; index++)

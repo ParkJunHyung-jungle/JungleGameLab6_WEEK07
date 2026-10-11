@@ -28,7 +28,6 @@ namespace KeyboardModeling
 
         [Header("Attack")]
         [SerializeField, Min(1)] private int _baseDamage = 1;
-        [SerializeField, Min(0)] private int _baseAreaDamage = 1;
 
         void OnEnable()
         {
@@ -94,8 +93,8 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// health의 위치를 중심으로 같은 키보드 반경 안의 살아 있는 키캡을 한 번씩 타격한다.
-        /// 공격 시작 시의 피버 배율로 피해를 계산하며 살아 있는 중심에만 직접 피해와 충전을 적용하고 깨진 중심도 광역 피해를 발생시킨다.
+        /// health에 기본 손 피해를 즉시 적용하고 강화 확률로 주먹 추가 타격을 예약한다.
+        /// 입력 시의 손·주먹 피해와 피버 배율을 사용하며 주먹의 직접·범위 피해는 충돌 순간에 적용한다.
         /// </summary>
         private void OnAttackRequested(KeycapHealth health)
         {
@@ -108,7 +107,6 @@ namespace KeyboardModeling
             }
 
             KeycapHealth[] keycaps = _keycaps;
-            Vector2[] positions = _keycapPositions;
             int targetIndex = Array.IndexOf(keycaps, health);
             if (targetIndex < 0)
             {
@@ -118,22 +116,43 @@ namespace KeyboardModeling
             int damageBonus = _gameSession != null
                 ? _gameSession.Upgrades.GetDamageBonus()
                 : 0;
-            int areaDamageBonus = _gameSession != null
-                ? _gameSession.Upgrades.GetAreaDamageBonus()
-                : 0;
             float radius = _gameSession != null
                 ? _gameSession.Upgrades.GetAreaRadius()
                 : 0f;
+            float fistChance = _gameSession != null ? _gameSession.Upgrades.GetFistChance() : 0f;
+            int fistBaseDamage = _gameSession != null ? _gameSession.Upgrades.GetFistDamage() : 0;
             float multiplier = _feverController != null
                 ? _feverController.DamageMultiplier
                 : 1f;
             int damage = Mathf.CeilToInt((_baseDamage + damageBonus) * multiplier);
-            int areaDamage = Mathf.CeilToInt((_baseAreaDamage + areaDamageBonus) * multiplier);
+            int fistDamage = Mathf.CeilToInt(fistBaseDamage * multiplier);
+            ApplyManualAttack(keyboard, destruction, health, damage, 0, 0f, true);
+
+            if (destruction == null || destruction.IsBroken || fistDamage <= 0 || fistChance <= 0f) return;
+            if (UnityEngine.Random.value < fistChance)
+                destruction.PlayKeycapStrike(health.transform, () => ApplyManualAttack(keyboard, destruction, health, fistDamage, fistDamage, radius, false));
+        }
+
+        /// <summary>
+        /// health에 damage를 적용하고 radius 안의 주변 키캡에 areaDamage를 적용한다.
+        /// keyboard와 destruction으로 유효 대상을 확인하며 chargeFever가 true인 기본 손 타격만 피버를 충전한다.
+        /// </summary>
+        private void ApplyManualAttack(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth health, int damage, int areaDamage, float radius, bool chargeFever)
+        {
+            if (keyboard == null || health == null || keyboard != _activeKeyboard
+                || !keyboard.InputEnabled || !keyboard.isActiveAndEnabled
+                || (destruction != null && destruction.IsBroken)) return;
+
+            KeycapHealth[] keycaps = _keycaps;
+            Vector2[] positions = _keycapPositions;
+            int targetIndex = Array.IndexOf(keycaps, health);
+            if (targetIndex < 0) return;
             Vector2 center = positions[targetIndex];
+            keyboard.NotifyManualKeycapHit(health.transform);
 
             if (health.CurrentHP > 0)
             {
-                _directHitTarget = health;
+                _directHitTarget = chargeFever ? health : null;
                 try
                 {
                     health.TakeDamage(damage);

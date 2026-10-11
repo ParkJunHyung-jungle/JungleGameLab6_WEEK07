@@ -79,6 +79,25 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     [Header("Keyboard destruction")]
     [SerializeField] private GameObject _keyboardFragmentsPrefab;
+    [SerializeField] private Sprite _destructionFistSprite;
+    public Sprite DestructionFistSprite => _destructionFistSprite;
+
+    [Header("Fist Animation")]
+    [Tooltip("주먹 이미지의 전체 높이입니다. 값을 키우면 주먹이 커집니다.")]
+    [SerializeField, Min(0.01f)] private float _fistHeight = 0.9f;
+    [Tooltip("키보드 접촉 위치에서 주먹을 들어 올리는 거리입니다.")]
+    [SerializeField, Min(0f)] private float _fistLift = 0.8f;
+    [InspectorName("Fist Impact Offset")]
+    [Tooltip("누른 키의 윗면에서의 이동량입니다. 0이면 해당 키를 정확히 타격합니다. 키보드 로컬 좌표 기준으로 X는 좌우, Y는 높이, Z는 앞뒤를 조절합니다.")]
+    [SerializeField] private Vector3 _keycapFistImpactOffset = Vector3.zero;
+    [Tooltip("주먹이 서서히 나타나는 시간입니다. 단위는 초입니다.")]
+    [SerializeField, Min(0.01f)] private float _appearDuration = 0.22f;
+    [Tooltip("주먹이 키보드까지 내려치는 시간입니다. 줄이면 더 빠르게 내려칩니다.")]
+    [SerializeField, Min(0.01f)] private float _strikeDuration = 0.16f;
+    [InspectorName("Impact Hold Duration")]
+    [Tooltip("타격 위치에서 주먹을 유지하는 시간입니다. 시간이 지나면 이동이나 페이드 없이 즉시 사라집니다. 단위는 초입니다.")]
+    [SerializeField, Min(0.01f)] private float _retreatDuration = 0.25f;
+
     [Header("monitor")]
     [SerializeField] private MiniGameController _controller;
     public bool IsMiniGameRunning => _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
@@ -98,6 +117,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void Awake()
     {
+#if UNITY_EDITOR
+        if (_destructionFistSprite == null)
+            _destructionFistSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Fist.png");
+#endif
         _gameSession = FindAnyObjectByType<GameSession>();
         _rewardController = FindAnyObjectByType<KeyboardRewardController>();
         _controller = FindAnyObjectByType<MiniGameController>();
@@ -271,9 +294,18 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (isPlayable)
         {
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
-            destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state));
+            destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
         }
         return state;
+    }
+
+    /// <summary>
+    /// Inspector에 설정한 주먹 크기, 등장 높이, 최종 타격 위치 보정값과 각 동작 시간을 destruction에 전달한다.
+    /// 일반 키보드와 자동 작업대 키보드의 파괴 연출 설정을 동일하게 변경한다.
+    /// </summary>
+    public void ConfigureFistAnimation(KeyboardDestruction destruction)
+    {
+        destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset);
     }
 
     /// <summary>

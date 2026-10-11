@@ -13,7 +13,7 @@ namespace Game.Shop
         [SerializeField] private Text _rewardText;
 
         [Header("Demo Reward")]
-        [SerializeField, Min(1)] private long _rewardAmount = 100;
+        [SerializeField, Min(1)] private long _rewardAmount = 10000;
 
         void Start()
         {

@@ -3238,7 +3238,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: +100
+  m_Text: +10,000
 --- !u!222 &1576151123
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -3775,7 +3775,7 @@ MonoBehaviour:
   _gameSession: {fileID: 889883016}
   _rewardButton: {fileID: 1814563032}
   _rewardText: {fileID: 1576151122}
-  _rewardAmount: 100
+  _rewardAmount: 10000
 --- !u!224 &1854336950
 RectTransform:
   m_ObjectHideFlags: 0

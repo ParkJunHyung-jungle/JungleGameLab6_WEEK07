@@ -48,6 +48,10 @@ namespace Game.Editor
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_handStageNames"), true);
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_handFirstPromotionRadius"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_handRadiusPerPromotion"));
+                    EditorGUILayout.HelpBox("기본 손 피해는 주먹 승급 전까지만 증가합니다. 주먹은 별도 추가 피해이며 발동 확률은 최대 30%입니다.", MessageType.Info);
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_fistBaseDamage"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_fistDamagePerLevel"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_fistChancePerLevel"));
                     break;
                 case UpgradeId.LuckyReward:
                     EditorGUILayout.HelpBox("확률은 레벨마다 누적됩니다. 0.1이면 1레벨 10%, 2레벨 20%입니다. Level Costs에 가격을 추가하면 구매 레벨이 늘어납니다.", MessageType.Info);

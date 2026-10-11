@@ -210,6 +210,7 @@ MonoBehaviour:
   _rewardController: {fileID: 0}
   _raritySettings: {fileID: 11400000, guid: b0111cb3a889f40449fb9a61f694451f, type: 2}
   _keyboardFragmentsPrefab: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
+  _destructionFistSprite: {fileID: 21300000, guid: 04e0a1508ba5bf24c856967e39bf1e6d, type: 3}
   _controller: {fileID: 0}
   _shopView: {fileID: 641087396}
   _monitorController: {fileID: 1068726019}

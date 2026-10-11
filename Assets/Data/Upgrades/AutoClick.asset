@@ -16,8 +16,17 @@ MonoBehaviour:
   _displayName: Auto Click
   _description: Increase the auto click upgrade level.
   _levelCosts: c800000000000000900100000000000058020000000000002003000000000000e803000000000000d00700000000000098080000000000006009000000000000280a000000000000f00a000000000000
+  _doubleRewardChance: 0.1
+  _handDamagePerLevel: 1
+  _handPromotionLevels: 060000000b000000
+  _handStageNames:
+  - Hand Upgrade
+  - Fist Upgrade
+  - Hammer Upgrade
+  _handFirstPromotionRadius: 1.5
+  _handRadiusPerPromotion: 1
   _damageBonuses: 010000000200000003000000
-  _autoAttackDamages: 01000000020000000300000004000000050000000500000006000000070000000800000009000000
+  _autoAttackDamages: 030000000500000007000000090000000c0000000f0000001200000015000000180000001b000000
   _autoAttackSpeeds:
   - 1
   - 2

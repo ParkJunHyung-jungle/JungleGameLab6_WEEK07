@@ -1,12 +1,16 @@
-using KeyboardModeling;
 using System;
+
 using UnityEngine;
+
+using KeyboardModeling;
 
 namespace Game.Upgrades
 {
     [CreateAssetMenu(fileName = "Upgrade", menuName = "Game/Upgrade Definition")]
     public sealed class UpgradeDefinition : ScriptableObject
     {
+        private const float MAX_FIST_CHANCE = 0.3f;
+
         [Header("Identity")]
         [SerializeField] private UpgradeId _id;
         [SerializeField] private string _displayName;
@@ -21,7 +25,7 @@ namespace Game.Upgrades
         [SerializeField, Range(0f, 1f)] private float _doubleRewardChance = 0.1f;
 
         [Header("Hand Power")]
-        [Tooltip("일반 강화 한 번마다 직접·범위 공격에 더하는 피해입니다. 승급 단계에서는 추가하지 않습니다.")]
+        [Tooltip("주먹 승급 전 손 강화 한 번마다 기본 손 공격에 더하는 피해입니다.")]
         [SerializeField, Min(0)] private int _handDamagePerLevel = 1;
         [Tooltip("범위 증가와 이름 변경이 발생하는 구매 레벨입니다.")]
         [SerializeField, Min(1)] private int[] _handPromotionLevels = { 6, 11 };
@@ -30,6 +34,14 @@ namespace Game.Upgrades
         [Tooltip("첫 승급의 반경입니다. 기존 범위 공격의 기본 반경 1.5를 사용합니다.")]
         [SerializeField, Min(0f)] private float _handFirstPromotionRadius = 1.5f;
         [SerializeField, Min(0f)] private float _handRadiusPerPromotion = 1f;
+
+        [Header("Fist Bonus Attack")]
+        [Tooltip("주먹 승급 시 해금되는 추가 타격의 기본 피해입니다. 기본 손 피해와 별개입니다.")]
+        [SerializeField, Min(1)] private int _fistBaseDamage = 5;
+        [Tooltip("주먹 승급 이후 일반 강화 한 번마다 주먹 피해에 더하는 값입니다.")]
+        [SerializeField, Min(0)] private int _fistDamagePerLevel = 1;
+        [Tooltip("주먹 승급부터 단계마다 더하는 발동 확률입니다. 0.06이면 6%, 12%, 18%, 24%, 30%이며 최대 30%입니다.")]
+        [SerializeField, Range(0f, 0.3f)] private float _fistChancePerLevel = 0.06f;
 
         [Header("Damage")]
         [Tooltip("직접·광역·자동 공격력 강화의 각 레벨에서 기본 공격력에 더하는 누적 추가 피해입니다. Element 0은 1레벨입니다.")]
@@ -194,12 +206,35 @@ namespace Game.Upgrades
         }
 
         /// <summary>
-        /// level의 일반 강화 횟수에 따른 누적 추가 피해를 반환한다.
-        /// 승급 횟수를 제외하고 레벨당 피해 증가량을 곱해 직접·범위 공격 보너스를 계산한다.
+        /// level에서 주먹 승급 전까지 구매한 손 강화의 추가 피해를 반환한다.
+        /// 첫 승급 레벨과 레벨당 피해 증가량을 사용하며 주먹 강화는 기본 손 피해에 포함하지 않는다.
         /// </summary>
         public int GetHandDamageBonus(int level)
         {
-            return Mathf.Max(0, level - GetHandPromotionCount(level)) * _handDamagePerLevel;
+            int handLevel = _handPromotionLevels.Length > 0 ? Mathf.Min(level, _handPromotionLevels[0] - 1) : level;
+            return Mathf.Max(0, handLevel) * _handDamagePerLevel;
+        }
+
+        /// <summary>
+        /// level과 첫 주먹 승급 레벨로 추가 타격 발동 확률을 계산한다.
+        /// 승급 전에는 0을 반환하고 승급부터 레벨당 확률을 더하되 최대 30%로 제한한다.
+        /// </summary>
+        public float GetFistChance(int level)
+        {
+            if (_handPromotionLevels.Length == 0 || level < _handPromotionLevels[0]) return 0f;
+            int fistLevel = level - _handPromotionLevels[0] + 1;
+            return Mathf.Clamp(fistLevel * _fistChancePerLevel, 0f, MAX_FIST_CHANCE);
+        }
+
+        /// <summary>
+        /// level의 주먹 추가 타격 피해를 기본 피해와 일반 강화 증가량으로 계산한다.
+        /// 주먹 승급 전에는 0을 반환하고 이후 승급 구매는 피해 증가 횟수에서 제외한다.
+        /// </summary>
+        public int GetFistDamage(int level)
+        {
+            if (_handPromotionLevels.Length == 0 || level < _handPromotionLevels[0]) return 0;
+            int upgrades = Mathf.Max(0, level - _handPromotionLevels[0] - (GetHandPromotionCount(level) - 1));
+            return _fistBaseDamage + upgrades * _fistDamagePerLevel;
         }
 
         /// <summary>

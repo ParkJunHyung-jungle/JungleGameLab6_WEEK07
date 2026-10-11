@@ -20,7 +20,7 @@ using UnityEditor;
 [RequireComponent(typeof(BoxCollider))]
 public sealed class KeyboardInteractionController : MonoBehaviour
 {
-    private const int SPAWN_REGION_COUNT = 3;
+    private const int SPAWN_REGION_COUNT = 1;
     private const int REGION_REFILL_THROW_COUNT = 3;
 
     public enum KeyboardGuideState { Hidden, Pickup, Placement }
@@ -64,18 +64,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [Header("Spawn")]
     [SerializeField] private GameObject _keyboardPrefab;
     [SerializeField] private GameObject _inGameKeyBoardPrefab;
-    [FormerlySerializedAs("_front"), InspectorName("첫 번째 구역")]
+    [FormerlySerializedAs("_front"), InspectorName("천장 생성 구역")]
     [SerializeField] private BoxCollider _firstRegion;
-    [FormerlySerializedAs("_left"), InspectorName("두 번째 구역")]
-    [SerializeField] private BoxCollider _secondRegion;
-    [FormerlySerializedAs("_right"), InspectorName("세 번째 구역")]
-    [SerializeField] private BoxCollider _thirdRegion;
-    [FormerlySerializedAs("_frontCount"), InspectorName("첫 번째 생성 개수")]
+    [FormerlySerializedAs("_frontCount"), InspectorName("생성 개수")]
     [SerializeField, Min(0)] private int _firstRegionCount = 20;
-    [FormerlySerializedAs("_leftCount"), InspectorName("두 번째 생성 개수")]
-    [SerializeField, Min(0)] private int _secondRegionCount = 20;
-    [FormerlySerializedAs("_rightCount"), InspectorName("세 번째 생성 개수")]
-    [SerializeField, Min(0)] private int _thirdRegionCount = 20;
     [Tooltip("첫 번째 구역이 비었을 때만 세 번 방문하여 키보드를 던지는 연출입니다.")]
     [SerializeField] private BackgroundKeyboardThrowVisit _regionThrowVisit;
     private Transform _spawnRoot;
@@ -83,6 +75,11 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private int[] _pendingRegionThrows;
     private bool[] _regionWasPopulated;
     private bool[] _regionRefillTriggered;
+
+    [Header("Opening")]
+    [SerializeField] private bool _startWithSingleKeyboard;
+    [SerializeField] private Transform _openingCeiling;
+    private KeyboardState _openingKeyboard;
 
     [Header("Keycap Quality")]
     [SerializeField] private GameSession _gameSession;
@@ -164,10 +161,12 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         //_placedKeyboard = RegisterKeyboard(_referenceKeyboard.GetComponent<KeyboardInputController>());
         _placedKeyboard = null;
         _spawnRoot = new GameObject("SpawnedKeyboards").transform;
-        SpawnKeyboards(_firstRegion, _firstRegionCount, "FirstRegion", 0);
-        SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1);
-        SpawnKeyboards(_thirdRegion, _thirdRegionCount, "ThirdRegion", 2);
-        Debug.Log($"[Keyboard] Spawned {SpawnedKeyboardCount} keyboards.", this);
+        if (_startWithSingleKeyboard)
+        {
+            CreateOpeningKeyboard();
+            return;
+        }
+        SpawnSurroundingKeyboards();
     }
 
     void Update()
@@ -370,11 +369,55 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     {
         if (_placedKeyboard != state) return;
 
+        if (_openingKeyboard == state)
+        {
+            Vector3 position = _openingCeiling.localPosition;
+            position.x = 10f;
+            _openingCeiling.localPosition = position;
+            _openingKeyboard = null;
+            SpawnSurroundingKeyboards();
+        }
+
         _gameSession.CompleteKeyboard();
 
         if (IsSmashMode) OnExitSmashMode();
         _placedKeyboard = null;
         PlacedKeyboardChanged?.Invoke(null);
+    }
+
+    /// <summary>
+    /// 설정된 키보드 프리팹과 Pad 위치·회전으로 시작 키보드 하나를 준비한다.
+    /// 기존 품질·파괴 등록을 사용하고 배치 상태를 저장하여 SmashMode 입력을 활성화한다.
+    /// </summary>
+    private void CreateOpeningKeyboard()
+    {
+        GameObject sourceObject = Instantiate(_keyboardPrefab, _padPosition, _padRotation, _spawnRoot);
+        KeyboardState source = RegisterKeyboard(sourceObject);
+        _openingKeyboard = CreatePlayableKeyboard(source);
+        _placedKeyboard = _openingKeyboard;
+        _keyboards.Remove(source.Body);
+        sourceObject.SetActive(false);
+        Destroy(sourceObject);
+        Rigidbody body = _placedKeyboard.Body;
+        body.interpolation = RigidbodyInterpolation.None;
+        body.isKinematic = true;
+        body.useGravity = false;
+        body.position = _padPosition;
+        body.rotation = _padRotation;
+        _controller.SetKeyBoard(_placedKeyboard.Keyboard);
+        PlacedKeyboardChanged?.Invoke(_placedKeyboard.Keyboard);
+        SpawnedKeyboardCount = 1;
+        OnEnterSmashMode();
+    }
+
+    /// <summary>
+    /// 천장 구역과 생성 수 설정으로 떨어질 키보드를 생성한다.
+    /// 구역 등록과 SpawnedKeyboardCount를 갱신하여 이후 보충 연출에 연결한다.
+    /// </summary>
+    private void SpawnSurroundingKeyboards()
+    {
+        SpawnKeyboards(_firstRegion, _firstRegionCount, "CeilingRegion", 0);
+        Debug.Log($"[Keyboard] Spawned {SpawnedKeyboardCount} keyboards.", this);
     }
 
     /// <summary>area 안에서 count개를 임의 위치와 회전으로 생성하고 regionIndex 구역에 등록한다. 영역이 없으면 areaName을 알리고 생성을 건너뛴다.</summary>
@@ -395,7 +438,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 세 구역의 제거된 키보드를 목록에서 정리하고 첫 번째 구역이 비면 던지기를 세 번 요청한다.
+    /// 천장 구역의 제거된 키보드를 목록에서 정리하고 구역이 비면 던지기를 세 번 요청한다.
     /// 구역 목록과 발동 기록을 사용하며 구역당 한 번만 요청하고 던진 키보드가 제거되어도 재발동하지 않는다.
     /// </summary>
     private void RefreshSpawnRegions()
@@ -415,12 +458,12 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// regionIndex에 해당하는 첫 번째·두 번째·세 번째 구역 안의 임의 월드 위치를 반환한다.
+    /// regionIndex로 등록된 단일 천장 구역 안의 임의 월드 위치를 반환한다.
     /// 구역 중심과 크기를 사용하여 보충 키보드의 던지기 도착 위치를 정한다.
     /// </summary>
     public Vector3 GetRegionSpawnPosition(int regionIndex)
     {
-        BoxCollider area = regionIndex == 0 ? _firstRegion : regionIndex == 1 ? _secondRegion : _thirdRegion;
+        BoxCollider area = _firstRegion;
         Vector3 offset = new Vector3(Random.Range(-0.3f, 0.3f) * area.size.x, 0f, Random.Range(-0.3f, 0.3f) * area.size.z);
         return area.transform.TransformPoint(area.center + offset);
     }

@@ -75,9 +75,14 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private MiniGameController _controller;
     public bool IsMiniGameRunning => _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
     private bool IsKeyboardBreaking => _placedKeyboard != null && _placedKeyboard.Keyboard.GetComponent<KeyboardDestruction>().IsBroken;
-    public bool CanEnterShop => IsSmashMode && !IsMiniGameRunning && !IsKeyboardBreaking;
+    public bool CanEnterShop => (_monitorController != null ? _isShopFocused : IsSmashMode)
+        && !IsMiniGameRunning && !IsKeyboardBreaking;
+    public bool CanEnterMonitor => CanRunMiniGame && !IsMiniGameRunning;
+    public bool CanRunMiniGame => IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
     [Header("Shop Focus")]
     [SerializeField] private ShopView _shopView;
+    [Tooltip("바탕화면을 사용하는 씬에서는 상점 대신 모니터 조작 상태에 입력을 연결합니다.")]
+    [SerializeField] private MonitorController _monitorController;
     private bool _isShopFocused;
     private bool _resumeSmashInput;
     private KeyboardAutomaticStation _viewingAutomaticStation;
@@ -135,8 +140,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (_resumeSmashInput)
         {
             bool tabPressedOrHeld = Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.tabKey.isPressed);
+            bool mousePressedOrHeld = Mouse.current != null && Mouse.current.leftButton.isPressed;
 
-            if (tabPressedOrHeld)
+            if (tabPressedOrHeld || mousePressedOrHeld)
             {
                 return;
             }
@@ -184,8 +190,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void OnEnable()
     {
-        _shopView.OpenStateChanged += ApplyShopFocus;
-        ApplyShopFocus(_shopView.IsOpen);
+        if (_monitorController != null)
+        {
+            _monitorController.FocusChanged += ApplyShopFocus;
+            ApplyShopFocus(_monitorController.IsMonitorFocused);
+        }
+        else
+        {
+            _shopView.OpenStateChanged += ApplyShopFocus;
+            ApplyShopFocus(_shopView.IsOpen);
+        }
     }
 
     void OnDisable()
@@ -195,7 +209,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             _viewingAutomaticStation.SetViewActive(false);
             _viewingAutomaticStation = null;
         }
-        _shopView.OpenStateChanged -= ApplyShopFocus;
+        if (_monitorController != null)
+            _monitorController.FocusChanged -= ApplyShopFocus;
+        else
+            _shopView.OpenStateChanged -= ApplyShopFocus;
 
         if (_heldKeyboard != null)
         {
@@ -262,6 +279,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
         if (_placedKeyboard == state)
         {
+            if (_monitorController != null)
+                _monitorController.SetMonitorFocus(false);
             _resumeSmashInput = false;
             _controller.SetKeyBoard(null);
         }
@@ -569,8 +588,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// isOpen으로 상점 Focus 상태를 갱신하고 키보드 입력을 중지한다.
-    /// 커서 상태를 변경하며 상점을 닫으면 부수기 입력 복원을 예약한다.
+    /// isOpen으로 모니터 조작 상태를 갱신하고 키보드 입력을 중지한다.
+    /// 커서를 표시하거나 잠그며 조작 종료 시 전환 입력 해제 후 부수기 입력 복원을 예약한다.
     /// </summary>
     private void ApplyShopFocus(bool isOpen)
     {

@@ -41,6 +41,10 @@ namespace Game.Shop
             {
                 ConfigureQualityLayout();
             }
+            else if (definition.Id == UpgradeId.SmashDamage || definition.Id == UpgradeId.AreaDamage)
+            {
+                ConfigureDamageLayout();
+            }
             else if (definition.Id == UpgradeId.FeverDuration || definition.Id == UpgradeId.FeverDamageMultiplier || definition.Id == UpgradeId.LuckyReward || definition.Id == UpgradeId.HandPower || definition.Id == UpgradeId.AutoClick)
             {
                 ConfigureFeverLayout();
@@ -51,7 +55,7 @@ namespace Game.Shop
 
         /// <summary>
         /// 보관 중인 강화 설정과 현재 레벨 및 잔액을 사용하여 화면을 갱신한다.
-        /// 레벨, 다음 가격, 구매 버튼의 표시와 활성 상태를 변경한다.
+        /// 현재·다음 강화 수치, 레벨, 다음 가격과 구매·승급 버튼의 상태를 변경한다.
         /// </summary>
         public void Refresh()
         {
@@ -65,16 +69,23 @@ namespace Game.Shop
             _buttonText.text = isMaxLevel ? "MAX" : requiresAreaSmash ? "LOCKED" : "Buy";
             _purchaseButton.interactable = purchaseStatus == PurchaseResult.Success;
 
-            if (_definition.Id == UpgradeId.HandPower)
+            if (_definition.Id == UpgradeId.SmashDamage || _definition.Id == UpgradeId.AreaDamage)
+            {
+                _nameText.text = $"{_definition.DisplayName}\nDamage +{_definition.GetDamageBonus(level)}";
+                if (!isMaxLevel)
+                {
+                    _nameText.text += $" -> +{_definition.GetDamageBonus(level + 1)}";
+                }
+            }
+            else if (_definition.Id == UpgradeId.HandPower)
             {
                 _levelText.text = $"Lv {_definition.GetHandStageLevel(level)}/{_definition.GetHandStageMaxLevel(level)}";
                 _nameText.text = $"{_definition.GetHandName(level)}\nDamage +{_definition.GetHandDamageBonus(level)}";
                 if (!isMaxLevel)
                 {
+                    _nameText.text += $" -> +{_definition.GetHandDamageBonus(level + 1)}";
                     if (_definition.IsHandPromotion(level + 1))
                         _buttonText.text = "Promote";
-                    else
-                        _nameText.text += $" -> +{_definition.GetHandDamageBonus(level + 1)}";
                 }
             }
             else if (_definition.Id == UpgradeId.AutoClick)
@@ -86,8 +97,8 @@ namespace Game.Shop
                 _nameText.text = $"{_definition.GetAutoAttackName(level)}\nDamage {_definition.GetAutoAttackDamage(level)}, {_definition.GetAutoAttackSpeed(level):0.##}/s";
                 if (!isMaxLevel)
                 {
+                    _nameText.text += $" -> {_definition.GetAutoAttackDamage(level + 1)}, {_definition.GetAutoAttackSpeed(level + 1):0.##}/s";
                     if (level + 1 == promotion) _buttonText.text = "Promote";
-                    else _nameText.text += $" -> {_definition.GetAutoAttackDamage(level + 1)}, {_definition.GetAutoAttackSpeed(level + 1):0.##}/s";
                 }
             }
             else if (_definition.Id == UpgradeId.LuckyReward)
@@ -124,6 +135,26 @@ namespace Game.Shop
             return _definition.Id == UpgradeId.FeverDuration
                 ? $"{_definition.GetFeverDuration(level):0.#}s"
                 : $"x{_definition.GetFeverDamageMultiplier(level):0.0}";
+        }
+
+        /// <summary>
+        /// 연결된 제목 텍스트와 구매 UI를 사용하여 공격력 강화의 두 줄 표시 영역을 확보한다.
+        /// 프리팹의 폰트 크기를 유지하면서 항목 높이와 레벨·가격·버튼 위치를 변경한다.
+        /// </summary>
+        private void ConfigureDamageLayout()
+        {
+            LayoutElement layout = GetComponent<LayoutElement>();
+            layout.minHeight = 132f;
+            layout.preferredHeight = 132f;
+            RectTransform nameRect = _nameText.rectTransform;
+            nameRect.anchorMin = new Vector2(0f, 1f);
+            nameRect.anchorMax = Vector2.one;
+            nameRect.offsetMin = new Vector2(14f, -76f);
+            nameRect.offsetMax = new Vector2(-14f, -6f);
+            _levelText.rectTransform.anchoredPosition = new Vector2(_levelText.rectTransform.anchoredPosition.x, -88f);
+            _costText.rectTransform.anchoredPosition = new Vector2(_costText.rectTransform.anchoredPosition.x, -82f);
+            RectTransform buttonRect = (RectTransform)_purchaseButton.transform;
+            buttonRect.anchoredPosition = new Vector2(buttonRect.anchoredPosition.x, -82f);
         }
 
         /// <summary>

@@ -16,7 +16,7 @@ MonoBehaviour:
   _displayName: Fever Damage
   _description: Start at x2.0 and gain x0.3 per level. Applies to direct and area
     damage from the next fever; round final damage up once.
-  _levelCosts: 2c01000000000000e803000000000000b80b000000000000282300000000000090650000000000007011010000000000
+  _levelCosts: 2c01000000000000dc050000000000008813000000000000204e000000000000a08601000000000020a1070000000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000
@@ -47,12 +47,12 @@ MonoBehaviour:
   _feverDurationPerLevel: 2
   _feverDamageMultipliers:
   - 2
-  - 2.3
-  - 2.6
-  - 2.9
-  - 3.2
+  - 2.5
+  - 3
   - 3.5
   - 4
+  - 4.5
+  - 5
   _baseFeverDamageMultiplier: 2
   _feverDamageMultiplierPerLevel: 0.3
   _rarityDistributions:

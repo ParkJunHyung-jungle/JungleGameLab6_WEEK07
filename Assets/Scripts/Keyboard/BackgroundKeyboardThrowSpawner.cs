@@ -112,16 +112,9 @@ public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
             GameObject oldest = _spawned.Dequeue();
             if (oldest != null) Destroy(oldest);
         }
-        Vector3 up = Physics.gravity.sqrMagnitude > 0.001f ? -Physics.gravity.normalized : Vector3.up;
-        Vector3 forward = Vector3.ProjectOnPlane(transform.forward, up).normalized;
-        if (forward.sqrMagnitude < 0.001f) forward = Vector3.ProjectOnPlane(transform.up, up).normalized;
-        forward = Quaternion.AngleAxis(Random.Range(-_directionSpread, _directionSpread), up) * forward;
-        Quaternion rotation = transform.rotation * Quaternion.Euler(_modelEulerAngles)
-            * Quaternion.Euler(Random.Range(-6f, 6f), Random.Range(-12f, 12f), Random.Range(-6f, 6f));
         GameObject keyboard = Instantiate(_keyboardPrefab);
         keyboard.name = "ThrownBackgroundKeyboard";
         keyboard.transform.localScale = Vector3.one * _keyboardScale;
-        keyboard.transform.SetPositionAndRotation(transform.position - rotation * (_modelBounds.center * _keyboardScale), rotation);
         foreach (MonoBehaviour behaviour in keyboard.GetComponentsInChildren<MonoBehaviour>(true))
             behaviour.enabled = false;
         foreach (Collider existing in keyboard.GetComponentsInChildren<Collider>(true))
@@ -134,6 +127,35 @@ public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
         collider.enabled = true;
         Rigidbody body = keyboard.GetComponent<Rigidbody>();
         if (body == null) body = keyboard.AddComponent<Rigidbody>();
+        LaunchKeyboard(body, regionIndex);
+        _spawned.Enqueue(keyboard);
+        _keyboardInteractionController.RegisterKeyboard(keyboard, false, regionIndex);
+        //Destroy(keyboard, _lifetime);
+    }
+
+    /// <summary>
+    /// keyboard의 원본을 기존 발사 위치로 옮겨 설정된 속도와 회전으로 다시 던진다.
+    /// 원본 모델, 크기와 등록 상태를 유지하며 새 인스턴스는 생성하지 않는다.
+    /// </summary>
+    public void ThrowExistingKeyboard(Rigidbody keyboard)
+    {
+        LaunchKeyboard(keyboard, -1);
+    }
+
+    /// <summary>
+    /// body의 Collider 중심과 기존 던지기 설정을 사용해 발사 위치, 회전과 초기 속도를 적용한다.
+    /// regionIndex가 지정되면 해당 구역으로 던지고 음수이면 기존 발사 방향으로 던진다.
+    /// </summary>
+    private void LaunchKeyboard(Rigidbody body, int regionIndex)
+    {
+        GameObject keyboard = body.gameObject;
+        BoxCollider collider = keyboard.GetComponent<BoxCollider>();
+        Vector3 up = Physics.gravity.sqrMagnitude > 0.001f ? -Physics.gravity.normalized : Vector3.up;
+        Vector3 forward = Vector3.ProjectOnPlane(transform.forward, up).normalized;
+        if (forward.sqrMagnitude < 0.001f) forward = Vector3.ProjectOnPlane(transform.up, up).normalized;
+        forward = Quaternion.AngleAxis(Random.Range(-_directionSpread, _directionSpread), up) * forward;
+        Quaternion rotation = transform.rotation * Quaternion.Euler(_modelEulerAngles)
+            * Quaternion.Euler(Random.Range(-6f, 6f), Random.Range(-12f, 12f), Random.Range(-6f, 6f));
         body.interpolation = RigidbodyInterpolation.None;
         body.isKinematic = false;
         body.useGravity = true;
@@ -141,7 +163,7 @@ public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
         body.linearDamping = 0f;
         body.angularDamping = 0.3f;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        body.position = transform.position - rotation * (_modelBounds.center * _keyboardScale);
+        body.position = transform.position - rotation * (Vector3.Scale(collider.center, body.transform.lossyScale));
         body.rotation = rotation;
         float height = Mathf.Max(0f, Random.Range(_arcHeight.x, _arcHeight.y));
         float upwardSpeed = Mathf.Sqrt(2f * Physics.gravity.magnitude * height);
@@ -159,9 +181,6 @@ public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
             keyboard.name = $"ThrownBackgroundKeyboard_Region_{regionIndex + 1}";
         }
         body.angularVelocity = Random.insideUnitSphere * _spinSpeed;
-        _spawned.Enqueue(keyboard);
-        _keyboardInteractionController.RegisterKeyboard(keyboard, false, regionIndex);
-        //Destroy(keyboard, _lifetime);
     }
 
     void OnDrawGizmosSelected()

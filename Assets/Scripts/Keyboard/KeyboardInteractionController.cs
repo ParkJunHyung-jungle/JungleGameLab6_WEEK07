@@ -76,10 +76,18 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private bool[] _regionWasPopulated;
     private bool[] _regionRefillTriggered;
 
+    [Header("Fallen Keyboard Return")]
+    [SerializeField] private bool _returnFallenKeyboards;
+    [Tooltip("등록된 월드 키보드가 이 월드 Y 이하로 떨어지면 동일한 키보드를 다시 던집니다.")]
+    [SerializeField] private float _fallReturnHeight = -3f;
+
     [Header("Opening")]
     [SerializeField] private bool _startWithSingleKeyboard;
     [SerializeField] private Transform _openingCeiling;
     private KeyboardState _openingKeyboard;
+
+    [Header("Fist Camera Shake")]
+    [SerializeField] private CinemachineImpulseSource _fistImpulseSource;
 
     [Header("Keycap Quality")]
     [SerializeField] private GameSession _gameSession;
@@ -229,6 +237,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void FixedUpdate()
     {
+        RequestFallenKeyboardReturns();
         if (_heldKeyboard == null) return;
         Quaternion rotation = _camera.transform.rotation * Quaternion.Euler(_holdEulerAngles);
         Vector3 center = _camera.transform.position + _camera.transform.forward * _holdDistance;
@@ -323,6 +332,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (isPlayable)
         {
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
+            if (_fistImpulseSource != null) destruction.FistImpact += HandleFistImpact;
             destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
         }
         return state;
@@ -335,6 +345,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public void ConfigureFistAnimation(KeyboardDestruction destruction)
     {
         destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset, _fistMaterial);
+    }
+
+    /// <summary>
+    /// 주먹이 닿은 position에서 설정된 Impulse 신호를 발생시킨다.
+    /// 활성 상태의 SmashMode에서만 부수기 카메라에 타격 흔들림을 전달한다.
+    /// </summary>
+    private void HandleFistImpact(Vector3 position)
+    {
+        if (!isActiveAndEnabled || !IsSmashMode) return;
+        _fistImpulseSource.GenerateImpulseAtPositionWithVelocity(position, _fistImpulseSource.DefaultVelocity);
     }
 
     /// <summary>
@@ -466,6 +486,26 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         BoxCollider area = _firstRegion;
         Vector3 offset = new Vector3(Random.Range(-0.3f, 0.3f) * area.size.x, 0f, Random.Range(-0.3f, 0.3f) * area.size.z);
         return area.transform.TransformPoint(area.center + offset);
+    }
+
+    /// <summary>
+    /// 등록된 월드 키보드가 _fallReturnHeight 이하로 떨어지면 동일한 Rigidbody의 재투척을 요청한다.
+    /// 들고 있거나 배치된 키보드는 제외하고 대기 중인 키보드의 물리를 정지하여 중복 요청을 막는다.
+    /// </summary>
+    private void RequestFallenKeyboardReturns()
+    {
+        if (!_returnFallenKeyboards || _regionThrowVisit == null || !_regionThrowVisit.isActiveAndEnabled) return;
+        foreach (KeyboardState state in _keyboards.Values)
+        {
+            Rigidbody body = state.Body;
+            if (body == null || !state.Root.activeInHierarchy || state == _heldKeyboard || state == _placedKeyboard || body.isKinematic) continue;
+            if (body.position.y > _fallReturnHeight) continue;
+            body.linearVelocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
+            body.isKinematic = true;
+            body.useGravity = false;
+            _regionThrowVisit.RequestKeyboardReturn(body);
+        }
     }
 
     /// <summary>

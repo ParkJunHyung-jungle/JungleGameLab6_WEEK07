@@ -205,6 +205,8 @@ MonoBehaviour:
   _secondRegionCount: 30
   _thirdRegionCount: 30
   _regionThrowVisit: {fileID: 9100000004}
+  _returnFallenKeyboards: 1
+  _fallReturnHeight: -3
   _gameSession: {fileID: 0}
   _rewardController: {fileID: 0}
   _raritySettings: {fileID: 11400000, guid: b0111cb3a889f40449fb9a61f694451f, type: 2}

@@ -201,6 +201,8 @@ MonoBehaviour:
   _firstRegion: {fileID: 102212880}
   _firstRegionCount: 100
   _regionThrowVisit: {fileID: 9100000004}
+  _returnFallenKeyboards: 1
+  _fallReturnHeight: -8
   _startWithSingleKeyboard: 1
   _openingCeiling: {fileID: 9700000001}
   _gameSession: {fileID: 0}
@@ -2078,7 +2080,7 @@ Transform:
   m_GameObject: {fileID: 1162827442}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 22, y: 4, z: -0.65}
+  m_LocalPosition: {x: 14, y: 4, z: -0.65}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2752,7 +2754,7 @@ PrefabInstance:
       objectReference: {fileID: 1068726015}
     - target: {fileID: 2256112767718196818, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 9.774
+      value: 9.69
       objectReference: {fileID: 0}
     - target: {fileID: 2256112767718196818, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: m_LocalPosition.y
@@ -2760,7 +2762,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2256112767718196818, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -6.159
+      value: -11.67
       objectReference: {fileID: 0}
     - target: {fileID: 2256112767718196818, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3506,7 +3508,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 6296055223845996250, guid: 7a056df9578f141428926d323771173b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 22
+      value: 14
       objectReference: {fileID: 0}
     - target: {fileID: 6296055223845996250, guid: 7a056df9578f141428926d323771173b, type: 3}
       propertyPath: m_LocalPosition.y

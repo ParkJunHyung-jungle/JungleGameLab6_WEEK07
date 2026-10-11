@@ -202,6 +202,7 @@ MonoBehaviour:
   _firstRegion: {fileID: 102212880}
   _firstRegionCount: 100
   _regionThrowVisit: {fileID: 9100000004}
+  _completionProgress: {fileID: 27118947}
   _returnFallenKeyboards: 1
   _fallReturnHeight: -8
   _startWithSingleKeyboard: 1
@@ -275,6 +276,28 @@ MonoBehaviour:
   _maximumTravelDistance: 0.85
   _hitStopDuration: 0.25
   _hitStopCooldown: 0.35
+--- !u!114 &27118947
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 27118942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 337f74f40d6684b4e9a0c97110463a28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCompletionProgress
+  _interactionController: {fileID: 27118945}
+  _spawner: {fileID: 9100000003}
+  _throwVisit: {fileID: 9100000004}
+  _door: {fileID: 633399229}
+  _doorOpenAngle: 90
+--- !u!4 &633399229 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1001, guid: e43b31dc5a774dd19b5c8b0fd8557e70, type: 3}
+  m_PrefabInstance: {fileID: 324177992}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &39970281
 GameObject:
   m_ObjectHideFlags: 0

@@ -18,14 +18,15 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
     private Vector3 _homePosition;
     private bool _visiting;
     private int _activeRegion = -1;
-    private Queue<int> _requestedRegions;
+    private bool _activeCompletionReward;
+    private Queue<(int Region, bool IsCompletionReward)> _requestedRegions;
     private Queue<Rigidbody> _returnKeyboards;
     private Rigidbody _activeReturnKeyboard;
 
     void Awake()
     {
         _homePosition = _actor.position;
-        _requestedRegions = new Queue<int>();
+        _requestedRegions = new Queue<(int Region, bool IsCompletionReward)>();
         _returnKeyboards = new Queue<Rigidbody>();
         _spawner.SetExternalSequence(true);
     }
@@ -41,7 +42,9 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
             return;
         }
         if (_requestedRegions.Count == 0) return;
-        _activeRegion = _requestedRegions.Dequeue();
+        (int Region, bool IsCompletionReward) request = _requestedRegions.Dequeue();
+        _activeRegion = request.Region;
+        _activeCompletionReward = request.IsCompletionReward;
         StartCoroutine(VisitAndThrow(_activeRegion));
     }
 
@@ -50,8 +53,9 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
         StopAllCoroutines();
         if (_activeReturnKeyboard != null) _returnKeyboards.Enqueue(_activeReturnKeyboard);
         _activeReturnKeyboard = null;
-        if (_activeRegion >= 0) _requestedRegions.Enqueue(_activeRegion);
+        if (_activeRegion >= 0) _requestedRegions.Enqueue((_activeRegion, _activeCompletionReward));
         _activeRegion = -1;
+        _activeCompletionReward = false;
         _actor.position = _homePosition;
         _visiting = false;
     }
@@ -65,8 +69,9 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
         _visiting = true;
         yield return MoveTo(_visitPoint.position);
         yield return WaitFor(_waitBeforeThrow);
-        _spawner.SpawnAndThrowForRegion(regionIndex);
+        _spawner.SpawnAndThrowForRegion(regionIndex, _activeCompletionReward);
         _activeRegion = -1;
+        _activeCompletionReward = false;
         yield return WaitFor(_waitAfterThrow);
         yield return MoveTo(_homePosition);
         _visiting = false;
@@ -78,7 +83,16 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
     /// </summary>
     public void RequestThrows(int regionIndex, int count)
     {
-        for (int index = 0; index < count; index++) _requestedRegions.Enqueue(regionIndex);
+        for (int index = 0; index < count; index++) _requestedRegions.Enqueue((regionIndex, false));
+    }
+
+    /// <summary>
+    /// regionIndex 구역에 던질 완료 보상 키보드를 count개 대기열에 저장한다.
+    /// 기존 방문 연출을 유지하며 생성된 객체를 보상 진행 대상으로 구분한다.
+    /// </summary>
+    public void RequestRewardThrows(int regionIndex, int count)
+    {
+        for (int index = 0; index < count; index++) _requestedRegions.Enqueue((regionIndex, true));
     }
 
     /// <summary>

@@ -28,6 +28,9 @@ MonoBehaviour:
   _fistBaseDamage: 5
   _fistDamagePerLevel: 1
   _fistChancePerLevel: 0.06
+  _hammerBaseDamage: 10
+  _hammerDamagePerLevel: 2
+  _hammerChancePerLevel: 0.06
   _damageBonuses: 010000000200000003000000
   _autoAttackDamages: 030000000500000007000000090000000c0000000f0000001200000015000000180000001b0000001b0000001b0000001b0000001b000000
   _autoAttackSpeeds:

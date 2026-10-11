@@ -15,7 +15,7 @@ MonoBehaviour:
   _id: 7
   _displayName: Lucky Reward
   _description: Each level adds 10% chance to double money earned from a broken keycap.
-  _levelCosts: e803000000000000a00f000000000000c832000000000000409c000000000000f049020000000000
+  _levelCosts: 2c01000000000000d0070000000000001027000000000000409c000000000000f049020000000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000
@@ -28,6 +28,9 @@ MonoBehaviour:
   _fistBaseDamage: 5
   _fistDamagePerLevel: 1
   _fistChancePerLevel: 0.06
+  _hammerBaseDamage: 10
+  _hammerDamagePerLevel: 2
+  _hammerChancePerLevel: 0.06
   _damageBonuses: 010000000200000003000000
   _autoAttackDamages: 010000000200000003000000
   _autoAttackSpeeds:

@@ -40,6 +40,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     public event Action<KeyboardInputController> ActiveKeyboardChanged;
     public event Action<KeyboardInputController> PlacedKeyboardChanged;
+    public event Action<KeyboardState> InitialKeyboardSpawned;
+    public event Action<KeyboardState> KeyboardCompleted;
 
     [Header("Pickup")]
     [SerializeField, Min(0.1f)] private float _rayDistance = 12f;
@@ -71,6 +73,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField, Min(0)] private int _firstRegionCount = 20;
     [Tooltip("첫 번째 구역이 비었을 때만 세 번 방문하여 키보드를 던지는 연출입니다.")]
     [SerializeField] private BackgroundKeyboardThrowVisit _regionThrowVisit;
+    [SerializeField] private KeyboardCompletionProgress _completionProgress;
     private Transform _spawnRoot;
     private List<GameObject>[] _regionKeyboards;
     private int[] _pendingRegionThrows;
@@ -407,10 +410,20 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         }
 
         _gameSession.CompleteKeyboard();
+        NotifyKeyboardCompleted(state);
 
         if (IsSmashMode) OnExitSmashMode();
         _placedKeyboard = null;
         PlacedKeyboardChanged?.Invoke(null);
+    }
+
+    /// <summary>
+    /// 파괴가 완료된 state의 진행 식별 정보를 구독자에게 전달한다.
+    /// 수동 패드와 자동작업대가 같은 완료 이벤트를 사용하도록 연결한다.
+    /// </summary>
+    private void NotifyKeyboardCompleted(KeyboardState state)
+    {
+        KeyboardCompleted?.Invoke(state);
     }
 
     /// <summary>
@@ -460,14 +473,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             GameObject keyboard = Instantiate(_keyboardPrefab, position, Random.rotationUniform, _spawnRoot);
             keyboard.name = $"{areaName}_Keyboard_{index + 1}";
             keyboard.transform.localScale = _referenceKeyboard.transform.lossyScale;
-            RegisterKeyboard(keyboard, false, regionIndex);
+            KeyboardState state = RegisterKeyboard(keyboard, false, regionIndex);
             SpawnedKeyboardCount++;
+            InitialKeyboardSpawned?.Invoke(state);
         }
     }
 
     /// <summary>
-    /// 천장 구역의 제거된 키보드를 목록에서 정리하고 구역이 비면 던지기를 세 번 요청한다.
-    /// 구역 목록과 발동 기록을 사용하며 구역당 한 번만 요청하고 던진 키보드가 제거되어도 재발동하지 않는다.
+    /// 천장 구역의 제거된 키보드를 정리하고 진행 컴포넌트가 없는 씬에서는 기존 보충을 요청한다.
+    /// 구역 목록과 진행 참조를 사용하며 완료 진행을 사용하는 씬의 투척은 해당 컴포넌트가 담당한다.
     /// </summary>
     private void RefreshSpawnRegions()
     {
@@ -475,6 +489,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         for (int index = 0; index < SPAWN_REGION_COUNT; index++)
         {
             _regionKeyboards[index].RemoveAll(keyboard => keyboard == null);
+            if (_completionProgress != null) continue;
             if (index != 0) continue;
             if (_regionRefillTriggered[index]) continue;
             if (_regionKeyboards[index].Count > 0 || !_regionWasPopulated[index] || _pendingRegionThrows[index] > 0) continue;
@@ -623,7 +638,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         try
         {
             target = CreatePlayableKeyboard(source, false);
-            station.AcceptKeyboard(target.Keyboard);
+            station.AcceptKeyboard(target.Keyboard, () => NotifyKeyboardCompleted(target));
             _keyboards.Remove(target.Body);
             _keyboards.Remove(source.Body);
             source.Collider.enabled = false;
@@ -852,7 +867,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// source의 최초 배치에서 현재 강화 분포로 생성 결과를 확정하고 플레이용 객체에 적용한다.
-    /// 재시도는 같은 프로필을 사용하며 준비 실패 시 새 객체를 정리하고 월드 원본을 유지한다.
+    /// 재시도는 같은 프로필을 사용하고 진행 식별자를 새 상태에 복사하며 준비 실패 시 월드 원본을 유지한다.
     /// </summary>
     private KeyboardState CreatePlayableKeyboard(KeyboardState source, bool playerControlled = true)
     {
@@ -886,7 +901,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             }
 
             keyboard.InitializeSpawnProfile(source.PendingProfile, layout);
-            return RegisterKeyboard(instance, playerControlled);
+            KeyboardState target = RegisterKeyboard(instance, playerControlled);
+            target.SetProgressId(source.ProgressId);
+            return target;
         }
         catch
         {
@@ -1005,6 +1022,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         public bool[] ColliderEnabled { get; }
         public KeyboardSpawnProfile PendingProfile => _pendingProfile;
         public bool PlacementFailed => _placementFailed;
+        public int ProgressId { get; private set; } = -1;
+
+        /// <summary>
+        /// progressId를 키보드의 진행 식별자로 저장한다.
+        /// 배경용 객체에서 플레이용 객체로 교체될 때 같은 식별자를 유지한다.
+        /// </summary>
+        public void SetProgressId(int progressId)
+        {
+            ProgressId = progressId;
+        }
 
         /// <summary>profile을 최초 배치 결과로 보관하여 실패 후 재시도에서도 추첨 결과를 유지한다.</summary>
         public void StoreProfile(KeyboardSpawnProfile profile)

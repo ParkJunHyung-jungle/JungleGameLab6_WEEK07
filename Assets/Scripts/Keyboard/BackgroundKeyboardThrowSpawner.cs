@@ -1,7 +1,8 @@
-using KeyboardModeling;
 using System.Collections.Generic;
 
 using UnityEngine;
+
+using KeyboardModeling;
 
 [DisallowMultipleComponent]
 public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
@@ -86,9 +87,27 @@ public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
     [ContextMenu("Spawn And Throw")]
     public void SpawnAndThrow()
     {
+        SpawnAndThrowForRegion(-1);
+    }
+
+    /// <summary>
+    /// external에 따라 자체 주기 생성 여부를 변경한다.
+    /// 외부 방문 연출을 사용할 때는 자동 생성 대신 명시적인 던지기 요청만 처리한다.
+    /// </summary>
+    public void SetExternalSequence(bool external)
+    {
+        _externalSequence = external;
+    }
+
+    /// <summary>
+    /// regionIndex 구역에 등록할 키보드를 생성하고 해당 구역 안으로 던진다.
+    /// 음수 구역은 기존 방향과 개수 제한을 사용하며 구역 보충은 다른 구역의 키보드를 강제로 제거하지 않는다.
+    /// </summary>
+    public void SpawnAndThrowForRegion(int regionIndex)
+    {
         if (!Application.isPlaying) return;
         while (_spawned.Count > 0 && _spawned.Peek() == null) _spawned.Dequeue();
-        while (_spawned.Count >= _maximumAlive)
+        while (regionIndex < 0 && _spawned.Count >= _maximumAlive)
         {
             GameObject oldest = _spawned.Dequeue();
             if (oldest != null) Destroy(oldest);
@@ -127,9 +146,21 @@ public sealed class BackgroundKeyboardThrowSpawner : MonoBehaviour
         float height = Mathf.Max(0f, Random.Range(_arcHeight.x, _arcHeight.y));
         float upwardSpeed = Mathf.Sqrt(2f * Physics.gravity.magnitude * height);
         body.linearVelocity = forward * Random.Range(_forwardSpeed.x, _forwardSpeed.y) + up * upwardSpeed;
+        if (regionIndex >= 0)
+        {
+            Vector3 destination = _keyboardInteractionController.GetRegionSpawnPosition(regionIndex);
+            Vector3 distance = destination - body.position;
+            float gravity = Physics.gravity.magnitude;
+            float verticalDistance = Vector3.Dot(distance, up);
+            float apexHeight = Mathf.Max(height, verticalDistance + 0.1f);
+            float launchSpeed = Mathf.Sqrt(2f * gravity * apexHeight);
+            float flightTime = (launchSpeed + Mathf.Sqrt(2f * gravity * (apexHeight - verticalDistance))) / gravity;
+            body.linearVelocity = Vector3.ProjectOnPlane(distance, up) / flightTime + up * launchSpeed;
+            keyboard.name = $"ThrownBackgroundKeyboard_Region_{regionIndex + 1}";
+        }
         body.angularVelocity = Random.insideUnitSphere * _spinSpeed;
         _spawned.Enqueue(keyboard);
-        _keyboardInteractionController.RegisterKeyboard(keyboard);
+        _keyboardInteractionController.RegisterKeyboard(keyboard, false, regionIndex);
         //Destroy(keyboard, _lifetime);
     }
 

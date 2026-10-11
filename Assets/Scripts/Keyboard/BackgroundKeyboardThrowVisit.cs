@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -11,53 +12,60 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
     [SerializeField] private BackgroundKeyboardThrowSpawner _spawner;
 
     [Header("Timing")]
-    [SerializeField, Min(0.1f)] private float _interval = 2.5f;
-    [SerializeField, Min(0f)] private float _firstDelay = 1f;
     [SerializeField, Min(0.01f)] private float _moveDuration = 0.6f;
     [SerializeField, Min(0f)] private float _waitBeforeThrow = 0.5f;
     [SerializeField, Min(0f)] private float _waitAfterThrow = 0.5f;
     private Vector3 _homePosition;
-    private float _remaining;
     private bool _visiting;
+    private int _activeRegion = -1;
+    private Queue<int> _requestedRegions;
 
     void Awake()
     {
         _homePosition = _actor.position;
-    }
-
-    void OnEnable()
-    {
-        _remaining = _firstDelay;
+        _requestedRegions = new Queue<int>();
+        _spawner.SetExternalSequence(true);
     }
 
     void Update()
     {
-        _remaining -= Time.deltaTime;
-        if (_visiting || _remaining > 0f) return;
-        _remaining = _interval;
-        StartCoroutine(VisitAndThrow());
+        if (_visiting || _requestedRegions.Count == 0) return;
+        _activeRegion = _requestedRegions.Dequeue();
+        StartCoroutine(VisitAndThrow(_activeRegion));
     }
 
     void OnDisable()
     {
         StopAllCoroutines();
+        if (_activeRegion >= 0) _requestedRegions.Enqueue(_activeRegion);
+        _activeRegion = -1;
         _actor.position = _homePosition;
         _visiting = false;
     }
 
     /// <summary>
-    /// 지정 위치를 방문하고 기존 던지기를 한 번 실행한 뒤 원래 위치로 복귀한다.
-    /// 방문점과 이동·대기 시간을 사용하며 중복 실행을 막는 _visiting 상태를 갱신한다.
+    /// regionIndex의 구역을 보충하기 위해 방문점으로 이동하고 던진 뒤 원래 위치로 복귀한다.
+    /// 이동·대기 시간을 사용하며 중복 실행을 막는 _visiting 상태를 갱신한다.
     /// </summary>
-    private IEnumerator VisitAndThrow()
+    private IEnumerator VisitAndThrow(int regionIndex)
     {
         _visiting = true;
         yield return MoveTo(_visitPoint.position);
         yield return WaitFor(_waitBeforeThrow);
-        _spawner.SpawnAndThrow();
+        _spawner.SpawnAndThrowForRegion(regionIndex);
+        _activeRegion = -1;
         yield return WaitFor(_waitAfterThrow);
         yield return MoveTo(_homePosition);
         _visiting = false;
+    }
+
+    /// <summary>
+    /// regionIndex 구역의 던지기 요청을 count회 대기열에 저장한다.
+    /// 각 요청은 진행 중인 방문이 끝난 뒤 순차적으로 실행하며 다른 구역 요청도 보관한다.
+    /// </summary>
+    public void RequestThrows(int regionIndex, int count)
+    {
+        for (int index = 0; index < count; index++) _requestedRegions.Enqueue(regionIndex);
     }
 
     /// <summary>

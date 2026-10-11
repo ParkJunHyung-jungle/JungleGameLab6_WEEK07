@@ -19,7 +19,7 @@ public static class BackgroundKeyboardThrowVisitSetup
         SerializedObject sourceSettings = new SerializedObject(source);
         Transform sourcePoint = (Transform)sourceSettings.FindProperty("_visitPoint").objectReferenceValue;
         Vector3 pointPosition = sourcePoint.position;
-        string[] timingFields = { "_interval", "_firstDelay", "_moveDuration", "_waitBeforeThrow", "_waitAfterThrow" };
+        string[] timingFields = { "_moveDuration", "_waitBeforeThrow", "_waitAfterThrow" };
         float[] timings = new float[timingFields.Length];
         for (int index = 0; index < timings.Length; index++)
             timings[index] = sourceSettings.FindProperty(timingFields[index]).floatValue;
@@ -45,7 +45,7 @@ public static class BackgroundKeyboardThrowVisitSetup
         settings.ApplyModifiedPropertiesWithoutUndo();
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
-        Debug.Log($"MAIN_THROW_VISIT_READY actor={actor.name} home={actor.position} target={point.position} interval={timings[0]}");
+        Debug.Log($"MAIN_THROW_VISIT_READY actor={actor.name} home={actor.position} target={point.position} moveDuration={timings[0]}");
     }
 
     /// <summary>
@@ -74,8 +74,6 @@ public static class BackgroundKeyboardThrowVisitSetup
         settings.FindProperty("_actor").objectReferenceValue = actor;
         settings.FindProperty("_visitPoint").objectReferenceValue = point;
         settings.FindProperty("_spawner").objectReferenceValue = spawner;
-        settings.FindProperty("_interval").floatValue = spawnSettings.FindProperty("_spawnInterval").floatValue;
-        settings.FindProperty("_firstDelay").floatValue = spawnSettings.FindProperty("_firstSpawnDelay").floatValue;
         settings.ApplyModifiedPropertiesWithoutUndo();
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);

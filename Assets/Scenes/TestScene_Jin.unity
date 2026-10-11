@@ -208,6 +208,7 @@ MonoBehaviour:
   _behindCount: 40
   _keyboardFragmentsPrefab: {fileID: 0}
   _destructionFistSprite: {fileID: 21300000, guid: 04e0a1508ba5bf24c856967e39bf1e6d, type: 3}
+  _fistMaterial: {fileID: 2100000, guid: 43c9cbe2ad8adeb47b9aaac1c2d505c9, type: 2}
   _controller: {fileID: 0}
   _shopView: {fileID: 0}
 --- !u!114 &27118946

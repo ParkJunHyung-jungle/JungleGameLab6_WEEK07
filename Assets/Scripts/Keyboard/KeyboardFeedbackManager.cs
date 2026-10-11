@@ -45,6 +45,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private MeshRenderer[] _flashRenderers;
     private Material[] _flashOriginalMaterials;
     private float[] _flashEndTimes;
+    private KeycapHealth[] _flashHealths;
     private readonly Dictionary<Transform, int> _flashIndices = new Dictionary<Transform, int>();
 
     [Header("Debris")]
@@ -137,6 +138,9 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private void BindKeyboard(KeyboardInputController keyboard)
     {
         ClearKeyboardBounce();
+        if (_flashHealths != null)
+            foreach (KeycapHealth health in _flashHealths)
+                if (health != null) health.DamageApplied -= HandleKeycapDamageApplied;
         if (_keyboard != null)
         {
             _keyboard.ManualKeycapHit -= HandleKeycapPressed;
@@ -191,7 +195,6 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             _isKeyboardBouncing = true;
         }
         if (_enableDebris) PlayDebris(keycap);
-        if (_enableWhiteFlash) PlayWhiteFlash(keycap);
         if (_enableHitStop && !_isHitStopped && Time.timeScale > 0f && Time.unscaledTime >= _nextHitStop)
         {
             _savedTimeScale = Time.timeScale;
@@ -398,6 +401,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         _flashRenderers = new MeshRenderer[buttons.Length];
         _flashOriginalMaterials = new Material[buttons.Length];
         _flashEndTimes = new float[buttons.Length];
+        _flashHealths = new KeycapHealth[buttons.Length];
         for (int index = 0; index < buttons.Length; index++)
         {
             Transform shell = buttons[index].transform.Find("PBT_SculptedShell");
@@ -406,7 +410,19 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             _flashRenderers[index] = renderer;
             _flashOriginalMaterials[index] = renderer.sharedMaterial;
             _flashIndices.Add(buttons[index].transform, index);
+            KeycapHealth health = buttons[index].GetComponent<KeycapHealth>();
+            _flashHealths[index] = health;
+            if (health != null) health.DamageApplied += HandleKeycapDamageApplied;
         }
+    }
+
+    /// <summary>
+    /// 실제 피해를 받은 health의 외피에 화이트 플래시를 적용한다.
+    /// 화이트 플래시 옵션과 키캡 Transform을 사용하며 직접·범위·외부 공격을 같은 방식으로 표시한다.
+    /// </summary>
+    private void HandleKeycapDamageApplied(KeycapHealth health)
+    {
+        if (_enableWhiteFlash) PlayWhiteFlash(health.transform);
     }
 
     /// <summary>

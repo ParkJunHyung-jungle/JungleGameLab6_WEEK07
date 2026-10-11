@@ -1171,6 +1171,7 @@ MonoBehaviour:
   _raritySettings: {fileID: 11400000, guid: b0111cb3a889f40449fb9a61f694451f, type: 2}
   _keyboardFragmentsPrefab: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
   _destructionFistSprite: {fileID: 21300000, guid: 04e0a1508ba5bf24c856967e39bf1e6d, type: 3}
+  _fistMaterial: {fileID: 2100000, guid: 43c9cbe2ad8adeb47b9aaac1c2d505c9, type: 2}
   _controller: {fileID: 0}
   _shopView: {fileID: 1762638216}
 --- !u!4 &1571674046

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using Random = UnityEngine.Random;
 
 using Unity.Cinemachine;
@@ -19,6 +20,9 @@ using UnityEditor;
 [RequireComponent(typeof(BoxCollider))]
 public sealed class KeyboardInteractionController : MonoBehaviour
 {
+    private const int SPAWN_REGION_COUNT = 3;
+    private const int REGION_REFILL_THROW_COUNT = 3;
+
     public enum KeyboardGuideState { Hidden, Pickup, Placement }
 
     [Header("Camera and Pad")]
@@ -60,15 +64,25 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [Header("Spawn")]
     [SerializeField] private GameObject _keyboardPrefab;
     [SerializeField] private GameObject _inGameKeyBoardPrefab;
-    [SerializeField] private BoxCollider _front;
-    [SerializeField] private BoxCollider _left;
-    [SerializeField] private BoxCollider _right;
-    [SerializeField] private BoxCollider _behind;
-    [SerializeField, Min(0)] private int _frontCount = 20;
-    [SerializeField, Min(0)] private int _leftCount = 20;
-    [SerializeField, Min(0)] private int _rightCount = 20;
-    [SerializeField, Min(0)] private int _behindCount = 40;
+    [FormerlySerializedAs("_front"), InspectorName("첫 번째 구역")]
+    [SerializeField] private BoxCollider _firstRegion;
+    [FormerlySerializedAs("_left"), InspectorName("두 번째 구역")]
+    [SerializeField] private BoxCollider _secondRegion;
+    [FormerlySerializedAs("_right"), InspectorName("세 번째 구역")]
+    [SerializeField] private BoxCollider _thirdRegion;
+    [FormerlySerializedAs("_frontCount"), InspectorName("첫 번째 생성 개수")]
+    [SerializeField, Min(0)] private int _firstRegionCount = 20;
+    [FormerlySerializedAs("_leftCount"), InspectorName("두 번째 생성 개수")]
+    [SerializeField, Min(0)] private int _secondRegionCount = 20;
+    [FormerlySerializedAs("_rightCount"), InspectorName("세 번째 생성 개수")]
+    [SerializeField, Min(0)] private int _thirdRegionCount = 20;
+    [Tooltip("첫 번째 구역이 비었을 때만 세 번 방문하여 키보드를 던지는 연출입니다.")]
+    [SerializeField] private BackgroundKeyboardThrowVisit _regionThrowVisit;
     private Transform _spawnRoot;
+    private List<GameObject>[] _regionKeyboards;
+    private int[] _pendingRegionThrows;
+    private bool[] _regionWasPopulated;
+    private bool[] _regionRefillTriggered;
 
     [Header("Keycap Quality")]
     [SerializeField] private GameSession _gameSession;
@@ -80,6 +94,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [Header("Keyboard destruction")]
     [SerializeField] private GameObject _keyboardFragmentsPrefab;
     [SerializeField] private Sprite _destructionFistSprite;
+    [Tooltip("주먹의 조명과 그림자 수신에 사용할 투명 Lit 재질입니다.")]
+    [SerializeField] private Material _fistMaterial;
     public Sprite DestructionFistSprite => _destructionFistSprite;
 
     [Header("Fist Animation")]
@@ -117,9 +133,17 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void Awake()
     {
+        _regionKeyboards = new List<GameObject>[SPAWN_REGION_COUNT];
+        _pendingRegionThrows = new int[SPAWN_REGION_COUNT];
+        _regionWasPopulated = new bool[SPAWN_REGION_COUNT];
+        _regionRefillTriggered = new bool[SPAWN_REGION_COUNT];
+        for (int index = 0; index < SPAWN_REGION_COUNT; index++)
+            _regionKeyboards[index] = new List<GameObject>();
 #if UNITY_EDITOR
         if (_destructionFistSprite == null)
             _destructionFistSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Fist.png");
+        if (_fistMaterial == null)
+            _fistMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Resource/Sprites/Materials/Fist.mat");
 #endif
         _gameSession = FindAnyObjectByType<GameSession>();
         _rewardController = FindAnyObjectByType<KeyboardRewardController>();
@@ -140,15 +164,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         //_placedKeyboard = RegisterKeyboard(_referenceKeyboard.GetComponent<KeyboardInputController>());
         _placedKeyboard = null;
         _spawnRoot = new GameObject("SpawnedKeyboards").transform;
-        SpawnKeyboards(_front, _frontCount, "front");
-        SpawnKeyboards(_left, _leftCount, "left");
-        SpawnKeyboards(_right, _rightCount, "right");
-        SpawnKeyboards(_behind, _behindCount, "behind");
+        SpawnKeyboards(_firstRegion, _firstRegionCount, "FirstRegion", 0);
+        SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1);
+        SpawnKeyboards(_thirdRegion, _thirdRegionCount, "ThirdRegion", 2);
         Debug.Log($"[Keyboard] Spawned {SpawnedKeyboardCount} keyboards.", this);
     }
 
     void Update()
     {
+        RefreshSpawnRegions();
         if (!Application.isFocused) return;
 #if UNITY_EDITOR
         if (EditorApplication.isPaused || EditorWindow.focusedWindow == null || EditorWindow.focusedWindow.GetType().Name != "GameView") return;
@@ -264,9 +288,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// instance의 입력과 키캡 Collider를 끄고 들기용 물리 상태를 구성하여 등록 상태를 반환한다.
-    /// isPlayable이 true인 경우에만 실제 입력 키캡의 전체 파괴 판정을 초기화한다.
+    /// isPlayable이 true이면 파괴 판정을 초기화하고 regionIndex가 지정된 배경 키보드는 해당 구역 목록에 저장한다.
     /// </summary>
-    public KeyboardState RegisterKeyboard(GameObject instance, bool isPlayable = false)
+    public KeyboardState RegisterKeyboard(GameObject instance, bool isPlayable = false, int regionIndex = -1)
     {
         KeyboardInputController keyboard = instance.GetComponent<KeyboardInputController>();
         if (keyboard != null)
@@ -291,6 +315,12 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         body.interpolation = RigidbodyInterpolation.Interpolate;
         KeyboardState state = new KeyboardState(instance, keyboard, body, collider, colliders, colliderEnabled);
         _keyboards.Add(body, state);
+        if (regionIndex >= 0 && regionIndex < SPAWN_REGION_COUNT)
+        {
+            _regionKeyboards[regionIndex].Add(instance);
+            _regionWasPopulated[regionIndex] = true;
+            if (_pendingRegionThrows[regionIndex] > 0) _pendingRegionThrows[regionIndex]--;
+        }
         if (isPlayable)
         {
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
@@ -305,7 +335,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public void ConfigureFistAnimation(KeyboardDestruction destruction)
     {
-        destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset);
+        destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset, _fistMaterial);
     }
 
     /// <summary>
@@ -347,8 +377,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         PlacedKeyboardChanged?.Invoke(null);
     }
 
-    /// <summary>area의 로컬 중심과 크기 안에서 count개를 임의 위치와 회전으로 생성한다. 영역이 없으면 areaName을 알리고 해당 영역 생성을 건너뛴다.</summary>
-    private void SpawnKeyboards(BoxCollider area, int count, string areaName)
+    /// <summary>area 안에서 count개를 임의 위치와 회전으로 생성하고 regionIndex 구역에 등록한다. 영역이 없으면 areaName을 알리고 생성을 건너뛴다.</summary>
+    private void SpawnKeyboards(BoxCollider area, int count, string areaName, int regionIndex)
     {
         if (area == null) { Debug.LogWarning($"[Keyboard] Assign the {areaName} BoxCollider to spawn {count} keyboards.", this); return; }
         area.isTrigger = true;
@@ -359,9 +389,40 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             GameObject keyboard = Instantiate(_keyboardPrefab, position, Random.rotationUniform, _spawnRoot);
             keyboard.name = $"{areaName}_Keyboard_{index + 1}";
             keyboard.transform.localScale = _referenceKeyboard.transform.lossyScale;
-            RegisterKeyboard(keyboard);
+            RegisterKeyboard(keyboard, false, regionIndex);
             SpawnedKeyboardCount++;
         }
+    }
+
+    /// <summary>
+    /// 세 구역의 제거된 키보드를 목록에서 정리하고 첫 번째 구역이 비면 던지기를 세 번 요청한다.
+    /// 구역 목록과 발동 기록을 사용하며 구역당 한 번만 요청하고 던진 키보드가 제거되어도 재발동하지 않는다.
+    /// </summary>
+    private void RefreshSpawnRegions()
+    {
+        if (_regionThrowVisit == null) return;
+        for (int index = 0; index < SPAWN_REGION_COUNT; index++)
+        {
+            _regionKeyboards[index].RemoveAll(keyboard => keyboard == null);
+            if (index != 0) continue;
+            if (_regionRefillTriggered[index]) continue;
+            if (_regionKeyboards[index].Count > 0 || !_regionWasPopulated[index] || _pendingRegionThrows[index] > 0) continue;
+            _regionRefillTriggered[index] = true;
+            _pendingRegionThrows[index] = REGION_REFILL_THROW_COUNT;
+            _regionWasPopulated[index] = false;
+            _regionThrowVisit.RequestThrows(index, REGION_REFILL_THROW_COUNT);
+        }
+    }
+
+    /// <summary>
+    /// regionIndex에 해당하는 첫 번째·두 번째·세 번째 구역 안의 임의 월드 위치를 반환한다.
+    /// 구역 중심과 크기를 사용하여 보충 키보드의 던지기 도착 위치를 정한다.
+    /// </summary>
+    public Vector3 GetRegionSpawnPosition(int regionIndex)
+    {
+        BoxCollider area = regionIndex == 0 ? _firstRegion : regionIndex == 1 ? _secondRegion : _thirdRegion;
+        Vector3 offset = new Vector3(Random.Range(-0.3f, 0.3f) * area.size.x, 0f, Random.Range(-0.3f, 0.3f) * area.size.z);
+        return area.transform.TransformPoint(area.center + offset);
     }
 
     /// <summary>

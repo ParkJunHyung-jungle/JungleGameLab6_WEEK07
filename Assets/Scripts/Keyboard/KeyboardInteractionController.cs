@@ -52,6 +52,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private Quaternion _pickupRotation;
     private bool _canPlaceHeldKeyboard;
     private readonly Dictionary<Rigidbody, KeyboardState> _keyboards = new Dictionary<Rigidbody, KeyboardState>();
+    private readonly HashSet<KeyboardState> _reservedAutomaticKeyboards = new HashSet<KeyboardState>();
     public bool IsHoldingKeyboard => _heldKeyboard != null;
     public int SpawnedKeyboardCount { get; private set; }
 
@@ -587,10 +588,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public void TryPlaceAutomaticKeyboard(Collider other, KeyboardAutomaticStation station)
     {
-        if (_isShopFocused || _isPlacingKeyboard || _viewingAutomaticStation != null || station.HasKeyboard || other.gameObject != lastDroped)
+        if (_isShopFocused || _isPlacingKeyboard || _viewingAutomaticStation != null || station.HasKeyboard || station.IsAutoRefillInProgress || other.gameObject != lastDroped)
+        {
             return;
-        if (other.attachedRigidbody == null || !_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed)
+        }
+
+        if (other.attachedRigidbody == null || !_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _reservedAutomaticKeyboards.Contains(source))
+        {
             return;
+        }
         _isPlacingKeyboard = true;
         KeyboardState target = null;
         try
@@ -613,6 +619,139 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             }
             source.MarkPlacementFailed();
             Debug.LogException(exception, this);
+        }
+        finally
+        {
+            _isPlacingKeyboard = false;
+        }
+    }
+
+    /// <summary>
+    /// station에 가장 가까운 사용 가능한 월드 키보드 하나를 예약한다.
+    /// 플레이어 사용 중이거나 다른 슬롯이 예약한 원본을 제외하고 충돌과 물리를 멈춘다.
+    /// </summary>
+    public bool TryReserveAutomaticKeyboard(
+        KeyboardAutomaticStation station,
+        out KeyboardState reserved)
+    {
+        reserved = null;
+
+        if (_isPlacingKeyboard || station.HasKeyboard)
+            return false;
+
+        float closestDistance = float.PositiveInfinity;
+
+        foreach (KeyboardState state in _keyboards.Values)
+        {
+            if (state.Root == null || !state.Root.activeInHierarchy ||
+                state.Keyboard != null ||
+                state == _heldKeyboard || state == _placedKeyboard ||
+                state.PlacementFailed ||
+                _reservedAutomaticKeyboards.Contains(state) ||
+                !state.Collider.enabled ||
+                state.Body.isKinematic || !state.Body.useGravity ||
+                state.Body.position.y <= _fallReturnHeight ||
+                state.Body.linearVelocity.sqrMagnitude > 1f)
+            {
+                continue;
+            }
+
+            float distance = (state.Body.position - station.Placement.position).sqrMagnitude;
+            if (distance >= closestDistance)
+                continue;
+
+            closestDistance = distance;
+            reserved = state;
+        }
+
+        if (reserved == null)
+            return false;
+
+        _reservedAutomaticKeyboards.Add(reserved);
+        reserved.Body.linearVelocity = Vector3.zero;
+        reserved.Body.angularVelocity = Vector3.zero;
+        reserved.Body.isKinematic = true;
+        reserved.Body.useGravity = false;
+        reserved.Collider.enabled = false;
+        return true;
+    }
+
+    /// <summary>
+    /// 운반하지 못한 source를 예약 전 위치와 회전으로 복원한다.
+    /// 예약을 해제하고 원본의 물리와 충돌을 다시 활성화한다.
+    /// </summary>
+    public void ReleaseAutomaticKeyboard(
+        KeyboardState source,
+        Vector3 originalPosition,
+        Quaternion originalRotation)
+    {
+        if (source == null || !_reservedAutomaticKeyboards.Remove(source) ||
+            source.Root == null)
+        {
+            return;
+        }
+
+        source.Body.position = originalPosition;
+        source.Body.rotation = originalRotation;
+        source.Body.linearVelocity = Vector3.zero;
+        source.Body.angularVelocity = Vector3.zero;
+        source.Body.isKinematic = false;
+        source.Body.useGravity = true;
+        source.Collider.enabled = true;
+    }
+
+    /// <summary>
+    /// 예약한 실제 월드 키보드를 station용 플레이 키보드로 교체한다.
+    /// 기존 희귀도·보상 경로를 사용하고 성공 시 월드 원본 하나를 제거한다.
+    /// </summary>
+    public bool TryPlaceReservedAutomaticKeyboard(KeyboardState source, KeyboardAutomaticStation station)
+    {
+        if (source == null || !_reservedAutomaticKeyboards.Contains(source) || _isPlacingKeyboard || station.HasKeyboard)
+        {
+            return false;
+        }
+
+        _isPlacingKeyboard = true;
+        KeyboardState target = null;
+
+        try
+        {
+            try
+            {
+                target = CreatePlayableKeyboard(source, false);
+                station.AcceptKeyboard(target.Keyboard);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+
+                if (target == null || station.Keyboard != target.Keyboard)
+                {
+                    if (target != null)
+                    {
+                        _keyboards.Remove(target.Body);
+                        target.Root.SetActive(false);
+                        Destroy(target.Root);
+                    }
+
+                    return false;
+                }
+            }
+
+            _keyboards.Remove(target.Body);
+            _keyboards.Remove(source.Body);
+
+            foreach (List<GameObject> region in _regionKeyboards)
+                region.Remove(source.Root);
+
+            _reservedAutomaticKeyboards.Remove(source);
+
+            if (lastDroped == source.Collider.gameObject)
+                lastDroped = null;
+
+            source.Root.SetActive(false);
+            Destroy(source.Root);
+            return true;
         }
         finally
         {
@@ -648,7 +787,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
 
-        if (!_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed)
+        if (!_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _reservedAutomaticKeyboards.Contains(source))
         {
             return;
         }

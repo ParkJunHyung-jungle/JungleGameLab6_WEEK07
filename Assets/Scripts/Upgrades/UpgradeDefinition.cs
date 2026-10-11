@@ -57,7 +57,12 @@ namespace Game.Upgrades
         [SerializeField] private string _autoPromotedName = "Auto Smash";
         [Tooltip("승급 후 기존 원형 범위 공격에 적용할 첫 단계 반경입니다.")]
         [SerializeField, Min(0f)] private float _autoPromotionRadius = 1.5f;
+        [SerializeField, Min(1)] private int _autoRefillStartLevel = 11;
+        [SerializeField] private string _autoRefillName = "Auto Supply";
+        [SerializeField, Min(0.1f)] private float[] _autoRefillDelays = { 8f, 6f, 4f, 2f };
+
         public int AutoPromotionLevel => _autoPromotionLevel;
+        public int AutoRefillStartLevel => _autoRefillStartLevel;
 
         [Header("Area Smash")]
         [Tooltip("범위 강화의 각 레벨에서 사용하는 반경입니다. 일반 키 간격을 1로 사용합니다.")]
@@ -125,6 +130,20 @@ namespace Game.Upgrades
                 {
                     _autoAttackDamages[i] = Math.Max(1, _autoAttackDamages[i]);
                     _autoAttackSpeeds[i] = Mathf.Max(0.01f, _autoAttackSpeeds[i]);
+                }
+
+                _autoRefillStartLevel = Mathf.Max(_autoPromotionLevel + 1, _autoRefillStartLevel);
+
+                int refillLevelCount = Mathf.Max(0, MaxLevel - _autoRefillStartLevel + 1);
+                int previousLength = _autoRefillDelays?.Length ?? 0;
+                Array.Resize(ref _autoRefillDelays, refillLevelCount);
+
+                for (int index = 0; index < refillLevelCount; index++)
+                {
+                    if (index >= previousLength || _autoRefillDelays[index] <= 0f)
+                    {
+                        _autoRefillDelays[index] = index == 0 ? 8f : Mathf.Max(0.1f, _autoRefillDelays[index - 1] - 2f);
+                    }
                 }
             }
             else if (_id == UpgradeId.AreaSmash)
@@ -275,11 +294,39 @@ namespace Game.Upgrades
         }
 
         /// <summary>
-        /// level의 자동공격 승급 여부에 따른 상점 이름을 반환한다.
-        /// 기본 표시 이름과 승급 이름 설정을 사용하며 구매 상태는 변경하지 않는다.
+        /// level이 자동 보충의 첫 구매 레벨에 도달했는지 확인한다.
+        /// 시작 레벨과 최대 레벨을 사용하며 자동 보충 해금 여부를 반환한다.
+        /// </summary>
+        public bool IsAutoRefillUnlocked(int level)
+        {
+            return _autoRefillStartLevel <= MaxLevel && level >= _autoRefillStartLevel;
+        }
+
+        /// <summary>
+        /// level에 설정된 자동 보충 대기 시간을 반환한다.
+        /// 시작 레벨을 배열의 첫 항목에 대응시키며 미해금 레벨은 사용할 수 없다.
+        /// </summary>
+        public float GetAutoRefillDelay(int level)
+        {
+            if (!IsAutoRefillUnlocked(level) || level > MaxLevel)
+                throw new ArgumentOutOfRangeException(nameof(level));
+
+            int index = level - _autoRefillStartLevel;
+            if (_autoRefillDelays == null || index >= _autoRefillDelays.Length)
+                throw new InvalidOperationException("Auto refill delays must match the refill upgrade levels.");
+
+            return Mathf.Max(0.1f, _autoRefillDelays[index]);
+        }
+
+        /// <summary>
+        /// level의 자동공격 강화 단계에 해당하는 상점 이름을 반환한다.
+        /// 자동 보충, 광역 공격, 기본 공격 순서로 현재 단계의 이름을 선택한다.
         /// </summary>
         public string GetAutoAttackName(int level)
         {
+            if (IsAutoRefillUnlocked(level))
+                return _autoRefillName;
+
             return level >= _autoPromotionLevel ? _autoPromotedName : _displayName;
         }
 

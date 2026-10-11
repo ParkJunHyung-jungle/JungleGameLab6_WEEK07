@@ -64,6 +64,9 @@ namespace Game.Editor
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoPromotionLevel"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoPromotedName"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoPromotionRadius"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoRefillStartLevel"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoRefillName"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoRefillDelays"), true);
                     break;
                 case UpgradeId.SmashDamage:
                 case UpgradeId.AreaDamage:

@@ -121,6 +121,30 @@ namespace Game.Upgrades
         }
 
         /// <summary>
+        /// 현재 Auto Click 레벨에서 자동 보충이 해금되었는지 확인한다.
+        /// 등록된 정의와 구매 레벨을 사용하며 해금 여부를 반환한다.
+        /// </summary>
+        public bool IsAutoRefillUnlocked()
+        {
+            return _definitions.TryGetValue(UpgradeId.AutoClick, out UpgradeDefinition definition)
+                && definition.IsAutoRefillUnlocked(GetLevel(UpgradeId.AutoClick));
+        }
+
+        /// <summary>
+        /// 현재 Auto Click 레벨에 설정된 자동 보충 대기 시간을 조회한다.
+        /// 미해금 상태에서는 0을 반환하며 강화 상태는 변경하지 않는다.
+        /// </summary>
+        public float GetAutoRefillDelay()
+        {
+            if (!_definitions.TryGetValue(UpgradeId.AutoClick, out UpgradeDefinition definition))
+                return 0f;
+
+            int level = GetLevel(UpgradeId.AutoClick);
+            return definition.IsAutoRefillUnlocked(level)
+                ? definition.GetAutoRefillDelay(level) : 0f;
+        }
+
+        /// <summary>
         /// 현재 AreaDamage 레벨과 강화 데이터로 광역 공격의 최종 피해를 조회한다.
         /// 광역 공격력 정의가 없는 기존 세션에서는 0을 반환하며 강화 레벨과 지갑은 변경하지 않는다.
         /// </summary>

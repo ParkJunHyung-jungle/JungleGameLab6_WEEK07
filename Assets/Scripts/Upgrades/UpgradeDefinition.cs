@@ -16,6 +16,21 @@ namespace Game.Upgrades
         [Tooltip("구매 가격의 개수가 최대 레벨입니다. Element 0은 0→1레벨 가격이며, 기본 0레벨용 가격은 넣지 않습니다.")]
         [SerializeField, Min(1)] private long[] _levelCosts = { 10, 25, 60 };
 
+        [Header("Lucky Reward")]
+        [Tooltip("강화 1레벨마다 더해지는 두 배 보상 확률입니다. 0.1이면 1레벨 10%, 2레벨 20%이며 최대 100%입니다.")]
+        [SerializeField, Range(0f, 1f)] private float _doubleRewardChance = 0.1f;
+
+        [Header("Hand Power")]
+        [Tooltip("일반 강화 한 번마다 직접·범위 공격에 더하는 피해입니다. 승급 단계에서는 추가하지 않습니다.")]
+        [SerializeField, Min(0)] private int _handDamagePerLevel = 1;
+        [Tooltip("범위 증가와 이름 변경이 발생하는 구매 레벨입니다.")]
+        [SerializeField, Min(1)] private int[] _handPromotionLevels = { 6, 11 };
+        [Tooltip("첫 이름과 승급 후 이름입니다. 승급 레벨 수보다 하나 많아야 합니다.")]
+        [SerializeField] private string[] _handStageNames = { "Hand Upgrade", "Fist Upgrade", "Hammer Upgrade" };
+        [Tooltip("첫 승급의 반경입니다. 기존 범위 공격의 기본 반경 1.5를 사용합니다.")]
+        [SerializeField, Min(0f)] private float _handFirstPromotionRadius = 1.5f;
+        [SerializeField, Min(0f)] private float _handRadiusPerPromotion = 1f;
+
         [Header("Damage")]
         [Tooltip("직접·광역·자동 공격력 강화의 각 레벨에서 기본 공격력에 더하는 누적 추가 피해입니다. Element 0은 1레벨입니다.")]
         [SerializeField, Min(0)] private int[] _damageBonuses = { 1, 2, 3 };
@@ -25,6 +40,12 @@ namespace Game.Upgrades
         [SerializeField, Min(1)] private int[] _autoAttackDamages = { 1, 2, 3 };
         [Tooltip("기계팔 하나의 최종 초당 공격 횟수입니다. Element 0은 1레벨입니다.")]
         [SerializeField, Min(0.01f)] private float[] _autoAttackSpeeds = { 1f, 2f, 3f };
+        [Tooltip("자동공격이 범위 공격으로 승급하는 구매 레벨입니다.")]
+        [SerializeField, Min(1)] private int _autoPromotionLevel = 6;
+        [SerializeField] private string _autoPromotedName = "Auto Smash";
+        [Tooltip("승급 후 기존 원형 범위 공격에 적용할 첫 단계 반경입니다.")]
+        [SerializeField, Min(0f)] private float _autoPromotionRadius = 1.5f;
+        public int AutoPromotionLevel => _autoPromotionLevel;
 
         [Header("Area Smash")]
         [Tooltip("범위 강화의 각 레벨에서 사용하는 반경입니다. 일반 키 간격을 1로 사용합니다.")]
@@ -60,6 +81,16 @@ namespace Game.Upgrades
 
         void OnValidate()
         {
+            if (_id == UpgradeId.HandPower)
+            {
+                Array.Sort(_handPromotionLevels);
+                for (int index = 0; index < _handPromotionLevels.Length; index++)
+                    _handPromotionLevels[index] = Math.Max(index == 0 ? 1 : _handPromotionLevels[index - 1] + 1, _handPromotionLevels[index]);
+                int previousLength = _handStageNames.Length;
+                Array.Resize(ref _handStageNames, _handPromotionLevels.Length + 1);
+                for (int index = previousLength; index < _handStageNames.Length; index++)
+                    _handStageNames[index] = $"Stage {index + 1} Upgrade";
+            }
             for (int i = 0; i < _levelCosts.Length; i++)
             {
                 _levelCosts[i] = Math.Max(1, _levelCosts[i]);
@@ -137,6 +168,116 @@ namespace Game.Upgrades
             }
 
             return _levelCosts[currentLevel];
+        }
+
+        /// <summary>
+        /// level에 레벨당 추가 확률을 곱해 두 배 보상의 누적 확률을 반환한다.
+        /// 구매 레벨과 _doubleRewardChance를 사용하며 미구매 상태는 0, 최대 확률은 1로 제한한다.
+        /// </summary>
+        public float GetDoubleRewardChance(int level)
+        {
+            if (level < 0 || level > MaxLevel)
+                throw new ArgumentOutOfRangeException(nameof(level));
+            return Mathf.Clamp01(Mathf.Clamp01(_doubleRewardChance) * level);
+        }
+
+        /// <summary>
+        /// level까지 구매한 승급 횟수를 반환한다.
+        /// 설정된 승급 레벨을 사용하며 효과 데이터와 구매 상태는 변경하지 않는다.
+        /// </summary>
+        private int GetHandPromotionCount(int level)
+        {
+            int count = 0;
+            foreach (int promotion in _handPromotionLevels)
+                if (promotion > 0 && level >= promotion) count++;
+            return count;
+        }
+
+        /// <summary>
+        /// level의 일반 강화 횟수에 따른 누적 추가 피해를 반환한다.
+        /// 승급 횟수를 제외하고 레벨당 피해 증가량을 곱해 직접·범위 공격 보너스를 계산한다.
+        /// </summary>
+        public int GetHandDamageBonus(int level)
+        {
+            return Mathf.Max(0, level - GetHandPromotionCount(level)) * _handDamagePerLevel;
+        }
+
+        /// <summary>
+        /// level의 승급 횟수에 따른 최종 공격 반경을 반환한다.
+        /// 기존 첫 반경과 이후 승급당 증가량을 사용하며 첫 승급 전 반경은 0이다.
+        /// </summary>
+        public float GetHandRadius(int level)
+        {
+            int promotions = GetHandPromotionCount(level);
+            return promotions == 0 ? 0f : _handFirstPromotionRadius + (promotions - 1) * _handRadiusPerPromotion;
+        }
+
+        /// <summary>
+        /// level의 승급 단계에 해당하는 상점 이름을 반환한다.
+        /// 단계 이름 배열을 사용하며 추가 이름이 없으면 마지막 이름을 유지한다.
+        /// </summary>
+        public string GetHandName(int level)
+        {
+            return _handStageNames[Mathf.Min(GetHandPromotionCount(level), _handStageNames.Length - 1)];
+        }
+
+        /// <summary>
+        /// level이 승급 구매인지 반환한다.
+        /// 승급 레벨 배열에서 해당 값을 검색하며 구매 상태는 변경하지 않는다.
+        /// </summary>
+        public bool IsHandPromotion(int level)
+        {
+            return Array.IndexOf(_handPromotionLevels, level) >= 0;
+        }
+
+        /// <summary>
+        /// level의 자동공격 승급 여부에 따른 공격 범위를 반환한다.
+        /// 승급 레벨과 반경 설정을 사용하며 승급 전에는 단일 공격을 의미하는 0을 반환한다.
+        /// </summary>
+        public float GetAutoAttackRadius(int level)
+        {
+            return level >= _autoPromotionLevel ? _autoPromotionRadius : 0f;
+        }
+
+        /// <summary>
+        /// level의 자동공격 승급 여부에 따른 상점 이름을 반환한다.
+        /// 기본 표시 이름과 승급 이름 설정을 사용하며 구매 상태는 변경하지 않는다.
+        /// </summary>
+        public string GetAutoAttackName(int level)
+        {
+            return level >= _autoPromotionLevel ? _autoPromotedName : _displayName;
+        }
+
+        /// <summary>
+        /// 전체 구매 level을 현재 손·주먹·망치 단계 안의 표시 레벨로 변환한다.
+        /// 가장 최근 승급 레벨을 사용하며 승급 직후 1, 미구매 상태는 0을 반환한다.
+        /// </summary>
+        public int GetHandStageLevel(int level)
+        {
+            int start = 1;
+            foreach (int promotion in _handPromotionLevels)
+                if (level >= promotion) start = promotion;
+            return level == 0 ? 0 : level - start + 1;
+        }
+
+        /// <summary>
+        /// level이 속한 강화 단계의 표시 최대 레벨을 반환한다.
+        /// 현재·다음 승급 레벨과 MaxLevel을 사용하여 해당 단계의 구매 구간 길이를 계산한다.
+        /// </summary>
+        public int GetHandStageMaxLevel(int level)
+        {
+            int start = 1;
+            int end = MaxLevel;
+            foreach (int promotion in _handPromotionLevels)
+            {
+                if (level >= promotion) start = promotion;
+                else
+                {
+                    end = promotion - 1;
+                    break;
+                }
+            }
+            return Mathf.Max(1, end - start + 1);
         }
 
         /// <summary>

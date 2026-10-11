@@ -211,7 +211,8 @@ namespace KeyboardModeling
                     return;
                 }
 
-                if (pressedThisFrame && _keycapButtons[index].isActiveAndEnabled && _keycapHealths[index] != null)
+                if (pressedThisFrame && _keycapHealths[index] != null &&
+                    (_keycapHealths[index].CurrentHP == 0 || _keycapButtons[index].isActiveAndEnabled))
                 {
                     AttackRequested?.Invoke(_keycapHealths[index]);
                     if (!_inputEnabled || !isActiveAndEnabled)

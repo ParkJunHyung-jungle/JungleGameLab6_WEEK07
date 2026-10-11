@@ -163,7 +163,7 @@ namespace KeyboardModeling
         /// keyboard에 범위 타격 효과를 알리고 keycaps와 positions에서 center와 radius 안의 살아 있는 주변 키캡을 타격한다.
         /// targetIndex를 제외하고 damage를 한 번씩 적용하며 destruction의 파괴가 시작되면 남은 처리를 중단한다.
         /// </summary>
-        private void ApplyAreaDamage(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex, Vector2 center, float radius, int damage)
+        public static void ApplyAreaDamage(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex, Vector2 center, float radius, int damage)
         {
             if (radius <= 0f || damage <= 0)
             {

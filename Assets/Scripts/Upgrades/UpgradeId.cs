@@ -8,6 +8,8 @@ namespace Game.Upgrades
         AreaDamage = 3,
         RareKeycapQuality = 4,
         FeverDuration = 5,
-        FeverDamageMultiplier = 6
+        FeverDamageMultiplier = 6,
+        LuckyReward = 7,
+        HandPower = 8
     }
 }

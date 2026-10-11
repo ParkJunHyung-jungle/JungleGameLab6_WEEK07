@@ -80,6 +80,9 @@ namespace Game.Economy
         private void OnKeycapBroken(KeycapHealth keycap)
         {
             long reward = keycap.HasSpawnData ? keycap.Reward : _rewardPerKeycap;
+            float chance = _gameSession.Upgrades.GetDoubleRewardChance();
+            if (chance > 0f && UnityEngine.Random.value < chance)
+                reward = checked(reward * 2);
             _gameSession.Wallet.Add(reward);
             RewardGranted?.Invoke(reward, keycap.transform.position);
         }

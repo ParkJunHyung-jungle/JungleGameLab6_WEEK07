@@ -24,6 +24,8 @@ namespace KeyboardModeling
         [Tooltip("기본 모델에서 흰색인 키의 식별자입니다. 실행 중 등급 색상은 대상 판정에 사용하지 않습니다.")]
         [SerializeField] private Key[] _eligibleKeys;
         private readonly List<KeycapHealth> _targets = new List<KeycapHealth>();
+        private KeycapHealth[] _areaTargets = System.Array.Empty<KeycapHealth>();
+        private Vector2[] _areaPositions = System.Array.Empty<Vector2>();
         private double _nextAttackAt;
         private float _attackInterval;
         private bool _unlocked;
@@ -113,9 +115,18 @@ namespace KeyboardModeling
                 return false;
             if (!_arm.PressKeyAutomatically(target.transform))
                 return false;
+            KeyboardInputController keyboard = _keyboard;
+            KeyboardDestruction destruction = _destruction;
+            KeycapHealth[] areaTargets = _areaTargets;
+            Vector2[] areaPositions = _areaPositions;
+            int index = System.Array.IndexOf(areaTargets, target);
+            int damage = _upgrades.GetAutoAttackDamage();
+            float radius = _upgrades.GetAutoAttackRadius();
             AdvanceAttackClock();
-            _keyboard.NotifyAutomaticKeycapHit(target.transform);
-            target.TakeDamage(_upgrades.GetAutoAttackDamage());
+            keyboard.NotifyAutomaticKeycapHit(target.transform);
+            target.TakeDamage(damage);
+            if (index >= 0)
+                KeyboardAttackController.ApplyAreaDamage(keyboard, destruction, areaTargets, areaPositions, index, areaPositions[index], radius, damage);
             return true;
         }
 
@@ -128,11 +139,20 @@ namespace KeyboardModeling
             _keyboard = keyboard;
             _destruction = null;
             _targets.Clear();
+            _areaTargets = System.Array.Empty<KeycapHealth>();
+            _areaPositions = System.Array.Empty<Vector2>();
             if (_stationFeedback != null)
                 _stationFeedback.SetAutomaticKeyboard(_keyboard);
             if (_keyboard == null)
                 return;
             _destruction = _keyboard.GetComponent<KeyboardDestruction>();
+            _areaTargets = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+            _areaPositions = new Vector2[_areaTargets.Length];
+            for (int index = 0; index < _areaTargets.Length; index++)
+            {
+                Vector3 position = _keyboard.transform.InverseTransformPoint(_areaTargets[index].transform.position);
+                _areaPositions[index] = new Vector2(position.x, position.z);
+            }
             IReadOnlyDictionary<Key, KeycapHealth> layout = _keyboard.GetKeycapLayout();
             foreach (Key key in _eligibleKeys)
             {

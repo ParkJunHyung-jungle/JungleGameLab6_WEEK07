@@ -55,7 +55,19 @@ namespace Game.Upgrades
         /// </summary>
         public int GetDamageBonus()
         {
+            if (_definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand))
+                return hand.GetHandDamageBonus(GetLevel(UpgradeId.HandPower));
             return _definitions[UpgradeId.SmashDamage].GetDamageBonus(_levels[UpgradeId.SmashDamage]);
+        }
+
+        /// <summary>
+        /// LuckyReward 구매 레벨과 레벨당 추가 확률로 두 배 지급의 누적 확률을 조회한다.
+        /// 미등록 또는 미구매 상태는 0을 반환하며 재화와 강화 레벨은 변경하지 않는다.
+        /// </summary>
+        public float GetDoubleRewardChance()
+        {
+            return _definitions.TryGetValue(UpgradeId.LuckyReward, out UpgradeDefinition definition) && GetLevel(UpgradeId.LuckyReward) > 0
+                ? definition.GetDoubleRewardChance(GetLevel(UpgradeId.LuckyReward)) : 0f;
         }
 
         /// <summary>
@@ -79,11 +91,23 @@ namespace Game.Upgrades
         }
 
         /// <summary>
+        /// 현재 자동공격 구매 레벨에서 승급 반경을 조회한다.
+        /// AutoClick 정의와 레벨을 사용하며 미등록 또는 승급 전에는 0을 반환한다.
+        /// </summary>
+        public float GetAutoAttackRadius()
+        {
+            return _definitions.TryGetValue(UpgradeId.AutoClick, out UpgradeDefinition definition)
+                ? definition.GetAutoAttackRadius(GetLevel(UpgradeId.AutoClick)) : 0f;
+        }
+
+        /// <summary>
         /// 현재 AreaDamage 레벨과 강화 데이터로 광역 공격의 최종 피해를 조회한다.
         /// 광역 공격력 정의가 없는 기존 세션에서는 0을 반환하며 강화 레벨과 지갑은 변경하지 않는다.
         /// </summary>
         public int GetAreaDamageBonus()
         {
+            if (_definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand))
+                return hand.GetHandDamageBonus(GetLevel(UpgradeId.HandPower));
             if (!_definitions.TryGetValue(UpgradeId.AreaDamage, out UpgradeDefinition definition))
             {
                 return 0;
@@ -98,6 +122,8 @@ namespace Game.Upgrades
         /// </summary>
         public float GetAreaRadius()
         {
+            if (_definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand))
+                return hand.GetHandRadius(GetLevel(UpgradeId.HandPower));
             return _definitions[UpgradeId.AreaSmash].GetAreaRadius(_levels[UpgradeId.AreaSmash]);
         }
 

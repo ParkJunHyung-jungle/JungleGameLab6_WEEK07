@@ -42,10 +42,24 @@ namespace Game.Editor
         {
             switch (id)
             {
+                case UpgradeId.HandPower:
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_handDamagePerLevel"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_handPromotionLevels"), true);
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_handStageNames"), true);
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_handFirstPromotionRadius"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_handRadiusPerPromotion"));
+                    break;
+                case UpgradeId.LuckyReward:
+                    EditorGUILayout.HelpBox("확률은 레벨마다 누적됩니다. 0.1이면 1레벨 10%, 2레벨 20%입니다. Level Costs에 가격을 추가하면 구매 레벨이 늘어납니다.", MessageType.Info);
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_doubleRewardChance"));
+                    break;
                 case UpgradeId.AutoClick:
                     EditorGUILayout.HelpBox("Element 0 = 1레벨. 공격력과 팔 하나의 초당 공격 횟수를 최종값으로 입력합니다.", MessageType.Info);
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoAttackDamages"), true);
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoAttackSpeeds"), true);
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoPromotionLevel"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoPromotedName"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_autoPromotionRadius"));
                     break;
                 case UpgradeId.SmashDamage:
                 case UpgradeId.AreaDamage:

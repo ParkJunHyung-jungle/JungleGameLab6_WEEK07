@@ -41,7 +41,7 @@ namespace Game.Shop
             {
                 ConfigureQualityLayout();
             }
-            else if (definition.Id == UpgradeId.FeverDuration || definition.Id == UpgradeId.FeverDamageMultiplier)
+            else if (definition.Id == UpgradeId.FeverDuration || definition.Id == UpgradeId.FeverDamageMultiplier || definition.Id == UpgradeId.LuckyReward || definition.Id == UpgradeId.HandPower || definition.Id == UpgradeId.AutoClick)
             {
                 ConfigureFeverLayout();
             }
@@ -65,7 +65,38 @@ namespace Game.Shop
             _buttonText.text = isMaxLevel ? "MAX" : requiresAreaSmash ? "LOCKED" : "Buy";
             _purchaseButton.interactable = purchaseStatus == PurchaseResult.Success;
 
-            if (_definition.Id == UpgradeId.RareKeycapQuality)
+            if (_definition.Id == UpgradeId.HandPower)
+            {
+                _levelText.text = $"Lv {_definition.GetHandStageLevel(level)}/{_definition.GetHandStageMaxLevel(level)}";
+                _nameText.text = $"{_definition.GetHandName(level)}\nDamage +{_definition.GetHandDamageBonus(level)}";
+                if (!isMaxLevel)
+                {
+                    if (_definition.IsHandPromotion(level + 1))
+                        _buttonText.text = "Promote";
+                    else
+                        _nameText.text += $" -> +{_definition.GetHandDamageBonus(level + 1)}";
+                }
+            }
+            else if (_definition.Id == UpgradeId.AutoClick)
+            {
+                int promotion = _definition.AutoPromotionLevel;
+                int localLevel = level >= promotion ? level - promotion + 1 : level;
+                int localMax = level >= promotion ? _definition.MaxLevel - promotion + 1 : Mathf.Min(_definition.MaxLevel, promotion - 1);
+                _levelText.text = $"Lv {localLevel}/{localMax}";
+                _nameText.text = $"{_definition.GetAutoAttackName(level)}\nDamage {_definition.GetAutoAttackDamage(level)}, {_definition.GetAutoAttackSpeed(level):0.##}/s";
+                if (!isMaxLevel)
+                {
+                    if (level + 1 == promotion) _buttonText.text = "Promote";
+                    else _nameText.text += $" -> {_definition.GetAutoAttackDamage(level + 1)}, {_definition.GetAutoAttackSpeed(level + 1):0.##}/s";
+                }
+            }
+            else if (_definition.Id == UpgradeId.LuckyReward)
+            {
+                _nameText.text = $"{_definition.DisplayName}\n{_definition.GetDoubleRewardChance(level):P0} chance: reward x2";
+                if (!isMaxLevel)
+                    _nameText.text += $" -> {_definition.GetDoubleRewardChance(level + 1):P0}";
+            }
+            else if (_definition.Id == UpgradeId.RareKeycapQuality)
             {
                 _nameText.text = $"{_definition.DisplayName} (Next keyboard)\n{FormatRarityDistribution(level)}";
                 if (!isMaxLevel)

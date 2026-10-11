@@ -24,6 +24,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
     private MaterialPropertyBlock _fistProperties;
     private List<MeshRenderer> _fistRenderers = new List<MeshRenderer>();
     private Stack<MeshRenderer> _availableFists = new Stack<MeshRenderer>();
+    public event Action<Vector3> FistImpact;
 
     [Header("Fragments")]
     [SerializeField, Min(0f)] private float _upwardSpeed = 1.5f;
@@ -178,6 +179,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
         }
 
         UpdateFistPose(fist, viewCamera, transform.TransformPoint(localImpactContact), 0f, 1f, fistHeight);
+        FistImpact?.Invoke(transform.TransformPoint(localImpactContact));
         onImpact();
         elapsed = 0f;
         while (elapsed < holdDuration)

@@ -86,6 +86,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private Transform _openingCeiling;
     private KeyboardState _openingKeyboard;
 
+    [Header("Fist Camera Shake")]
+    [SerializeField] private CinemachineImpulseSource _fistImpulseSource;
+
     [Header("Keycap Quality")]
     [SerializeField] private GameSession _gameSession;
     [SerializeField] private KeyboardRewardController _rewardController;
@@ -329,6 +332,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (isPlayable)
         {
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
+            if (_fistImpulseSource != null) destruction.FistImpact += HandleFistImpact;
             destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
         }
         return state;
@@ -341,6 +345,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public void ConfigureFistAnimation(KeyboardDestruction destruction)
     {
         destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset, _fistMaterial);
+    }
+
+    /// <summary>
+    /// 주먹이 닿은 position에서 설정된 Impulse 신호를 발생시킨다.
+    /// 활성 상태의 SmashMode에서만 부수기 카메라에 타격 흔들림을 전달한다.
+    /// </summary>
+    private void HandleFistImpact(Vector3 position)
+    {
+        if (!isActiveAndEnabled || !IsSmashMode) return;
+        _fistImpulseSource.GenerateImpulseAtPositionWithVelocity(position, _fistImpulseSource.DefaultVelocity);
     }
 
     /// <summary>

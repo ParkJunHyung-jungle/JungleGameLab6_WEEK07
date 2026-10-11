@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 27118944}
   - component: {fileID: 27118945}
   - component: {fileID: 27118946}
+  - component: {fileID: 9800000001}
   m_Layer: 0
   m_Name: SmashModeTrigger
   m_TagString: Untagged
@@ -220,6 +221,7 @@ MonoBehaviour:
   _controller: {fileID: 0}
   _shopView: {fileID: 641087396}
   _monitorController: {fileID: 1068726019}
+  _fistImpulseSource: {fileID: 9800000001}
 --- !u!114 &27118946
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1702,6 +1704,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1022828483}
   - component: {fileID: 1022828482}
+  - component: {fileID: 9800000002}
   m_Layer: 0
   m_Name: FixedCam
   m_TagString: Untagged
@@ -3560,6 +3563,83 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6296055223845996250, guid: 7a056df9578f141428926d323771173b, type: 3}
   m_PrefabInstance: {fileID: 7940145484255243565}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &9800000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 27118942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 180ecf9b41d478f468eb3e9083753217, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseSource
+  ImpulseDefinition:
+    ImpulseChannel: 16
+    ImpulseShape: 2
+    CustomImpulseShape:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    ImpulseDuration: 0.18
+    ImpulseType: 0
+    DissipationRate: 0.25
+    RawSignal: {fileID: 0}
+    AmplitudeGain: 1
+    FrequencyGain: 1
+    RepeatMode: 0
+    Randomize: 1
+    TimeEnvelope:
+      AttackShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      DecayShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      AttackTime: 0
+      SustainTime: 0.2
+      DecayTime: 0.7
+      ScaleWithImpact: 1
+      HoldForever: 0
+    ImpactRadius: 100
+    DirectionMode: 0
+    DissipationMode: 2
+    DissipationDistance: 100
+    PropagationSpeed: 343
+  DefaultVelocity: {x: 0.03, y: 0, z: 0}
+--- !u!114 &9800000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1022828481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00b2d199b96b516448144ab30fb26aed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseListener
+  ApplyAfter: 2
+  ChannelMask: 16
+  Gain: 1
+  Use2DDistance: 0
+  UseCameraSpace: 1
+  SignalCombinationMode: 1
+  ReactionSettings:
+    m_SecondaryNoise: {fileID: 0}
+    AmplitudeGain: 0
+    FrequencyGain: 1
+    Duration: 0.18
+    m_NoiseOffsets: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

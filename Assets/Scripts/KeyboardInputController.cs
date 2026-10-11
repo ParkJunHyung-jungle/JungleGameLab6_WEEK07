@@ -39,6 +39,8 @@ namespace KeyboardModeling
         private float _lastPressDistance;
         private bool _hitStopEnabled;
         private bool[] _actuatedKeys;
+        private float[] _waveOffsets;
+        private readonly Dictionary<Transform, int> _waveBindingIndices = new Dictionary<Transform, int>();
 
         [Header("Debug")]
         [SerializeField] private bool _logInput = true;
@@ -137,6 +139,7 @@ namespace KeyboardModeling
         void Awake()
         {
             _actuatedKeys = new bool[_bindings.Length];
+            _waveOffsets = new float[_bindings.Length];
             _restPositions = new Vector3[_bindings.Length];
             _pressAmounts = new float[_bindings.Length];
             _previousPressed = new bool[_bindings.Length];
@@ -146,6 +149,7 @@ namespace KeyboardModeling
             for (int index = 0; index < _bindings.Length; index++)
             {
                 _restPositions[index] = _bindings[index].Keycap.localPosition;
+                _waveBindingIndices[_bindings[index].Keycap] = index;
                 _keycapButtons[index] = _bindings[index].Keycap.GetComponent<KeycapButton>();
                 _keycapHealths[index] = _bindings[index].Keycap.GetComponent<KeycapHealth>();
             }
@@ -360,7 +364,7 @@ namespace KeyboardModeling
                 return;
 
             _pressAmounts[index] = Mathf.MoveTowards(_pressAmounts[index], targetAmount, _animationSpeed * deltaTime);
-            _bindings[index].Keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * _pressAmounts[index]);
+            _bindings[index].Keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * _pressAmounts[index]) + Vector3.up * _waveOffsets[index];
         }
         /// <summary>
         /// 키캡 애니메이션의 히트스톱 연동 여부를 설정한다.
@@ -384,10 +388,21 @@ namespace KeyboardModeling
                 _actuatedKeys[index] = pressed;
                 float amount = pressed || _previousPressed[index] ? 1f : 0f;
                 _pressAmounts[index] = amount;
-                keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * amount);
+                keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * amount) + Vector3.up * _waveOffsets[index];
                 return;
             }
         }
+        /// <summary>
+        /// keycap의 충격파 높이에 delta를 더하고 기존 눌림 위치와 합쳐 표시한다.
+        /// 바인딩 인덱스와 누적 높이를 사용하여 겹치는 충격파를 독립적으로 더하거나 제거한다.
+        /// </summary>
+        public void AddKeycapWaveOffset(Transform keycap, float delta)
+        {
+            if (!_waveBindingIndices.TryGetValue(keycap, out int index)) return;
+            _waveOffsets[index] += delta;
+            keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * _pressAmounts[index]) + Vector3.up * _waveOffsets[index];
+        }
+
         /// <summary>
         /// 현재 눌린 키 목록을 문자열로 갱신한다.
         /// _previousPressed와 _bindings를 사용하여 입력 변화 시에만 _currentPressedKeys를 다시 만든다.
@@ -421,8 +436,9 @@ namespace KeyboardModeling
                     Debug.Log("[Keyboard][Model] RESET " + _bindings[index].Key, this);
                 _previousPressed[index] = false;
                 _actuatedKeys[index] = false;
-                if (_pressAmounts[index] != 0f)
+                if (_pressAmounts[index] != 0f || _waveOffsets[index] != 0f)
                     _bindings[index].Keycap.localPosition = _restPositions[index];
+                _waveOffsets[index] = 0f;
                 _pressAmounts[index] = 0f;
                 _keycapButtons[index].ResetPressState();
             }

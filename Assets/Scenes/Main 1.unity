@@ -213,6 +213,25 @@ MonoBehaviour:
   _keyboardFragmentsPrefab: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
   _destructionFistSprite: {fileID: 21300000, guid: 04e0a1508ba5bf24c856967e39bf1e6d, type: 3}
   _fistMaterial: {fileID: 2100000, guid: 43c9cbe2ad8adeb47b9aaac1c2d505c9, type: 2}
+  _hammerSprite: {fileID: 21300000, guid: 2a2d2a4d10436db45a6986a0928df040, type: 3}
+  _hammerAnimation:
+    _height: 1.8
+    _sideOffset: -1
+    _lift: 0.45
+    _startAngle: -45
+    _impactAngle: -135
+    _headContact: {x: 0.18, y: 0.78}
+    _gripPoint: {x: 0.48, y: 0.1}
+    _appearDuration: 0.12
+    _prepareDuration: 0.1
+    _swingDuration: 0.18
+    _holdDuration: 0.15
+    _waveSpeed: 22
+    _showWaveRing: 1
+    _waveHeight: 0.25
+    _waveDuration: 0.35
+    _waveWidth: 0.03
+    _waveColor: {r: 1, g: 0.75, b: 0.25, a: 1}
   _fistHeight: 2
   _fistLift: 0.8
   _keycapFistImpactOffset: {x: 0, y: 0, z: 0}

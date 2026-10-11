@@ -43,6 +43,13 @@ namespace Game.Upgrades
         [Tooltip("주먹 승급부터 단계마다 더하는 발동 확률입니다. 0.06이면 6%, 12%, 18%, 24%, 30%이며 최대 30%입니다.")]
         [SerializeField, Range(0f, 0.3f)] private float _fistChancePerLevel = 0.06f;
 
+        [Header("Hammer Bonus Attack")]
+        [Tooltip("망치 승급 시 해금되는 별도 추가 타격의 기본 피해입니다.")]
+        [SerializeField, Min(1)] private int _hammerBaseDamage = 10;
+        [SerializeField, Min(0)] private int _hammerDamagePerLevel = 2;
+        [Tooltip("망치 승급부터 단계마다 더하는 독립 발동 확률입니다. 최대 30%입니다.")]
+        [SerializeField, Range(0f, 0.3f)] private float _hammerChancePerLevel = 0.06f;
+
         [Header("Damage")]
         [Tooltip("직접·광역·자동 공격력 강화의 각 레벨에서 기본 공격력에 더하는 누적 추가 피해입니다. Element 0은 1레벨입니다.")]
         [SerializeField, Min(0)] private int[] _damageBonuses = { 1, 2, 3 };
@@ -222,19 +229,50 @@ namespace Game.Upgrades
         public float GetFistChance(int level)
         {
             if (_handPromotionLevels.Length == 0 || level < _handPromotionLevels[0]) return 0f;
-            int fistLevel = level - _handPromotionLevels[0] + 1;
+            int effectiveLevel = _handPromotionLevels.Length > 1 ? Mathf.Min(level, _handPromotionLevels[1] - 1) : level;
+            int fistLevel = effectiveLevel - _handPromotionLevels[0] + 1;
             return Mathf.Clamp(fistLevel * _fistChancePerLevel, 0f, MAX_FIST_CHANCE);
         }
 
         /// <summary>
         /// level의 주먹 추가 타격 피해를 기본 피해와 일반 강화 증가량으로 계산한다.
-        /// 주먹 승급 전에는 0을 반환하고 이후 승급 구매는 피해 증가 횟수에서 제외한다.
+        /// 주먹 승급 전에는 0을 반환하고 망치 단계의 구매는 주먹 피해 증가에 포함하지 않는다.
         /// </summary>
         public int GetFistDamage(int level)
         {
             if (_handPromotionLevels.Length == 0 || level < _handPromotionLevels[0]) return 0;
-            int upgrades = Mathf.Max(0, level - _handPromotionLevels[0] - (GetHandPromotionCount(level) - 1));
+            int fistLevel = _handPromotionLevels.Length > 1 ? Mathf.Min(level, _handPromotionLevels[1] - 1) : level;
+            int upgrades = Mathf.Max(0, fistLevel - _handPromotionLevels[0] - (GetHandPromotionCount(fistLevel) - 1));
             return _fistBaseDamage + upgrades * _fistDamagePerLevel;
+        }
+
+        /// <summary>
+        /// level이 두 번째 손 강화 승급인 망치 단계에 도달했는지 반환한다.
+        /// 승급 레벨 배열을 사용하며 구매 레벨이나 강화 데이터를 변경하지 않는다.
+        /// </summary>
+        public bool IsHammerUnlocked(int level)
+        {
+            return _handPromotionLevels.Length > 1 && level >= _handPromotionLevels[1];
+        }
+
+        /// <summary>
+        /// level과 망치 승급 레벨로 주먹과 독립적인 망치 발동 확률을 계산한다.
+        /// 승급 전에는 0을 반환하며 레벨당 확률을 더하되 최대 30%로 제한한다.
+        /// </summary>
+        public float GetHammerChance(int level)
+        {
+            return IsHammerUnlocked(level)
+                ? Mathf.Clamp((level - _handPromotionLevels[1] + 1) * _hammerChancePerLevel, 0f, MAX_FIST_CHANCE) : 0f;
+        }
+
+        /// <summary>
+        /// level의 망치 추가 피해를 망치 기본 피해와 레벨당 증가량으로 계산한다.
+        /// 승급 전에는 0을 반환하며 손과 주먹 피해에는 영향을 주지 않는다.
+        /// </summary>
+        public int GetHammerDamage(int level)
+        {
+            return IsHammerUnlocked(level)
+                ? _hammerBaseDamage + (level - _handPromotionLevels[1]) * _hammerDamagePerLevel : 0;
         }
 
         /// <summary>

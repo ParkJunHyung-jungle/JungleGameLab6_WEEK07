@@ -52,6 +52,9 @@ namespace Game.Editor
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_fistBaseDamage"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_fistDamagePerLevel"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_fistChancePerLevel"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_hammerBaseDamage"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_hammerDamagePerLevel"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_hammerChancePerLevel"));
                     break;
                 case UpgradeId.LuckyReward:
                     EditorGUILayout.HelpBox("확률은 레벨마다 누적됩니다. 0.1이면 1레벨 10%, 2레벨 20%입니다. Level Costs에 가격을 추가하면 구매 레벨이 늘어납니다.", MessageType.Info);

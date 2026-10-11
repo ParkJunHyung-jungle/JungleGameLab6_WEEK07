@@ -119,6 +119,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [Tooltip("타격 위치에서 주먹을 유지하는 시간입니다. 시간이 지나면 이동이나 페이드 없이 즉시 사라집니다. 단위는 초입니다.")]
     [SerializeField, Min(0.01f)] private float _retreatDuration = 0.25f;
 
+    [Header("Hammer Animation")]
+    [SerializeField] private Sprite _hammerSprite;
+    [SerializeField] private KeyboardDestruction.HammerAnimationSettings _hammerAnimation = new KeyboardDestruction.HammerAnimationSettings();
+
     [Header("monitor")]
     [SerializeField] private MiniGameController _controller;
     public bool IsMiniGameRunning => _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
@@ -149,6 +153,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             _destructionFistSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Fist.png");
         if (_fistMaterial == null)
             _fistMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Resource/Sprites/Materials/Fist.mat");
+        if (_hammerSprite == null && gameObject.scene.name == "Main 1")
+            _hammerSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Hammer.png");
 #endif
         _gameSession = FindAnyObjectByType<GameSession>();
         _rewardController = FindAnyObjectByType<KeyboardRewardController>();
@@ -339,12 +345,13 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// Inspector에 설정한 주먹 크기, 등장 높이, 최종 타격 위치 보정값과 각 동작 시간을 destruction에 전달한다.
+    /// Inspector에 설정한 주먹 및 망치 이미지, 크기, 이동과 타격 설정을 destruction에 전달한다.
     /// 일반 키보드와 자동 작업대 키보드의 파괴 연출 설정을 동일하게 변경한다.
     /// </summary>
     public void ConfigureFistAnimation(KeyboardDestruction destruction)
     {
         destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset, _fistMaterial);
+        destruction.ConfigureHammerAnimation(_hammerSprite, _hammerAnimation);
     }
 
     /// <summary>

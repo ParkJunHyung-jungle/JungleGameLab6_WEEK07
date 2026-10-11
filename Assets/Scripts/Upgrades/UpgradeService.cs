@@ -81,6 +81,36 @@ namespace Game.Upgrades
         }
 
         /// <summary>
+        /// 현재 HandPower 정의와 구매 레벨로 망치 승급 여부를 반환한다.
+        /// 강화 정의가 없는 세션에서는 false를 반환하며 상태는 변경하지 않는다.
+        /// </summary>
+        public bool IsHammerUnlocked()
+        {
+            return _definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand)
+                && hand.IsHammerUnlocked(GetLevel(UpgradeId.HandPower));
+        }
+
+        /// <summary>
+        /// 현재 HandPower 레벨에서 망치의 독립 발동 확률을 조회한다.
+        /// 정의가 없거나 망치 승급 전이면 0을 반환하며 주먹 확률은 변경하지 않는다.
+        /// </summary>
+        public float GetHammerChance()
+        {
+            return _definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand)
+                ? hand.GetHammerChance(GetLevel(UpgradeId.HandPower)) : 0f;
+        }
+
+        /// <summary>
+        /// 현재 HandPower 레벨에서 손·주먹과 분리된 망치 추가 피해를 조회한다.
+        /// 정의가 없거나 망치 승급 전이면 0을 반환하며 구매 상태는 변경하지 않는다.
+        /// </summary>
+        public int GetHammerDamage()
+        {
+            return _definitions.TryGetValue(UpgradeId.HandPower, out UpgradeDefinition hand)
+                ? hand.GetHammerDamage(GetLevel(UpgradeId.HandPower)) : 0;
+        }
+
+        /// <summary>
         /// LuckyReward 구매 레벨과 레벨당 추가 확률로 두 배 지급의 누적 확률을 조회한다.
         /// 미등록 또는 미구매 상태는 0을 반환하며 재화와 강화 레벨은 변경하지 않는다.
         /// </summary>

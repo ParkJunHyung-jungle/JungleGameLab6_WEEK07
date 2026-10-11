@@ -121,16 +121,21 @@ namespace KeyboardModeling
                 : 0f;
             float fistChance = _gameSession != null ? _gameSession.Upgrades.GetFistChance() : 0f;
             int fistBaseDamage = _gameSession != null ? _gameSession.Upgrades.GetFistDamage() : 0;
+            float hammerChance = _gameSession != null ? _gameSession.Upgrades.GetHammerChance() : 0f;
+            int hammerBaseDamage = _gameSession != null ? _gameSession.Upgrades.GetHammerDamage() : 0;
             float multiplier = _feverController != null
                 ? _feverController.DamageMultiplier
                 : 1f;
             int damage = Mathf.CeilToInt((_baseDamage + damageBonus) * multiplier);
             int fistDamage = Mathf.CeilToInt(fistBaseDamage * multiplier);
+            int hammerDamage = Mathf.CeilToInt(hammerBaseDamage * multiplier);
             ApplyManualAttack(keyboard, destruction, health, damage, 0, 0f, true);
 
-            if (destruction == null || destruction.IsBroken || fistDamage <= 0 || fistChance <= 0f) return;
-            if (UnityEngine.Random.value < fistChance)
+            if (destruction == null || destruction.IsBroken) return;
+            if (fistDamage > 0 && fistChance > 0f && UnityEngine.Random.value < fistChance)
                 destruction.PlayKeycapStrike(health.transform, () => ApplyManualAttack(keyboard, destruction, health, fistDamage, fistDamage, radius, false));
+            if (hammerDamage > 0 && hammerChance > 0f && UnityEngine.Random.value < hammerChance)
+                destruction.PlayHammerStrike(health.transform, () => ApplyHammerAttack(keyboard, destruction, health, hammerDamage));
         }
 
         /// <summary>
@@ -163,6 +168,21 @@ namespace KeyboardModeling
                 }
             }
             ApplyAreaDamage(keyboard, destruction, keycaps, positions, targetIndex, center, radius, areaDamage);
+        }
+
+        /// <summary>
+        /// health에 망치의 직접 damage를 적용하고 키보드 전체로 퍼지는 충격파를 시작한다.
+        /// keyboard와 destruction의 유효성을 확인하며 충격파는 별도로 각 키캡에 피해 1을 적용한다.
+        /// </summary>
+        private void ApplyHammerAttack(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth health, int damage)
+        {
+            if (keyboard == null || health == null || keyboard != _activeKeyboard
+                || !keyboard.InputEnabled || !keyboard.isActiveAndEnabled || destruction.IsBroken) return;
+            int targetIndex = Array.IndexOf(_keycaps, health);
+            if (targetIndex < 0) return;
+            ApplyManualAttack(keyboard, destruction, health, damage, 0, 0f, false);
+            if (!destruction.IsBroken)
+                destruction.PlayHammerShockwave(keyboard, _keycaps, _keycapPositions, targetIndex);
         }
 
         /// <summary>

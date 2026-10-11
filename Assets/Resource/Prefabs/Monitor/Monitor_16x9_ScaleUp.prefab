@@ -647,7 +647,7 @@ RectTransform:
   m_Father: {fileID: 703191375050647239}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -2077,10 +2077,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Session.GameSession
   _initialBalance: 0
   _upgradeDefinitions:
-  - {fileID: 11400000, guid: 9aa211f0cf0e32f45b6916573844effd, type: 2}
-  - {fileID: 11400000, guid: 61d81da62fab48c44a3868935f7e152b, type: 2}
+  - {fileID: 11400000, guid: a2f327170fc543b4faa6a7812ae278dc, type: 2}
+  - {fileID: 11400000, guid: 38403b05acb124d40901236152f6a457, type: 2}
   - {fileID: 11400000, guid: df4cf494358af934a802f8eacb253c81, type: 2}
-  - {fileID: 11400000, guid: 508188f373d5f5e43a6a9bb3ba3de547, type: 2}
   - {fileID: 11400000, guid: af08dd03129bd8a41957b5f6e5fdbf83, type: 2}
   - {fileID: 11400000, guid: 72624913e5b8d184980d818bb50b0844, type: 2}
   _rarityProgression: {fileID: 11400000, guid: a1f8d9c15f5c28140bddf8dc742af76a, type: 2}
@@ -2630,7 +2629,7 @@ RectTransform:
   m_Father: {fileID: 5128287622649049610}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3453,7 +3452,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5218081715310181582, guid: 298dd09b174288249bd1bdab08e410b3, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5250420075746880957, guid: 298dd09b174288249bd1bdab08e410b3, type: 3}
       propertyPath: m_FontData.m_MinSize

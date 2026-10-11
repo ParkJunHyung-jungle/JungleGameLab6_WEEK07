@@ -915,10 +915,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 350501781}
     m_Modifications:
-    - target: {fileID: 495590650872988902, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: monitorCam
       value: 
@@ -983,14 +979,6 @@ PrefabInstance:
       propertyPath: _interactionController
       value: 
       objectReference: {fileID: 27118945}
-    - target: {fileID: 6155192021724201980, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7372345893925918935, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7425521347323571261, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: _interactionController
       value: 

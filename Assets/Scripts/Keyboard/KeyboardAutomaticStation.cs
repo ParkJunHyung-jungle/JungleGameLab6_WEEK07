@@ -1,4 +1,5 @@
 using Game.Economy;
+using Game.Session;
 using System;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -14,6 +15,7 @@ namespace KeyboardModeling
         private KeyboardRewardController _rewards;
         private GameObject _keyboardFragmentsPrefab;
         private KeyboardInteractionController _interactionController;
+        private GameSession _gameSession;
         private KeyboardInputController _keyboard;
         private KeycapHealth[] _keycaps = Array.Empty<KeycapHealth>();
         public KeyboardInputController Keyboard => _keyboard;
@@ -24,6 +26,7 @@ namespace KeyboardModeling
         void Awake()
         {
             _interactionController = KeyboardAutoAttackManager.Instance.InteractionController;
+            _gameSession = KeyboardAutoAttackManager.Instance.GameSession;
             _rewards = KeyboardAutoAttackManager.Instance.RewardController;
             _keyboardFragmentsPrefab = KeyboardAutoAttackManager.Instance.KeyboardFragmentsPrefab;
             GetComponent<BoxCollider>().isTrigger = true;
@@ -102,10 +105,11 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 파괴 연출이 끝난 키보드를 제거하고 새 키보드를 넣을 수 있게 한다.
-        /// 보관된 키보드와 파괴 구독을 정리하고 슬롯 상태를 비운다.
+        /// 같은 세션의 완료 대수를 한 번 증가시켜 다음 키보드의 희귀도 진행에 반영하고 슬롯을 비운다.
         /// </summary>
         private void HandleDestroyed()
         {
+            _gameSession.CompleteKeyboard();
             UnsubscribeRewards();
             GameObject keyboardObject = _keyboard.gameObject;
             _keyboard = null;

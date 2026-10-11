@@ -19,17 +19,28 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
     private bool _visiting;
     private int _activeRegion = -1;
     private Queue<int> _requestedRegions;
+    private Queue<Rigidbody> _returnKeyboards;
+    private Rigidbody _activeReturnKeyboard;
 
     void Awake()
     {
         _homePosition = _actor.position;
         _requestedRegions = new Queue<int>();
+        _returnKeyboards = new Queue<Rigidbody>();
         _spawner.SetExternalSequence(true);
     }
 
     void Update()
     {
-        if (_visiting || _requestedRegions.Count == 0) return;
+        if (_visiting) return;
+        while (_returnKeyboards.Count > 0 && _returnKeyboards.Peek() == null) _returnKeyboards.Dequeue();
+        if (_returnKeyboards.Count > 0)
+        {
+            _activeReturnKeyboard = _returnKeyboards.Dequeue();
+            StartCoroutine(VisitAndReturnKeyboard(_activeReturnKeyboard));
+            return;
+        }
+        if (_requestedRegions.Count == 0) return;
         _activeRegion = _requestedRegions.Dequeue();
         StartCoroutine(VisitAndThrow(_activeRegion));
     }
@@ -37,6 +48,8 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
     void OnDisable()
     {
         StopAllCoroutines();
+        if (_activeReturnKeyboard != null) _returnKeyboards.Enqueue(_activeReturnKeyboard);
+        _activeReturnKeyboard = null;
         if (_activeRegion >= 0) _requestedRegions.Enqueue(_activeRegion);
         _activeRegion = -1;
         _actor.position = _homePosition;
@@ -66,6 +79,31 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
     public void RequestThrows(int regionIndex, int count)
     {
         for (int index = 0; index < count; index++) _requestedRegions.Enqueue(regionIndex);
+    }
+
+    /// <summary>
+    /// 떨어진 keyboard의 원본 Rigidbody를 재투척 대기열에 저장한다.
+    /// 기존 방문이 끝난 뒤 처리하며 새 키보드를 생성하거나 구역 등록을 변경하지 않는다.
+    /// </summary>
+    public void RequestKeyboardReturn(Rigidbody keyboard)
+    {
+        _returnKeyboards.Enqueue(keyboard);
+    }
+
+    /// <summary>
+    /// 기존 방문점으로 이동하여 keyboard 자체를 다시 던지고 원래 위치로 복귀한다.
+    /// 이동·대기 시간을 사용하며 대기 중 원본이 제거되면 재투척을 생략한다.
+    /// </summary>
+    private IEnumerator VisitAndReturnKeyboard(Rigidbody keyboard)
+    {
+        _visiting = true;
+        yield return MoveTo(_visitPoint.position);
+        yield return WaitFor(_waitBeforeThrow);
+        if (keyboard != null) _spawner.ThrowExistingKeyboard(keyboard);
+        _activeReturnKeyboard = null;
+        yield return WaitFor(_waitAfterThrow);
+        yield return MoveTo(_homePosition);
+        _visiting = false;
     }
 
     /// <summary>

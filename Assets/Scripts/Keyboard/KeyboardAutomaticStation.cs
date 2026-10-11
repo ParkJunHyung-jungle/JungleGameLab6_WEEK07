@@ -80,7 +80,7 @@ namespace KeyboardModeling
                 keycap.Broken += HandleKeycapBroken;
 
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
-            destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, HandleBreaking, HandleDestroyed);
+            destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _interactionController.DestructionFistSprite, HandleBreaking, HandleDestroyed, _interactionController.ConfigureFistAnimation);
             _keyboard = keyboard;
             KeyboardChanged?.Invoke(keyboard);
         }

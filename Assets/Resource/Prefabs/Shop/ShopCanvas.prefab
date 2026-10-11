@@ -700,7 +700,7 @@ MonoBehaviour:
   _gameSession: {fileID: 0}
   _rewardButton: {fileID: 209435986869672767}
   _rewardText: {fileID: 5608326266991549430}
-  _rewardAmount: 100
+  _rewardAmount: 10000
 --- !u!1 &5796680169441074007
 GameObject:
   m_ObjectHideFlags: 0
@@ -1137,4 +1137,4 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: +100
+  m_Text: +10,000

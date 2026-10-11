@@ -153,7 +153,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             _destructionFistSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Fist.png");
         if (_fistMaterial == null)
             _fistMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Resource/Sprites/Materials/Fist.mat");
-        if (_hammerSprite == null && gameObject.scene.name == "Main 1")
+        if (_hammerSprite == null && (gameObject.scene.name == "Main 1" || gameObject.scene.name == "Main"))
             _hammerSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Hammer.png");
 #endif
         _gameSession = FindAnyObjectByType<GameSession>();

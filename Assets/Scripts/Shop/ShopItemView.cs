@@ -116,7 +116,7 @@ namespace Game.Shop
 
                     if (level + 1 == refillStart)
                     {
-                        _nameText.text += $"\nNext: {_definition.GetAutoAttackName(refillStart)} " + $"{_definition.GetAutoRefillDelay(refillStart):0.#}s";
+                        _nameText.text = $"{_definition.GetAutoAttackName(level)}\n" + $"Next: {_definition.GetAutoAttackName(refillStart)} " + $"{_definition.GetAutoRefillDelay(refillStart):0.#}s";
                         _buttonText.text = "Promote";
                     }
                     else if (!isMaxLevel)

@@ -437,6 +437,7 @@ GameObject:
   - component: {fileID: 463588969316111382}
   - component: {fileID: 4149212296703210319}
   - component: {fileID: 4850299712002065784}
+  - component: {fileID: 6287178679820753411}
   m_Layer: 0
   m_Name: AutomaticSlot_2
   m_TagString: Untagged
@@ -515,6 +516,19 @@ MonoBehaviour:
   _station: {fileID: 4149212296703210319}
   _stationFeedback: {fileID: 6223961565752397748}
   _eligibleKeys: 0400000005000000060000000700000008000000090000000b0000000c0000000d0000000e0000000f000000100000001100000012000000130000001400000015000000160000001700000018000000190000001a0000001b0000001c0000001d0000001e0000001f000000200000002100000022000000230000002400000025000000260000002700000028000000290000002a0000002b0000002c0000002d0000002e0000002f0000003000000031000000320000005e0000005f00000060000000610000006200000063000000640000006500000066000000670000006800000069000000
+--- !u!114 &6287178679820753411
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6268994863583700563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cb5f91bc5cf68147bf74ef3c10cd651, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardAutomaticRefillController
+  _carryDuration: 0.75
 --- !u!1 &6473820656794952159
 GameObject:
   m_ObjectHideFlags: 0
@@ -566,8 +580,6 @@ MonoBehaviour:
   _gameSession: {fileID: 0}
   _rewardController: {fileID: 0}
   _keyboardFragmentsPrefab: {fileID: 0}
-  _damage: 5
-  _attacksPerSecond: 5
 --- !u!1 &6668512050925200167
 GameObject:
   m_ObjectHideFlags: 0
@@ -692,6 +704,7 @@ GameObject:
   - component: {fileID: 4690892585519114682}
   - component: {fileID: 2126159037437128305}
   - component: {fileID: 4058274546556956987}
+  - component: {fileID: 130816482576728832}
   m_Layer: 0
   m_Name: AutomaticSlot_1
   m_TagString: Untagged
@@ -770,6 +783,19 @@ MonoBehaviour:
   _station: {fileID: 2126159037437128305}
   _stationFeedback: {fileID: 6193609516080889216}
   _eligibleKeys: 0400000005000000060000000700000008000000090000000b0000000c0000000d0000000e0000000f000000100000001100000012000000130000001400000015000000160000001700000018000000190000001a0000001b0000001c0000001d0000001e0000001f000000200000002100000022000000230000002400000025000000260000002700000028000000290000002a0000002b0000002c0000002d0000002e0000002f0000003000000031000000320000005e0000005f00000060000000610000006200000063000000640000006500000066000000670000006800000069000000
+--- !u!114 &130816482576728832
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7728338320389280312}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cb5f91bc5cf68147bf74ef3c10cd651, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardAutomaticRefillController
+  _carryDuration: 0.75
 --- !u!1 &7737022932694256859
 GameObject:
   m_ObjectHideFlags: 0

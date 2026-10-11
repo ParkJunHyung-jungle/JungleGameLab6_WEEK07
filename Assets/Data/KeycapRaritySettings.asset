@@ -19,13 +19,13 @@ MonoBehaviour:
     _shellMaterial: {fileID: 2100000, guid: 0a1a2ec0d6ed18c459f87b5d181564bf, type: 2}
   - _rarity: 1
     _healthMultiplier: 3
-    _rewardMultiplier: 2
+    _rewardMultiplier: 5
     _shellMaterial: {fileID: 2100000, guid: 1c359114b88294f4faf80ab69cd546a9, type: 2}
   - _rarity: 2
     _healthMultiplier: 10
-    _rewardMultiplier: 6
+    _rewardMultiplier: 10
     _shellMaterial: {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
   - _rarity: 3
     _healthMultiplier: 40
-    _rewardMultiplier: 10
+    _rewardMultiplier: 100
     _shellMaterial: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}

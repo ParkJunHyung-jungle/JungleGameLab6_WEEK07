@@ -16,7 +16,7 @@ MonoBehaviour:
   _displayName: Fever Duration
   _description: Start at 5 seconds and gain 2 seconds per level. Purchases apply
     from the next fever.
-  _levelCosts: c8000000000000009001000000000000e803000000000000b80b000000000000581b000000000000204e000000000000
+  _levelCosts: 2c01000000000000e803000000000000b80b000000000000282300000000000090650000000000007011010000000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000

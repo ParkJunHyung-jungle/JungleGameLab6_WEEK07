@@ -7,6 +7,7 @@ using UnityEngine;
 public sealed class KeyboardDestruction : MonoBehaviour
 {
     private const float MAX_ANIMATION_PROGRESS_PER_FRAME = 0.25f;
+    private const int FIST_SORTING_ORDER = 10;
 
     [Header("Fist strike")]
     private float _fistHeight = 0.9f;
@@ -16,7 +17,8 @@ public sealed class KeyboardDestruction : MonoBehaviour
     private float _retreatDuration = 0.25f;
     private Vector3 _fistImpactOffset;
     private Sprite _fistSprite;
-    private GameObject _fistObject;
+    private readonly List<SpriteRenderer> _fistRenderers = new List<SpriteRenderer>();
+    private readonly Stack<SpriteRenderer> _availableFists = new Stack<SpriteRenderer>();
 
     [Header("Fragments")]
     [SerializeField, Min(0f)] private float _upwardSpeed = 1.5f;
@@ -75,7 +77,8 @@ public sealed class KeyboardDestruction : MonoBehaviour
 
     void OnDestroy()
     {
-        if (_fistObject != null) Destroy(_fistObject);
+        foreach (SpriteRenderer fist in _fistRenderers)
+            if (fist != null) Destroy(fist.gameObject);
         if (_requiredKeycaps == null) return;
         foreach (KeycapHealth health in _requiredKeycaps) if (health != null) health.Broken -= OnKeycapBroken;
     }
@@ -87,75 +90,112 @@ public sealed class KeyboardDestruction : MonoBehaviour
         _remainingKeycaps--;
         if (_remainingKeycaps != 0 || IsBroken) return;
         IsBroken = true;
-        _configureFistAnimation(this);
         _onBreaking();
-        StartCoroutine(StrikeKeyboard());
+        BreakIntoFragments();
     }
 
     /// <summary>
-    /// 저장된 주먹 스프라이트를 키보드 위에 등장시켜 내려친 후 파편을 생성한다.
-    /// 키보드 Collider와 현재 카메라를 사용해 주먹 위치와 방향을 정하고 연출 종료 시 주먹을 제거한다.
-    /// 프레임당 진행량을 제한하여 긴 프레임 지연에서도 등장과 내려치기의 중간 상태를 표시한다.
+    /// keycap의 외피 윗면을 목표로 주먹을 내려치고 충돌 순간 onImpact를 호출한다.
+    /// 현재 Inspector 설정을 읽고 입력마다 독립적인 연출을 시작하여 연타와 동시 입력을 처리한다.
     /// </summary>
-    private IEnumerator StrikeKeyboard()
+    public void PlayKeycapStrike(Transform keycap, Action onImpact)
     {
+        if (IsBroken) return;
+        _configureFistAnimation(this);
         if (_fistSprite == null)
         {
             Debug.LogError("[Keyboard] Assign the destruction fist sprite on KeyboardInteractionController.", this);
-            BreakIntoFragments();
-            yield break;
+            onImpact();
+            return;
         }
 
+        MeshFilter shell = keycap.Find("PBT_SculptedShell").GetComponent<MeshFilter>();
+        Bounds bounds = shell.sharedMesh.bounds;
+        Vector3 contact = shell.transform.TransformPoint(bounds.center + Vector3.up * bounds.extents.y);
+        StartCoroutine(StrikeKeyboard(transform.InverseTransformPoint(contact), onImpact));
+    }
+
+    /// <summary>
+    /// localContact를 키보드 로컬 타격 위치로 사용해 주먹을 등장시키고 내려친 후 onImpact를 호출한다.
+    /// 시작 시 연출 설정을 보관하고 종료 시 주먹을 풀에 반환하여 다른 입력에서 재사용한다.
+    /// 프레임당 진행량을 제한하여 긴 프레임 지연에서도 등장과 내려치기의 중간 상태를 표시한다.
+    /// </summary>
+    private IEnumerator StrikeKeyboard(Vector3 localContact, Action onImpact)
+    {
         Camera viewCamera = Camera.main;
-        BoxCollider keyboardCollider = GetComponent<BoxCollider>();
-        Vector3 contact = transform.TransformPoint(keyboardCollider.center + Vector3.up * keyboardCollider.size.y * 0.5f);
-        Vector3 impactContact = contact + transform.TransformVector(_fistImpactOffset);
-        _fistObject = new GameObject("KeyboardDestructionFist");
-        SpriteRenderer fist = _fistObject.AddComponent<SpriteRenderer>();
+        float fistHeight = _fistHeight;
+        float fistLift = _fistLift;
+        float appearDuration = _appearDuration;
+        float strikeDuration = _strikeDuration;
+        float holdDuration = _retreatDuration;
+        Vector3 localImpactContact = localContact + _fistImpactOffset;
+        SpriteRenderer fist = GetFistRenderer();
         fist.sprite = _fistSprite;
         fist.flipY = true;
-        _fistObject.transform.localScale = Vector3.one * (_fistHeight / _fistSprite.bounds.size.y);
-        UpdateFistPose(fist, viewCamera, contact, _fistLift, 0f);
+        fist.transform.localScale = Vector3.one * (fistHeight / _fistSprite.bounds.size.y);
+        UpdateFistPose(fist, viewCamera, transform.TransformPoint(localImpactContact), fistLift, 0f, fistHeight);
+        fist.gameObject.SetActive(true);
 
         float elapsed = 0f;
-        while (elapsed < _appearDuration)
+        while (elapsed < appearDuration)
         {
             yield return null;
             // 긴 프레임에서 등장 연출 전체가 한 번에 끝나지 않도록 진행량을 제한한다.
-            elapsed += Mathf.Min(Time.deltaTime, _appearDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
-            float progress = Mathf.Clamp01(elapsed / _appearDuration);
-            UpdateFistPose(fist, viewCamera, contact, _fistLift, progress);
+            elapsed += Mathf.Min(Time.deltaTime, appearDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
+            float progress = Mathf.Clamp01(elapsed / appearDuration);
+            UpdateFistPose(fist, viewCamera, transform.TransformPoint(localImpactContact), fistLift, progress, fistHeight);
         }
 
         elapsed = 0f;
-        while (elapsed < _strikeDuration)
+        while (elapsed < strikeDuration)
         {
             yield return null;
-            elapsed += Mathf.Min(Time.deltaTime, _strikeDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
-            float progress = Mathf.Clamp01(elapsed / _strikeDuration);
+            elapsed += Mathf.Min(Time.deltaTime, strikeDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
+            float progress = Mathf.Clamp01(elapsed / strikeDuration);
             float strikeProgress = progress * progress;
-            UpdateFistPose(fist, viewCamera, Vector3.Lerp(contact, impactContact, strikeProgress), _fistLift * (1f - strikeProgress), 1f);
+            Vector3 contact = transform.TransformPoint(localImpactContact);
+            UpdateFistPose(fist, viewCamera, contact, fistLift * (1f - strikeProgress), 1f, fistHeight);
         }
 
-        UpdateFistPose(fist, viewCamera, impactContact, 0f, 1f);
-        BreakIntoFragments();
+        UpdateFistPose(fist, viewCamera, transform.TransformPoint(localImpactContact), 0f, 1f, fistHeight);
+        onImpact();
         elapsed = 0f;
-        while (elapsed < _retreatDuration)
+        while (elapsed < holdDuration)
         {
             yield return null;
             elapsed += Time.deltaTime;
         }
-        Destroy(_fistObject);
+        fist.gameObject.SetActive(false);
+        _availableFists.Push(fist);
     }
 
     /// <summary>
-    /// fist를 viewCamera에 보이도록 회전시키고 contact 위로 lift만큼 이동한다.
-    /// alpha를 주먹 투명도에 반영하며 주먹 아래쪽이 키보드 접촉 위치에 맞도록 높이를 보정한다.
+    /// 대기 중인 주먹을 풀에서 꺼내 반환하고 없으면 새 SpriteRenderer를 생성한다.
+    /// 생성된 주먹은 정리 목록에 저장하여 키보드 제거 시 함께 제거한다.
     /// </summary>
-    private void UpdateFistPose(SpriteRenderer fist, Camera viewCamera, Vector3 contact, float lift, float alpha)
+    private SpriteRenderer GetFistRenderer()
     {
-        Quaternion rotation = viewCamera != null ? viewCamera.transform.rotation : transform.rotation * Quaternion.Euler(90f, 0f, 0f);
-        fist.transform.SetPositionAndRotation(contact + rotation * Vector3.up * (_fistHeight * 0.5f) + transform.up * lift, rotation);
+        if (_availableFists.Count > 0) return _availableFists.Pop();
+        GameObject fistObject = new GameObject("KeyboardKeycapFist");
+        SpriteRenderer fist = fistObject.AddComponent<SpriteRenderer>();
+        fist.sortingOrder = FIST_SORTING_ORDER;
+        _fistRenderers.Add(fist);
+        return fist;
+    }
+
+    /// <summary>
+    /// fist를 월드 수직으로 세운 상태에서 viewCamera의 수평 방향을 향하도록 회전시킨다.
+    /// contact의 X와 Z를 유지하고 lift와 fistHeight로 높이만 변경하며 alpha를 주먹 투명도에 반영한다.
+    /// </summary>
+    private void UpdateFistPose(SpriteRenderer fist, Camera viewCamera, Vector3 contact, float lift, float alpha, float fistHeight)
+    {
+        Vector3 forward = viewCamera != null ? viewCamera.transform.forward : transform.forward;
+        Vector3 horizontalForward = Vector3.ProjectOnPlane(forward, Vector3.up);
+        if (horizontalForward.sqrMagnitude < 0.0001f) horizontalForward = Vector3.forward;
+        Quaternion rotation = Quaternion.LookRotation(horizontalForward, Vector3.up);
+
+        // 카메라 기울기는 이동 높이에 적용하지 않고 월드 Y축으로만 내려친다.
+        fist.transform.SetPositionAndRotation(contact + Vector3.up * (fistHeight * 0.5f + lift), rotation);
         fist.color = new Color(1f, 1f, 1f, alpha);
     }
 

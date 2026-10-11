@@ -95,7 +95,7 @@ namespace KeyboardModeling
 
         /// <summary>
         /// health의 위치를 중심으로 같은 키보드 반경 안의 살아 있는 키캡을 한 번씩 타격한다.
-        /// 공격 시작 시의 피버 배율로 피해를 계산하며 살아 있는 중심에만 직접 피해와 충전을 적용하고 깨진 중심도 광역 피해를 발생시킨다.
+        /// 입력 시의 강화와 피버 배율로 피해를 계산하고 주먹 충돌 순간 직접 및 광역 피해를 적용한다.
         /// </summary>
         private void OnAttackRequested(KeycapHealth health)
         {
@@ -108,7 +108,6 @@ namespace KeyboardModeling
             }
 
             KeycapHealth[] keycaps = _keycaps;
-            Vector2[] positions = _keycapPositions;
             int targetIndex = Array.IndexOf(keycaps, health);
             if (targetIndex < 0)
             {
@@ -129,7 +128,28 @@ namespace KeyboardModeling
                 : 1f;
             int damage = Mathf.CeilToInt((_baseDamage + damageBonus) * multiplier);
             int areaDamage = Mathf.CeilToInt((_baseAreaDamage + areaDamageBonus) * multiplier);
+            if (destruction != null)
+                destruction.PlayKeycapStrike(health.transform, () => ApplyManualAttack(keyboard, destruction, health, damage, areaDamage, radius));
+            else
+                ApplyManualAttack(keyboard, destruction, health, damage, areaDamage, radius);
+        }
+
+        /// <summary>
+        /// 주먹이 충돌한 health에 damage를 적용하고 radius 안의 주변 키캡에 areaDamage를 적용한다.
+        /// keyboard와 destruction으로 대상 교체 및 파괴 상태를 확인하고 직접 타격 피드백과 피버 충전을 처리한다.
+        /// </summary>
+        private void ApplyManualAttack(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth health, int damage, int areaDamage, float radius)
+        {
+            if (keyboard == null || health == null || keyboard != _activeKeyboard
+                || !keyboard.InputEnabled || !keyboard.isActiveAndEnabled
+                || (destruction != null && destruction.IsBroken)) return;
+
+            KeycapHealth[] keycaps = _keycaps;
+            Vector2[] positions = _keycapPositions;
+            int targetIndex = Array.IndexOf(keycaps, health);
+            if (targetIndex < 0) return;
             Vector2 center = positions[targetIndex];
+            keyboard.NotifyManualKeycapHit(health.transform);
 
             if (health.CurrentHP > 0)
             {

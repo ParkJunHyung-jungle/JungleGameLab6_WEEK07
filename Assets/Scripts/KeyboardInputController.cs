@@ -27,6 +27,7 @@ namespace KeyboardModeling
         public event Action<Key> KeyPressed;
         public event Action<KeycapHealth> AttackRequested;
         public event Action<Transform> KeycapPressed;
+        public event Action<Transform> ManualKeycapHit;
         public event Action<Transform> AutomaticKeycapHit;
         public event Action<Transform> AreaKeycapHit;
 
@@ -228,6 +229,15 @@ namespace KeyboardModeling
             _lastPressDistance = _pressDistance;
             if (pressedKeysChanged)
                 RefreshPressedKeyNames();
+        }
+
+        /// <summary>
+        /// 주먹이 충돌한 keycap을 ManualKeycapHit로 전달한다.
+        /// 직접 타격 피드백만 알리며 추가 키 입력이나 피해 요청은 발생시키지 않는다.
+        /// </summary>
+        public void NotifyManualKeycapHit(Transform keycap)
+        {
+            ManualKeycapHit?.Invoke(keycap);
         }
 
         /// <summary>

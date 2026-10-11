@@ -139,7 +139,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         ClearKeyboardBounce();
         if (_keyboard != null)
         {
-            _keyboard.KeycapPressed -= HandleKeycapPressed;
+            _keyboard.ManualKeycapHit -= HandleKeycapPressed;
             _keyboard.AreaKeycapHit -= HandleKeycapPressed;
             _keyboard.AutomaticKeycapHit -= HandleKeycapPressed;
             _keyboard.SetHitStopEnabled(false);
@@ -171,13 +171,13 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             }
         }
         _keyboard.SetHitStopEnabled(_enableHitStop);
-        _keyboard.KeycapPressed += HandleKeycapPressed;
+        _keyboard.ManualKeycapHit += HandleKeycapPressed;
         _keyboard.AreaKeycapHit += HandleKeycapPressed;
         _keyboard.AutomaticKeycapHit += HandleKeycapPressed;
     }
 
     /// <summary>
-    /// 살아 있는 keycap의 새 눌림에서 키보드 바운스, 부스러기, 흰색 점멸과 히트스톱을 시작한다.
+    /// 살아 있는 keycap의 주먹 충돌이나 범위 및 자동 타격에서 키보드 바운스, 부스러기, 흰색 점멸과 히트스톱을 시작한다.
     /// 키캡 위치와 현재 옵션을 사용하여 각 효과의 재생 상태를 변경한다.
     /// </summary>
     private void HandleKeycapPressed(Transform keycap)

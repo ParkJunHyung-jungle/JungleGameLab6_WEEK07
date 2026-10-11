@@ -213,10 +213,10 @@ MonoBehaviour:
   _destructionFistSprite: {fileID: 21300000, guid: 04e0a1508ba5bf24c856967e39bf1e6d, type: 3}
   _fistHeight: 2
   _fistLift: 0.8
-  _fistImpactOffset: {x: 0, y: -4, z: 0}
-  _appearDuration: 0.5
+  _keycapFistImpactOffset: {x: 0, y: 0, z: 0}
+  _appearDuration: 0.01
   _strikeDuration: 0.1
-  _retreatDuration: 0.5
+  _retreatDuration: 0.2
   _controller: {fileID: 0}
   _shopView: {fileID: 641087396}
   _monitorController: {fileID: 1068726019}

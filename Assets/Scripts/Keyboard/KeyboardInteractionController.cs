@@ -79,8 +79,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField, Min(0.01f)] private float _fistHeight = 0.9f;
     [Tooltip("키보드 접촉 위치에서 주먹을 들어 올리는 거리입니다.")]
     [SerializeField, Min(0f)] private float _fistLift = 0.8f;
-    [Tooltip("기본 타격 위치에서의 이동량입니다. 키보드 로컬 좌표 기준으로 X는 좌우, Y는 높이, Z는 앞뒤를 조절합니다.")]
-    [SerializeField] private Vector3 _fistImpactOffset = Vector3.zero;
+    [InspectorName("Fist Impact Offset")]
+    [Tooltip("누른 키의 윗면에서의 이동량입니다. 0이면 해당 키를 정확히 타격합니다. 키보드 로컬 좌표 기준으로 X는 좌우, Y는 높이, Z는 앞뒤를 조절합니다.")]
+    [SerializeField] private Vector3 _keycapFistImpactOffset = Vector3.zero;
     [Tooltip("주먹이 서서히 나타나는 시간입니다. 단위는 초입니다.")]
     [SerializeField, Min(0.01f)] private float _appearDuration = 0.22f;
     [Tooltip("주먹이 키보드까지 내려치는 시간입니다. 줄이면 더 빠르게 내려칩니다.")]
@@ -290,7 +291,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public void ConfigureFistAnimation(KeyboardDestruction destruction)
     {
-        destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _fistImpactOffset);
+        destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset);
     }
 
     /// <summary>

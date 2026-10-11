@@ -902,7 +902,7 @@ MonoBehaviour:
   _feverController: {fileID: 6937473625109612741}
   _monitorController: {fileID: 2612928670998550527}
   _progressPerPress: 0.04
-  _progressDecayPerSecond: 1
+  _progressDecayPerSecond: 0.3
   _keyMashProgressPerPress: 0.08
   _keyMashDecayPerSecond: 0.06
   _keyMashDecayDelay: 0.4

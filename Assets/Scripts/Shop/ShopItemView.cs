@@ -91,14 +91,41 @@ namespace Game.Shop
             else if (_definition.Id == UpgradeId.AutoClick)
             {
                 int promotion = _definition.AutoPromotionLevel;
-                int localLevel = level >= promotion ? level - promotion + 1 : level;
-                int localMax = level >= promotion ? _definition.MaxLevel - promotion + 1 : Mathf.Min(_definition.MaxLevel, promotion - 1);
-                _levelText.text = $"Lv {localLevel}/{localMax}";
-                _nameText.text = $"{_definition.GetAutoAttackName(level)}\nDamage {_definition.GetAutoAttackDamage(level)}, {_definition.GetAutoAttackSpeed(level):0.##}/s";
-                if (!isMaxLevel)
+                int refillStart = _definition.AutoRefillStartLevel;
+
+                if (level >= refillStart)
                 {
-                    _nameText.text += $" -> {_definition.GetAutoAttackDamage(level + 1)}, {_definition.GetAutoAttackSpeed(level + 1):0.##}/s";
-                    if (level + 1 == promotion) _buttonText.text = "Promote";
+                    int stageLevel = level - refillStart + 1;
+                    int stageMax = _definition.MaxLevel - refillStart + 1;
+
+                    _levelText.text = $"Lv {stageLevel}/{stageMax}";
+                    _nameText.text = $"{_definition.GetAutoAttackName(level)}\n" + $"Next keyboard: {_definition.GetAutoRefillDelay(level):0.#}s";
+
+                    if (!isMaxLevel)
+                    {
+                        _nameText.text += $" -> {_definition.GetAutoRefillDelay(level + 1):0.#}s";
+                    }
+                }
+                else
+                {
+                    int stageLevel = level >= promotion ? level - promotion + 1 : level;
+                    int stageMax = level >= promotion ? refillStart - promotion : promotion - 1;
+
+                    _levelText.text = $"Lv {stageLevel}/{stageMax}";
+                    _nameText.text = $"{_definition.GetAutoAttackName(level)}\n" + $"Damage {_definition.GetAutoAttackDamage(level)}, " + $"{_definition.GetAutoAttackSpeed(level):0.##}/s";
+
+                    if (level + 1 == refillStart)
+                    {
+                        _nameText.text += $"\nNext: {_definition.GetAutoAttackName(refillStart)} " + $"{_definition.GetAutoRefillDelay(refillStart):0.#}s";
+                        _buttonText.text = "Promote";
+                    }
+                    else if (!isMaxLevel)
+                    {
+                        _nameText.text += $" -> {_definition.GetAutoAttackDamage(level + 1)}, " + $"{_definition.GetAutoAttackSpeed(level + 1):0.##}/s";
+
+                        if (level + 1 == promotion)
+                            _buttonText.text = "Promote";
+                    }
                 }
             }
             else if (_definition.Id == UpgradeId.LuckyReward)

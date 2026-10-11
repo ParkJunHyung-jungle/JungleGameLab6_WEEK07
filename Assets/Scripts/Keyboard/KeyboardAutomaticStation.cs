@@ -22,6 +22,9 @@ namespace KeyboardModeling
         public bool HasKeyboard => _keyboard != null;
         public Transform Placement => _placement;
         public event Action<KeyboardInputController> KeyboardChanged;
+        public bool HasCompletedKeyboard { get; private set; }
+        public bool IsAutoRefillInProgress { get; private set; }
+        public event Action<KeyboardAutomaticStation> KeyboardDestroyed;
 
         void Awake()
         {
@@ -35,7 +38,7 @@ namespace KeyboardModeling
 
         void OnTriggerStay(Collider other)
         {
-            if (!HasKeyboard)
+            if (!HasKeyboard && !IsAutoRefillInProgress)
                 _interactionController.TryPlaceAutomaticKeyboard(other, this);
         }
 
@@ -111,10 +114,14 @@ namespace KeyboardModeling
         {
             _gameSession.CompleteKeyboard();
             UnsubscribeRewards();
+
             GameObject keyboardObject = _keyboard.gameObject;
             _keyboard = null;
             Destroy(keyboardObject);
+
+            HasCompletedKeyboard = true;
             KeyboardChanged?.Invoke(null);
+            KeyboardDestroyed?.Invoke(this);
         }
 
         /// <summary>
@@ -138,6 +145,15 @@ namespace KeyboardModeling
         private void HandleKeycapBroken(KeycapHealth keycap)
         {
             _rewards.GrantAutomaticKeycapReward(keycap);
+        }
+
+        /// <summary>
+        /// 자동 보충을 위해 원본 키보드를 운반 중인지 설정한다.
+        /// active를 저장하여 운반 중 수동 배치를 제한한다.
+        /// </summary>
+        public void SetAutoRefillInProgress(bool active)
+        {
+            IsAutoRefillInProgress = active;
         }
     }
 }

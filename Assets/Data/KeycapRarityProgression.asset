@@ -23,23 +23,23 @@ MonoBehaviour:
   - _requiredCompletedKeyboards: 4
     _distribution:
       _weights:
-      - 85
-      - 15
+      - 50
+      - 50
       - 0
       - 0
   - _requiredCompletedKeyboards: 8
     _distribution:
       _weights:
-      - 70
-      - 25
-      - 5
+      - 0
+      - 100
+      - 0
       - 0
   - _requiredCompletedKeyboards: 12
     _distribution:
       _weights:
-      - 60
-      - 28
-      - 10
+      - 0
+      - 50
+      - 50
       - 2
   - _requiredCompletedKeyboards: 16
     _distribution:

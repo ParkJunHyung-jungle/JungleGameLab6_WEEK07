@@ -17,31 +17,47 @@ MonoBehaviour:
     _healthMultiplier: 1
     _rewardMultiplier: 1
     _shellMaterial: {fileID: 2100000, guid: 0a1a2ec0d6ed18c459f87b5d181564bf, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}
   - _rarity: 1
     _healthMultiplier: 2
     _rewardMultiplier: 2
     _shellMaterial: {fileID: 2100000, guid: 1c359114b88294f4faf80ab69cd546a9, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}
   - _rarity: 2
     _healthMultiplier: 3
     _rewardMultiplier: 3
-    _shellMaterial: {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
+    _shellMaterial: {fileID: 2100000, guid: dc81f37b2d349b54faeb49ad09dc0abf, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}
   - _rarity: 3
     _healthMultiplier: 5
     _rewardMultiplier: 4.5
-    _shellMaterial: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+    _shellMaterial: {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}
   - _rarity: 4
     _healthMultiplier: 7
     _rewardMultiplier: 6.5
-    _shellMaterial: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+    _shellMaterial: {fileID: 2100000, guid: ef29bfa57b8eeaa4684755d94aec900c, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}
   - _rarity: 5
     _healthMultiplier: 10
     _rewardMultiplier: 9
-    _shellMaterial: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+    _shellMaterial: {fileID: 2100000, guid: 994431c627356934b98175a03bb95d66, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}
   - _rarity: 6
     _healthMultiplier: 15
     _rewardMultiplier: 13
-    _shellMaterial: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+    _shellMaterial: {fileID: 2100000, guid: b390153fd5970104f9ca9f3f820ea816, type: 2}
+    _shellMesh: {fileID: 4300000, guid: ad3711dc7f945084296fd68ff97962a8, type: 2}
+    _bandMaterial: {fileID: 2100000, guid: 35526b543471e6844a3a7af84333e124, type: 2}
   - _rarity: 7
     _healthMultiplier: 20
     _rewardMultiplier: 20
     _shellMaterial: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+    _shellMesh: {fileID: 0}
+    _bandMaterial: {fileID: 0}

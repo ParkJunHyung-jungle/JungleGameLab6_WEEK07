@@ -40,6 +40,8 @@ namespace KeyboardModeling
             public int MaxHP { get; }
             public long Reward { get; }
             public Material ShellMaterial { get; }
+            public Mesh ShellMesh { get; }
+            public Material BandMaterial { get; }
 
             /// <summary>
             /// key, rarity, maxHP, reward와 shellMaterial로 키캡 생성 결과를 만든다.
@@ -50,7 +52,10 @@ namespace KeyboardModeling
                 KeycapRarity rarity,
                 int maxHP,
                 long reward,
-                Material shellMaterial)
+                Material shellMaterial,
+                Mesh shellMesh,
+                Material bandMaterial
+                )
             {
                 if (maxHP <= 0 || reward <= 0 ||
                     !Enum.IsDefined(typeof(KeycapRarity), rarity) || shellMaterial == null)
@@ -63,6 +68,8 @@ namespace KeyboardModeling
                 MaxHP = maxHP;
                 Reward = reward;
                 ShellMaterial = shellMaterial;
+                ShellMesh = shellMesh;
+                BandMaterial = bandMaterial;
             }
         }
     }

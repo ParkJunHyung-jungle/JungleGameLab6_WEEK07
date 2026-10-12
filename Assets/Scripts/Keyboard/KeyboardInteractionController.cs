@@ -903,6 +903,18 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             }
 
             keyboard.InitializeSpawnProfile(source.PendingProfile, layout);
+            foreach (KeyboardSpawnProfile.KeycapData data in source.PendingProfile.Keycaps)
+            {
+                if (data.Rarity != KeycapRarity.Tier7)
+                    continue;
+
+                NeonKeyboardGradient gradient = instance.GetComponent<NeonKeyboardGradient>();
+                if (gradient == null)
+                    gradient = instance.AddComponent<NeonKeyboardGradient>();
+
+                gradient.Configure(data.BandMaterial);
+                break;
+            }
             KeyboardState target = RegisterKeyboard(instance, playerControlled);
             target.SetProgressId(source.ProgressId);
             return target;

@@ -89,5 +89,15 @@ namespace KeyboardModeling
                 _renderers[index].SetPropertyBlock(_properties, _materialIndices[index]);
             }
         }
+
+        /// <summary>
+        /// bandMaterial을 네온 띠 재질로 저장하고 키보드의 대상 렌더러를 다시 찾는다.
+        /// 각 렌더러의 그라데이션 좌표 설정을 갱신한다.
+        /// </summary>
+        public void Configure(Material bandMaterial)
+        {
+            _bandMaterial = bandMaterial;
+            RefreshRenderers();
+        }
     }
 }

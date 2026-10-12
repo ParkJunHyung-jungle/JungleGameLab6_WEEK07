@@ -25,16 +25,18 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _FlowSpeed: 0.12
-    - _Glow: 0.5
+    - _DepthContrast: 1.1
+    - _FlowSpeed: 0.035
+    - _Glow: 0.85
     - _NebulaScale: 1.8
+    - _ParallaxDepth: 0.65
     - _RimStrength: 0.22
     - _StarDensity: 9
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BlueColor: {r: 0.025, g: 0.17999998, b: 0.39999998, a: 1}
     - _SpaceColor: {r: 0.002, g: 0.004, b: 0.015, a: 1}
-    - _StarColor: {r: 1, g: 0.86, b: 0.5, a: 1}
+    - _StarColor: {r: 0.82, g: 0.92, b: 1, a: 1}
     - _VioletColor: {r: 0.23999995, g: 0.035, b: 0.37999994, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -42,6 +42,9 @@ namespace Game.Editor
         {
             switch (id)
             {
+                case UpgradeId.BoxCapacity:
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_boxCapacities"), true);
+                    break;
                 case UpgradeId.HandPower:
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_handDamagePerLevel"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_handPromotionLevels"), true);

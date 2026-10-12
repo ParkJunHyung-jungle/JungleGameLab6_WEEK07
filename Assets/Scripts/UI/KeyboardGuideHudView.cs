@@ -52,6 +52,11 @@ namespace Game.UI
             {
                 KeyboardInteractionController.KeyboardGuideState.Pickup => PICKUP_GUIDE,
                 KeyboardInteractionController.KeyboardGuideState.Placement => PLACEMENT_GUIDE,
+                KeyboardInteractionController.KeyboardGuideState.BoxPickup => "좌클릭으로 상자 집기",
+                KeyboardInteractionController.KeyboardGuideState.BoxHolding => "좌클릭으로 상자 내려놓기",
+                KeyboardInteractionController.KeyboardGuideState.BoxStore => $"좌클릭으로 키보드 넣기 ({_interactionController.GuideCount}/{_interactionController.GuideCapacity})",
+                KeyboardInteractionController.KeyboardGuideState.BoxFull => $"상자가 가득 찼습니다 ({_interactionController.GuideCount}/{_interactionController.GuideCapacity})",
+                KeyboardInteractionController.KeyboardGuideState.BoxTake => $"상자 위쪽을 좌클릭하여 키보드 꺼내기 ({_interactionController.GuideCount}/{_interactionController.GuideCapacity})",
                 _ => string.Empty
             };
             _guideText.gameObject.SetActive(state != KeyboardInteractionController.KeyboardGuideState.Hidden);

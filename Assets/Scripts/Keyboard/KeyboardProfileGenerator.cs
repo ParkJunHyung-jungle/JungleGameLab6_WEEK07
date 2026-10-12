@@ -27,7 +27,7 @@ namespace KeyboardModeling
             if (baseReward <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(baseReward));
-            }            
+            }
 
             System.Random random = new System.Random(seed);
             List<Key> keys = new List<Key>(layout.Keys);
@@ -37,7 +37,7 @@ namespace KeyboardModeling
             {
                 KeycapHealth health = layout[key];
                 bool canRollRarity = health.SupportsRarity && eligibleKeys.Contains(health);
-                KeycapRarity rarity = canRollRarity ? distribution.Roll(random) : KeycapRarity.Common;
+                KeycapRarity rarity = canRollRarity ? distribution.Roll(random) : KeycapRarity.Tier1;
                 KeycapRaritySettings.Tier tier = settings.GetTier(rarity);
                 int maxHP = checked((int)Math.Ceiling(health.MaxHP * (double)tier.HealthMultiplier));
                 long reward = checked((long)Math.Ceiling(baseReward * (double)tier.RewardMultiplier));

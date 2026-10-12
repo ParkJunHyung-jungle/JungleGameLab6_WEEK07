@@ -11,10 +11,14 @@ namespace KeyboardModeling
         [SerializeField]
         private Tier[] _tiers =
         {
-            new Tier(KeycapRarity.Common, 1f, 1f),
-            new Tier(KeycapRarity.Rare, 1.5f, 2f),
-            new Tier(KeycapRarity.Epic, 2.5f, 4f),
-            new Tier(KeycapRarity.Legendary, 4f, 8f)
+            new Tier(KeycapRarity.Tier1, 1f, 1f),
+            new Tier(KeycapRarity.Tier2, 1.2f, 2f),
+            new Tier(KeycapRarity.Tier3, 1.6f, 3f),
+            new Tier(KeycapRarity.Tier4, 2f, 4.5f),
+            new Tier(KeycapRarity.Tier5, 2.6f, 6.5f),
+            new Tier(KeycapRarity.Tier6, 3.4f, 9f),
+            new Tier(KeycapRarity.Tier7, 4.4f, 13f),
+            new Tier(KeycapRarity.Tier8, 6f, 20f)
         };
 
         /// <summary>
@@ -66,7 +70,7 @@ namespace KeyboardModeling
             [Header("Rarity")]
             [SerializeField] private KeycapRarity _rarity;
             [SerializeField, Min(1f)] private float _healthMultiplier;
-            [SerializeField, Min(1f)] private float _rewardMultiplier;            
+            [SerializeField, Min(1f)] private float _rewardMultiplier;
             [SerializeField] private Material _shellMaterial;
 
 
@@ -102,8 +106,8 @@ namespace KeyboardModeling
                 if (_shellMaterial == null)
                 {
                     throw new InvalidOperationException($"Missing keycap shell material: {_rarity}.");
-                }                
+                }
             }
-        }        
+        }
     }
 }

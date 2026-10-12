@@ -128,6 +128,12 @@ namespace Game.Shop
                     }
                 }
             }
+            else if (_definition.Id == UpgradeId.BoxCapacity)
+            {
+                _nameText.text = $"{_definition.DisplayName}\nCapacity {_definition.GetBoxCapacity(level)}";
+                if (!isMaxLevel)
+                    _nameText.text += $" -> {_definition.GetBoxCapacity(level + 1)}";
+            }
             else if (_definition.Id == UpgradeId.LuckyReward)
             {
                 _nameText.text = $"{_definition.DisplayName}\n{_definition.GetDoubleRewardChance(level):P0} chance: reward x2";

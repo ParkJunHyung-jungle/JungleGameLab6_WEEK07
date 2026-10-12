@@ -3,15 +3,18 @@ using System.Collections.Generic;
 
 using UnityEngine;
 
+using Game.Session;
+
 [RequireComponent(typeof(Rigidbody))]
 public sealed class KeyboardStorageBox : MonoBehaviour
 {
     [Header("Storage")]
     [SerializeField, Min(1)] private int _capacity = 5;
     [SerializeField] private BoxCollider _topInteractionArea;
+    [SerializeField] private GameSession _gameSession;
     private readonly List<StoredKeyboard> _storedKeyboards = new List<StoredKeyboard>();
     public int Count => _storedKeyboards.Count;
-    public int Capacity => _capacity;
+    public int Capacity => _gameSession != null ? _gameSession.Upgrades.GetBoxCapacity(_capacity) : _capacity;
     public bool IsFull => Count >= Capacity;
     public event Action<KeyboardInteractionController.KeyboardState> KeyboardReleased;
 

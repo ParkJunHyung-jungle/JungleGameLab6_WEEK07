@@ -20,6 +20,10 @@ namespace Game.Upgrades
         [Tooltip("구매 가격의 개수가 최대 레벨입니다. Element 0은 0→1레벨 가격이며, 기본 0레벨용 가격은 넣지 않습니다.")]
         [SerializeField, Min(1)] private long[] _levelCosts = { 10, 25, 60 };
 
+        [Header("Box Capacity")]
+        [Tooltip("Element 0은 기본 용량입니다. 최대 레벨까지의 최종 보관 개수를 입력하며 가격보다 한 항목 많아야 합니다.")]
+        [SerializeField, Min(1)] private int[] _boxCapacities = { 5, 10, 15, 20, 25, 30 };
+
         [Header("Lucky Reward")]
         [Tooltip("강화 1레벨마다 더해지는 두 배 보상 확률입니다. 0.1이면 1레벨 10%, 2레벨 20%이며 최대 100%입니다.")]
         [SerializeField, Range(0f, 1f)] private float _doubleRewardChance = 0.1f;
@@ -105,6 +109,17 @@ namespace Game.Upgrades
 
         void OnValidate()
         {
+            if (_id == UpgradeId.BoxCapacity)
+            {
+                int previousLength = _boxCapacities.Length;
+                Array.Resize(ref _boxCapacities, MaxLevel + 1);
+                for (int level = 0; level < _boxCapacities.Length; level++)
+                {
+                    if (level >= previousLength)
+                        _boxCapacities[level] = level == 0 ? 5 : _boxCapacities[level - 1] + 5;
+                    _boxCapacities[level] = Math.Max(level == 0 ? 1 : _boxCapacities[level - 1], _boxCapacities[level]);
+                }
+            }
             if (_id == UpgradeId.HandPower)
             {
                 Array.Sort(_handPromotionLevels);
@@ -206,6 +221,19 @@ namespace Game.Upgrades
             }
 
             return _levelCosts[currentLevel];
+        }
+
+        /// <summary>
+        /// level에 설정된 상자의 최종 용량을 반환한다.
+        /// 기본 0레벨부터 최대 레벨까지의 설정을 조회하며 범위를 벗어난 레벨은 예외로 알린다.
+        /// </summary>
+        public int GetBoxCapacity(int level)
+        {
+            if (level < 0 || level > MaxLevel)
+                throw new ArgumentOutOfRangeException(nameof(level));
+            if (_boxCapacities.Length != MaxLevel + 1)
+                throw new InvalidOperationException($"Upgrade '{name}' requires {MaxLevel + 1} box capacity values.");
+            return _boxCapacities[level];
         }
 
         /// <summary>

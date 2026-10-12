@@ -864,6 +864,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: KeyboardStorageBox
       objectReference: {fileID: 0}
+    - target: {fileID: 3133189558032688346, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: _gameSession
+      value: 
+      objectReference: {fileID: 641087395}
     - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
       propertyPath: m_LocalPosition.x
       value: -3.7
@@ -1022,6 +1026,14 @@ PrefabInstance:
       propertyPath: m_AnchorMax.y
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1979642950152958313, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: _upgradeDefinitions.Array.size
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1979642950152958313, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: '_upgradeDefinitions.Array.data[5]'
+      value: 
+      objectReference: {fileID: 11400000, guid: b8f0ccd6c532857438c9803eff8ad4a6, type: 2}
     - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: monitorCam
       value: 

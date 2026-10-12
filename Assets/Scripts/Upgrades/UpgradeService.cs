@@ -50,6 +50,16 @@ namespace Game.Upgrades
         }
 
         /// <summary>
+        /// 상자 강화의 현재 구매 레벨에 대응하는 최종 용량을 반환한다.
+        /// 강화 정의가 없는 세션에서는 fallbackCapacity를 반환하며 구매 상태는 변경하지 않는다.
+        /// </summary>
+        public int GetBoxCapacity(int fallbackCapacity)
+        {
+            return _definitions.TryGetValue(UpgradeId.BoxCapacity, out UpgradeDefinition definition)
+                ? definition.GetBoxCapacity(GetLevel(UpgradeId.BoxCapacity)) : fallbackCapacity;
+        }
+
+        /// <summary>
         /// 현재 손 강화 또는 기존 SmashDamage 레벨로 기본 손 공격의 추가 피해를 조회한다.
         /// 주먹 피해를 제외한 보너스를 반환하며 강화 레벨과 지갑 상태는 변경하지 않는다.
         /// </summary>

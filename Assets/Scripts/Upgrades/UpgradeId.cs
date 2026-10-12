@@ -10,6 +10,7 @@ namespace Game.Upgrades
         FeverDuration = 5,
         FeverDamageMultiplier = 6,
         LuckyReward = 7,
-        HandPower = 8
+        HandPower = 8,
+        BoxCapacity = 9
     }
 }

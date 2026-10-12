@@ -107,15 +107,13 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// 한 번 이상 키보드를 파괴한 빈 작업대에서 자동 보충을 예약한다.
-        /// 현재 해금 여부와 실행 상태를 확인해 중복 코루틴을 막는다.
+        /// 자동 보충이 해금된 빈 작업대에서 보충 대기를 시작한다.
+        /// 현재 작업대 상태와 실행 중인 코루틴을 확인하여 중복 실행을 막는다.
         /// </summary>
         private void BeginRefill()
         {
-            if (_refillRoutine != null || !_station.HasCompletedKeyboard || _station.HasKeyboard || !_upgrades.IsAutoRefillUnlocked())
-            {
+            if (_refillRoutine != null || _station.HasKeyboard || !_upgrades.IsAutoRefillUnlocked())
                 return;
-            }
 
             _refillRoutine = StartCoroutine(Refill());
         }

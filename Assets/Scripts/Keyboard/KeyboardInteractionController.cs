@@ -63,6 +63,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField, Min(0.1f)] private float _followSpeed = 12f;
     [SerializeField] private Vector3 _holdEulerAngles = new Vector3(-75f, 0f, 0f);
     [SerializeField] private LayerMask _pickupLayers = ~0;
+    [SerializeField] private LayerMask _heldKeyboardBlockLayers;
+    [SerializeField, Min(0f)] private float _heldKeyboardWallGap = 0.02f;
     private KeyboardState _heldKeyboard;
     private Vector3 _pickupPosition;
     private Quaternion _pickupRotation;
@@ -303,12 +305,19 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     {
         RequestFallenKeyboardReturns();
         if (_heldKeyboard == null) return;
+
+        Rigidbody body = _heldKeyboard.Body;
         Quaternion rotation = _camera.transform.rotation * Quaternion.Euler(_holdEulerAngles);
         Vector3 center = _camera.transform.position + _camera.transform.forward * _holdDistance;
-        Vector3 position = center - rotation * Vector3.Scale(_heldKeyboard.Collider.center, _heldKeyboard.Body.transform.lossyScale);
+        Vector3 position = center - rotation * Vector3.Scale(_heldKeyboard.Collider.center, body.transform.lossyScale);
         float amount = 1f - Mathf.Exp(-_followSpeed * Time.fixedDeltaTime);
-        _heldKeyboard.Body.MovePosition(Vector3.Lerp(_heldKeyboard.Body.position, position, amount));
-        _heldKeyboard.Body.MoveRotation(Quaternion.Slerp(_heldKeyboard.Body.rotation, rotation, amount));
+
+        Vector3 nextPosition = Vector3.Lerp(body.position, position, amount);
+        Quaternion nextRotation = Quaternion.Slerp(body.rotation, rotation, amount);
+        ConstrainHeldKeyboardPose(_heldKeyboard, ref nextPosition, ref nextRotation);
+
+        body.MovePosition(nextPosition);
+        body.MoveRotation(nextRotation);
     }
 
     void LateUpdate()
@@ -993,6 +1002,45 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
         BeginHoldKeyboard(state);
+    }
+
+    /// <summary>
+    /// 들고 있는 키보드의 목표 자세가 지정된 벽을 통과하지 않도록 제한한다.
+    /// state의 BoxCollider와 position, rotation을 사용하며 필요한 경우 두 목표 값을 벽 앞의 자세로 변경한다.
+    /// </summary>
+    private void ConstrainHeldKeyboardPose(KeyboardState state, ref Vector3 position, ref Quaternion rotation)
+    {
+        Rigidbody body = state.Body;
+        BoxCollider collider = state.Collider;
+        Vector3 scale = body.transform.lossyScale;
+        Vector3 scaledCenter = Vector3.Scale(collider.center, scale);
+        Vector3 halfExtents = Vector3.Scale(collider.size, new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z))) * 0.5f;
+
+        Vector3 currentCenter = body.position + body.rotation * scaledCenter;
+        Vector3 targetCenter = position + rotation * scaledCenter;
+        Vector3 movement = targetCenter - currentCenter;
+        float distance = movement.magnitude;
+
+        if (distance > 0.0001f && Physics.BoxCast(currentCenter, halfExtents, movement / distance, out RaycastHit hit, body.rotation, distance, _heldKeyboardBlockLayers, QueryTriggerInteraction.Ignore))
+        {
+            Vector3 stoppedCenter = currentCenter + movement / distance * Mathf.Max(0f, hit.distance - _heldKeyboardWallGap);
+            position = stoppedCenter - rotation * scaledCenter;
+        }
+
+        targetCenter = position + rotation * scaledCenter;
+        if (!Physics.CheckBox(targetCenter, halfExtents, rotation, _heldKeyboardBlockLayers, QueryTriggerInteraction.Ignore))
+            return;
+
+        Quaternion previousRotation = body.rotation;
+        if (!Physics.CheckBox(targetCenter, halfExtents, previousRotation, _heldKeyboardBlockLayers, QueryTriggerInteraction.Ignore))
+        {
+            position = targetCenter - previousRotation * scaledCenter;
+            rotation = previousRotation;
+            return;
+        }
+
+        position = body.position;
+        rotation = previousRotation;
     }
 
     /// <summary>

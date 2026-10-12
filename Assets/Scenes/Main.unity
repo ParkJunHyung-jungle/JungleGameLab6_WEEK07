@@ -205,10 +205,10 @@ MonoBehaviour:
   _keyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _inGameKeyBoardPrefab: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
   _firstRegion: {fileID: 1485046093}
-  _firstRegionCount: 50
+  _firstRegionCount: 1
   _firstRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _secondRegion: {fileID: 550167387}
-  _secondRegionCount: 70
+  _secondRegionCount: 1
   _secondRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _thirdRegion: {fileID: 1464566189}
   _thirdRegionCount: 1
@@ -438,6 +438,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 30.78336, y: 263.15723, z: 0}
+--- !u!1 &69554665
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 69554666}
+  m_Layer: 0
+  m_Name: SecondBoxPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &69554666
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 69554665}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -20.76, y: -3.65, z: -7.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &89418935
 GameObject:
   m_ObjectHideFlags: 0
@@ -486,8 +517,7 @@ MonoBehaviour:
   _workbenchDestination: {fileID: 0}
   _nextSpawnRegion: 2
   _nextDoor: {fileID: 0}
-  _boxSourceArea: {fileID: 129514598}
-  _boxOffset: {x: 0, y: 0, z: 0}
+  _boxDestination: {fileID: 952052075}
 --- !u!54 &89418937
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -957,11 +987,6 @@ Transform:
 --- !u!4 &129514597 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3814156318923512344, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
-  m_PrefabInstance: {fileID: 129514595}
-  m_PrefabAsset: {fileID: 0}
---- !u!65 &129514598 stripped
-BoxCollider:
-  m_CorrespondingSourceObject: {fileID: 3585709104477070935, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
   m_PrefabInstance: {fileID: 129514595}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &240308793
@@ -2168,6 +2193,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &952052074
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 952052075}
+  m_Layer: 0
+  m_Name: ThirdBoxpoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &952052075
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 952052074}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -29.66, y: -3.65, z: 25.51}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1022828481
 GameObject:
   m_ObjectHideFlags: 0
@@ -3296,8 +3352,7 @@ MonoBehaviour:
   _workbenchDestination: {fileID: 0}
   _nextSpawnRegion: 1
   _nextDoor: {fileID: 276827729}
-  _boxSourceArea: {fileID: 129514598}
-  _boxOffset: {x: 0, y: 0, z: 0}
+  _boxDestination: {fileID: 69554666}
 --- !u!54 &1449495235
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4557,3 +4612,5 @@ SceneRoots:
   - {fileID: 89418939}
   - {fileID: 1704111280}
   - {fileID: 111551562}
+  - {fileID: 69554666}
+  - {fileID: 952052075}

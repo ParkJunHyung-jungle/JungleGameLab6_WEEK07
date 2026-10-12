@@ -19,8 +19,7 @@ public sealed class NextRegionWorkbenchTransition : MonoBehaviour
     [SerializeField] private Transform _nextDoor;
 
     [Header("Storage Box Movement")]
-    [SerializeField] private BoxCollider _boxSourceArea;
-    [SerializeField] private Vector3 _boxOffset;
+    [SerializeField, InspectorName("상자 이동 목적지")] private Transform _boxDestination;
     private bool _hasTransitioned;
 
     void OnTriggerEnter(Collider other)
@@ -42,7 +41,7 @@ public sealed class NextRegionWorkbenchTransition : MonoBehaviour
         if (_hasTransitioned || !_completionProgress.IsDoorOpen || _interactionController.ActiveSpawnRegion != _nextSpawnRegion - 1
             || other.GetComponentInParent<PlayerMovement>() != _player) return;
         _hasTransitioned = true;
-        _interactionController.MoveStorageBoxes(_boxOffset, _boxSourceArea.bounds);
+        _interactionController.MoveStorageBoxes(_boxDestination);
         Vector3 workbenchOffset = MoveWorkbench();
         _interactionController.RefreshWorkbenchPlacement();
         if (_nextSpawnRegion == 2)

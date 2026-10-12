@@ -124,6 +124,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private bool _returnFallenKeyboards;
     [Tooltip("등록된 월드 키보드가 이 월드 Y 이하로 떨어지면 동일한 키보드를 다시 던집니다.")]
     [SerializeField] private float _fallReturnHeight = -3f;
+    [Tooltip("키보드 중심이 이 영역 밖으로 나가면 같은 키보드를 보스가 다시 던집니다. 투척 경로까지 포함하는 Trigger BoxCollider를 지정하세요. 비우면 Y 높이만 검사합니다.")]
+    [SerializeField, InspectorName("키보드 유지 영역")] private BoxCollider _keyboardReturnArea;
 
     [Header("Opening")]
     [SerializeField] private bool _startWithSingleKeyboard;
@@ -862,7 +864,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 등록된 월드 키보드가 _fallReturnHeight 이하로 떨어지면 동일한 Rigidbody의 재투척을 요청한다.
+    /// 등록된 월드 키보드가 _fallReturnHeight 이하로 떨어지거나 지정한 유지 영역 밖으로 나가면 동일한 Rigidbody의 재투척을 요청한다.
     /// 들고 있거나 배치된 키보드는 제외하고 대기 중인 키보드의 물리를 정지하여 중복 요청을 막는다.
     /// </summary>
     private void RequestFallenKeyboardReturns()
@@ -872,14 +874,28 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         {
             Rigidbody body = state.Body;
             if (body == null || !state.Root.activeInHierarchy || state == _heldKeyboard || state == _placedKeyboard || _storedKeyboards.Contains(state) || body.isKinematic) continue;
-            if (body.position.y > _fallReturnHeight) continue;
+            bool belowHeight = body.position.y <= _fallReturnHeight;
+            bool outsideArea = IsOutsideKeyboardReturnArea(body.worldCenterOfMass);
+            if (!belowHeight && !outsideArea) continue;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             body.isKinematic = true;
             body.useGravity = false;
             _regionThrowVisit.RequestKeyboardReturn(body);
-            Debug.Log($"[Keyboard] Fallen return: {state.Root.name}, region={state.SpawnRegionIndex + 1}, below Y={_fallReturnHeight}. Reusing the same keyboard.", state.Root);
+            Debug.Log($"[Keyboard] Fallen return: {state.Root.name}, region={state.SpawnRegionIndex + 1}, reason={(belowHeight ? "BelowHeight" : "OutsideArea")}. Reusing the same keyboard.", state.Root);
         }
+    }
+
+    /// <summary>
+    /// position이 Inspector에서 지정한 키보드 유지 영역 밖인지 반환한다.
+    /// BoxCollider의 로컬 중심과 크기를 사용하여 회전과 배율을 반영하며 영역 미지정 시 false를 반환한다.
+    /// </summary>
+    private bool IsOutsideKeyboardReturnArea(Vector3 position)
+    {
+        if (_keyboardReturnArea == null) return false;
+        Vector3 local = _keyboardReturnArea.transform.InverseTransformPoint(position) - _keyboardReturnArea.center;
+        Vector3 halfSize = _keyboardReturnArea.size * 0.5f;
+        return Mathf.Abs(local.x) > halfSize.x || Mathf.Abs(local.y) > halfSize.y || Mathf.Abs(local.z) > halfSize.z;
     }
 
     /// <summary>
@@ -1014,12 +1030,12 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// sourceArea에 내려놓은 상자의 위치를 offset만큼 이동하도록 들기 컨트롤러에 전달한다.
+    /// 내려놓은 상자를 destination의 위치와 회전으로 이동하도록 들기 컨트롤러에 전달한다.
     /// 손에 든 상자는 카메라 추적을 유지하며 보관 목록과 키보드 상태는 변경하지 않는다.
     /// </summary>
-    public void MoveStorageBoxes(Vector3 offset, Bounds sourceArea)
+    public void MoveStorageBoxes(Transform destination)
     {
-        _boxPickupController.MoveUnheldBoxes(offset, sourceArea);
+        _boxPickupController.MoveUnheldBoxes(destination);
     }
     /// <summary>
     /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.

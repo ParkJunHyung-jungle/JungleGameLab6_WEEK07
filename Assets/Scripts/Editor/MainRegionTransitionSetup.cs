@@ -50,30 +50,25 @@ public static class MainRegionTransitionSetup
     }
 
     /// <summary>
-    /// Main의 방과 거실 바닥을 상자 이동의 원래 구역 범위로 연결한다.
-    /// 두 진입 트리거의 상자 이동량만 설정하고 기존 작업대, 문과 디버깅 설정은 유지한다.
+    /// Main의 거실과 마당 바닥을 상자 이동 목적지 Transform으로 연결한다.
+    /// 두 진입 트리거의 목적지만 설정하고 기존 작업대와 문 설정은 유지한다.
     /// </summary>
     public static void ConfigureBoxTransitions()
     {
         var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
         Transform[] transforms = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        Transform roomFloor = Array.Find(transforms, item => item.name == "Floor" && item.parent != null && item.parent.name == "RoomShell" && item.gameObject.activeInHierarchy);
         Transform livingFloor = Array.Find(transforms, item => item.name == "LivingRoom_Floor");
         Transform yardFloor = Array.Find(transforms, item => item.name == "Yard_GrassFloor");
-        if (roomFloor == null || livingFloor == null || yardFloor == null) throw new InvalidOperationException("Main region floors are missing.");
+        if (livingFloor == null || yardFloor == null) throw new InvalidOperationException("Main region floors are missing.");
         NextRegionWorkbenchTransition[] transitions = UnityEngine.Object.FindObjectsByType<NextRegionWorkbenchTransition>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (NextRegionWorkbenchTransition transition in transitions)
         {
             SerializedObject settings = new SerializedObject(transition);
             bool yard = settings.FindProperty("_nextSpawnRegion").intValue == 2;
-            Transform source = yard ? livingFloor : roomFloor;
             Transform destination = yard ? yardFloor : livingFloor;
-            Vector3 offset = destination.position - source.position;
-            offset.y = 0f;
-            settings.FindProperty("_boxSourceArea").objectReferenceValue = source.GetComponent<BoxCollider>();
-            settings.FindProperty("_boxOffset").vector3Value = offset;
+            settings.FindProperty("_boxDestination").objectReferenceValue = destination;
             settings.ApplyModifiedPropertiesWithoutUndo();
-            Debug.Log($"BOX_TRANSITION_READY trigger={transition.name} source={source.name} offset={offset}");
+            Debug.Log($"BOX_TRANSITION_READY trigger={transition.name} destination={destination.name}");
         }
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);

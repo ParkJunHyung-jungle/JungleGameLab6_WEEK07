@@ -16,7 +16,7 @@ namespace KeyboardModeling.Editor
             EditorGUILayout.LabelField("Runtime Input Status", EditorStyles.boldLabel);
             using (new EditorGUI.DisabledScope(true))
             {
-                EditorGUILayout.Toggle("Shortcut Capture Active", controller.ShortcutCaptureActive);
+                EditorGUILayout.Toggle("Input Enabled", controller.InputEnabled);
                 EditorGUILayout.TextField("Last Pressed Key", controller.LastPressedKey.ToString());
                 EditorGUILayout.TextField("Currently Pressed Keys", controller.CurrentPressedKeys);
             }

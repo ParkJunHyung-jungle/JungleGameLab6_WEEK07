@@ -151,6 +151,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [Header("monitor")]
     [SerializeField] private MiniGameController _controller;
     public bool IsMiniGameRunning => _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
+    private bool IsMiniGameBlockingWorldInput => IsMiniGameRunning && _controller.HasKeyboard;
     private bool IsKeyboardBreaking => _placedKeyboard != null && _placedKeyboard.Keyboard.GetComponent<KeyboardDestruction>().IsBroken;
     public bool CanEnterShop => (_monitorController != null ? _isShopFocused : IsSmashMode)
         && !_feverSupplyPending && !IsMiniGameRunning && !IsKeyboardBreaking;
@@ -268,7 +269,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
             return;
         }
-        if (IsSmashMode || IsMiniGameRunning || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
+        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
         HandleWorldInteraction();
     }
 
@@ -726,7 +727,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void RefreshGuideState()
     {
         if (!Application.isFocused || IsSmashMode || _isShopFocused || _viewingAutomaticStation != null
-            || _isPlacingKeyboard || IsMiniGameRunning || Mouse.current == null)
+            || _isPlacingKeyboard || IsMiniGameBlockingWorldInput || Mouse.current == null)
         {
             SetGuideState(KeyboardGuideState.Hidden);
             return;

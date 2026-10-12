@@ -422,7 +422,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (_openingKeyboard == state)
         {
             Vector3 position = _openingCeiling.localPosition;
-            position.x = 10f;
+            position.x = 30f;
             _openingCeiling.localPosition = position;
             _openingKeyboard = null;
             SpawnSurroundingKeyboards();

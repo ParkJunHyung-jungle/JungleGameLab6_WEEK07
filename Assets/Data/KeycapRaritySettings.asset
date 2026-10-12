@@ -35,40 +35,40 @@ MonoBehaviour:
     _shellMaterial: {fileID: 2100000, guid: dc81f37b2d349b54faeb49ad09dc0abf, type: 2}
     _shellMesh: {fileID: 0}
     _bandMaterial: {fileID: 0}
-    _pressSound: {fileID: 8300000, guid: 24e1186cea1229c41bba0deb2e6abad4, type: 3}
-    _breakSound: {fileID: 8300000, guid: 955fef2c80a5a4745a33159d827bdc2e, type: 3}
+    _pressSound: {fileID: 8300000, guid: 8acbb06a2b3cf8946acad6b48b681c5c, type: 3}
+    _breakSound: {fileID: 8300000, guid: a83e7573bdfcff149879a8328a0788fe, type: 3}
   - _rarity: 3
     _healthMultiplier: 5
     _rewardMultiplier: 4.5
     _shellMaterial: {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
     _shellMesh: {fileID: 0}
     _bandMaterial: {fileID: 0}
-    _pressSound: {fileID: 8300000, guid: 229eec0525fc29544b417ee0cff5933d, type: 3}
-    _breakSound: {fileID: 8300000, guid: 53f05dad024ea1541ad34e636296e9c4, type: 3}
+    _pressSound: {fileID: 8300000, guid: 24e1186cea1229c41bba0deb2e6abad4, type: 3}
+    _breakSound: {fileID: 8300000, guid: 955fef2c80a5a4745a33159d827bdc2e, type: 3}
   - _rarity: 4
     _healthMultiplier: 7
     _rewardMultiplier: 6.5
     _shellMaterial: {fileID: 2100000, guid: ef29bfa57b8eeaa4684755d94aec900c, type: 2}
     _shellMesh: {fileID: 0}
     _bandMaterial: {fileID: 0}
-    _pressSound: {fileID: 8300000, guid: 229eec0525fc29544b417ee0cff5933d, type: 3}
-    _breakSound: {fileID: 8300000, guid: 53f05dad024ea1541ad34e636296e9c4, type: 3}
+    _pressSound: {fileID: 8300000, guid: 7ada86c49f04fd542a06ec97c628612f, type: 3}
+    _breakSound: {fileID: 8300000, guid: 2b443ab1699c99644abfc89771ded2dd, type: 3}
   - _rarity: 5
     _healthMultiplier: 10
     _rewardMultiplier: 9
     _shellMaterial: {fileID: 2100000, guid: 994431c627356934b98175a03bb95d66, type: 2}
     _shellMesh: {fileID: 0}
     _bandMaterial: {fileID: 0}
-    _pressSound: {fileID: 8300000, guid: 229eec0525fc29544b417ee0cff5933d, type: 3}
-    _breakSound: {fileID: 8300000, guid: 53f05dad024ea1541ad34e636296e9c4, type: 3}
+    _pressSound: {fileID: 8300000, guid: 7c1911b97ec404b499f6ed821e39d071, type: 3}
+    _breakSound: {fileID: 8300000, guid: f65800f2bba9329459d1b0a089daf9f4, type: 3}
   - _rarity: 6
     _healthMultiplier: 15
     _rewardMultiplier: 13
     _shellMaterial: {fileID: 2100000, guid: b390153fd5970104f9ca9f3f820ea816, type: 2}
     _shellMesh: {fileID: 4300000, guid: ad3711dc7f945084296fd68ff97962a8, type: 2}
     _bandMaterial: {fileID: 2100000, guid: 35526b543471e6844a3a7af84333e124, type: 2}
-    _pressSound: {fileID: 8300000, guid: 229eec0525fc29544b417ee0cff5933d, type: 3}
-    _breakSound: {fileID: 8300000, guid: 53f05dad024ea1541ad34e636296e9c4, type: 3}
+    _pressSound: {fileID: 8300000, guid: 9d146e29aad42eb439a8250923306c97, type: 3}
+    _breakSound: {fileID: 8300000, guid: e8fa737c459108d43b3a8d1b17102344, type: 3}
   - _rarity: 7
     _healthMultiplier: 20
     _rewardMultiplier: 20

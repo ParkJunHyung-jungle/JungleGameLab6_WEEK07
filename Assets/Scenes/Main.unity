@@ -203,7 +203,7 @@ MonoBehaviour:
   _firstRegion: {fileID: 102212880}
   _firstRegionCount: 100
   _regionThrowVisit: {fileID: 9100000004}
-  _completionProgress: {fileID: 0}
+  _completionProgress: {fileID: 27118947}
   _returnFallenKeyboards: 1
   _fallReturnHeight: -8
   _startWithSingleKeyboard: 1

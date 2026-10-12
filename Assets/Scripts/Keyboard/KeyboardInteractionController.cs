@@ -757,7 +757,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             try
             {
                 target = CreatePlayableKeyboard(source, false);
-                station.AcceptKeyboard(target.Keyboard);
+                station.AcceptKeyboard(target.Keyboard, () => NotifyKeyboardCompleted(target));
             }
             catch (Exception exception)
             {

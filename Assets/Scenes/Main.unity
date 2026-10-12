@@ -2542,6 +2542,10 @@ PrefabInstance:
       propertyPath: m_Color.r
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5750844012438177231, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -150
+      objectReference: {fileID: 0}
     - target: {fileID: 5986885291804400204, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
       propertyPath: _message
       value: "\uC774\uC81C \uB2F9\uC2E0\uC744 \uB3C4\uC640\uC904 \uAE30\uACC4 \uD314\uC774

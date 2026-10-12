@@ -1,5 +1,7 @@
 using UnityEngine;
 
+using KeyboardModeling;
+
 [RequireComponent(typeof(BoxCollider), typeof(Rigidbody))]
 public sealed class NextRegionWorkbenchTransition : MonoBehaviour
 {
@@ -60,20 +62,33 @@ public sealed class NextRegionWorkbenchTransition : MonoBehaviour
 
     /// <summary>
     /// 기준 책상을 Inspector 목적지의 위치와 회전에 맞추며 작업대들의 상대 배치를 유지한다.
-    /// 목적지가 없는 기존 설정은 이동량을 사용하고 실제 위치 이동량을 반환한다.
+    /// 목적지 또는 이동량을 사용하되 세 번째 구역에서는 자동작업대를 제외하고 실제 위치 이동량을 반환한다.
     /// </summary>
     private Vector3 MoveWorkbench()
     {
         if (_workbenchAnchor == null || _workbenchDestination == null)
         {
-            foreach (Transform item in _workbenchObjects) item.position += _workbenchOffset;
+            foreach (Transform item in _workbenchObjects)
+                if (ShouldMoveWorkbenchItem(item)) item.position += _workbenchOffset;
             return _workbenchOffset;
         }
         Vector3 origin = _workbenchAnchor.position;
         Vector3 destination = _workbenchDestination.position;
         Quaternion rotation = _workbenchDestination.rotation * Quaternion.Inverse(_workbenchAnchor.rotation);
         foreach (Transform item in _workbenchObjects)
-            item.SetPositionAndRotation(destination + rotation * (item.position - origin), rotation * item.rotation);
+            if (ShouldMoveWorkbenchItem(item))
+                item.SetPositionAndRotation(destination + rotation * (item.position - origin), rotation * item.rotation);
         return destination - origin;
+    }
+
+    /// <summary>
+    /// item이 현재 구역 전환에서 이동할 대상인지 반환한다.
+    /// 다음 구역 번호와 자동작업대 컴포넌트를 확인하여 세 번째 구역에서는 자동작업대와 그 하위 대상을 제외한다.
+    /// </summary>
+    private bool ShouldMoveWorkbenchItem(Transform item)
+    {
+        return _nextSpawnRegion != 2
+            || (item.GetComponentInChildren<KeyboardAutomaticStation>(true) == null
+                && item.GetComponentInParent<KeyboardAutomaticStation>(true) == null);
     }
 }

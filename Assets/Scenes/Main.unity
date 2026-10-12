@@ -233,6 +233,7 @@ MonoBehaviour:
   _strikeDuration: 0.16
   _retreatDuration: 0.25
   _hammerSprite: {fileID: 21300000, guid: 2a2d2a4d10436db45a6986a0928df040, type: 3}
+  _hammerShockwaveMaterial: {fileID: 2100000, guid: c8b9a474c4aa2c94ea91dcbb809bd8ef, type: 2}
   _hammerAnimation:
     _height: 1.8
     _sideOffset: -1
@@ -245,7 +246,7 @@ MonoBehaviour:
     _prepareDuration: 0.1
     _swingDuration: 0.18
     _holdDuration: 0.15
-    _showWaveRing: 0
+    _showWaveRing: 1
     _waveSpeed: 22
     _waveHeight: 0.25
     _waveDuration: 0.35

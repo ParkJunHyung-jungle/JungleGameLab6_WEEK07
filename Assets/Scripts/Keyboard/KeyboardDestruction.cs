@@ -76,13 +76,14 @@ public sealed class KeyboardDestruction : MonoBehaviour
     }
 
     /// <summary>
-    /// sprite와 settings를 망치 이미지 및 옆으로 등장하는 회전 타격 설정으로 저장한다.
-    /// 다음 망치 타격에서 사용하며 진행 중인 연출의 설정은 변경하지 않는다.
+    /// 망치 이미지와 타격 설정, 충격파 재질을 저장한다.
+    /// sprite, settings, shockwaveMaterial을 사용하며 다음 망치 연출에 적용한다.
     /// </summary>
-    public void ConfigureHammerAnimation(Sprite sprite, HammerAnimationSettings settings)
+    public void ConfigureHammerAnimation(Sprite sprite, HammerAnimationSettings settings, Material shockwaveMaterial)
     {
         _hammerSprite = sprite;
         _hammerAnimation = settings;
+        _shockwaveMaterial = shockwaveMaterial;
     }
 
     /// <summary>
@@ -111,8 +112,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
     }
 
     void OnDestroy()
-    {
-        if (_shockwaveMaterial != null) Destroy(_shockwaveMaterial);
+    {        
         if (_fistRenderers != null)
             foreach (MeshRenderer fist in _fistRenderers)
                 if (fist != null) Destroy(fist.gameObject);
@@ -174,8 +174,6 @@ public sealed class KeyboardDestruction : MonoBehaviour
     public void PlayHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex)
     {
         if (IsBroken || _hammerAnimation == null) return;
-        if (_shockwaveMaterial == null)
-            _shockwaveMaterial = new Material(Shader.Find("Sprites/Default"));
         MeshFilter shell = keycaps[targetIndex].transform.Find("PBT_SculptedShell").GetComponent<MeshFilter>();
         Bounds bounds = shell.sharedMesh.bounds;
         Vector3 contact = transform.InverseTransformPoint(shell.transform.TransformPoint(bounds.center + Vector3.up * bounds.extents.y));

@@ -165,6 +165,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     [Header("Hammer Animation")]
     [SerializeField] private Sprite _hammerSprite;
+    [SerializeField] private Material _hammerShockwaveMaterial;
     [SerializeField] private KeyboardDestruction.HammerAnimationSettings _hammerAnimation = new KeyboardDestruction.HammerAnimationSettings();
 
     [Header("monitor")]
@@ -414,7 +415,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public void ConfigureFistAnimation(KeyboardDestruction destruction)
     {
         destruction.ConfigureFistAnimation(_fistHeight, _fistLift, _appearDuration, _strikeDuration, _retreatDuration, _keycapFistImpactOffset, _fistMaterial);
-        destruction.ConfigureHammerAnimation(_hammerSprite, _hammerAnimation);
+        destruction.ConfigureHammerAnimation(_hammerSprite, _hammerAnimation, _hammerShockwaveMaterial);
     }
 
     /// <summary>

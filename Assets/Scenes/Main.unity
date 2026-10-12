@@ -205,10 +205,10 @@ MonoBehaviour:
   _keyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _inGameKeyBoardPrefab: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
   _firstRegion: {fileID: 1485046093}
-  _firstRegionCount: 1
+  _firstRegionCount: 50
   _firstRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _secondRegion: {fileID: 550167387}
-  _secondRegionCount: 1
+  _secondRegionCount: 70
   _secondRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _thirdRegion: {fileID: 1464566189}
   _thirdRegionCount: 1

@@ -9,17 +9,25 @@ namespace Game.UI
     {
         [Header("State")]
         [SerializeField] private FeverController _controller;
-        private float _refreshRemaining;
+        private bool _wasFeverActive;
 
         [Header("Vertical Gauge")]
         [SerializeField] private Slider _gauge;
         [SerializeField] private Text _status;
-        [SerializeField] private Text _charge;
-        [SerializeField] private Text _remaining;
         [SerializeField] private Text _multiplier;
-        [SerializeField] private Text _pauseGuide;
         [SerializeField] private Color _chargeColor = new Color(0.25f, 0.95f, 0.72f);
         [SerializeField] private Color _activeColor = new Color(1f, 0.56f, 0.16f);
+
+        [Header("Active Fever HUD")]
+        [SerializeField] private GameObject _activeFeverRoot;
+        [SerializeField] private Slider _remainingGauge;
+        [SerializeField] private Text _activeMultiplier;
+
+        [Header("Damage Pulse")]
+        [SerializeField, Min(0.01f)] private float _minimumDamageScale = 1f;
+        [SerializeField, Min(0.01f)] private float _maximumDamageScale = 1.35f;
+        [SerializeField, Min(0.01f)] private float _damagePulseDuration = 0.5f;
+        private float _pulseElapsed;
 
         void OnEnable()
         {
@@ -39,39 +47,76 @@ namespace Game.UI
         {
             if (_controller != null)
                 _controller.StateChanged -= RefreshView;
+            _activeFeverRoot.SetActive(false);
+            _activeMultiplier.rectTransform.localScale = Vector3.one;
+            _wasFeverActive = false;
+            _pulseElapsed = 0f;
         }
 
         void Update()
         {
-            _refreshRemaining -= Time.unscaledDeltaTime;
-            if (_refreshRemaining > 0f)
-                return;
-            _refreshRemaining = 0.05f;
-            RefreshView();
+            RefreshGauges();
+            UpdateDamagePulse();
+        }
+
+        void OnValidate()
+        {
+            _minimumDamageScale = Mathf.Max(0.01f, _minimumDamageScale);
+            _maximumDamageScale = Mathf.Max(_minimumDamageScale, _maximumDamageScale);
+            _damagePulseDuration = Mathf.Max(0.01f, _damagePulseDuration);
         }
 
         /// <summary>
-        /// 피버 상태를 읽어 세로 게이지와 충전량, 남은 초, 현재 배율, 정지 안내를 갱신한다.
-        /// 충전 중에는 충전 비율, 피버 중에는 남은 시간 비율을 표시하며 게임 상태는 변경하지 않는다.
+        /// 연결된 피버 상태로 세로 게이지, 배율 숫자 및 상단 활성 HUD를 갱신한다.
+        /// 충전량과 확정된 남은 시간·배율을 사용하며 피버 전환 시 강조 연출을 초기화한다.
         /// </summary>
         private void RefreshView()
         {
             bool active = _controller.IsFeverActive;
             Color accent = active ? _activeColor : _chargeColor;
-            _gauge.SetValueWithoutNotify(active ? _controller.Remaining / _controller.Duration : _controller.Charge);
+            RefreshGauges();
             _gauge.targetGraphic.color = accent;
-            _status.text = active ? "FEVER ACTIVE" : "FEVER CHARGE";
+            _status.text = "FEVER";
             _status.color = accent;
-            _charge.text = $"CHARGE\n{_controller.Charge * 100f:0.0}%";
-            _remaining.text = $"TIME LEFT\n{_controller.Remaining:0.0}s";
-            _multiplier.text = $"DAMAGE\nx{_controller.DamageMultiplier:0.0}";
-            _pauseGuide.text = _controller.CurrentPauseReason switch
+            _multiplier.text = $"{_controller.DamageMultiplier:0.0#}";
+            _activeMultiplier.text = $"DAMAGE X {_controller.DamageMultiplier:0.0#}";
+
+            if (_wasFeverActive != active)
             {
-                FeverController.PauseReason.KeyboardUnavailable => "PAUSED\nPlace a keyboard\nto resume.",
-                FeverController.PauseReason.InputDisabled => "PAUSED\nReturn to smash\nto resume.",
-                FeverController.PauseReason.GamePaused => "PAUSED\nResume the game\nto continue.",
-                _ => active ? "Keep smashing!" : "+0.1% direct hit\n+50% per minigame"
-            };
+                _wasFeverActive = active;
+                _pulseElapsed = 0f;
+                _activeMultiplier.rectTransform.localScale = active ? Vector3.one * _minimumDamageScale : Vector3.one;
+            }
+
+            _activeFeverRoot.SetActive(active);
+        }
+
+        /// <summary>
+        /// 연결된 피버의 충전량 또는 남은 시간 비율로 두 Slider를 갱신한다.
+        /// 현재 활성 상태와 Remaining·Duration을 사용하며 표시값만 변경하고 이벤트는 발생시키지 않는다.
+        /// </summary>
+        private void RefreshGauges()
+        {
+            bool active = _controller.IsFeverActive;
+            float remainingRatio = Mathf.Clamp01(_controller.Remaining / _controller.Duration);
+            _gauge.SetValueWithoutNotify(active ? remainingRatio : _controller.Charge);
+            _remainingGauge.SetValueWithoutNotify(active ? remainingRatio : 0f);
+        }
+
+        /// <summary>
+        /// 피버가 진행 중이면 설정된 주기와 크기 범위로 상단 배율 텍스트를 확대·축소한다.
+        /// Time.deltaTime으로 연출 시간을 누적하며 피버 일시정지 중에는 현재 크기를 유지한다.
+        /// </summary>
+        private void UpdateDamagePulse()
+        {
+            if (!_controller.IsFeverActive || _controller.IsSuspended)
+                return;
+
+            _pulseElapsed = Mathf.Repeat(_pulseElapsed + Time.deltaTime, _damagePulseDuration);
+            float phase = _pulseElapsed / _damagePulseDuration;
+            float weight = (1f - Mathf.Cos(phase * Mathf.PI * 2f)) * 0.5f;
+            float scale = Mathf.Lerp(_minimumDamageScale, _maximumDamageScale, weight);
+            _activeMultiplier.rectTransform.localScale = Vector3.one * scale;
         }
     }
 }

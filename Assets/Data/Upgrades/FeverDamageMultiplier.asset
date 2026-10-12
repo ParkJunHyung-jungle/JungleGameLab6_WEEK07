@@ -13,17 +13,16 @@ MonoBehaviour:
   m_Name: FeverDamageMultiplier
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 6
-  _displayName: Fever Damage
-  _description: Start at x2.0 and gain x0.3 per level. Applies to direct and area
-    damage from the next fever; round final damage up once.
+  _displayName: '피버 피해 배율'
+  _description: '피버의 피해 배율을 높입니다. 다음 피버부터 적용됩니다.'
   _levelCosts: 2c01000000000000dc050000000000008813000000000000204e000000000000a08601000000000020a1070000000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000
   _handStageNames:
-  - Hand Upgrade
-  - Fist Upgrade
-  - Hammer Upgrade
+  - 손 강화
+  - 주먹 강화
+  - 망치 강화
   _handFirstPromotionRadius: 1.5
   _handRadiusPerPromotion: 1
   _fistBaseDamage: 5
@@ -36,7 +35,7 @@ MonoBehaviour:
   - 2
   - 3
   _autoPromotionLevel: 6
-  _autoPromotedName: Auto Smash
+  _autoPromotedName: 자동 범위 공격
   _autoPromotionRadius: 1.5
   _areaRadii:
   - 1.5

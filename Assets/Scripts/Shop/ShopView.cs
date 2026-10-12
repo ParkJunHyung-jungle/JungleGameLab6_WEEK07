@@ -96,7 +96,7 @@ namespace Game.Shop
             }
 
             _shopPanel.SetActive(isOpen);
-            _toggleText.text = _useWindowCloseButton ? "X" : isOpen ? "Close [Tab]" : "Shop [Tab]";
+            _toggleText.text = _useWindowCloseButton ? "닫기" : isOpen ? "닫기 [Tab]" : "상점 [Tab]";
 
             if (isOpen)
             {
@@ -125,7 +125,7 @@ namespace Game.Shop
         /// </summary>
         private void OnBalanceChanged(long balance)
         {
-            _balanceText.text = $"Currency: {balance:N0}";
+            _balanceText.text = $"보유 재화: {balance:N0}";
             RefreshItems();
         }
 

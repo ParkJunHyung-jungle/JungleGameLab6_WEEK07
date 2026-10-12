@@ -21,7 +21,6 @@ namespace KeyboardModeling.Editor
         private static readonly Color _background = new Color(0.018f, 0.035f, 0.055f, 0.94f);
         private static readonly Color _surface = new Color(0.035f, 0.075f, 0.095f);
         private static readonly Color _green = new Color(0.25f, 0.95f, 0.72f);
-        private static readonly Color _muted = new Color(0.48f, 0.65f, 0.70f);
 
         /// <summary>
         /// 기존 미니게임 및 모니터 프리팹을 분리된 피버 상태와 Overlay HUD 구성으로 갱신한다.
@@ -140,55 +139,130 @@ namespace KeyboardModeling.Editor
         }
 
         /// <summary>
-        /// canvasObject 우측에 피버 전용 세로 게이지와 정보를 추가한다.
-        /// 기존 지갑과 알림을 왼쪽으로 이동하여 겹침을 피하고, 이미 패널이 있으면 기존 구성을 유지한다.
+        /// canvasObject의 피버 패널을 간소화하고 중앙 상단 활성 HUD를 구성한다.
+        /// 기존 표시 객체와 상태 참조를 보존하며 삭제한 안내를 정리하고 새 게이지 및 배율 참조를 연결한다.
         /// </summary>
         public static void AddFeverPanel(GameObject canvasObject)
         {
-            if (canvasObject.GetComponentInChildren<FeverHudView>(true) != null) return;
-            foreach (string name in new[] { "WalletPanel", "HUDToastLayer" })
+            FeverHudView view = canvasObject.GetComponentInChildren<FeverHudView>(true);
+            if (view == null)
             {
-                RectTransform existing = (RectTransform)canvasObject.transform.Find(name);
-                existing.anchoredPosition = new Vector2(-256f, existing.anchoredPosition.y);
+                foreach (string name in new[] { "WalletPanel", "HUDToastLayer" })
+                {
+                    RectTransform existing = (RectTransform)canvasObject.transform.Find(name);
+                    existing.anchoredPosition = new Vector2(-256f, existing.anchoredPosition.y);
+                }
             }
 
-            RectTransform panel = CreateRect("FeverPanel", canvasObject.transform, new Vector2(-32f, -32f), new Vector2(200f, 440f));
+            RectTransform panel = GetOrCreateRect("FeverPanel", canvasObject.transform, new Vector2(-30f, -40f), new Vector2(96f, 440f));
+            foreach (string name in new[] { "Charge", "Remaining", "PauseGuide" })
+            {
+                Transform obsolete = panel.Find(name);
+                if (obsolete != null) UnityEngine.Object.DestroyImmediate(obsolete.gameObject);
+            }
             AddImage(panel, _background);
-            RectTransform accent = CreateRect("Accent", panel, Vector2.zero, new Vector2(200f, 3f));
+            RectTransform accent = GetOrCreateRect("Accent", panel, Vector2.zero, new Vector2(96f, 3f));
             AddImage(accent, _green);
-            Text title = CreateText("Status", panel, new Vector2(-12f, -14f), new Vector2(176f, 28f), "FEVER CHARGE", 18, _green);
+            Text title = CreateText("Status", panel, new Vector2(-12f, -12f), new Vector2(72f, 28f), "FEVER", 18, _green);
             title.fontStyle = FontStyle.Bold;
+            title.alignment = TextAnchor.MiddleCenter;
 
-            RectTransform gaugeRoot = CreateRect("VerticalGauge", panel, new Vector2(-148f, -58f), new Vector2(34f, 360f));
-            AddImage(gaugeRoot, _surface);
-            RectTransform fill = CreateRect("Fill", gaugeRoot, Vector2.zero, Vector2.zero);
+            RectTransform gaugeRoot = GetOrCreateRect("VerticalGauge", panel, new Vector2(-31f, -52f), new Vector2(34f, 320f));
+            Slider gauge = ConfigureGauge(gaugeRoot, Slider.Direction.BottomToTop, _green);
+
+            Text multiplier = CreateText("Multiplier", panel, new Vector2(-12f, -384f), new Vector2(72f, 36f), "1.0", 24, Color.white);
+            multiplier.alignment = TextAnchor.MiddleCenter;
+
+            Color activeColor = new Color(1f, 0.56f, 0.16f);
+            RectTransform activeRoot = GetOrCreateRect("ActiveFeverHUD", canvasObject.transform, new Vector2(0f, -32f), new Vector2(0f, 224f));
+            activeRoot.anchorMin = new Vector2(0.25f, 1f);
+            activeRoot.anchorMax = new Vector2(0.75f, 1f);
+            activeRoot.pivot = new Vector2(0.5f, 1f);
+            activeRoot.anchoredPosition = new Vector2(0f, -32f);
+            activeRoot.sizeDelta = new Vector2(0f, 224f);
+
+            Text activeTitle = CreateText("Title", activeRoot, Vector2.zero, Vector2.zero, "FEVER-TIME!", 56, activeColor);
+            ConfigureCenteredRow(activeTitle.rectTransform, 0f, 72f);
+            activeTitle.fontStyle = FontStyle.Bold;
+            activeTitle.alignment = TextAnchor.MiddleCenter;
+            AddOutline(activeTitle);
+
+            RectTransform remainingRoot = GetOrCreateRect("RemainingGauge", activeRoot, Vector2.zero, Vector2.zero);
+            ConfigureCenteredRow(remainingRoot, 84f, 20f);
+            Slider remainingGauge = ConfigureGauge(remainingRoot, Slider.Direction.LeftToRight, activeColor);
+
+            Text activeMultiplier = CreateText("DamageMultiplier", activeRoot, Vector2.zero, Vector2.zero,
+                "DAMAGE X 2.0", 48, new Color(1f, 0.85f, 0.25f));
+            ConfigureCenteredRow(activeMultiplier.rectTransform, 128f, 64f);
+            activeMultiplier.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            activeMultiplier.rectTransform.anchoredPosition = new Vector2(0f, -160f);
+            activeMultiplier.fontStyle = FontStyle.Bold;
+            activeMultiplier.alignment = TextAnchor.MiddleCenter;
+            AddOutline(activeMultiplier);
+
+            if (view == null) view = panel.gameObject.AddComponent<FeverHudView>();
+            SetReference(view, "_gauge", gauge);
+            SetReference(view, "_status", title);
+            SetReference(view, "_multiplier", multiplier);
+            SetReference(view, "_activeFeverRoot", activeRoot.gameObject);
+            SetReference(view, "_remainingGauge", remainingGauge);
+            SetReference(view, "_activeMultiplier", activeMultiplier);
+            activeRoot.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// root의 기존 이미지와 Slider를 재사용하거나 추가하여 표시 전용 게이지를 구성한다.
+        /// direction과 color를 적용하고 입력·탐색을 끈 0부터 1까지의 Slider를 반환한다.
+        /// </summary>
+        private static Slider ConfigureGauge(RectTransform root, Slider.Direction direction, Color color)
+        {
+            AddImage(root, _surface);
+            RectTransform fill = GetOrCreateRect("Fill", root, Vector2.zero, Vector2.zero);
             fill.anchorMin = Vector2.zero;
             fill.anchorMax = Vector2.one;
             fill.offsetMin = new Vector2(3f, 3f);
             fill.offsetMax = new Vector2(-3f, -3f);
-            Image fillImage = AddImage(fill, _green);
-            Slider gauge = gaugeRoot.gameObject.AddComponent<Slider>();
+            Image fillImage = AddImage(fill, color);
+            Slider gauge = root.GetComponent<Slider>();
+            if (gauge == null) gauge = root.gameObject.AddComponent<Slider>();
             gauge.fillRect = fill;
             gauge.targetGraphic = fillImage;
-            gauge.direction = Slider.Direction.BottomToTop;
+            gauge.handleRect = null;
+            gauge.direction = direction;
             gauge.minValue = 0f;
             gauge.maxValue = 1f;
+            gauge.wholeNumbers = false;
             gauge.interactable = false;
             gauge.transition = Selectable.Transition.None;
             gauge.navigation = new Navigation { mode = Navigation.Mode.None };
             gauge.SetValueWithoutNotify(0f);
+            return gauge;
+        }
 
-            Text charge = CreateText("Charge", panel, new Vector2(-12f, -56f), new Vector2(124f, 66f), "CHARGE\n0.0%", 24, Color.white);
-            Text remaining = CreateText("Remaining", panel, new Vector2(-12f, -140f), new Vector2(124f, 66f), "TIME LEFT\n0.0s", 24, Color.white);
-            Text multiplier = CreateText("Multiplier", panel, new Vector2(-12f, -224f), new Vector2(124f, 66f), "DAMAGE\nx1.0", 24, Color.white);
-            Text pause = CreateText("PauseGuide", panel, new Vector2(-12f, -320f), new Vector2(124f, 94f), "+0.1% direct hit\n+50% per clear", 17, _muted);
-            FeverHudView view = panel.gameObject.AddComponent<FeverHudView>();
-            SetReference(view, "_gauge", gauge);
-            SetReference(view, "_status", title);
-            SetReference(view, "_charge", charge);
-            SetReference(view, "_remaining", remaining);
-            SetReference(view, "_multiplier", multiplier);
-            SetReference(view, "_pauseGuide", pause);
+        /// <summary>
+        /// rect를 부모 너비에 맞춘 중앙 정렬 행으로 배치한다.
+        /// top과 height로 상단 여백 및 높이를 설정하며 가로 크기는 부모에 따라 변한다.
+        /// </summary>
+        private static void ConfigureCenteredRow(RectTransform rect, float top, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -top);
+            rect.sizeDelta = new Vector2(0f, height);
+        }
+
+        /// <summary>
+        /// text에 기존 외곽선을 재사용하거나 추가하여 피버 강조 문구를 배경과 구분한다.
+        /// 검은색 외곽선과 두 픽셀 간격을 설정하며 텍스트 내용은 변경하지 않는다.
+        /// </summary>
+        private static void AddOutline(Text text)
+        {
+            Outline outline = text.GetComponent<Outline>();
+            if (outline == null) outline = text.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            outline.useGraphicAlpha = true;
         }
 
         /// <summary>
@@ -240,26 +314,45 @@ namespace KeyboardModeling.Editor
         }
 
         /// <summary>
-        /// rect에 비상호작용 배경 이미지를 추가한다.
-        /// color를 적용한 Image를 반환한다.
+        /// parent의 name 자식을 재사용하거나 생성하고 위치·크기를 구성한다.
+        /// position과 size를 적용한 우측 상단 기준 RectTransform을 반환하며 기존 객체 식별자를 보존한다.
+        /// </summary>
+        private static RectTransform GetOrCreateRect(string name, Transform parent, Vector2 position, Vector2 size)
+        {
+            RectTransform rect = (RectTransform)parent.Find(name);
+            if (rect == null) return CreateRect(name, parent, position, size);
+            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            rect.localScale = Vector3.one;
+            return rect;
+        }
+
+        /// <summary>
+        /// rect의 기존 배경 이미지를 재사용하거나 추가한다.
+        /// color를 적용하고 레이캐스트를 끈 Image를 반환한다.
         /// </summary>
         private static Image AddImage(RectTransform rect, Color color)
         {
-            Image image = rect.gameObject.AddComponent<Image>();
+            Image image = rect.GetComponent<Image>();
+            if (image == null) image = rect.gameObject.AddComponent<Image>();
             image.color = color;
             image.raycastTarget = false;
             return image;
         }
 
         /// <summary>
-        /// parent의 지정 영역에 피버 정보 텍스트를 생성한다.
+        /// parent의 지정 영역에 피버 정보 텍스트를 생성하거나 기존 객체를 갱신한다.
         /// content, fontSize, color와 위치 및 크기를 적용한 비상호작용 Text를 반환한다.
         /// </summary>
         private static Text CreateText(string name, Transform parent, Vector2 position, Vector2 size, string content, int fontSize, Color color)
         {
-            Text text = CreateRect(name, parent, position, size).gameObject.AddComponent<Text>();
+            RectTransform rect = GetOrCreateRect(name, parent, position, size);
+            Text text = rect.GetComponent<Text>();
+            if (text == null) text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = fontSize;
+            text.resizeTextForBestFit = false;
             text.color = color;
             text.text = content;
             text.alignment = TextAnchor.UpperLeft;

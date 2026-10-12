@@ -27,8 +27,8 @@ public static class HandPowerUpgradeSetup
             AssetDatabase.CreateAsset(hand, HAND_PATH);
             SerializedObject settings = new SerializedObject(hand);
             settings.FindProperty("_id").intValue = (int)UpgradeId.HandPower;
-            settings.FindProperty("_displayName").stringValue = "Hand Upgrade";
-            settings.FindProperty("_description").stringValue = "Hand damage upgrades before Lv 6. Fist promotion unlocks a separate bonus strike with an upgrade chance capped at 30%.";
+            settings.FindProperty("_displayName").stringValue = "손 강화";
+            settings.FindProperty("_description").stringValue = "손의 추가 피해를 높이고 승급으로 주먹과 망치의 추가 타격을 해금합니다.";
             SerializedProperty costs = settings.FindProperty("_levelCosts");
             costs.arraySize = 15;
             for (int index = 0; index < 15; index++)

@@ -1575,7 +1575,7 @@ Transform:
   m_GameObject: {fileID: 484509825}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -20.84, y: -6.42, z: 12.31}
+  m_LocalPosition: {x: -20.84, y: -15.81, z: 15.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2356,7 +2356,7 @@ Transform:
   m_GameObject: {fileID: 1121487765}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -20.84, y: 2.133, z: 12.749}
+  m_LocalPosition: {x: -20.84, y: 1.3130002, z: 14.52}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2386,13 +2386,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1162827442}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 14, y: 4, z: -0.65}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
 --- !u!1 &1200543320
 GameObject:
   m_ObjectHideFlags: 0
@@ -3696,7 +3696,7 @@ Transform:
   m_GameObject: {fileID: 1970541378}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -20.84, y: 2.99, z: 12.31}
+  m_LocalPosition: {x: -20.84, y: -0.99, z: 15.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4052,7 +4052,7 @@ MonoBehaviour:
   _maximumAlive: 6
   _lifetime: 10
   _keyboardInteractionController: {fileID: 27118945}
-  _temporarySecondPointThrow: 1
+  _temporarySecondPointThrow: 0
   _temporaryThrowPoint: {fileID: 1121487766}
   _temporaryKeyboardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
   _temporaryVisit: {fileID: 9100000004}

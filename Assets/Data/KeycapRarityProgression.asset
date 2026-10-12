@@ -219,21 +219,10 @@ MonoBehaviour:
       - 0
       - 0
       - 0
-      - 40
-      - 55
-      - 5
-  - _requiredCompletedKeyboards: 108
-    _distribution:
-      _weights:
-      - 0
-      - 0
-      - 0
-      - 0
-      - 0
       - 30
-      - 55
-      - 15
-  - _requiredCompletedKeyboards: 116
+      - 70
+      - 0
+  - _requiredCompletedKeyboards: 110
     _distribution:
       _weights:
       - 0
@@ -241,17 +230,6 @@ MonoBehaviour:
       - 0
       - 0
       - 0
-      - 20
-      - 55
-      - 25
-  - _requiredCompletedKeyboards: 123
-    _distribution:
-      _weights:
       - 0
+      - 100
       - 0
-      - 0
-      - 0
-      - 0
-      - 10
-      - 50
-      - 40

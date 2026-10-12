@@ -206,13 +206,13 @@ MonoBehaviour:
   _inGameKeyBoardPrefab: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
   _firstRegion: {fileID: 1485046093}
   _firstRegionCount: 1
-  _firstRegionKeyboardPrefab: {fileID: 0}
+  _firstRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _secondRegion: {fileID: 550167387}
   _secondRegionCount: 1
-  _secondRegionKeyboardPrefab: {fileID: 0}
+  _secondRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _thirdRegion: {fileID: 1464566189}
   _thirdRegionCount: 1
-  _yardKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
+  _yardKeyboardPrefab: {fileID: 3581682056968462558, guid: d947e6dca5a118e4c925edf0f0146ba2, type: 3}
   _regionThrowVisit: {fileID: 9100000004}
   _completionProgress: {fileID: 27118947}
   _returnFallenKeyboards: 1
@@ -304,9 +304,9 @@ MonoBehaviour:
   _spawner: {fileID: 9100000003}
   _throwVisit: {fileID: 9100000004}
   _door: {fileID: 633399229}
-  _firstRegionRewardPrefab: {fileID: 0}
+  _firstRegionRewardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
   _firstRegionRewardCount: 3
-  _secondRegionRewardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
+  _secondRegionRewardPrefab: {fileID: 6581466875129381213, guid: a1479ebf6f9cba346b4c17222150f31b, type: 3}
   _secondRegionRewardCount: 3
   _doorOpenAngle: 90
   _requiredInitialKeyboardCount: 100
@@ -485,7 +485,7 @@ MonoBehaviour:
   _workbenchDestination: {fileID: 0}
   _nextSpawnRegion: 2
   _nextDoor: {fileID: 0}
-  _boxSourceArea: {fileID: 0}
+  _boxSourceArea: {fileID: 129514598}
   _boxOffset: {x: 0, y: 0, z: 0}
 --- !u!54 &89418937
 Rigidbody:
@@ -1736,6 +1736,14 @@ PrefabInstance:
       propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2093098406094755166, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2093098406094755166, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: monitorCam
       value: 
@@ -1800,6 +1808,14 @@ PrefabInstance:
       propertyPath: _interactionController
       value: 
       objectReference: {fileID: 27118945}
+    - target: {fileID: 5763386574607367480, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5763386574607367480, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6327983813781174956, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: _completionProgress
       value: 
@@ -1808,6 +1824,30 @@ PrefabInstance:
       propertyPath: _interactionController
       value: 
       objectReference: {fileID: 27118945}
+    - target: {fileID: 7624906190427793828, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7624906190427793828, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7624906190427793828, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8509789379118238894, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8509789379118238894, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8509789379118238894, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8823056269604226751, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: _toastPool
       value: 

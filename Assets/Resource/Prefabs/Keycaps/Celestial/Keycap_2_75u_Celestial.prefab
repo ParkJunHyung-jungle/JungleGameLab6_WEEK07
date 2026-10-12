@@ -8,6 +8,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: -1789783969029415368, guid: 2efd26659f41ecb4586dab5e9f737a40, type: 3}
+      propertyPath: _maxHP
+      value: 200
+      objectReference: {fileID: 0}
     - target: {fileID: 465240974499055117, guid: 2efd26659f41ecb4586dab5e9f737a40, type: 3}
       propertyPath: m_Name
       value: Keycap_2_75u_Celestial

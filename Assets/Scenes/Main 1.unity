@@ -201,6 +201,10 @@ MonoBehaviour:
   _inGameKeyBoardPrefab: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
   _firstRegion: {fileID: 9300000003}
   _firstRegionCount: 30
+  _secondRegion: {fileID: 1583888832}
+  _secondRegionCount: 30
+  _thirdRegion: {fileID: 918914755}
+  _thirdRegionCount: 30
   _regionThrowVisit: {fileID: 9100000004}
   _completionProgress: {fileID: 0}
   _returnFallenKeyboards: 1

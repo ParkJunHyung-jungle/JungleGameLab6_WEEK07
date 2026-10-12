@@ -21,7 +21,7 @@ using UnityEditor;
 [RequireComponent(typeof(BoxCollider), typeof(BoxPickupController))]
 public sealed class KeyboardInteractionController : MonoBehaviour
 {
-    private const int SPAWN_REGION_COUNT = 1;
+    private const int SPAWN_REGION_COUNT = 3;
     private const int REGION_REFILL_THROW_COUNT = 3;
     private const float FEVER_REFILL_RETRY_INTERVAL = 0.25f;
 
@@ -86,18 +86,33 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public event Action<KeyboardGuideState> GuideStateChanged;
 
     [Header("Spawn")]
+    [SerializeField] private bool _spawnRegionsOnEntry;
     [SerializeField] private GameObject _keyboardPrefab;
     [SerializeField] private GameObject _inGameKeyBoardPrefab;
-    [FormerlySerializedAs("_front"), InspectorName("천장 생성 구역")]
+    [FormerlySerializedAs("_front"), InspectorName("첫 번째 생성 구역")]
     [SerializeField] private BoxCollider _firstRegion;
-    [FormerlySerializedAs("_frontCount"), InspectorName("생성 개수")]
+    [FormerlySerializedAs("_frontCount"), InspectorName("첫 번째 생성 개수")]
     [SerializeField, Min(0)] private int _firstRegionCount = 20;
-    [Tooltip("첫 번째 구역이 비었을 때만 세 번 방문하여 키보드를 던지는 연출입니다.")]
+    [FormerlySerializedAs("_left"), InspectorName("두 번째 생성 구역")]
+    [SerializeField] private BoxCollider _secondRegion;
+    [FormerlySerializedAs("_leftCount"), InspectorName("두 번째 생성 개수")]
+    [SerializeField, Min(0)] private int _secondRegionCount;
+    [FormerlySerializedAs("_right"), InspectorName("세 번째 생성 구역")]
+    [SerializeField] private BoxCollider _thirdRegion;
+    [FormerlySerializedAs("_rightCount"), InspectorName("세 번째 생성 개수")]
+    [SerializeField, Min(0)] private int _thirdRegionCount;
+    [Tooltip("마당에 처음 들어갈 때 한 개 생성할 키보드 프리팹입니다.")]
+    [SerializeField] private GameObject _yardKeyboardPrefab;
+    [Tooltip("각 구역이 처음 비었을 때 세 번 방문하여 해당 구역에 키보드를 던지는 연출입니다.")]
     [SerializeField] private BackgroundKeyboardThrowVisit _regionThrowVisit;
     [SerializeField] private KeyboardCompletionProgress _completionProgress;
     private Transform _spawnRoot;
     private List<GameObject>[] _regionKeyboards;
     private int[] _pendingRegionThrows;
+    private int[] _remainingRegionKeyboards;
+    private bool[] _spawnRegionStarted;
+    private int _activeSpawnRegion = -1;
+    public int ActiveSpawnRegion => _activeSpawnRegion;
     private bool[] _regionWasPopulated;
     private bool[] _regionRefillTriggered;
 
@@ -176,6 +191,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _boxPickupController.Initialize(_camera);
         _regionKeyboards = new List<GameObject>[SPAWN_REGION_COUNT];
         _pendingRegionThrows = new int[SPAWN_REGION_COUNT];
+        _remainingRegionKeyboards = new int[SPAWN_REGION_COUNT];
+        _spawnRegionStarted = new bool[SPAWN_REGION_COUNT];
         _regionWasPopulated = new bool[SPAWN_REGION_COUNT];
         _regionRefillTriggered = new bool[SPAWN_REGION_COUNT];
         for (int index = 0; index < SPAWN_REGION_COUNT; index++)
@@ -369,6 +386,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _keyboards.Add(body, state);
         if (regionIndex >= 0 && regionIndex < SPAWN_REGION_COUNT)
         {
+            state.SetSpawnRegionIndex(regionIndex);
+            _remainingRegionKeyboards[regionIndex]++;
             _regionKeyboards[regionIndex].Add(instance);
             _regionWasPopulated[regionIndex] = true;
             if (_pendingRegionThrows[regionIndex] > 0) _pendingRegionThrows[regionIndex]--;
@@ -464,11 +483,13 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 파괴가 완료된 state의 진행 식별 정보를 구독자에게 전달한다.
-    /// 수동 패드와 자동작업대가 같은 완료 이벤트를 사용하도록 연결한다.
+    /// 파괴가 완료된 state의 구역 잔여 개수를 줄이고 진행 정보를 구독자에게 전달한다.
+    /// 수동 패드와 자동작업대 모두 실제 파괴 완료를 기준으로 구역 투척에 연결한다.
     /// </summary>
     private void NotifyKeyboardCompleted(KeyboardState state)
     {
+        if (state.SpawnRegionIndex >= 0)
+            _remainingRegionKeyboards[state.SpawnRegionIndex] = Mathf.Max(0, _remainingRegionKeyboards[state.SpawnRegionIndex] - 1);
         KeyboardCompleted?.Invoke(state);
     }
 
@@ -641,36 +662,119 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 천장 구역과 생성 수 설정으로 떨어질 키보드를 생성한다.
+    /// 세 구역과 각 생성 개수 설정으로 떨어질 키보드를 생성한다.
     /// 구역 등록과 SpawnedKeyboardCount를 갱신하여 이후 보충 연출에 연결한다.
     /// </summary>
     private void SpawnSurroundingKeyboards()
     {
+        if (_spawnRegionsOnEntry)
+        {
+            ActivateSpawnRegion(0);
+            return;
+        }
         SpawnKeyboards(_firstRegion, _firstRegionCount, "CeilingRegion", 0);
+        SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1);
+        SpawnKeyboards(_thirdRegion, _thirdRegionCount, "ThirdRegion", 2);
         Debug.Log($"[Keyboard] Spawned {SpawnedKeyboardCount} keyboards.", this);
     }
 
-    /// <summary>area 안에서 count개를 임의 위치와 회전으로 생성하고 regionIndex 구역에 등록한다. 영역이 없으면 areaName을 알리고 생성을 건너뛴다.</summary>
-    private void SpawnKeyboards(BoxCollider area, int count, string areaName, int regionIndex)
+    /// <summary>
+    /// regionIndex의 구역을 한 번 활성화하고 해당 구역의 설정된 개수만 생성한다.
+    /// 활성 구역과 생성 예약 상태를 저장하여 중복 진입 생성을 막는다.
+    /// </summary>
+    private void ActivateSpawnRegion(int regionIndex)
     {
+        if (_spawnRegionStarted[regionIndex]) return;
+        _spawnRegionStarted[regionIndex] = true;
+        _activeSpawnRegion = regionIndex;
+        switch (regionIndex)
+        {
+            case 0: SpawnKeyboards(_firstRegion, _firstRegionCount, "FirstRegion", 0); break;
+            case 1: SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1); break;
+            case 2: SpawnKeyboards(_thirdRegion, 1, "YardKeyboard", 2, _yardKeyboardPrefab, false); break;
+        }
+        Debug.Log($"[Keyboard] Entered region {regionIndex + 1}; initial spawn complete.", this);
+    }
+
+    /// <summary>
+    /// regionIndex 진입 시 nextDoor를 새 완료 대상으로 연결하고 보스 위치를 offset만큼 옮긴다.
+    /// 이전 구역 예약을 정리한 뒤 새 구역의 키보드만 생성한다.
+    /// </summary>
+    public void EnterSpawnRegion(int regionIndex, Transform nextDoor, Vector3 offset)
+    {
+        if (regionIndex < 0 || regionIndex >= SPAWN_REGION_COUNT || _spawnRegionStarted[regionIndex]) return;
+        _regionThrowVisit.RelocateForRegion(offset, regionIndex);
+        _completionProgress.BeginRegion(nextDoor);
+        ActivateSpawnRegion(regionIndex);
+    }
+
+    /// <summary>
+    /// 마당에 처음 진입하면 Inspector의 키보드 프리팹을 한 개 생성한다.
+    /// 문, 작업대, 보스 위치와 이전 구역 완료 상태는 변경하지 않는다.
+    /// </summary>
+    public void EnterYard()
+    {
+        ActivateSpawnRegion(2);
+    }
+
+    /// <summary>
+    /// body에 등록된 키보드의 원래 생성 구역을 반환한다.
+    /// 미등록 키보드는 -1을 반환하여 기존 방향 투척을 사용한다.
+    /// </summary>
+    public int GetKeyboardSpawnRegionIndex(Rigidbody body)
+    {
+        return _keyboards.TryGetValue(body, out KeyboardState state) ? state.SpawnRegionIndex : -1;
+    }
+
+    /// <summary>
+    /// 등록된 body에 대응하는 키보드 상태를 반환한다.
+    /// 재투척 시 같은 원본, 구역과 진행 정보를 사용하며 등록 개수는 변경하지 않는다.
+    /// </summary>
+    public KeyboardState GetRegisteredKeyboard(Rigidbody body)
+    {
+        return _keyboards[body];
+    }
+
+    /// <summary>
+    /// 사용 중이 아닌 임시 root를 등록 목록에서 제거하고 삭제한다.
+    /// 손에 들거나 배치, 보관, 자동 운반 중인 키보드는 유지하여 연속 투척 개수 정리가 플레이 상태를 지우지 않게 한다.
+    /// </summary>
+    public void DiscardTemporaryKeyboard(GameObject root)
+    {
+        Rigidbody body = root.GetComponent<Rigidbody>();
+        if (!_keyboards.TryGetValue(body, out KeyboardState state)) return;
+        if (state == _heldKeyboard || state == _placedKeyboard || _storedKeyboards.Contains(state)
+            || _reservedAutomaticKeyboards.Contains(state)) return;
+        _keyboards.Remove(body);
+        root.SetActive(false);
+        Destroy(root);
+    }
+
+    /// <summary>
+    /// area 안에서 count개를 생성하고 regionIndex 구역에 등록한다.
+    /// 지정한 prefab 또는 기본 프리팹을 사용하며 trackInitialProgress가 true이면 초기 완료 집계에 전달한다.
+    /// </summary>
+    private void SpawnKeyboards(BoxCollider area, int count, string areaName, int regionIndex, GameObject prefab = null, bool trackInitialProgress = true)
+    {
+        if (count == 0) return;
         if (area == null) { Debug.LogWarning($"[Keyboard] Assign the {areaName} BoxCollider to spawn {count} keyboards.", this); return; }
         area.isTrigger = true;
         for (int index = 0; index < count; index++)
         {
             Vector3 offset = new Vector3(Random.Range(-0.5f, 0.5f) * area.size.x, Random.Range(-0.5f, 0.5f) * area.size.y, Random.Range(-0.5f, 0.5f) * area.size.z);
             Vector3 position = area.transform.TransformPoint(area.center + offset);
-            GameObject keyboard = Instantiate(_keyboardPrefab, position, Random.rotationUniform, _spawnRoot);
+            GameObject keyboard = Instantiate(prefab != null ? prefab : _keyboardPrefab, position, Random.rotationUniform, _spawnRoot);
             keyboard.name = $"{areaName}_Keyboard_{index + 1}";
             keyboard.transform.localScale = _referenceKeyboard.transform.lossyScale;
             KeyboardState state = RegisterKeyboard(keyboard, false, regionIndex);
             SpawnedKeyboardCount++;
-            InitialKeyboardSpawned?.Invoke(state);
+            if (trackInitialProgress) InitialKeyboardSpawned?.Invoke(state);
         }
     }
 
     /// <summary>
-    /// 천장 구역의 제거된 키보드를 정리하고 진행 컴포넌트가 없는 씬에서는 기존 보충을 요청한다.
-    /// 구역 목록과 진행 참조를 사용하며 완료 진행을 사용하는 씬의 투척은 해당 컴포넌트가 담당한다.
+    /// 각 구역의 실제 파괴 잔여 개수가 0이면 한 번 보충 투척을 요청한다.
+    /// 완료 진행이 있으면 보스 투척을 문 개방용 보상으로 요청하고 중복 투척을 막는다.
     /// </summary>
     private void RefreshSpawnRegions()
     {
@@ -678,24 +782,33 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         for (int index = 0; index < SPAWN_REGION_COUNT; index++)
         {
             _regionKeyboards[index].RemoveAll(keyboard => keyboard == null);
-            if (_completionProgress != null) continue;
-            if (index != 0) continue;
+            if (_completionProgress != null && _completionProgress.RewardsRequested) continue;
             if (_regionRefillTriggered[index]) continue;
-            if (_regionKeyboards[index].Count > 0 || !_regionWasPopulated[index] || _pendingRegionThrows[index] > 0) continue;
+            if (_spawnRegionsOnEntry && index != _activeSpawnRegion) continue;
+            if (_remainingRegionKeyboards[index] > 0 || !_regionWasPopulated[index] || _pendingRegionThrows[index] > 0) continue;
             _regionRefillTriggered[index] = true;
             _pendingRegionThrows[index] = REGION_REFILL_THROW_COUNT;
             _regionWasPopulated[index] = false;
-            _regionThrowVisit.RequestThrows(index, REGION_REFILL_THROW_COUNT);
+            if (_completionProgress != null)
+                _completionProgress.RequestRegionRewards(index);
+            else
+                _regionThrowVisit.RequestThrows(index, REGION_REFILL_THROW_COUNT);
         }
     }
 
     /// <summary>
-    /// regionIndex로 등록된 단일 천장 구역 안의 임의 월드 위치를 반환한다.
+    /// regionIndex에 해당하는 첫 번째, 두 번째 또는 세 번째 구역 안의 임의 월드 위치를 반환한다.
     /// 구역 중심과 크기를 사용하여 보충 키보드의 던지기 도착 위치를 정한다.
     /// </summary>
     public Vector3 GetRegionSpawnPosition(int regionIndex)
     {
-        BoxCollider area = _firstRegion;
+        BoxCollider area = regionIndex switch
+        {
+            0 => _firstRegion,
+            1 => _secondRegion,
+            2 => _thirdRegion,
+            _ => throw new ArgumentOutOfRangeException(nameof(regionIndex))
+        };
         Vector3 offset = new Vector3(Random.Range(-0.3f, 0.3f) * area.size.x, 0f, Random.Range(-0.3f, 0.3f) * area.size.z);
         return area.transform.TransformPoint(area.center + offset);
     }
@@ -717,6 +830,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             body.isKinematic = true;
             body.useGravity = false;
             _regionThrowVisit.RequestKeyboardReturn(body);
+            Debug.Log($"[Keyboard] Fallen return: {state.Root.name}, region={state.SpawnRegionIndex + 1}, below Y={_fallReturnHeight}. Reusing the same keyboard.", state.Root);
         }
     }
 
@@ -836,6 +950,19 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             _placedKeyboard = null;
             PlacedKeyboardChanged?.Invoke(null);
         }
+    }
+
+    /// <summary>
+    /// 이동한 작업대의 기준 키보드 위치와 회전으로 패드 배치 좌표를 갱신한다.
+    /// 기존 배치 키보드가 있으면 같은 좌표로 옮기며 구매와 파괴 상태는 유지한다.
+    /// </summary>
+    public void RefreshWorkbenchPlacement()
+    {
+        _padPosition = _referenceKeyboard.transform.position;
+        _padRotation = _referenceKeyboard.transform.rotation;
+        if (_placedKeyboard == null) return;
+        _placedKeyboard.Body.position = _padPosition;
+        _placedKeyboard.Body.rotation = _padRotation;
     }
     /// <summary>
     /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.
@@ -1268,6 +1395,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             }
             KeyboardState target = RegisterKeyboard(instance, playerControlled);
             target.SetProgressId(source.ProgressId);
+            target.SetSpawnRegionIndex(source.SpawnRegionIndex);
             return target;
         }
         catch
@@ -1394,6 +1522,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         public KeyboardSpawnProfile PendingProfile => _pendingProfile;
         public bool PlacementFailed => _placementFailed;
         public int ProgressId { get; private set; } = -1;
+        public int SpawnRegionIndex { get; private set; } = -1;
+
+        /// <summary>
+        /// regionIndex를 원본 생성 구역으로 저장한다.
+        /// 플레이용 키보드 교체 후에도 같은 구역의 파괴 개수를 추적한다.
+        /// </summary>
+        public void SetSpawnRegionIndex(int regionIndex)
+        {
+            SpawnRegionIndex = regionIndex;
+        }
 
         /// <summary>
         /// progressId를 키보드의 진행 식별자로 저장한다.

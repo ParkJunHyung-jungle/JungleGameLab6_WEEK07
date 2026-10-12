@@ -99,7 +99,7 @@ public sealed class KeyboardGoalAppView : MonoBehaviour, IPointerClickHandler
         _remainingText.text = $"남은 목표 {remaining}개";
         _statusText.text = remaining == 0
             ? "목표 달성 — 금 키보드 보상 조건 완료"
-            : "초기 키보드를 파괴하면 금 키보드 3개를 받습니다.";
+            : $"초기 키보드를 파괴하면 보상 키보드 {_completionProgress.RequiredRewardKeyboardCount}개를 받습니다.";
         _progressFill.value = Mathf.Clamp01((float)completed / required);
     }
 }

@@ -14,6 +14,12 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     [SerializeField] private BackgroundKeyboardThrowVisit _throwVisit;
     [SerializeField] private Transform _door;
 
+    [Header("Second Region Reward")]
+    [Tooltip("두 번째 구역 완료 후 보스가 던질 키보드 프리팹입니다. 비우면 보스의 기본 프리팹을 사용합니다.")]
+    [SerializeField] private GameObject _secondRegionRewardPrefab;
+    [SerializeField, Min(1)] private int _secondRegionRewardCount = 3;
+    private int _requiredRewardKeyboardCount = REWARD_KEYBOARD_COUNT;
+
     [Header("Door Opening")]
     [SerializeField] private float _doorOpenAngle = 90f;
     private Quaternion _closedDoorRotation;
@@ -32,9 +38,12 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     private bool _isDoorOpen;
     public int InitialKeyboardCount => _initialKeyboardIds.Count;
     public int CompletedInitialKeyboardCount => _completedInitialKeyboardCount;
-    public int RequiredInitialKeyboardCount => _requiredInitialKeyboardCount;
+    public int RequiredInitialKeyboardCount => Mathf.Min(_requiredInitialKeyboardCount, Mathf.Max(1, InitialKeyboardCount));
+    public bool RewardsRequested => _rewardsRequested;
     public int RewardKeyboardCount => _rewardKeyboardIds.Count;
     public int CompletedRewardKeyboardCount => _completedRewardKeyboardCount;
+    public int RequiredRewardKeyboardCount => _rewardsRequested ? _requiredRewardKeyboardCount
+        : _interactionController.ActiveSpawnRegion == 1 ? Mathf.Max(1, _secondRegionRewardCount) : REWARD_KEYBOARD_COUNT;
     public bool IsDoorOpen => _isDoorOpen;
     public event Action ProgressChanged;
 
@@ -64,6 +73,25 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     }
 
     /// <summary>
+    /// 다음 구역의 door를 완료 대상으로 지정하고 해당 구역의 초기 및 보상 집계를 비운다.
+    /// door가 없는 마지막 구역은 문 회전 없이 완료 상태만 기록한다.
+    /// </summary>
+    public void BeginRegion(Transform door)
+    {
+        _door = door;
+        _closedDoorRotation = door != null ? door.localRotation : Quaternion.identity;
+        _initialKeyboardIds.Clear();
+        _rewardKeyboardIds.Clear();
+        _completedKeyboardIds.Clear();
+        _completedInitialKeyboardCount = 0;
+        _completedRewardKeyboardCount = 0;
+        _rewardsRequested = false;
+        _requiredRewardKeyboardCount = REWARD_KEYBOARD_COUNT;
+        _isDoorOpen = false;
+        ProgressChanged?.Invoke();
+    }
+
+    /// <summary>
     /// 생성된 state에 고유 진행 식별자를 부여하고 초기 키보드 목록에 등록한다.
     /// 천장 생성 이벤트의 상태를 사용하며 시작용 키보드와 보상 키보드는 포함하지 않는다.
     /// </summary>
@@ -76,18 +104,33 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
 
     /// <summary>
     /// 보상 투척으로 생성된 state에 식별자를 부여하고 보상 키보드 목록에 등록한다.
-    /// 보상 요청 상태와 등록 수를 사용하여 세 개만 문 개방 대상으로 추적한다.
+    /// 보상 요청 상태와 설정된 개수를 사용하여 문 개방 대상으로 추적한다.
     /// </summary>
     private void RegisterRewardKeyboard(KeyboardInteractionController.KeyboardState state)
     {
-        if (!_rewardsRequested || _rewardKeyboardIds.Count >= REWARD_KEYBOARD_COUNT || state.ProgressId >= 0) return;
+        if (!_rewardsRequested || _rewardKeyboardIds.Count >= _requiredRewardKeyboardCount || state.ProgressId >= 0) return;
         state.SetProgressId(_nextProgressId++);
         _rewardKeyboardIds.Add(state.ProgressId);
+        ProgressChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// 완료된 regionIndex에 보스 보상 투척을 한 번 요청한다.
+    /// 두 번째 구역은 Inspector의 프리팹과 개수를 사용하고 나머지는 기본 세 개를 사용한다.
+    /// 이 투척으로 생성된 키보드를 문 개방 집계 대상으로 연결하고 전체 완료의 중복 요청을 막는다.
+    /// </summary>
+    public void RequestRegionRewards(int regionIndex)
+    {
+        if (_rewardsRequested) return;
+        _rewardsRequested = true;
+        _requiredRewardKeyboardCount = regionIndex == 1 ? Mathf.Max(1, _secondRegionRewardCount) : REWARD_KEYBOARD_COUNT;
+        _throwVisit.RequestRewardThrows(regionIndex, _requiredRewardKeyboardCount, regionIndex == 1 ? _secondRegionRewardPrefab : null);
+        ProgressChanged?.Invoke();
     }
 
     /// <summary>
     /// 파괴 완료된 state의 식별자를 초기 또는 보상 진행에 한 번만 반영한다.
-    /// Inspector의 초기 파괴 목표 수를 달성하면 세 번 투척을 요청하고 보상 세 개가 모두 완료되면 문을 개방한다.
+    /// 초기 파괴 목표를 달성하면 미요청 보상을 투척하고 설정된 보상 키보드가 모두 파괴되면 문을 개방한다.
     /// </summary>
     private void HandleKeyboardCompleted(KeyboardInteractionController.KeyboardState state)
     {
@@ -99,18 +142,18 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
         if (isInitial)
         {
             _completedInitialKeyboardCount++;
-            if (!_rewardsRequested && _completedInitialKeyboardCount >= _requiredInitialKeyboardCount)
+            if (!_rewardsRequested && _completedInitialKeyboardCount >= RequiredInitialKeyboardCount)
             {
-                _rewardsRequested = true;
-                _throwVisit.RequestRewardThrows(0, REWARD_KEYBOARD_COUNT);
+                RequestRegionRewards(state.SpawnRegionIndex >= 0 ? state.SpawnRegionIndex : 0);
             }
             ProgressChanged?.Invoke();
             return;
         }
 
         _completedRewardKeyboardCount++;
-        if (_rewardKeyboardIds.Count == REWARD_KEYBOARD_COUNT && _completedRewardKeyboardCount == REWARD_KEYBOARD_COUNT)
+        if (_rewardKeyboardIds.Count == _requiredRewardKeyboardCount && _completedRewardKeyboardCount == _requiredRewardKeyboardCount)
             OpenDoor();
+        ProgressChanged?.Invoke();
     }
 
     /// <summary>
@@ -120,7 +163,18 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     private void OpenDoor()
     {
         if (_isDoorOpen) return;
-        _door.localRotation = _closedDoorRotation * Quaternion.Euler(0f, _doorOpenAngle, 0f);
+        if (_door != null)
+            _door.localRotation = _closedDoorRotation * Quaternion.Euler(0f, _doorOpenAngle, 0f);
         _isDoorOpen = true;
+    }
+
+    /// <summary>
+    /// 다음 구역 진입 후 문을 Awake에서 기록한 닫힌 회전으로 복원한다.
+    /// 완료 기록을 유지하고 문 개방 상태만 해제한다.
+    /// </summary>
+    public void CloseDoor()
+    {
+        if (_door != null) _door.localRotation = _closedDoorRotation;
+        _isDoorOpen = false;
     }
 }

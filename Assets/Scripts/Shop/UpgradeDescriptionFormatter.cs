@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 using Game.Upgrades;
@@ -143,17 +144,22 @@ namespace Game.Shop
         }
 
         /// <summary>
-        /// definition의 level과 nextLevel 등급 분포를 읽어 등급별 비교 문구를 추가한다.
-        /// 일반부터 전설까지의 확률과 다음 키보드 적용 시점을 description에 기록한다.
+        /// 현재와 다음 레벨의 8티어 확률 중 등장 가능한 티어를 설명에 추가한다.
+        /// definition의 분포와 level을 사용하며 표시 문구를 description에 기록한다.
         /// </summary>
         private static void AppendRarityEffects(StringBuilder description, UpgradeDefinition definition, int level, int nextLevel, bool hasNext)
         {
             KeycapRarityDistribution current = definition.GetRarityDistribution(level);
             KeycapRarityDistribution next = hasNext ? definition.GetRarityDistribution(nextLevel) : current;
-            AppendRarityComparison(description, "일반", KeycapRarity.Common, current, next, hasNext);
-            AppendRarityComparison(description, "희귀", KeycapRarity.Rare, current, next, hasNext);
-            AppendRarityComparison(description, "영웅", KeycapRarity.Epic, current, next, hasNext);
-            AppendRarityComparison(description, "전설", KeycapRarity.Legendary, current, next, hasNext);
+
+            foreach (KeycapRarity rarity in Enum.GetValues(typeof(KeycapRarity)))
+            {
+                if (current.GetProbability(rarity) <= 0f && next.GetProbability(rarity) <= 0f)
+                    continue;
+
+                AppendRarityComparison(description, $"티어 {(int)rarity + 1}", rarity, current, next, hasNext);
+            }
+
             description.Append("\n다음 키보드부터 적용");
         }
 

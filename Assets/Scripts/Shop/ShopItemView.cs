@@ -96,6 +96,7 @@ namespace Game.Shop
             _buttonText.text = isMaxLevel ? "최대 레벨" : requiresAreaSmash ? "잠김" : isPromotion ? "승급" : "구매";
             _purchaseButton.interactable = purchaseStatus == PurchaseResult.Success;
         }
+        }
 
         /// <summary>
         /// 구매 버튼에서 선택한 강화의 ID를 PurchaseRequested로 전달한다.

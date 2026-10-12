@@ -237,7 +237,7 @@ namespace Game.Upgrades
         {
             return _definitions.TryGetValue(UpgradeId.RareKeycapQuality, out UpgradeDefinition definition)
                 ? definition.GetRarityDistribution(GetKeycapQualityLevel())
-                : new KeycapRarityDistribution(100f, 0f, 0f, 0f);
+                : new KeycapRarityDistribution(100f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
         }
 
         /// <summary>

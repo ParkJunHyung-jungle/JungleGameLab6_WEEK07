@@ -27,8 +27,8 @@ public static class LuckyRewardUpgradeSetup
             AssetDatabase.CreateAsset(definition, PATH);
             SerializedObject settings = new SerializedObject(definition);
             settings.FindProperty("_id").intValue = (int)UpgradeId.LuckyReward;
-            settings.FindProperty("_displayName").stringValue = "Lucky Reward";
-            settings.FindProperty("_description").stringValue = "10% chance to double money earned from a broken keycap.";
+            settings.FindProperty("_displayName").stringValue = "행운 보상";
+            settings.FindProperty("_description").stringValue = "키캡 파괴 시 받는 재화가 두 배가 될 확률을 높입니다.";
             settings.FindProperty("_doubleRewardChance").floatValue = .1f;
             SerializedProperty costs = settings.FindProperty("_levelCosts");
             costs.arraySize = 1;

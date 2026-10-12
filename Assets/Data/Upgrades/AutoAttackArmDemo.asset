@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: AutoAttackArmDemo
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 2
-  _displayName: Auto Attack
-  _description: 'Unlock a robotic arm: one intact white key, 1 damage, every second.'
+  _displayName: '자동 공격'
+  _description: '기계팔의 자동 공격을 해금하고 공격력과 공격 속도를 높입니다.'
   _levelCosts: 6400000000000000
   _damageBonuses: 010000000200000003000000
   _autoAttackDamages: 01000000

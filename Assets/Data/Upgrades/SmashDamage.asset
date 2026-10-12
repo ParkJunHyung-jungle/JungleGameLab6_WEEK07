@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: SmashDamage
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 0
-  _displayName: Smash Damage
-  _description: Add 1 damage per level. Applies before the fever multiplier.
+  _displayName: '직접 공격력'
+  _description: '직접 공격의 추가 피해를 높입니다. 피버 피해 배율 적용 전에 반영됩니다.'
   _levelCosts: 2c0100000000000058020000000000003408000000000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000
   _handStageNames:
-  - Hand Upgrade
-  - Fist Upgrade
-  - Hammer Upgrade
+  - 손 강화
+  - 주먹 강화
+  - 망치 강화
   _handFirstPromotionRadius: 1.5
   _handRadiusPerPromotion: 1
   _fistBaseDamage: 5
@@ -35,7 +35,7 @@ MonoBehaviour:
   - 2
   - 3
   _autoPromotionLevel: 6
-  _autoPromotedName: Auto Smash
+  _autoPromotedName: 자동 범위 공격
   _autoPromotionRadius: 1.5
   _areaRadii:
   - 1.5

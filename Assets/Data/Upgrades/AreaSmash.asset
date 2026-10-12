@@ -13,9 +13,8 @@ MonoBehaviour:
   m_Name: AreaSmash
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 1
-  _displayName: Area Smash
-  _description: Hit keys within a radius of 1.5 / 2 / 2.5 key spacings. Nearby keys
-    take the same damage.
+  _displayName: '범위 타격'
+  _description: '키 간격을 기준으로 주변 키를 함께 타격하는 반경을 늘립니다.'
   _levelCosts: 2c01000000000000e8030000000000008813000000000000
   _damageBonuses: 010000000200000003000000
   _areaRadii:

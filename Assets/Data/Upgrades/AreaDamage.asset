@@ -13,9 +13,8 @@ MonoBehaviour:
   m_Name: AreaDamage
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 3
-  _displayName: Area Damage
-  _description: Increase nearby-key damage independently from direct smash damage.
-    Applies before the fever multiplier.
+  _displayName: '광역 공격력'
+  _description: '주변 키에 가하는 추가 피해를 높입니다. 범위 타격 1레벨부터 구매할 수 있습니다.'
   _levelCosts: 2c0100000000000084030000000000009411000000000000
   _damageBonuses: 010000000200000003000000
   _areaRadii:

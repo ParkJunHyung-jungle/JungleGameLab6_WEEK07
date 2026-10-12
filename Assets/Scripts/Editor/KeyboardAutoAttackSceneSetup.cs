@@ -57,8 +57,8 @@ namespace KeyboardModeling.Editor
                 AssetDatabase.CreateAsset(upgrade, UPGRADE_PATH);
             }
             SerializedObject upgradeSettings = new SerializedObject(upgrade);
-            upgradeSettings.FindProperty("_displayName").stringValue = "Auto Attack";
-            upgradeSettings.FindProperty("_description").stringValue = "Unlock a robotic arm: one intact white key, 1 damage, every second.";
+            upgradeSettings.FindProperty("_displayName").stringValue = "자동 공격";
+            upgradeSettings.FindProperty("_description").stringValue = "기계팔의 자동 공격을 해금하고 공격력과 공격 속도를 높입니다.";
             upgradeSettings.FindProperty("_levelCosts").arraySize = 1;
             upgradeSettings.FindProperty("_levelCosts").GetArrayElementAtIndex(0).longValue = 50;
             upgradeSettings.ApplyModifiedPropertiesWithoutUndo();

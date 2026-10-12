@@ -13,9 +13,8 @@ MonoBehaviour:
   m_Name: KeycapQuality
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 4
-  _displayName: Keycap Quality
-  _description: Improve the Common, Rare, Epic and Legendary distribution for the
-    next keyboard placement.
+  _displayName: '키캡 품질'
+  _description: '일반·희귀·영웅·전설 키캡의 등장 확률을 변경합니다. 다음 키보드부터 적용됩니다.'
   _levelCosts: 2c010000000000006009000000000000204e0000000000003057050000000000
   _damageBonuses: 010000000200000003000000
   _areaRadii:

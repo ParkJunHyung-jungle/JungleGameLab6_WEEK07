@@ -30,7 +30,7 @@ namespace Game.Upgrades
         [Tooltip("범위 증가와 이름 변경이 발생하는 구매 레벨입니다.")]
         [SerializeField, Min(1)] private int[] _handPromotionLevels = { 6, 11 };
         [Tooltip("첫 이름과 승급 후 이름입니다. 승급 레벨 수보다 하나 많아야 합니다.")]
-        [SerializeField] private string[] _handStageNames = { "Hand Upgrade", "Fist Upgrade", "Hammer Upgrade" };
+        [SerializeField] private string[] _handStageNames = { "손 강화", "주먹 강화", "망치 강화" };
         [Tooltip("첫 승급의 반경입니다. 기존 범위 공격의 기본 반경 1.5를 사용합니다.")]
         [SerializeField, Min(0f)] private float _handFirstPromotionRadius = 1.5f;
         [SerializeField, Min(0f)] private float _handRadiusPerPromotion = 1f;
@@ -61,11 +61,11 @@ namespace Game.Upgrades
         [SerializeField, Min(0.01f)] private float[] _autoAttackSpeeds = { 1f, 2f, 3f };
         [Tooltip("자동공격이 범위 공격으로 승급하는 구매 레벨입니다.")]
         [SerializeField, Min(1)] private int _autoPromotionLevel = 6;
-        [SerializeField] private string _autoPromotedName = "Auto Smash";
+        [SerializeField] private string _autoPromotedName = "자동 범위 공격";
         [Tooltip("승급 후 기존 원형 범위 공격에 적용할 첫 단계 반경입니다.")]
         [SerializeField, Min(0f)] private float _autoPromotionRadius = 1.5f;
         [SerializeField, Min(1)] private int _autoRefillStartLevel = 11;
-        [SerializeField] private string _autoRefillName = "Auto Supply";
+        [SerializeField] private string _autoRefillName = "자동 보충";
         [SerializeField, Min(0.1f)] private float[] _autoRefillDelays = { 8f, 6f, 4f, 2f };
 
         public int AutoPromotionLevel => _autoPromotionLevel;
@@ -113,7 +113,7 @@ namespace Game.Upgrades
                 int previousLength = _handStageNames.Length;
                 Array.Resize(ref _handStageNames, _handPromotionLevels.Length + 1);
                 for (int index = previousLength; index < _handStageNames.Length; index++)
-                    _handStageNames[index] = $"Stage {index + 1} Upgrade";
+                    _handStageNames[index] = $"{index + 1}단계 강화";
             }
             for (int i = 0; i < _levelCosts.Length; i++)
             {

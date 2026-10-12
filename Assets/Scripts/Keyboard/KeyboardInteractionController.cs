@@ -44,6 +44,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public event Action<KeyboardInputController> PlacedKeyboardChanged;
     public event Action<KeyboardState> InitialKeyboardSpawned;
     public event Action<KeyboardState> KeyboardCompleted;
+    public event Action FinalRegionCompleted;
 
     [Header("Fever Keyboard Supply")]
     [SerializeField, Min(0.01f)] private float _feverCarryDuration = 0.35f;
@@ -497,6 +498,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (state.SpawnRegionIndex >= 0)
             _remainingRegionKeyboards[state.SpawnRegionIndex] = Mathf.Max(0, _remainingRegionKeyboards[state.SpawnRegionIndex] - 1);
         KeyboardCompleted?.Invoke(state);
+        if (state.SpawnRegionIndex == 2 && _activeSpawnRegion == 2
+            && _remainingRegionKeyboards[2] == 0 && _pendingRegionThrows[2] == 0)
+            FinalRegionCompleted?.Invoke();
     }
 
     /// <summary>
@@ -756,6 +760,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public void EnterYard()
     {
+        Game.UI.ThanksForPlayingHudView.Attach(this);
         ActivateSpawnRegion(2);
     }
 

@@ -18,7 +18,8 @@ namespace Game.Shop
         void Start()
         {
             _rewardText.text = $"+{_rewardAmount:N0}";
-            _rewardButton.onClick.AddListener(OnRewardClicked);
+            _rewardButton.interactable = false;
+            _rewardButton.gameObject.SetActive(false);
         }
 
         void OnDestroy()

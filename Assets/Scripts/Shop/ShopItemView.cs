@@ -53,7 +53,7 @@ namespace Game.Shop
 
         /// <summary>
         /// 보관 중인 강화 설정과 현재 레벨 및 잔액을 사용하여 화면을 갱신한다.
-        /// 이름만 24pt로 표시하고 상자 용량 설명, 레벨, 다음 가격과 구매·승급 버튼의 상태를 변경한다.
+        /// 이름만 24pt로 표시하고 모든 강화의 현재·다음 효과, 레벨, 다음 가격과 구매·승급 버튼의 상태를 변경한다.
         /// </summary>
         public void Refresh()
         {
@@ -61,6 +61,7 @@ namespace Game.Shop
             _nameText.resizeTextForBestFit = false;
             _nameText.text = _definition.DisplayName;
             int level = _upgrades.GetLevel(_definition.Id);
+            _descriptionText.text = UpgradeDescriptionFormatter.Format(_definition, level);
             bool isMaxLevel = level >= _definition.MaxLevel;
             PurchaseResult purchaseStatus = _upgrades.GetPurchaseStatus(_definition.Id);
             bool requiresAreaSmash = purchaseStatus == PurchaseResult.RequiresAreaSmash;
@@ -106,10 +107,6 @@ namespace Game.Shop
                         _buttonText.text = "Promote";
                     }
                 }
-            }
-            else if (_definition.Id == UpgradeId.BoxCapacity)
-            {
-                _descriptionText.text = UpgradeDescriptionFormatter.Format(_definition, level);
             }
         }
 

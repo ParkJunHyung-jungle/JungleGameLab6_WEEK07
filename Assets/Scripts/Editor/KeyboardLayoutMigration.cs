@@ -86,13 +86,7 @@ namespace KeyboardModeling.Editor
             body.transform.SetParent(keyboard.transform, false);
             body.transform.localScale = Vector3.one;
 
-            KeyboardInputController controller = keyboard.GetComponent<KeyboardInputController>();
-            var serialized = new SerializedObject(controller);
-            bool blockShortcuts = serialized.FindProperty("_blockShortcuts").boolValue;
             KeyboardInputSetup.Configure(keyboard, false);
-            serialized.Update();
-            serialized.FindProperty("_blockShortcuts").boolValue = blockShortcuts;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>

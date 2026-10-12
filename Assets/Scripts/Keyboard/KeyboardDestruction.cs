@@ -46,6 +46,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
     [SerializeField, Min(0.1f)] private float _lifetimeAfterPush = 5f;
     private List<KeycapHealth> _requiredKeycaps;
     private GameObject _fragmentsPrefab;
+    private GameObject _fragments;
     private Action _onBreaking;
     private Action _onFinished;
     private Action<KeyboardDestruction> _configureFistAnimation;
@@ -493,6 +494,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
     private void BreakIntoFragments()
     {
         GameObject fragments = Instantiate(_fragmentsPrefab, transform.position, transform.rotation);
+        _fragments = fragments;
         fragments.transform.localScale = transform.lossyScale;
         Rigidbody[] bodies = fragments.GetComponentsInChildren<Rigidbody>();
         Vector3 center = Vector3.zero;
@@ -510,6 +512,16 @@ public sealed class KeyboardDestruction : MonoBehaviour
             body.AddTorque(UnityEngine.Random.insideUnitSphere * _spin, ForceMode.VelocityChange);
         }
         StartCoroutine(PushFragments(fragments, bodies));
+    }
+
+    /// <summary>
+    /// 생성된 파편의 Collider를 비활성화하여 다음 키보드와의 물리 충돌을 방지한다.
+    /// 피버 교체 완료 경로에서 사용하며 파편의 이동과 기존 제거 시간은 유지한다.
+    /// </summary>
+    public void DisableFragmentCollisions()
+    {
+        foreach (Collider collider in _fragments.GetComponentsInChildren<Collider>())
+            collider.enabled = false;
     }
 
     /// <summary>fragments의 bodies를 Time.deltaTime으로 지정 시간 기다린 후 월드 -Z로 밀고 완료 콜백을 호출하며 파편과 원본을 제거한다.</summary>

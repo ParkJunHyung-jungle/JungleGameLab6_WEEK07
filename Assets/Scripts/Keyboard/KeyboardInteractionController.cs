@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -22,6 +23,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 {
     private const int SPAWN_REGION_COUNT = 1;
     private const int REGION_REFILL_THROW_COUNT = 3;
+    private const float FEVER_REFILL_RETRY_INTERVAL = 0.25f;
 
     public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake }
 
@@ -35,13 +37,23 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private BoxCollider _padCollider;
     private KeyboardState _placedKeyboard;
     public bool IsSmashMode { get; private set; }
-    public KeyboardInputController ActiveKeyboard => IsSmashMode ? _placedKeyboard.Keyboard : null;
+    public KeyboardInputController ActiveKeyboard => IsSmashMode && _placedKeyboard != null ? _placedKeyboard.Keyboard : null;
     public KeyboardInputController PlacedKeyboard => _placedKeyboard != null ? _placedKeyboard.Keyboard : null;
 
     public event Action<KeyboardInputController> ActiveKeyboardChanged;
     public event Action<KeyboardInputController> PlacedKeyboardChanged;
     public event Action<KeyboardState> InitialKeyboardSpawned;
     public event Action<KeyboardState> KeyboardCompleted;
+
+    [Header("Fever Keyboard Supply")]
+    [SerializeField, Min(0.01f)] private float _feverCarryDuration = 0.35f;
+    [SerializeField, Min(0.1f)] private float _feverSupplyTimeout = 5f;
+    private FeverController _feverController;
+    private Coroutine _feverSupplyRoutine;
+    private KeyboardState _feverReservedKeyboard;
+    private Vector3 _feverSourcePosition;
+    private Quaternion _feverSourceRotation;
+    private bool _feverSupplyPending;
 
     [Header("Pickup")]
     [SerializeField, Min(0.1f)] private float _rayDistance = 12f;
@@ -141,11 +153,11 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public bool IsMiniGameRunning => _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
     private bool IsKeyboardBreaking => _placedKeyboard != null && _placedKeyboard.Keyboard.GetComponent<KeyboardDestruction>().IsBroken;
     public bool CanEnterShop => (_monitorController != null ? _isShopFocused : IsSmashMode)
-        && !IsMiniGameRunning && !IsKeyboardBreaking;
-    public bool CanEnterMonitor => !IsMiniGameRunning && (CanRunMiniGame
+        && !_feverSupplyPending && !IsMiniGameRunning && !IsKeyboardBreaking;
+    public bool CanEnterMonitor => !_feverSupplyPending && !IsMiniGameRunning && (CanRunMiniGame
         || (_completionProgress != null && _placedKeyboard == null && _heldKeyboard == null && _boxPickupController.HeldBox == null
             && !_isPlacingKeyboard && _viewingAutomaticStation == null));
-    public bool CanRunMiniGame => IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
+    public bool CanRunMiniGame => !_feverSupplyPending && IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
     [Header("Shop Focus")]
     [SerializeField] private ShopView _shopView;
     [Tooltip("바탕화면을 사용하는 씬에서는 상점 대신 모니터 조작 상태에 입력을 연결합니다.")]
@@ -178,6 +190,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _gameSession = FindAnyObjectByType<GameSession>();
         _rewardController = FindAnyObjectByType<KeyboardRewardController>();
         _controller = FindAnyObjectByType<MiniGameController>();
+        _feverController = FindAnyObjectByType<FeverController>();
         _padPosition = _referenceKeyboard.transform.position;
         _padRotation = _referenceKeyboard.transform.rotation;
         _keyboardBounds = CalculateKeyboardBounds(_referenceKeyboard.transform);
@@ -248,7 +261,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         }
         if (IsSmashMode && escapePressed)
         {
-            if (!IsMiniGameRunning && !IsKeyboardBreaking)
+            if (_feverSupplyPending || (!IsMiniGameRunning && !IsKeyboardBreaking))
             {
                 OnExitSmashMode();
             }
@@ -298,6 +311,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void OnDisable()
     {
+        CancelFeverSupply();
         if (_boxPickupController.HeldBox != null) _boxPickupController.DropBox();
         foreach (KeyboardStorageBox box in _observedBoxes)
             if (box != null) box.KeyboardReleased -= ReleaseBoxKeyboard;
@@ -389,7 +403,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// state의 입력을 끄고 들기 목록에서 제거한다.
-    /// 배치된 키보드가 파괴되는 경우 입력 복원 예약을 해제하고,
+    /// 배치된 키보드가 파괴되면 피버 공급 자격을 확정하고 입력 복원 예약을 해제한다.
     /// 미니게임의 입력 대상만 해제하여 진행도와 피버 상태를 보존한다.
     /// </summary>
     private void HandleKeyboardBreaking(KeyboardState state)
@@ -404,6 +418,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
         if (_placedKeyboard == state)
         {
+            _feverSupplyPending = IsSmashMode && isActiveAndEnabled
+                && _feverController != null && _feverController.IsFeverActive;
             if (_monitorController != null)
                 _monitorController.SetMonitorFocus(false);
             _resumeSmashInput = false;
@@ -412,8 +428,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// state가 Pad 키보드이면 파편의 -Z 이동 시작 후 SmashMode를 종료하고 배치 참조를 비운다.
-    /// 보존된 미니게임 상태와 관계없이 새 키보드를 집고 배치할 수 있도록 교체 상태를 해제한다.
+    /// state가 Pad 키보드이면 완료 보상과 진행을 반영하고 배치 참조를 비운다.
+    /// 피버 중 확정한 공급은 SmashMode를 유지하여 시작하고 일반 파괴는 모드를 종료한다.
     /// </summary>
     private void HandleKeyboardDestroyed(KeyboardState state)
     {
@@ -431,6 +447,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _gameSession.CompleteKeyboard();
         NotifyKeyboardCompleted(state);
 
+        if (_feverSupplyPending && IsSmashMode && isActiveAndEnabled)
+        {
+            state.Keyboard.GetComponent<KeyboardDestruction>().DisableFragmentCollisions();
+            _placedKeyboard = null;
+            ActiveKeyboardChanged?.Invoke(null);
+            PlacedKeyboardChanged?.Invoke(null);
+            _feverSupplyRoutine = StartCoroutine(SupplyFeverKeyboard());
+            return;
+        }
+
         if (IsSmashMode) OnExitSmashMode();
         _placedKeyboard = null;
         PlacedKeyboardChanged?.Invoke(null);
@@ -443,6 +469,149 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void NotifyKeyboardCompleted(KeyboardState state)
     {
         KeyboardCompleted?.Invoke(state);
+    }
+
+    /// <summary>
+    /// 피버 중 파괴 완료된 패드에 월드 키보드 하나를 예약하여 운반한다.
+    /// 운반 시간과 대기 한도에 Time.deltaTime을 사용하고 실패 시 일반 교체 상태로 복귀한다.
+    /// </summary>
+    private IEnumerator SupplyFeverKeyboard()
+    {
+        yield return null;
+        float elapsed = 0f;
+        float retryRemaining = 0f;
+        float carryElapsed = 0f;
+
+        while (_feverSupplyPending && IsSmashMode && elapsed < _feverSupplyTimeout)
+        {
+            if (Time.deltaTime <= 0f)
+            {
+                yield return null;
+                continue;
+            }
+
+            elapsed += Time.deltaTime;
+            if (elapsed >= _feverSupplyTimeout) break;
+            if (_feverReservedKeyboard == null)
+            {
+                retryRemaining -= Time.deltaTime;
+                if (retryRemaining <= 0f)
+                {
+                    if (TryReserveWorldKeyboard(_padPosition, out KeyboardState source))
+                    {
+                        _feverReservedKeyboard = source;
+                        _feverSourcePosition = source.Body.position;
+                        _feverSourceRotation = source.Body.rotation;
+                        carryElapsed = 0f;
+                    }
+                    retryRemaining = FEVER_REFILL_RETRY_INTERVAL;
+                }
+            }
+
+            if (_feverReservedKeyboard != null)
+            {
+                KeyboardState source = _feverReservedKeyboard;
+                if (source.Root == null || source.Body == null)
+                {
+                    ReleaseFeverKeyboard();
+                }
+                else
+                {
+                    carryElapsed += Time.deltaTime;
+                    float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(carryElapsed / _feverCarryDuration));
+                    source.Body.position = Vector3.Lerp(_feverSourcePosition, _padPosition, progress);
+                    source.Body.rotation = Quaternion.Slerp(_feverSourceRotation, _padRotation, progress);
+                    if (carryElapsed >= _feverCarryDuration)
+                    {
+                        if (TryPlaceFeverKeyboard(source)) yield break;
+                        ReleaseFeverKeyboard();
+                    }
+                }
+            }
+            yield return null;
+        }
+
+        _feverSupplyRoutine = null;
+        OnExitSmashMode();
+    }
+
+    /// <summary>
+    /// 예약된 source를 기존 프로필과 진행 식별자를 유지한 플레이 키보드로 전환한다.
+    /// 준비 성공 시 원본을 소비하고 새 대상의 구독을 연결한 뒤 입력을 켜며 성공 여부를 반환한다.
+    /// </summary>
+    private bool TryPlaceFeverKeyboard(KeyboardState source)
+    {
+        if (!_feverSupplyPending || !IsSmashMode || _placedKeyboard != null || _isPlacingKeyboard
+            || !_reservedAutomaticKeyboards.Contains(source)) return false;
+
+        _isPlacingKeyboard = true;
+        KeyboardState target;
+        try
+        {
+            target = CreatePlayableKeyboard(source);
+        }
+        catch (Exception exception)
+        {
+            source.MarkPlacementFailed();
+            Debug.LogException(exception, this);
+            return false;
+        }
+        finally
+        {
+            _isPlacingKeyboard = false;
+        }
+
+        Rigidbody body = target.Body;
+        body.interpolation = RigidbodyInterpolation.None;
+        body.isKinematic = true;
+        body.useGravity = false;
+        body.position = _padPosition;
+        body.rotation = _padRotation;
+        KeyboardProtectionCover cover = source.Root.GetComponentInChildren<KeyboardProtectionCover>();
+        if (cover != null) cover.RemoveFrom(target.Root.transform);
+
+        _keyboards.Remove(source.Body);
+        foreach (List<GameObject> region in _regionKeyboards) region.Remove(source.Root);
+        _reservedAutomaticKeyboards.Remove(source);
+        if (lastDroped == source.Collider.gameObject) lastDroped = null;
+        source.Root.SetActive(false);
+        Destroy(source.Root);
+
+        _placedKeyboard = target;
+        _feverReservedKeyboard = null;
+        _feverSupplyRoutine = null;
+        _feverSupplyPending = false;
+        _controller.SetKeyBoard(target.Keyboard);
+        PlacedKeyboardChanged?.Invoke(target.Keyboard);
+        ActiveKeyboardChanged?.Invoke(target.Keyboard);
+        SetKeyboardInput(target, true);
+        return true;
+    }
+
+    /// <summary>
+    /// 진행 중인 피버 공급 코루틴을 중단하고 공급 자격을 해제한다.
+    /// 사용자 이탈과 비활성화에 사용하며 예약한 월드 키보드의 위치와 물리를 복원한다.
+    /// </summary>
+    private void CancelFeverSupply()
+    {
+        _feverSupplyPending = false;
+        if (_feverSupplyRoutine != null)
+        {
+            StopCoroutine(_feverSupplyRoutine);
+            _feverSupplyRoutine = null;
+        }
+        ReleaseFeverKeyboard();
+    }
+
+    /// <summary>
+    /// 피버 공급으로 예약한 키보드를 운반 전 위치와 회전으로 반환한다.
+    /// 공통 예약 해제 경로를 사용하고 공급 대상 참조를 비운다.
+    /// </summary>
+    private void ReleaseFeverKeyboard()
+    {
+        if (_feverReservedKeyboard == null) return;
+        ReleaseAutomaticKeyboard(_feverReservedKeyboard, _feverSourcePosition, _feverSourceRotation);
+        _feverReservedKeyboard = null;
     }
 
     /// <summary>
@@ -846,6 +1015,18 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (_isPlacingKeyboard || station.HasKeyboard)
             return false;
 
+        return TryReserveWorldKeyboard(station.Placement.position, out reserved);
+    }
+
+    /// <summary>
+    /// placementPosition에 가까운 사용 가능한 월드 키보드 하나를 공통 예약 목록에 등록한다.
+    /// 플레이어와 작업대가 사용 중인 원본을 제외하고 reserved와 예약 성공 여부를 반환한다.
+    /// </summary>
+    private bool TryReserveWorldKeyboard(Vector3 placementPosition, out KeyboardState reserved)
+    {
+        reserved = null;
+        if (_isPlacingKeyboard) return false;
+
         float closestDistance = float.PositiveInfinity;
 
         foreach (KeyboardState state in _keyboards.Values)
@@ -863,7 +1044,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
                 continue;
             }
 
-            float distance = (state.Body.position - station.Placement.position).sqrMagnitude;
+            float distance = (state.Body.position - placementPosition).sqrMagnitude;
             if (distance >= closestDistance)
                 continue;
 
@@ -893,7 +1074,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         Quaternion originalRotation)
     {
         if (source == null || !_reservedAutomaticKeyboards.Remove(source) ||
-            source.Root == null)
+            source.Root == null || source.Body == null || source.Collider == null)
         {
             return;
         }
@@ -983,7 +1164,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private void TryPlaceKeyboard(Collider other)
     {
-        if (_isShopFocused || _isPlacingKeyboard)
+        if (_isShopFocused || _isPlacingKeyboard || _feverSupplyPending)
             return;
 
         if (other.gameObject != lastDroped) return;
@@ -1102,8 +1283,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         }
     }
 
+    /// <summary>
     /// 배치된 키보드와 고정 카메라를 사용해 부수기 모드에 진입한다.
     /// ActiveKeyboardChanged로 대상 키보드를 알린 뒤 해당 키보드의 입력을 켠다.
+    /// </summary>
     private void OnEnterSmashMode()
     {
         IsSmashMode = true;
@@ -1114,13 +1297,17 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         SetKeyboardInput(_placedKeyboard, true);
     }
 
+    /// <summary>
     /// 배치된 키보드와 고정 카메라를 사용해 부수기 모드를 종료한다.
-    /// 키보드 입력을 끄고 ActiveKeyboardChanged에 null을 전달해 대상 해제를 알린다.
+    /// 피버 공급을 취소하고 키보드 입력과 ActiveKeyboardChanged 대상을 해제한다.
+    /// </summary>
     private void OnExitSmashMode()
     {
+        CancelFeverSupply();
+        _resumeSmashInput = false;
         IsSmashMode = false;
         _fixedCam.Priority = 0;
-        SetKeyboardInput(_placedKeyboard, false);
+        if (_placedKeyboard != null) SetKeyboardInput(_placedKeyboard, false);
 
         ActiveKeyboardChanged?.Invoke(null);
     }

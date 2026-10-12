@@ -72,6 +72,9 @@ namespace KeyboardModeling
             [SerializeField, Min(1f)] private float _healthMultiplier;
             [SerializeField, Min(1f)] private float _rewardMultiplier;
             [SerializeField] private Material _shellMaterial;
+            [Header("Neon Appearance")]
+            [SerializeField] private Mesh _shellMesh;
+            [SerializeField] private Material _bandMaterial;
 
 
             [Header("Audio")]
@@ -84,6 +87,8 @@ namespace KeyboardModeling
             public float HealthMultiplier => _healthMultiplier;
             public float RewardMultiplier => _rewardMultiplier;
             public Material ShellMaterial => _shellMaterial;
+            public Mesh ShellMesh => _shellMesh;
+            public Material BandMaterial => _bandMaterial;
 
 
             /// <summary>
@@ -107,6 +112,11 @@ namespace KeyboardModeling
                     float.IsNaN(_rewardMultiplier) || float.IsInfinity(_rewardMultiplier) || _rewardMultiplier < 1f)
                 {
                     throw new InvalidOperationException("Keycap rarity multipliers must be finite and at least one.");
+                }
+
+                if (_rarity == KeycapRarity.Tier7 && (_shellMesh == null || _bandMaterial == null))
+                {
+                    throw new InvalidOperationException("Tier7 requires a Neon shell mesh and band material.");
                 }
 
                 if (_shellMaterial == null)

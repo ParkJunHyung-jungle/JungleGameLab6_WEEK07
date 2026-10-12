@@ -31,6 +31,7 @@ public sealed class KeycapHealth : MonoBehaviour
     public KeycapRarity Rarity => _rarity;
     public long Reward => _reward;
     private MeshRenderer _shellRenderer;
+    private MeshFilter _shellFilter;
 
     [Header("Damage decal")]
     [SerializeField] private DecalProjector _damageDecal;
@@ -62,6 +63,7 @@ public sealed class KeycapHealth : MonoBehaviour
         UpdateDamageDecal();
 
         _shellRenderer = transform.Find("PBT_SculptedShell").GetComponent<MeshRenderer>();
+        _shellFilter = transform.Find("PBT_SculptedShell").GetComponent<MeshFilter>();
         _renderers = GetComponentsInChildren<Renderer>();
         _colliders = GetComponentsInChildren<Collider>();
     }
@@ -87,7 +89,16 @@ public sealed class KeycapHealth : MonoBehaviour
 
         if (_supportsRarity)
         {
-            _shellRenderer.sharedMaterial = data.ShellMaterial;
+            if (data.ShellMesh != null)
+            {
+                _shellFilter.sharedMesh = data.ShellMesh;
+                _shellRenderer.sharedMaterials =
+                    new[] { data.ShellMaterial, data.BandMaterial };
+            }
+            else
+            {
+                _shellRenderer.sharedMaterial = data.ShellMaterial;
+            }
         }
         UpdateDamageDecal();
     }

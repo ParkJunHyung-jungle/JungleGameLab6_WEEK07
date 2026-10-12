@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -18,6 +19,9 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     private Quaternion _closedDoorRotation;
 
     [Header("Completion Progress")]
+    [InspectorName("금 키보드 생성에 필요한 파괴 개수")]
+    [Tooltip("초기 키보드를 이 개수만큼 파괴하면 보상 금 키보드 세 개를 던집니다. 초기 생성 개수 이하로 설정하세요.")]
+    [SerializeField, Min(1)] private int _requiredInitialKeyboardCount = 100;
     private readonly HashSet<int> _initialKeyboardIds = new HashSet<int>();
     private readonly HashSet<int> _rewardKeyboardIds = new HashSet<int>();
     private readonly HashSet<int> _completedKeyboardIds = new HashSet<int>();
@@ -28,9 +32,11 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     private bool _isDoorOpen;
     public int InitialKeyboardCount => _initialKeyboardIds.Count;
     public int CompletedInitialKeyboardCount => _completedInitialKeyboardCount;
+    public int RequiredInitialKeyboardCount => _requiredInitialKeyboardCount;
     public int RewardKeyboardCount => _rewardKeyboardIds.Count;
     public int CompletedRewardKeyboardCount => _completedRewardKeyboardCount;
     public bool IsDoorOpen => _isDoorOpen;
+    public event Action ProgressChanged;
 
     void Awake()
     {
@@ -53,6 +59,7 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
 
     void OnValidate()
     {
+        _requiredInitialKeyboardCount = Mathf.Max(1, _requiredInitialKeyboardCount);
         _doorOpenAngle = _doorOpenAngle < 0f ? -90f : 90f;
     }
 
@@ -80,7 +87,7 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
 
     /// <summary>
     /// 파괴 완료된 state의 식별자를 초기 또는 보상 진행에 한 번만 반영한다.
-    /// 초기 목록 전체 완료 시 세 번 투척을 요청하고 보상 세 개가 모두 완료되면 문을 개방한다.
+    /// Inspector의 초기 파괴 목표 수를 달성하면 세 번 투척을 요청하고 보상 세 개가 모두 완료되면 문을 개방한다.
     /// </summary>
     private void HandleKeyboardCompleted(KeyboardInteractionController.KeyboardState state)
     {
@@ -92,11 +99,12 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
         if (isInitial)
         {
             _completedInitialKeyboardCount++;
-            if (!_rewardsRequested && _completedInitialKeyboardCount == _initialKeyboardIds.Count)
+            if (!_rewardsRequested && _completedInitialKeyboardCount >= _requiredInitialKeyboardCount)
             {
                 _rewardsRequested = true;
                 _throwVisit.RequestRewardThrows(0, REWARD_KEYBOARD_COUNT);
             }
+            ProgressChanged?.Invoke();
             return;
         }
 

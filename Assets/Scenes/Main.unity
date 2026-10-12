@@ -203,7 +203,7 @@ MonoBehaviour:
   _firstRegion: {fileID: 102212880}
   _firstRegionCount: 100
   _regionThrowVisit: {fileID: 9100000004}
-  _completionProgress: {fileID: 27118947}
+  _completionProgress: {fileID: 0}
   _returnFallenKeyboards: 1
   _fallReturnHeight: -8
   _startWithSingleKeyboard: 1
@@ -221,7 +221,7 @@ MonoBehaviour:
   _appearDuration: 0.22
   _strikeDuration: 0.16
   _retreatDuration: 0.25
-  _hammerSprite: {fileID: 21300000, guid: 2a2d2a4d10436db45a6986a0928df040, type: 3}
+  _hammerSprite: {fileID: 0}
   _hammerAnimation:
     _height: 1.8
     _sideOffset: -1
@@ -234,7 +234,7 @@ MonoBehaviour:
     _prepareDuration: 0.1
     _swingDuration: 0.18
     _holdDuration: 0.15
-    _showWaveRing: 0
+    _showWaveRing: 1
     _waveSpeed: 22
     _waveHeight: 0.25
     _waveDuration: 0.35
@@ -294,6 +294,7 @@ MonoBehaviour:
   _throwVisit: {fileID: 9100000004}
   _door: {fileID: 633399229}
   _doorOpenAngle: 90
+  _requiredInitialKeyboardCount: 10
 --- !u!1 &39970281
 GameObject:
   m_ObjectHideFlags: 0
@@ -522,10 +523,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.y
       value: 90
       objectReference: {fileID: 0}
-    - target: {fileID: 660798894883404853, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0.085
-      objectReference: {fileID: 0}
     - target: {fileID: 1144101122205934637, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
       propertyPath: m_LocalScale.x
       value: 3
@@ -646,10 +643,6 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: -8.74
       objectReference: {fileID: 0}
-    - target: {fileID: 4902664924926538809, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0.13
-      objectReference: {fileID: 0}
     - target: {fileID: 6228553805995389639, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
       propertyPath: m_LocalScale.x
       value: 0
@@ -663,20 +656,16 @@ PrefabInstance:
       value: MainRoom (1)
       objectReference: {fileID: 0}
     - target: {fileID: 7886769783459153521, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7886769783459153521, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.8191521
+      value: 0.57357645
       objectReference: {fileID: 0}
     - target: {fileID: 7886769783459153521, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.5735764
+      value: -0.8191521
       objectReference: {fileID: 0}
     - target: {fileID: 7886769783459153521, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 70
+      value: -110
       objectReference: {fileID: 0}
     - target: {fileID: 8383359294453796781, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
       propertyPath: m_LocalScale.x
@@ -1437,6 +1426,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 350501781}
     m_Modifications:
+    - target: {fileID: 2166173113089468555, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: monitorCam
       value: 
@@ -1501,6 +1494,10 @@ PrefabInstance:
       propertyPath: _interactionController
       value: 
       objectReference: {fileID: 27118945}
+    - target: {fileID: 6327983813781174956, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: _completionProgress
+      value: 
+      objectReference: {fileID: 27118947}
     - target: {fileID: 7425521347323571261, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: _interactionController
       value: 

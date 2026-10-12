@@ -939,7 +939,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 20, y: -20}
-  m_SizeDelta: {x: 300, y: 160}
+  m_SizeDelta: {x: 300, y: 240}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &6434266807992439974
 CanvasRenderer:
@@ -1015,7 +1015,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: -70}
-  m_SizeDelta: {x: 260, y: 80}
+  m_SizeDelta: {x: 260, y: 160}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!222 &2048974609379692591
 CanvasRenderer:
@@ -1058,7 +1058,8 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "[Tab] : \n\uBAA8\uB2C8\uD130 \uC870\uC791/\uD574\uC81C"
+  m_Text: "[Tab] : \n\uBAA8\uB2C8\uD130 \uC870\uC791/\uD574\uC81C\n\n[ESC] :\n\uD14C\uC774\uBE14\uC5D0\uC11C
+    \uC77C\uC5B4\uB098\uAE30"
 --- !u!114 &8223163395178341262
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1496,7 +1497,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: -20}
-  m_SizeDelta: {x: 260, y: 80}
+  m_SizeDelta: {x: 260, y: 40}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!222 &7099695046738432179
 CanvasRenderer:

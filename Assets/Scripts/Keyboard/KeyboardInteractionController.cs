@@ -133,7 +133,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private bool IsKeyboardBreaking => _placedKeyboard != null && _placedKeyboard.Keyboard.GetComponent<KeyboardDestruction>().IsBroken;
     public bool CanEnterShop => (_monitorController != null ? _isShopFocused : IsSmashMode)
         && !IsMiniGameRunning && !IsKeyboardBreaking;
-    public bool CanEnterMonitor => CanRunMiniGame && !IsMiniGameRunning;
+    public bool CanEnterMonitor => !IsMiniGameRunning && (CanRunMiniGame
+        || (_completionProgress != null && _placedKeyboard == null && _heldKeyboard == null
+            && !_isPlacingKeyboard && _viewingAutomaticStation == null));
     public bool CanRunMiniGame => IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
     [Header("Shop Focus")]
     [SerializeField] private ShopView _shopView;

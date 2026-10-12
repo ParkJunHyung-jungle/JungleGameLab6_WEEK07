@@ -17,13 +17,13 @@ using KeyboardModeling;
 using UnityEditor;
 #endif
 
-[RequireComponent(typeof(BoxCollider))]
+[RequireComponent(typeof(BoxCollider), typeof(BoxPickupController))]
 public sealed class KeyboardInteractionController : MonoBehaviour
 {
     private const int SPAWN_REGION_COUNT = 1;
     private const int REGION_REFILL_THROW_COUNT = 3;
 
-    public enum KeyboardGuideState { Hidden, Pickup, Placement }
+    public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake }
 
     [Header("Camera and Pad")]
     [SerializeField] private Camera _camera;
@@ -57,6 +57,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private readonly HashSet<KeyboardState> _reservedAutomaticKeyboards = new HashSet<KeyboardState>();
     public bool IsHoldingKeyboard => _heldKeyboard != null;
     public int SpawnedKeyboardCount { get; private set; }
+
+    [Header("Storage Box")]
+    private BoxPickupController _boxPickupController;
+    private readonly HashSet<KeyboardState> _storedKeyboards = new HashSet<KeyboardState>();
+    private readonly HashSet<KeyboardStorageBox> _observedBoxes = new HashSet<KeyboardStorageBox>();
+    private int _guideCount;
+    private int _guideCapacity;
+    public int GuideCount => _guideCount;
+    public int GuideCapacity => _guideCapacity;
 
     [Header("Keyboard Guide")]
     private KeyboardGuideState _guideState;
@@ -134,7 +143,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public bool CanEnterShop => (_monitorController != null ? _isShopFocused : IsSmashMode)
         && !IsMiniGameRunning && !IsKeyboardBreaking;
     public bool CanEnterMonitor => !IsMiniGameRunning && (CanRunMiniGame
-        || (_completionProgress != null && _placedKeyboard == null && _heldKeyboard == null
+        || (_completionProgress != null && _placedKeyboard == null && _heldKeyboard == null && _boxPickupController.HeldBox == null
             && !_isPlacingKeyboard && _viewingAutomaticStation == null));
     public bool CanRunMiniGame => IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
     [Header("Shop Focus")]
@@ -148,6 +157,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void Awake()
     {
+        _boxPickupController = GetComponent<BoxPickupController>();
+        if (_boxPickupController == null)
+            _boxPickupController = gameObject.AddComponent<BoxPickupController>();
+        _boxPickupController.Initialize(_camera);
         _regionKeyboards = new List<GameObject>[SPAWN_REGION_COUNT];
         _pendingRegionThrows = new int[SPAWN_REGION_COUNT];
         _regionWasPopulated = new bool[SPAWN_REGION_COUNT];
@@ -242,9 +255,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
             return;
         }
-        if (IsSmashMode || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
-        if (_heldKeyboard != null) DropKeyboard();
-        else PickUpKeyboard();
+        if (IsSmashMode || IsMiniGameRunning || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
+        HandleWorldInteraction();
     }
 
     void FixedUpdate()
@@ -270,6 +282,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void OnEnable()
     {
+        foreach (KeyboardStorageBox box in _observedBoxes)
+            if (box != null) box.KeyboardReleased += ReleaseBoxKeyboard;
         if (_monitorController != null)
         {
             _monitorController.FocusChanged += ApplyShopFocus;
@@ -284,6 +298,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     void OnDisable()
     {
+        if (_boxPickupController.HeldBox != null) _boxPickupController.DropBox();
+        foreach (KeyboardStorageBox box in _observedBoxes)
+            if (box != null) box.KeyboardReleased -= ReleaseBoxKeyboard;
         SetGuideState(KeyboardGuideState.Hidden);
         if (_viewingAutomaticStation != null)
         {
@@ -523,7 +540,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         foreach (KeyboardState state in _keyboards.Values)
         {
             Rigidbody body = state.Body;
-            if (body == null || !state.Root.activeInHierarchy || state == _heldKeyboard || state == _placedKeyboard || body.isKinematic) continue;
+            if (body == null || !state.Root.activeInHierarchy || state == _heldKeyboard || state == _placedKeyboard || _storedKeyboards.Contains(state) || body.isKinematic) continue;
             if (body.position.y > _fallReturnHeight) continue;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
@@ -558,6 +575,24 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
 
+        if (_boxPickupController.HeldBox != null)
+        {
+            bool target = TryGetStorageKeyboard(out _);
+            SetGuideState(target ? (_boxPickupController.HeldBox.IsFull ? KeyboardGuideState.BoxFull : KeyboardGuideState.BoxStore)
+                : KeyboardGuideState.BoxHolding, _boxPickupController.HeldBox);
+            return;
+        }
+        if (TryGetInteractionHit(out RaycastHit boxHit))
+        {
+            KeyboardStorageBox box = boxHit.collider.GetComponentInParent<KeyboardStorageBox>();
+            if (box != null)
+            {
+                SetGuideState(box.Count > 0 && box.IsTopInteraction(boxHit.collider)
+                    ? KeyboardGuideState.BoxTake : KeyboardGuideState.BoxPickup, box);
+                return;
+            }
+        }
+
         bool canPickUp = TryGetLookedAtKeyboard(out KeyboardState state) && state != _placedKeyboard;
         SetGuideState(canPickUp ? KeyboardGuideState.Pickup : KeyboardGuideState.Hidden);
     }
@@ -566,31 +601,36 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// state가 기존 가이드 상태와 다르면 현재 상태를 교체한다.
     /// 변경된 상태를 GuideStateChanged로 전달하여 HUD 문구를 갱신한다.
     /// </summary>
-    private void SetGuideState(KeyboardGuideState state)
+    private void SetGuideState(KeyboardGuideState state, KeyboardStorageBox box = null)
     {
-        if (_guideState == state)
+        int count = box != null ? box.Count : 0;
+        int capacity = box != null ? box.Capacity : 0;
+        if (_guideState == state && _guideCount == count && _guideCapacity == capacity)
             return;
 
+        _guideCount = count;
+        _guideCapacity = capacity;
         _guideState = state;
         GuideStateChanged?.Invoke(state);
     }
 
     /// <summary>
-    /// 카메라 중앙 Ray와 집기 거리·레이어로 처음 충돌한 등록 키보드를 찾는다.
+    /// 공용 조준 판정으로 처음 보이는 등록 키보드를 찾는다.
     /// 자동 작업대를 제외하고 조준 대상을 state로 전달하며 대상이 있으면 true를 반환한다.
     /// </summary>
     private bool TryGetLookedAtKeyboard(out KeyboardState state)
     {
         state = null;
-        Ray ray = _camera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-        if (!Physics.Raycast(ray, out RaycastHit hit, _rayDistance, _pickupLayers, QueryTriggerInteraction.Ignore))
+        if (!TryGetInteractionHit(out RaycastHit hit))
             return false;
 
         KeyboardAutomaticStation station = hit.collider.GetComponentInParent<KeyboardAutomaticStation>();
         if (station != null)
             return false;
 
-        return hit.rigidbody != null && _keyboards.TryGetValue(hit.rigidbody, out state);
+        return hit.rigidbody != null && _keyboards.TryGetValue(hit.rigidbody, out state)
+            && !_storedKeyboards.Contains(state) && !_reservedAutomaticKeyboards.Contains(state)
+            && state.Root.activeInHierarchy && state.Collider.enabled;
     }
 
     /// <summary>카메라 중앙 Ray의 첫 충돌이 등록된 키보드이면 집고, 교환에 사용할 원래 위치 및 회전을 저장한다.</summary>
@@ -604,6 +644,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             OnEnterSmashMode();
             return;
         }
+        BeginHoldKeyboard(state);
+    }
+
+    /// <summary>
+    /// state를 손에 든 키보드로 지정하고 위치, 물리와 패드 배치 가능 상태를 갱신한다.
+    /// 바닥 집기와 상자 꺼내기에 동일한 잡기 설정을 적용한다.
+    /// </summary>
+    private void BeginHoldKeyboard(KeyboardState state)
+    {
         _heldKeyboard = state;
         state.AllowPlacementRetry();
         _pickupPosition = state.Body.position;
@@ -618,6 +667,126 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             PlacedKeyboardChanged?.Invoke(null);
         }
     }
+    /// <summary>
+    /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.
+    /// 상자 보관, 꺼내기 또는 기존 집기 상태를 변경한다.
+    /// </summary>
+    private void HandleWorldInteraction()
+    {
+        if (_heldKeyboard != null) { DropKeyboard(); return; }
+        if (_boxPickupController.HeldBox != null)
+        {
+            if (!TryStoreLookedAtKeyboard()) _boxPickupController.DropBox();
+            return;
+        }
+        if (TryGetInteractionHit(out RaycastHit hit))
+        {
+            KeyboardStorageBox box = hit.collider.GetComponentInParent<KeyboardStorageBox>();
+            if (box != null)
+            {
+                ObserveBox(box);
+                if (box.Count > 0 && box.IsTopInteraction(hit.collider)) TryTakeKeyboardFromBox(box);
+                else _boxPickupController.PickUpBox(box);
+                return;
+            }
+        }
+        PickUpKeyboard();
+    }
+
+    /// <summary>
+    /// 중앙 Ray의 가장 가까운 물리 표면 또는 상자 위쪽 영역을 hit에 전달한다.
+    /// 일반 Trigger와 들고 있는 상자를 제외하고 카메라가 키보드 영역 안에 있는 경우도 검사하여 대상 유무를 반환한다.
+    /// </summary>
+    private bool TryGetInteractionHit(out RaycastHit hit)
+    {
+        hit = default;
+        float closest = float.PositiveInfinity;
+        Ray ray = _camera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        foreach (RaycastHit candidate in Physics.RaycastAll(ray, _rayDistance, _pickupLayers, QueryTriggerInteraction.Collide))
+        {
+            KeyboardStorageBox box = candidate.collider.GetComponentInParent<KeyboardStorageBox>();
+            if (box != null && box == _boxPickupController.HeldBox) continue;
+            if (candidate.collider is CharacterController && candidate.collider.GetComponent<PlayerMovement>() != null) continue;
+            if (candidate.collider.isTrigger && (box == null || !box.IsTopInteraction(candidate.collider)
+                || Vector3.Dot(candidate.normal, box.transform.up) < 0.5f)) continue;
+            if (candidate.distance >= closest) continue;
+            closest = candidate.distance;
+            hit = candidate;
+        }
+        foreach (KeyboardState keyboard in _keyboards.Values)
+        {
+            if (!keyboard.Root.activeInHierarchy || !keyboard.Collider.enabled || _storedKeyboards.Contains(keyboard)
+                || _reservedAutomaticKeyboards.Contains(keyboard) || keyboard == _heldKeyboard) continue;
+            if ((_pickupLayers.value & (1 << keyboard.Root.layer)) == 0) continue;
+            if ((keyboard.Collider.ClosestPoint(ray.origin) - ray.origin).sqrMagnitude > 0.000001f) continue;
+            float distance = keyboard.Collider.bounds.size.magnitude + 1f;
+            Ray reverse = new Ray(ray.origin + ray.direction * distance, -ray.direction);
+            if (!keyboard.Collider.Raycast(reverse, out RaycastHit insideHit, distance)) continue;
+            insideHit.distance = 0f;
+            hit = insideHit;
+            closest = 0f;
+            break;
+        }
+        return closest < float.PositiveInfinity;
+    }
+
+    /// <summary>
+    /// 일반 집기와 동일한 공용 조준 판정으로 보관할 키보드를 keyboard에 전달한다.
+    /// 배치, 보관, 자동 수거와 복귀 중인 대상은 제외하고 성공 여부를 반환한다.
+    /// </summary>
+    private bool TryGetStorageKeyboard(out KeyboardState keyboard)
+    {
+        return TryGetLookedAtKeyboard(out keyboard) && keyboard != _placedKeyboard;
+    }
+
+    /// <summary>
+    /// box의 해제 이벤트를 한 번 구독하여 보관 상태 정리를 연결한다.
+    /// </summary>
+    private void ObserveBox(KeyboardStorageBox box)
+    {
+        if (_observedBoxes.Add(box)) box.KeyboardReleased += ReleaseBoxKeyboard;
+    }
+
+    /// <summary>
+    /// 조준한 키보드를 현재 상자에 보관하고 보관 집합을 갱신한다.
+    /// 가득 찬 경우도 클릭을 소비하며 키보드 조준 여부를 반환한다.
+    /// </summary>
+    private bool TryStoreLookedAtKeyboard()
+    {
+        if (!TryGetStorageKeyboard(out KeyboardState keyboard)) return false;
+        if (_boxPickupController.HeldBox.TryStoreKeyboard(keyboard))
+        {
+            _storedKeyboards.Add(keyboard);
+            if (lastDroped == keyboard.Collider.gameObject) lastDroped = null;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// box에서 마지막 키보드를 꺼내 보관 집합을 해제하고 손에 든 상태로 전환한다.
+    /// 꺼내기 성공 여부를 반환한다.
+    /// </summary>
+    private bool TryTakeKeyboardFromBox(KeyboardStorageBox box)
+    {
+        if (!box.TryTakeKeyboard(out KeyboardState keyboard)) return false;
+        _storedKeyboards.Remove(keyboard);
+        BeginHoldKeyboard(keyboard);
+        Quaternion rotation = _camera.transform.rotation * Quaternion.Euler(_holdEulerAngles);
+        keyboard.Body.rotation = rotation;
+        keyboard.Body.position = _camera.transform.position + _camera.transform.forward * _holdDistance
+            - rotation * Vector3.Scale(keyboard.Collider.center, keyboard.Root.transform.lossyScale);
+        return true;
+    }
+
+    /// <summary>
+    /// 상자에서 해제된 state를 보관 집합에서 제거한다.
+    /// 월드 키보드의 기존 집기와 배치 대상으로 복원한다.
+    /// </summary>
+    private void ReleaseBoxKeyboard(KeyboardState state)
+    {
+        _storedKeyboards.Remove(state);
+    }
+
     private GameObject lastDroped;
 
     /// <summary>
@@ -631,7 +800,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
 
-        if (other.attachedRigidbody == null || !_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _reservedAutomaticKeyboards.Contains(source))
+        if (other.attachedRigidbody == null || !_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _storedKeyboards.Contains(source) || _reservedAutomaticKeyboards.Contains(source))
         {
             return;
         }
@@ -684,7 +853,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             if (state.Root == null || !state.Root.activeInHierarchy ||
                 state.Keyboard != null ||
                 state == _heldKeyboard || state == _placedKeyboard ||
-                state.PlacementFailed ||
+                state.PlacementFailed || _storedKeyboards.Contains(state) ||
                 _reservedAutomaticKeyboards.Contains(state) ||
                 !state.Collider.enabled ||
                 state.Body.isKinematic || !state.Body.useGravity ||
@@ -825,7 +994,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
 
-        if (!_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _reservedAutomaticKeyboards.Contains(source))
+        if (!_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _storedKeyboards.Contains(source) || _reservedAutomaticKeyboards.Contains(source))
         {
             return;
         }

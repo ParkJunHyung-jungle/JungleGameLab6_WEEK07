@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 27118944}
   - component: {fileID: 27118945}
   - component: {fileID: 27118946}
+  - component: {fileID: 27118947}
   m_Layer: 0
   m_Name: SmashModeTrigger
   m_TagString: Untagged
@@ -201,6 +202,7 @@ MonoBehaviour:
   _firstRegion: {fileID: 9300000003}
   _firstRegionCount: 30
   _regionThrowVisit: {fileID: 9100000004}
+  _completionProgress: {fileID: 0}
   _returnFallenKeyboards: 1
   _fallReturnHeight: -3
   _startWithSingleKeyboard: 0
@@ -274,6 +276,22 @@ MonoBehaviour:
   _maximumTravelDistance: 0.85
   _hitStopDuration: 0.25
   _hitStopCooldown: 0.35
+--- !u!114 &27118947
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 27118942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 587d547f32c732b499f2767315cbd53f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoxPickupController
+  _camera: {fileID: 330585545}
+  _holdViewportPosition: {x: 0.2, y: 0.18}
+  _holdDistance: 4
+  _followSpeed: 12
 --- !u!1 &250938437
 GameObject:
   m_ObjectHideFlags: 0
@@ -834,6 +852,63 @@ Transform:
   - {fileID: 9300000002}
   m_Father: {fileID: 350501781}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &440209306
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 161744758964335215, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_Name
+      value: KeyboardStorageBox
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -3.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -2.48
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5383189875688189542, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 4891a7b54c23ef74e9d506e782617cdc, type: 3}
 --- !u!1001 &451483022
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3106,3 +3181,4 @@ SceneRoots:
   - {fileID: 451483022}
   - {fileID: 2107089719}
   - {fileID: 1162827443}
+  - {fileID: 440209306}

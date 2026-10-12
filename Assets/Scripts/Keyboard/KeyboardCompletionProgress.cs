@@ -14,10 +14,14 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     [SerializeField] private BackgroundKeyboardThrowVisit _throwVisit;
     [SerializeField] private Transform _door;
 
+    [Header("First Region Reward")]
+    [SerializeField, InspectorName("첫 번째 구역 보스 키보드 프리팹")] private GameObject _firstRegionRewardPrefab;
+    [SerializeField, Min(1), InspectorName("첫 번째 구역 보스 키보드 개수")] private int _firstRegionRewardCount = 3;
+
     [Header("Second Region Reward")]
     [Tooltip("두 번째 구역 완료 후 보스가 던질 키보드 프리팹입니다. 비우면 보스의 기본 프리팹을 사용합니다.")]
-    [SerializeField] private GameObject _secondRegionRewardPrefab;
-    [SerializeField, Min(1)] private int _secondRegionRewardCount = 3;
+    [SerializeField, InspectorName("두 번째 구역 보스 키보드 프리팹")] private GameObject _secondRegionRewardPrefab;
+    [SerializeField, Min(1), InspectorName("두 번째 구역 보스 키보드 개수")] private int _secondRegionRewardCount = 3;
     private int _requiredRewardKeyboardCount = REWARD_KEYBOARD_COUNT;
 
     [Header("Door Opening")]
@@ -43,6 +47,7 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
     public int RewardKeyboardCount => _rewardKeyboardIds.Count;
     public int CompletedRewardKeyboardCount => _completedRewardKeyboardCount;
     public int RequiredRewardKeyboardCount => _rewardsRequested ? _requiredRewardKeyboardCount
+        : _interactionController.ActiveSpawnRegion == 0 ? Mathf.Max(1, _firstRegionRewardCount)
         : _interactionController.ActiveSpawnRegion == 1 ? Mathf.Max(1, _secondRegionRewardCount) : REWARD_KEYBOARD_COUNT;
     public bool IsDoorOpen => _isDoorOpen;
     public event Action ProgressChanged;
@@ -116,15 +121,17 @@ public sealed class KeyboardCompletionProgress : MonoBehaviour
 
     /// <summary>
     /// 완료된 regionIndex에 보스 보상 투척을 한 번 요청한다.
-    /// 두 번째 구역은 Inspector의 프리팹과 개수를 사용하고 나머지는 기본 세 개를 사용한다.
+    /// 첫 번째와 두 번째 구역은 각각 Inspector의 프리팹과 개수를 사용한다.
     /// 이 투척으로 생성된 키보드를 문 개방 집계 대상으로 연결하고 전체 완료의 중복 요청을 막는다.
     /// </summary>
     public void RequestRegionRewards(int regionIndex)
     {
         if (_rewardsRequested) return;
         _rewardsRequested = true;
-        _requiredRewardKeyboardCount = regionIndex == 1 ? Mathf.Max(1, _secondRegionRewardCount) : REWARD_KEYBOARD_COUNT;
-        _throwVisit.RequestRewardThrows(regionIndex, _requiredRewardKeyboardCount, regionIndex == 1 ? _secondRegionRewardPrefab : null);
+        _requiredRewardKeyboardCount = regionIndex == 0 ? Mathf.Max(1, _firstRegionRewardCount)
+            : regionIndex == 1 ? Mathf.Max(1, _secondRegionRewardCount) : REWARD_KEYBOARD_COUNT;
+        GameObject prefab = regionIndex == 0 ? _firstRegionRewardPrefab : regionIndex == 1 ? _secondRegionRewardPrefab : null;
+        _throwVisit.RequestRewardThrows(regionIndex, _requiredRewardKeyboardCount, prefab);
         ProgressChanged?.Invoke();
     }
 

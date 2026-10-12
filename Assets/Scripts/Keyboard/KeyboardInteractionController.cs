@@ -51,6 +51,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private FeverController _feverController;
     private Coroutine _feverSupplyRoutine;
     private KeyboardState _feverReservedKeyboard;
+    private KeyboardStorageBox _feverSourceBox;
     private Vector3 _feverSourcePosition;
     private Quaternion _feverSourceRotation;
     private bool _feverSupplyPending;
@@ -93,16 +94,18 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private BoxCollider _firstRegion;
     [FormerlySerializedAs("_frontCount"), InspectorName("첫 번째 생성 개수")]
     [SerializeField, Min(0)] private int _firstRegionCount = 20;
+    [SerializeField, InspectorName("첫 번째 구역 키보드 프리팹")] private GameObject _firstRegionKeyboardPrefab;
     [FormerlySerializedAs("_left"), InspectorName("두 번째 생성 구역")]
     [SerializeField] private BoxCollider _secondRegion;
     [FormerlySerializedAs("_leftCount"), InspectorName("두 번째 생성 개수")]
     [SerializeField, Min(0)] private int _secondRegionCount;
+    [SerializeField, InspectorName("두 번째 구역 키보드 프리팹")] private GameObject _secondRegionKeyboardPrefab;
     [FormerlySerializedAs("_right"), InspectorName("세 번째 생성 구역")]
     [SerializeField] private BoxCollider _thirdRegion;
     [FormerlySerializedAs("_rightCount"), InspectorName("세 번째 생성 개수")]
     [SerializeField, Min(0)] private int _thirdRegionCount;
     [Tooltip("마당에 처음 들어갈 때 한 개 생성할 키보드 프리팹입니다.")]
-    [SerializeField] private GameObject _yardKeyboardPrefab;
+    [SerializeField, InspectorName("세 번째 구역 마당 키보드 프리팹")] private GameObject _yardKeyboardPrefab;
     [Tooltip("각 구역이 처음 비었을 때 세 번 방문하여 해당 구역에 키보드를 던지는 연출입니다.")]
     [SerializeField] private BackgroundKeyboardThrowVisit _regionThrowVisit;
     [SerializeField] private KeyboardCompletionProgress _completionProgress;
@@ -494,7 +497,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 피버 중 파괴 완료된 패드에 월드 키보드 하나를 예약하여 운반한다.
+    /// 피버 중 파괴 완료된 패드에 바닥 또는 상자 키보드 하나를 예약하여 운반한다.
     /// 운반 시간과 대기 한도에 Time.deltaTime을 사용하고 실패 시 일반 교체 상태로 복귀한다.
     /// </summary>
     private IEnumerator SupplyFeverKeyboard()
@@ -519,7 +522,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
                 retryRemaining -= Time.deltaTime;
                 if (retryRemaining <= 0f)
                 {
-                    if (TryReserveWorldKeyboard(_padPosition, out KeyboardState source))
+                    if (TryReserveFeverKeyboard(out KeyboardState source))
                     {
                         _feverReservedKeyboard = source;
                         _feverSourcePosition = source.Body.position;
@@ -601,6 +604,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
         _placedKeyboard = target;
         _feverReservedKeyboard = null;
+        _feverSourceBox = null;
         _feverSupplyRoutine = null;
         _feverSupplyPending = false;
         _controller.SetKeyBoard(target.Keyboard);
@@ -627,13 +631,48 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// 피버 공급으로 예약한 키보드를 운반 전 위치와 회전으로 반환한다.
-    /// 공통 예약 해제 경로를 사용하고 공급 대상 참조를 비운다.
+    /// 상자에서 꺼낸 경우 원래 상자에 다시 보관하고 공급 대상 참조를 비운다.
     /// </summary>
     private void ReleaseFeverKeyboard()
     {
         if (_feverReservedKeyboard == null) return;
         ReleaseAutomaticKeyboard(_feverReservedKeyboard, _feverSourcePosition, _feverSourceRotation);
+        if (_feverSourceBox != null && _feverReservedKeyboard.Root != null
+            && _feverSourceBox.TryStoreKeyboard(_feverReservedKeyboard))
+            _storedKeyboards.Add(_feverReservedKeyboard);
         _feverReservedKeyboard = null;
+        _feverSourceBox = null;
+    }
+
+    /// <summary>
+    /// 피버 공급용 바닥 키보드를 먼저 예약하고 없으면 가장 가까운 상자에서 하나를 꺼낸다.
+    /// reserved에 원본 상태를 전달하고 보관 목록, 운반 예약과 복원용 상자 참조를 갱신한다.
+    /// </summary>
+    private bool TryReserveFeverKeyboard(out KeyboardState reserved)
+    {
+        _feverSourceBox = null;
+        if (TryReserveWorldKeyboard(_padPosition, out reserved)) return true;
+        KeyboardStorageBox nearest = null;
+        float closest = float.PositiveInfinity;
+        foreach (KeyboardStorageBox box in _observedBoxes)
+        {
+            if (box == null || !box.isActiveAndEnabled || box.Count == 0) continue;
+            float distance = (box.transform.position - _padPosition).sqrMagnitude;
+            if (distance >= closest) continue;
+            nearest = box;
+            closest = distance;
+        }
+        if (nearest == null || !nearest.TryTakeKeyboard(out reserved)) return false;
+        _feverSourceBox = nearest;
+        _storedKeyboards.Remove(reserved);
+        _reservedAutomaticKeyboards.Add(reserved);
+        reserved.AllowPlacementRetry();
+        reserved.Body.isKinematic = true;
+        reserved.Body.useGravity = false;
+        reserved.Collider.enabled = false;
+        reserved.Body.position = nearest.transform.position + nearest.transform.up * 1.2f;
+        reserved.Body.rotation = nearest.transform.rotation;
+        return true;
     }
 
     /// <summary>
@@ -642,7 +681,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private void CreateOpeningKeyboard()
     {
-        GameObject sourceObject = Instantiate(_keyboardPrefab, _padPosition, _padRotation, _spawnRoot);
+        GameObject sourceObject = Instantiate(_firstRegionKeyboardPrefab != null ? _firstRegionKeyboardPrefab : _keyboardPrefab, _padPosition, _padRotation, _spawnRoot);
         KeyboardState source = RegisterKeyboard(sourceObject);
         _openingKeyboard = CreatePlayableKeyboard(source);
         _placedKeyboard = _openingKeyboard;
@@ -672,8 +711,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             ActivateSpawnRegion(0);
             return;
         }
-        SpawnKeyboards(_firstRegion, _firstRegionCount, "CeilingRegion", 0);
-        SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1);
+        SpawnKeyboards(_firstRegion, _firstRegionCount, "CeilingRegion", 0, _firstRegionKeyboardPrefab);
+        SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1, _secondRegionKeyboardPrefab);
         SpawnKeyboards(_thirdRegion, _thirdRegionCount, "ThirdRegion", 2);
         Debug.Log($"[Keyboard] Spawned {SpawnedKeyboardCount} keyboards.", this);
     }
@@ -689,8 +728,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _activeSpawnRegion = regionIndex;
         switch (regionIndex)
         {
-            case 0: SpawnKeyboards(_firstRegion, _firstRegionCount, "FirstRegion", 0); break;
-            case 1: SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1); break;
+            case 0: SpawnKeyboards(_firstRegion, _firstRegionCount, "FirstRegion", 0, _firstRegionKeyboardPrefab); break;
+            case 1: SpawnKeyboards(_secondRegion, _secondRegionCount, "SecondRegion", 1, _secondRegionKeyboardPrefab); break;
             case 2: SpawnKeyboards(_thirdRegion, 1, "YardKeyboard", 2, _yardKeyboardPrefab, false); break;
         }
         Debug.Log($"[Keyboard] Entered region {regionIndex + 1}; initial spawn complete.", this);
@@ -963,6 +1002,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (_placedKeyboard == null) return;
         _placedKeyboard.Body.position = _padPosition;
         _placedKeyboard.Body.rotation = _padRotation;
+    }
+
+    /// <summary>
+    /// sourceArea에 내려놓은 상자의 위치를 offset만큼 이동하도록 들기 컨트롤러에 전달한다.
+    /// 손에 든 상자는 카메라 추적을 유지하며 보관 목록과 키보드 상태는 변경하지 않는다.
+    /// </summary>
+    public void MoveStorageBoxes(Vector3 offset, Bounds sourceArea)
+    {
+        _boxPickupController.MoveUnheldBoxes(offset, sourceArea);
     }
     /// <summary>
     /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.

@@ -206,8 +206,10 @@ MonoBehaviour:
   _inGameKeyBoardPrefab: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
   _firstRegion: {fileID: 1485046093}
   _firstRegionCount: 1
+  _firstRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _secondRegion: {fileID: 550167387}
   _secondRegionCount: 1
+  _secondRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
   _thirdRegion: {fileID: 1464566189}
   _thirdRegionCount: 1
   _yardKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
@@ -243,7 +245,7 @@ MonoBehaviour:
     _prepareDuration: 0.1
     _swingDuration: 0.18
     _holdDuration: 0.15
-    _showWaveRing: 1
+    _showWaveRing: 0
     _waveSpeed: 22
     _waveHeight: 0.25
     _waveDuration: 0.35
@@ -302,6 +304,8 @@ MonoBehaviour:
   _spawner: {fileID: 9100000003}
   _throwVisit: {fileID: 9100000004}
   _door: {fileID: 633399229}
+  _firstRegionRewardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
+  _firstRegionRewardCount: 3
   _secondRegionRewardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
   _secondRegionRewardCount: 3
   _doorOpenAngle: 90
@@ -467,10 +471,22 @@ MonoBehaviour:
   _completionProgress: {fileID: 27118947}
   _interactionController: {fileID: 27118945}
   _player: {fileID: 9200000004}
-  _workbenchObjects: []
+  _workbenchObjects:
+  - {fileID: 2026616913}
+  - {fileID: 27118943}
+  - {fileID: 1097689384}
+  - {fileID: 1484990492}
+  - {fileID: 641087394}
+  - {fileID: 1200543324}
+  - {fileID: 129514597}
+  - {fileID: 1022828483}
   _workbenchOffset: {x: 0, y: 0, z: 0}
+  _workbenchAnchor: {fileID: 129514597}
+  _workbenchDestination: {fileID: 240308794}
   _nextSpawnRegion: 2
   _nextDoor: {fileID: 0}
+  _boxSourceArea: {fileID: 276827730}
+  _boxOffset: {x: 12.449999, y: 0, z: 36.36}
 --- !u!54 &89418937
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -589,6 +605,39 @@ Transform:
   - {fileID: 550167386}
   - {fileID: 1464566190}
   m_Father: {fileID: 350501781}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &111551561
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 111551562}
+  m_Layer: 0
+  m_Name: RegionWorkbenchDestinations
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &111551562
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 111551561}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 819447845}
+  - {fileID: 240308794}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &129514595
 PrefabInstance:
@@ -885,6 +934,42 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3814156318923512344, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
   m_PrefabInstance: {fileID: 129514595}
   m_PrefabAsset: {fileID: 0}
+--- !u!65 &129514598 stripped
+BoxCollider:
+  m_CorrespondingSourceObject: {fileID: 3585709104477070935, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
+  m_PrefabInstance: {fileID: 129514595}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &240308793
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 240308794}
+  m_Layer: 0
+  m_Name: YardWorkbench
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &240308794
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 240308793}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -12.6, y: -3.65, z: 30.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 111551562}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &250938437
 GameObject:
   m_ObjectHideFlags: 0
@@ -1073,6 +1158,11 @@ PrefabInstance:
 --- !u!4 &276827729 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 720011, guid: b1a53c321b7748cd96b1ef4023324c46, type: 3}
+  m_PrefabInstance: {fileID: 276827728}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &276827730 stripped
+BoxCollider:
+  m_CorrespondingSourceObject: {fileID: 700013, guid: b1a53c321b7748cd96b1ef4023324c46, type: 3}
   m_PrefabInstance: {fileID: 276827728}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &324177992
@@ -1887,6 +1977,37 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 729915526}
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &819447844
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 819447845}
+  m_Layer: 0
+  m_Name: LivingRoomWorkbench
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &819447845
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 819447844}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -25.05, y: -3.65, z: 1.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 111551562}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &825563187
 GameObject:
   m_ObjectHideFlags: 0
@@ -3091,8 +3212,12 @@ MonoBehaviour:
   - {fileID: 129514597}
   - {fileID: 1022828483}
   _workbenchOffset: {x: -25.05, y: 0, z: 0}
+  _workbenchAnchor: {fileID: 129514597}
+  _workbenchDestination: {fileID: 819447845}
   _nextSpawnRegion: 1
   _nextDoor: {fileID: 276827729}
+  _boxSourceArea: {fileID: 129514598}
+  _boxOffset: {x: -25.05, y: 0, z: -0.00000047683716}
 --- !u!54 &1449495235
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4351,3 +4476,4 @@ SceneRoots:
   - {fileID: 1449495237}
   - {fileID: 89418939}
   - {fileID: 1704111280}
+  - {fileID: 111551562}

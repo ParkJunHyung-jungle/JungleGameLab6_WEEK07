@@ -11,6 +11,99 @@ using UnityEditor.SceneManagement;
 public static class MainRegionTransitionSetup
 {
     /// <summary>
+    /// Main의 거실과 마당 작업대 목적지를 Inspector용 지점으로 연결한다.
+    /// 기존 이동 대상과 개별 설정을 유지하고 마당에도 같은 작업대 목록을 연결하여 씬을 저장한다.
+    /// </summary>
+    public static void ConfigureWorkbenchDestinations()
+    {
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        Transform[] transforms = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Transform desk = Array.Find(transforms, item => item.name == "RoomDesk");
+        Transform livingFloor = Array.Find(transforms, item => item.name == "LivingRoom_Floor");
+        Transform yardFloor = Array.Find(transforms, item => item.name == "Yard_GrassFloor");
+        if (desk == null || livingFloor == null || yardFloor == null) throw new InvalidOperationException("Main workbench destinations are missing.");
+        GameObject root = GameObject.Find("RegionWorkbenchDestinations");
+        if (root == null) root = new GameObject("RegionWorkbenchDestinations");
+        Transform living = CreatePoint(root.transform, "LivingRoomWorkbench", new Vector3(livingFloor.position.x, desk.position.y, desk.position.z), desk.rotation);
+        Transform yard = CreatePoint(root.transform, "YardWorkbench", new Vector3(yardFloor.position.x, desk.position.y, yardFloor.position.z), desk.rotation);
+        NextRegionWorkbenchTransition[] transitions = UnityEngine.Object.FindObjectsByType<NextRegionWorkbenchTransition>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        NextRegionWorkbenchTransition first = Array.Find(transitions, item => new SerializedObject(item).FindProperty("_nextSpawnRegion").intValue == 1);
+        SerializedProperty originalTargets = new SerializedObject(first).FindProperty("_workbenchObjects");
+        foreach (NextRegionWorkbenchTransition transition in transitions)
+        {
+            SerializedObject settings = new SerializedObject(transition);
+            bool isYard = settings.FindProperty("_nextSpawnRegion").intValue == 2;
+            settings.FindProperty("_workbenchAnchor").objectReferenceValue = desk;
+            settings.FindProperty("_workbenchDestination").objectReferenceValue = isYard ? yard : living;
+            if (isYard)
+            {
+                SerializedProperty targets = settings.FindProperty("_workbenchObjects");
+                targets.arraySize = originalTargets.arraySize;
+                for (int index = 0; index < targets.arraySize; index++)
+                    targets.GetArrayElementAtIndex(index).objectReferenceValue = originalTargets.GetArrayElementAtIndex(index).objectReferenceValue;
+            }
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log($"WORKBENCH_DESTINATION_READY trigger={transition.name} point={(isYard ? yard.name : living.name)}");
+        }
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+    }
+
+    /// <summary>
+    /// Main의 방과 거실 바닥을 상자 이동의 원래 구역 범위로 연결한다.
+    /// 두 진입 트리거의 상자 이동량만 설정하고 기존 작업대, 문과 디버깅 설정은 유지한다.
+    /// </summary>
+    public static void ConfigureBoxTransitions()
+    {
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        Transform[] transforms = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Transform roomFloor = Array.Find(transforms, item => item.name == "Floor" && item.parent != null && item.parent.name == "RoomShell" && item.gameObject.activeInHierarchy);
+        Transform livingFloor = Array.Find(transforms, item => item.name == "LivingRoom_Floor");
+        Transform yardFloor = Array.Find(transforms, item => item.name == "Yard_GrassFloor");
+        if (roomFloor == null || livingFloor == null || yardFloor == null) throw new InvalidOperationException("Main region floors are missing.");
+        NextRegionWorkbenchTransition[] transitions = UnityEngine.Object.FindObjectsByType<NextRegionWorkbenchTransition>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (NextRegionWorkbenchTransition transition in transitions)
+        {
+            SerializedObject settings = new SerializedObject(transition);
+            bool yard = settings.FindProperty("_nextSpawnRegion").intValue == 2;
+            Transform source = yard ? livingFloor : roomFloor;
+            Transform destination = yard ? yardFloor : livingFloor;
+            Vector3 offset = destination.position - source.position;
+            offset.y = 0f;
+            settings.FindProperty("_boxSourceArea").objectReferenceValue = source.GetComponent<BoxCollider>();
+            settings.FindProperty("_boxOffset").vector3Value = offset;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log($"BOX_TRANSITION_READY trigger={transition.name} source={source.name} offset={offset}");
+        }
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+    }
+
+    /// <summary>
+    /// Main의 첫 번째와 두 번째 구역 키보드 프리팹 설정을 기존 기본값으로 연결한다.
+    /// 비어 있는 새 항목만 초기화하며 기존 생성 개수와 임시 투척 체크 설정은 유지한다.
+    /// </summary>
+    public static void ConfigureRegionKeyboardPrefabs()
+    {
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        KeyboardInteractionController interaction = UnityEngine.Object.FindFirstObjectByType<KeyboardInteractionController>(FindObjectsInactive.Include);
+        SerializedObject settings = new SerializedObject(interaction);
+        foreach (string field in new[] { "_firstRegionKeyboardPrefab", "_secondRegionKeyboardPrefab" })
+            if (settings.FindProperty(field).objectReferenceValue == null)
+                settings.FindProperty(field).objectReferenceValue = settings.FindProperty("_keyboardPrefab").objectReferenceValue;
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        KeyboardCompletionProgress progress = UnityEngine.Object.FindFirstObjectByType<KeyboardCompletionProgress>(FindObjectsInactive.Include);
+        SerializedObject progressSettings = new SerializedObject(progress);
+        SerializedObject spawnerSettings = new SerializedObject(progressSettings.FindProperty("_spawner").objectReferenceValue);
+        if (progressSettings.FindProperty("_firstRegionRewardPrefab").objectReferenceValue == null)
+            progressSettings.FindProperty("_firstRegionRewardPrefab").objectReferenceValue = spawnerSettings.FindProperty("_keyboardPrefab").objectReferenceValue;
+        progressSettings.ApplyModifiedPropertiesWithoutUndo();
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("REGION_KEYBOARD_PREFABS_CONFIGURED");
+    }
+
+    /// <summary>
     /// Main의 두 번째 발사 지점을 임시 연속 투척 모드로 연결한다.
     /// 기존 간격과 최대 개수를 유지하고 두 번째 구역 보상 프리팹을 테스트용으로 사용하여 씬을 저장한다.
     /// </summary>

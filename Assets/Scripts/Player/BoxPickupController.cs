@@ -21,6 +21,23 @@ public sealed class BoxPickupController : MonoBehaviour
         _camera = camera;
     }
 
+    /// <summary>
+    /// sourceArea의 수평 범위 안에 내려놓은 상자를 offset만큼 이동한다.
+    /// 같은 씬의 상자만 처리하고 손에 든 상자, 회전과 보관 상태는 유지한다.
+    /// </summary>
+    public void MoveUnheldBoxes(Vector3 offset, Bounds sourceArea)
+    {
+        foreach (KeyboardStorageBox box in FindObjectsByType<KeyboardStorageBox>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (box == _heldBox || box.gameObject.scene != gameObject.scene) continue;
+            Vector3 position = box.transform.position;
+            if (position.x < sourceArea.min.x || position.x > sourceArea.max.x
+                || position.z < sourceArea.min.z || position.z > sourceArea.max.z) continue;
+            Rigidbody body = box.GetComponent<Rigidbody>();
+            body.position += offset;
+        }
+    }
+
     void FixedUpdate()
     {
         if (_heldBox != null) UpdateHeldBoxPose();

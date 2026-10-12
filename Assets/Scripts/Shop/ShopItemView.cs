@@ -1,10 +1,9 @@
 using System;
-
-using UnityEngine;
-using UnityEngine.UI;
-
+using System.Collections.Generic;
 using Game.Upgrades;
 using KeyboardModeling;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace Game.Shop
 {
@@ -229,12 +228,25 @@ namespace Game.Shop
             buttonRect.anchoredPosition = new Vector2(buttonRect.anchoredPosition.x, -72f);
         }
 
-        /// <summary>levelの一般・希少・上位等級の最終確率を短い表示文にして返し、購入状態は変更しない。</summary>
+        /// <summary>
+        /// level의 등급 분포에서 출현 확률이 있는 티어를 표시 문자열로 만든다.
+        /// 강화 정의의 분포를 사용하며 티어별 확률을 연결한 문자열을 반환한다.
+        /// </summary>
         private string FormatRarityDistribution(int level)
         {
             KeycapRarityDistribution distribution = _definition.GetRarityDistribution(level);
-            return $"Common {distribution.GetProbability(KeycapRarity.Common) * 100f:0.##}% / Rare {distribution.GetProbability(KeycapRarity.Rare) * 100f:0.##}% / " +
-                $"Epic {distribution.GetProbability(KeycapRarity.Epic) * 100f:0.##}% / Legendary {distribution.GetProbability(KeycapRarity.Legendary) * 100f:0.##}%";
+            List<string> entries = new List<string>();
+
+            foreach (KeycapRarity rarity in Enum.GetValues(typeof(KeycapRarity)))
+            {
+                float probability = distribution.GetProbability(rarity);
+                if (probability <= 0f)
+                    continue;
+
+                entries.Add($"{rarity} {probability * 100f:0.##}%");
+            }
+
+            return string.Join(" / ", entries);
         }
 
         /// <summary>

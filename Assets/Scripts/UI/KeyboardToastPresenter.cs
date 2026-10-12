@@ -64,12 +64,12 @@ namespace Game.UI
         }
 
         /// <summary>
-        /// 지급 완료된 amount와 발생 순간의 worldPosition을 보상 Toast로 전달한다.
-        /// 지갑 잔액과 독립적인 획득량 알림을 풀에 요청한다.
+        /// 지급 완료된 amount와 worldPosition 및 isDoubleReward를 보상 Toast로 전달한다.
+        /// 최종 지급액과 두 배 판정 결과를 풀에 요청하여 표시 내용과 글자 크기에 반영한다.
         /// </summary>
-        private void OnRewardGranted(long amount, Vector3 worldPosition)
+        private void OnRewardGranted(long amount, Vector3 worldPosition, bool isDoubleReward)
         {
-            _toastPool.Show(new ToastRequest(ToastKind.Reward, amount, worldPosition));
+            _toastPool.Show(new ToastRequest(ToastKind.Reward, amount, worldPosition, isDoubleReward: isDoubleReward));
         }
     }
 }

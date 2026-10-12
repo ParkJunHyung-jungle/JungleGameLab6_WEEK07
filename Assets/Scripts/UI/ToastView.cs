@@ -8,12 +8,17 @@ namespace Game.UI
     [RequireComponent(typeof(CanvasGroup))]
     public sealed class ToastView : MonoBehaviour
     {
+        private const int DOUBLE_REWARD_FONT_INCREASE = 6;
+        private const float TEXT_PADDING = 8f;
+
         [Header("References")]
         [SerializeField] private Text _label;
         private RectTransform _rect;
         private CanvasGroup _canvasGroup;
 
         [Header("Runtime State")]
+        private int _baseFontSize;
+        private Vector2 _baseSize;
         private ToastRequest _request;
         private Vector2 _offset;
         private float _elapsed;
@@ -26,14 +31,17 @@ namespace Game.UI
         {
             _rect = (RectTransform)transform;
             _canvasGroup = GetComponent<CanvasGroup>();
+            _baseFontSize = _label.fontSize;
+            _baseSize = _rect.sizeDelta;
             _canvasGroup.interactable = false;
             _canvasGroup.blocksRaycasts = false;
             _label.raycastTarget = false;
+            _label.resizeTextForBestFit = false;
         }
 
         /// <summary>
         /// 이전 연출 상태를 초기화하고 request를 표시할 상승 및 페이드 설정을 저장한다.
-        /// 수명, 상승 거리, 페이드 시작 비율, 오프셋, 색과 크기를 사용하여 새 Toast를 시작한다.
+        /// 연출 설정과 request의 두 배 판정을 사용하며 보상 강조 시 기본 글자 크기에 6을 더하고 문구를 확장한다.
         /// </summary>
         public void Begin(ToastRequest request, float duration, float riseDistance, float fadeStart, Vector2 offset, Color color, float scale)
         {
@@ -43,7 +51,15 @@ namespace Game.UI
             _riseDistance = riseDistance;
             _fadeStart = fadeStart;
             _offset = offset;
-            _label.text = (request.Kind == ToastKind.Reward ? "+" : "-") + request.Amount.ToString(CultureInfo.InvariantCulture);
+            _label.fontSize = _baseFontSize + (request.IsDoubleReward ? DOUBLE_REWARD_FONT_INCREASE : 0);
+            string prefix = request.Kind == ToastKind.Reward ? request.IsDoubleReward ? "+2배! " : "+" : "-";
+            _label.text = prefix + request.Amount.ToString(CultureInfo.InvariantCulture);
+            if (request.Kind == ToastKind.Reward)
+            {
+                _rect.sizeDelta = new Vector2(
+                    Mathf.Max(_baseSize.x, Mathf.Ceil(_label.preferredWidth) + TEXT_PADDING),
+                    Mathf.Max(_baseSize.y, Mathf.Ceil(_label.preferredHeight) + TEXT_PADDING));
+            }
             _label.color = color;
             _rect.localScale = Vector3.one * scale;
             _running = true;
@@ -82,7 +98,7 @@ namespace Game.UI
 
         /// <summary>
         /// 풀 반환 또는 재사용 전에 이전 표시와 애니메이션 상태를 제거한다.
-        /// 저장 데이터, 위치, 회전, 크기, 색, 알파, 경과 시간 및 진행 플래그를 초기화한다.
+        /// 저장 데이터와 연출 상태를 초기화하며 글자 크기와 표시 영역도 생성 시 기본값으로 복원한다.
         /// </summary>
         public void ResetForPool()
         {
@@ -96,6 +112,8 @@ namespace Game.UI
             _rect.anchoredPosition3D = Vector3.zero;
             _rect.localRotation = Quaternion.identity;
             _rect.localScale = Vector3.one;
+            _rect.sizeDelta = _baseSize;
+            _label.fontSize = _baseFontSize;
             _label.text = string.Empty;
             _label.color = Color.white;
             _canvasGroup.alpha = 0f;

@@ -19,7 +19,7 @@ namespace Game.Economy
         [Header("Runtime State")]
         private KeyboardInputController _activeKeyboard;
         private KeycapHealth[] _keycaps = Array.Empty<KeycapHealth>();
-        public event Action<long, Vector3> RewardGranted;
+        public event Action<long, Vector3, bool> RewardGranted;
         public long RewardPerKeycap => _rewardPerKeycap;
 
         void OnEnable()
@@ -75,16 +75,17 @@ namespace Game.Economy
 
         /// <summary>
         /// keycap의 파괴 알림을 받아 설정된 키캡당 보상을 지급한다.
-        /// 생성 데이터의 보상 또는 기존 고정 보상을 지갑에 더하고 지급 금액과 키캡 위치를 RewardGranted로 알린다.
+        /// 생성 보상과 두 배 확률을 사용해 최종 금액을 지급하고 금액·키캡 위치·두 배 여부를 RewardGranted로 알린다.
         /// </summary>
         private void OnKeycapBroken(KeycapHealth keycap)
         {
             long reward = keycap.HasSpawnData ? keycap.Reward : _rewardPerKeycap;
             float chance = _gameSession.Upgrades.GetDoubleRewardChance();
-            if (chance > 0f && UnityEngine.Random.value < chance)
+            bool isDoubleReward = chance > 0f && UnityEngine.Random.value < chance;
+            if (isDoubleReward)
                 reward = checked(reward * 2);
-            _gameSession.Wallet.Add(reward);
-            RewardGranted?.Invoke(reward, keycap.transform.position);
+            _gameSession.Wallet.Add(reward, isDoubleReward);
+            RewardGranted?.Invoke(reward, keycap.transform.position, isDoubleReward);
         }
 
         /// <summary>

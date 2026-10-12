@@ -1123,7 +1123,7 @@ MonoBehaviour:
   _duration: 1.2
   _riseDistance: 14
   _fadeStart: 0.55
-  _rowSpacing: 42
+  _rowSpacing: 56
   _toastColor: {r: 0.78431374, g: 0.7921569, b: 0.44313726, a: 1}
 --- !u!114 &8180162107046832621
 MonoBehaviour:

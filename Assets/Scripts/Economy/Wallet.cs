@@ -12,6 +12,7 @@ namespace Game.Economy
         public long Balance => _balance;
 
         public event Action<long> BalanceChanged;
+        public event Action<long, bool> IncomeReceived;
 
         /// <summary>
         /// initialBalance를 초기 재화로 사용하여 지갑을 생성한다.
@@ -28,10 +29,10 @@ namespace Game.Economy
         }
 
         /// <summary>
-        /// 양수인 amount를 잔액에 더한다.
-        /// 변경된 잔액을 보관하고 BalanceChanged로 알린다.
+        /// 양수인 최종 지급액 amount를 잔액에 더하고 수입 정보를 전달한다.
+        /// isDoubleReward는 표시용 판정 결과로 사용하며 잔액과 수입을 각 C# 이벤트로 알린다.
         /// </summary>
-        public void Add(long amount)
+        public void Add(long amount, bool isDoubleReward = false)
         {
             if (amount <= 0)
             {
@@ -40,6 +41,7 @@ namespace Game.Economy
 
             _balance = checked(_balance + amount);
             NotifyBalanceChanged();
+            IncomeReceived?.Invoke(amount, isDoubleReward);
         }
 
         /// <summary>

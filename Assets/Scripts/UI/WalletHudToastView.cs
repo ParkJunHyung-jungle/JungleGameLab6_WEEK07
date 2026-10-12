@@ -8,35 +8,46 @@ namespace Game.UI
     [RequireComponent(typeof(CanvasGroup))]
     public sealed class WalletHudToastView : MonoBehaviour
     {
+        private const int DOUBLE_REWARD_FONT_INCREASE = 6;
+        private const float TEXT_PADDING = 8f;
+
         [Header("References")]
         [SerializeField] private Text _label;
         private RectTransform _rect;
         private CanvasGroup _canvasGroup;
 
         [Header("Runtime State")]
+        private int _baseFontSize;
+        private Vector2 _baseSize;
         private long _amount;
+        private bool _isDoubleReward;
         private float _elapsed;
         private float _duration;
         private float _riseDistance;
         private float _fadeStart;
+        public float DisplayHeight => _rect.rect.height;
 
         void Awake()
         {
             _rect = (RectTransform)transform;
             _canvasGroup = GetComponent<CanvasGroup>();
+            _baseFontSize = _label.fontSize;
+            _baseSize = _rect.sizeDelta;
             _canvasGroup.interactable = false;
             _canvasGroup.blocksRaycasts = false;
             _label.raycastTarget = false;
+            _label.resizeTextForBestFit = false;
         }
 
         /// <summary>
         /// amount를 표시할 HUD Toast의 이전 상태를 초기화하고 새 연출을 시작한다.
-        /// duration, riseDistance, fadeStart와 color를 적용하여 획득량과 수명을 저장한다.
+        /// 연출 설정과 isDoubleReward를 사용하여 최종 지급액과 강조 상태 및 수명을 저장한다.
         /// </summary>
-        public void Begin(long amount, float duration, float riseDistance, float fadeStart, Color color)
+        public void Begin(long amount, float duration, float riseDistance, float fadeStart, Color color, bool isDoubleReward = false)
         {
             ResetForPool();
             _amount = amount;
+            _isDoubleReward = isDoubleReward;
             _duration = duration;
             _riseDistance = riseDistance;
             _fadeStart = fadeStart;
@@ -73,11 +84,12 @@ namespace Game.UI
 
         /// <summary>
         /// 풀 반환 또는 대여 전에 숫자와 이전 연출을 제거한다.
-        /// 획득량, 시간, 위치, 회전, 크기, 텍스트, 색과 알파를 초기화한다.
+        /// 획득량, 두 배 여부와 연출 상태를 초기화하고 글자 크기 및 표시 영역을 기본값으로 복원한다.
         /// </summary>
         public void ResetForPool()
         {
             _amount = 0;
+            _isDoubleReward = false;
             _elapsed = 0f;
             _duration = 0f;
             _riseDistance = 0f;
@@ -85,18 +97,24 @@ namespace Game.UI
             _rect.anchoredPosition3D = Vector3.zero;
             _rect.localRotation = Quaternion.identity;
             _rect.localScale = Vector3.one;
+            _rect.sizeDelta = _baseSize;
+            _label.fontSize = _baseFontSize;
             _label.text = string.Empty;
             _label.color = Color.white;
             _canvasGroup.alpha = 0f;
         }
 
         /// <summary>
-        /// 저장된 획득량을 더하기 기호와 천 단위 구분자가 있는 텍스트로 표시한다.
-        /// 현재 _amount를 사용하여 HUD 알림의 숫자를 갱신한다.
+        /// 저장된 _amount와 두 배 여부를 사용하여 HUD 알림의 문구와 크기를 갱신한다.
+        /// 두 배 보상에는 2배 문구와 기본 글자 크기보다 6 큰 폰트를 적용하고 텍스트 영역을 확보한다.
         /// </summary>
         private void RefreshLabel()
         {
-            _label.text = "+" + _amount.ToString("N0", CultureInfo.InvariantCulture);
+            _label.fontSize = _baseFontSize + (_isDoubleReward ? DOUBLE_REWARD_FONT_INCREASE : 0);
+            _label.text = (_isDoubleReward ? "+2배! " : "+") + _amount.ToString("N0", CultureInfo.InvariantCulture);
+            _rect.sizeDelta = new Vector2(
+                Mathf.Max(_baseSize.x, Mathf.Ceil(_label.preferredWidth) + TEXT_PADDING),
+                Mathf.Max(_baseSize.y, Mathf.Ceil(_label.preferredHeight) + TEXT_PADDING));
         }
     }
 }

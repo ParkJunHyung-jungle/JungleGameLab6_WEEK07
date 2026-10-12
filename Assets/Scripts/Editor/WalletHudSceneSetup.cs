@@ -65,12 +65,12 @@ namespace KeyboardModeling.Editor
             GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(ITEM_PATH);
             if (existing != null) return existing.GetComponent<WalletHudToastView>();
 
-            RectTransform rect = CreateRect("WalletHUDToastItem", null, Vector2.zero, new Vector2(248f, 36f));
-            Text label = AddText(rect, string.Empty, 26, new Color(1f, 0.85f, 0.25f), TextAnchor.MiddleRight);
+            RectTransform rect = CreateRect("WalletHUDToastItem", null, Vector2.zero, new Vector2(248f, 48f));
+            Text label = AddText(rect, string.Empty, 32, new Color(1f, 0.85f, 0.25f), TextAnchor.MiddleRight);
             label.fontStyle = FontStyle.Bold;
-            label.resizeTextForBestFit = true;
+            label.resizeTextForBestFit = false;
             label.resizeTextMinSize = 12;
-            label.resizeTextMaxSize = 26;
+            label.resizeTextMaxSize = 38;
             Outline outline = rect.gameObject.AddComponent<Outline>();
             outline.effectColor = new Color(0.02f, 0.02f, 0.02f, 0.95f);
             outline.effectDistance = new Vector2(1f, -1f);

@@ -9,6 +9,9 @@ using UnityEngine.InputSystem;
 using UnityEditor;
 #endif
 
+using Game.Session;
+using Game.Settings;
+
 namespace KeyboardModeling
 {
     public sealed class KeyboardInputController : MonoBehaviour
@@ -64,6 +67,7 @@ namespace KeyboardModeling
         [Header("Audio")]
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _pressSound;
+        private GameSettings _gameSettings;
 
         public bool InputEnabled
         {
@@ -149,6 +153,14 @@ namespace KeyboardModeling
 
         void Awake()
         {
+            GameSession session = FindAnyObjectByType<GameSession>();
+            _gameSettings = session != null ? session.Settings : null;
+            if (_gameSettings != null)
+            {
+                _gameSettings.RegisterSfxSource(_audioSource);
+                foreach (AudioSource source in GetComponentsInChildren<AudioSource>(true))
+                    _gameSettings.RegisterSfxSource(source);
+            }
             _actuatedKeys = new bool[_bindings.Length];
             _waveOffsets = new float[_bindings.Length];
             _restPositions = new Vector3[_bindings.Length];

@@ -23,6 +23,7 @@ public class MonitorController : MonoBehaviour
     [Tooltip("바탕화면을 연결하지 않은 개발 씬은 기존 화면 전환을 사용합니다.")]
     [SerializeField] private MonitorDesktopView _desktopView;
     [SerializeField] private KeyboardGoalAppView _goalAppView;
+    [SerializeField] private MonitorSettingsAppView _settingsAppView;
     [SerializeField] private CanvasGroup _shopCanvasGroup;
     [SerializeField] private MiniGameController _miniGameController;
     [SerializeField] private KeyboardInteractionController _interactionController;
@@ -53,6 +54,11 @@ public class MonitorController : MonoBehaviour
             _goalAppView.OpenRequested += OpenGoal;
             _goalAppView.OpenStateChanged += HandleGoalOpenStateChanged;
         }
+        if (_settingsAppView != null)
+        {
+            _settingsAppView.OpenRequested += OpenSettings;
+            _settingsAppView.OpenStateChanged += HandleSettingsOpenStateChanged;
+        }
         _toggleAction.performed += OnTogglePerformed;
         _toggleAction.Enable();
     }
@@ -73,6 +79,12 @@ public class MonitorController : MonoBehaviour
         {
             _goalAppView.OpenRequested -= OpenGoal;
             _goalAppView.OpenStateChanged -= HandleGoalOpenStateChanged;
+        }
+        if (_settingsAppView != null)
+        {
+            _settingsAppView.SetOpen(false);
+            _settingsAppView.OpenRequested -= OpenSettings;
+            _settingsAppView.OpenStateChanged -= HandleSettingsOpenStateChanged;
         }
         if (_desktopView != null)
         {
@@ -120,6 +132,7 @@ public class MonitorController : MonoBehaviour
         {
             _shopView.SetOpen(false);
             if (_goalAppView != null) _goalAppView.SetOpen(false);
+            if (_settingsAppView != null) _settingsAppView.SetOpen(false);
         }
 
         _isMonitorFocused = isFocused;
@@ -156,6 +169,7 @@ public class MonitorController : MonoBehaviour
         if (!_isMonitorFocused || _miniGameController.CurrentGame != MiniGameController.MiniGameKind.Idle)
             return;
         _shopView.SetOpen(false);
+        if (_settingsAppView != null) _settingsAppView.SetOpen(false);
         _goalAppView.SetOpen(true);
     }
 
@@ -165,7 +179,39 @@ public class MonitorController : MonoBehaviour
     /// </summary>
     private void HandleGoalOpenStateChanged(bool isOpen)
     {
-        if (isOpen) _shopView.SetOpen(false);
+        if (isOpen)
+        {
+            _shopView.SetOpen(false);
+            if (_settingsAppView != null) _settingsAppView.SetOpen(false);
+        }
+        RefreshDesktopState();
+    }
+
+    /// <summary>
+    /// 설정 앱의 요청을 받아 기존 모니터 진입 규칙 안에서 팝업을 연다.
+    /// 다른 앱을 닫고 설정 창과 모니터 입력 상태를 갱신한다.
+    /// </summary>
+    private void OpenSettings()
+    {
+        if (!_isMonitorFocused || !_interactionController.CanEnterMonitor
+            || _miniGameController.CurrentGame != MiniGameController.MiniGameKind.Idle) return;
+        _shopView.SetOpen(false);
+        if (_goalAppView != null) _goalAppView.SetOpen(false);
+        _settingsAppView.SetInputEnabled(true);
+        _settingsAppView.SetOpen(true);
+    }
+
+    /// <summary>
+    /// isOpen으로 전달된 설정 창 변경을 모니터 입력 권한에 반영한다.
+    /// 열림 시 다른 앱을 닫고 바탕화면 및 팝업의 조작 상태를 갱신한다.
+    /// </summary>
+    private void HandleSettingsOpenStateChanged(bool isOpen)
+    {
+        if (isOpen)
+        {
+            _shopView.SetOpen(false);
+            if (_goalAppView != null) _goalAppView.SetOpen(false);
+        }
         RefreshDesktopState();
     }
 
@@ -178,6 +224,7 @@ public class MonitorController : MonoBehaviour
         if (_desktopView != null)
         {
             if (isShopOpen && _goalAppView != null) _goalAppView.SetOpen(false);
+            if (isShopOpen && _settingsAppView != null) _settingsAppView.SetOpen(false);
             RefreshDesktopState();
             return;
         }
@@ -212,14 +259,17 @@ public class MonitorController : MonoBehaviour
         bool isMiniGameRunning = _miniGameController.CurrentGame != MiniGameController.MiniGameKind.Idle;
         bool isShopOpen = _shopView.IsOpen;
         bool isGoalOpen = _goalAppView != null && _goalAppView.IsOpen;
+        bool isSettingsOpen = _settingsAppView != null && _settingsAppView.IsOpen;
         _shopCanvas.SetActive(true);
         _shopCanvasGroup.alpha = isShopOpen ? 1f : 0f;
-        _shopCanvasGroup.interactable = _isMonitorFocused && isShopOpen && !isMiniGameRunning;
+        _shopCanvasGroup.interactable = _isMonitorFocused && isShopOpen && !isMiniGameRunning && !isSettingsOpen;
         _shopCanvasGroup.blocksRaycasts = _shopCanvasGroup.interactable;
-        _shopView.SetInputEnabled(_isMonitorFocused && !isMiniGameRunning);
-        _desktopView.SetInputEnabled(_isMonitorFocused && !isShopOpen && !isGoalOpen && !isMiniGameRunning);
+        _shopView.SetInputEnabled(_isMonitorFocused && !isMiniGameRunning && !isSettingsOpen);
+        _desktopView.SetInputEnabled(_isMonitorFocused && !isShopOpen && !isGoalOpen && !isSettingsOpen && !isMiniGameRunning);
         if (_goalAppView != null)
-            _goalAppView.SetInputEnabled(_isMonitorFocused && !isShopOpen && !isMiniGameRunning);
+            _goalAppView.SetInputEnabled(_isMonitorFocused && !isShopOpen && !isSettingsOpen && !isMiniGameRunning);
+        if (_settingsAppView != null)
+            _settingsAppView.SetInputEnabled(_isMonitorFocused && !isShopOpen && !isGoalOpen && !isMiniGameRunning);
         _miniGameCanvas.SetActive(isMiniGameRunning);
     }
 }

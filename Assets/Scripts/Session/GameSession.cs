@@ -1,8 +1,11 @@
 using System.Collections.Generic;
+
+using UnityEngine;
+
 using Game.Economy;
+using Game.Settings;
 using Game.Upgrades;
 using KeyboardModeling;
-using UnityEngine;
 
 namespace Game.Session
 {
@@ -15,6 +18,7 @@ namespace Game.Session
         [Header("Runtime State")]
         private Wallet _wallet;
         private UpgradeService _upgrades;
+        private GameSettings _settings;
 
         [Header("Rarity Progression")]
         [SerializeField] private KeycapRarityProgression _rarityProgression;
@@ -23,6 +27,7 @@ namespace Game.Session
         private int _completedKeyboardCount;
 
         public Wallet Wallet => _wallet;
+        public GameSettings Settings => _settings ??= new GameSettings();
         public UpgradeService Upgrades => _upgrades;
         public IReadOnlyList<UpgradeDefinition> UpgradeDefinitions => _upgradeDefinitions;
         public int CompletedKeyboardCount => _completedKeyboardCount;
@@ -34,6 +39,11 @@ namespace Game.Session
 
             _wallet = new Wallet(_initialBalance);
             _upgrades = new UpgradeService(_wallet, _upgradeDefinitions);
+        }
+
+        void OnDestroy()
+        {
+            _settings?.Dispose();
         }
 
         /// <summary>

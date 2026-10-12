@@ -209,6 +209,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             _hammerSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Hammer.png");
 #endif
         _gameSession = FindAnyObjectByType<GameSession>();
+        if (_gameSession != null)
+            _gameSession.Settings.RegisterShakeListener(_fixedCam.GetComponent<CinemachineImpulseListener>());
         _rewardController = FindAnyObjectByType<KeyboardRewardController>();
         _controller = FindAnyObjectByType<MiniGameController>();
         _feverController = FindAnyObjectByType<FeverController>();
@@ -421,6 +423,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void HandleFistImpact(Vector3 position)
     {
         if (!isActiveAndEnabled || !IsSmashMode) return;
+        if (_gameSession != null && _gameSession.Settings.CameraShakeStrength <= 0f) return;
         _fistImpulseSource.GenerateImpulseAtPositionWithVelocity(position, _fistImpulseSource.DefaultVelocity);
     }
 

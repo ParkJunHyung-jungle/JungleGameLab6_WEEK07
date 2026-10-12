@@ -206,10 +206,10 @@ MonoBehaviour:
   _inGameKeyBoardPrefab: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
   _firstRegion: {fileID: 1485046093}
   _firstRegionCount: 1
-  _firstRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
+  _firstRegionKeyboardPrefab: {fileID: 0}
   _secondRegion: {fileID: 550167387}
   _secondRegionCount: 1
-  _secondRegionKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
+  _secondRegionKeyboardPrefab: {fileID: 0}
   _thirdRegion: {fileID: 1464566189}
   _thirdRegionCount: 1
   _yardKeyboardPrefab: {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
@@ -304,7 +304,7 @@ MonoBehaviour:
   _spawner: {fileID: 9100000003}
   _throwVisit: {fileID: 9100000004}
   _door: {fileID: 633399229}
-  _firstRegionRewardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
+  _firstRegionRewardPrefab: {fileID: 0}
   _firstRegionRewardCount: 3
   _secondRegionRewardPrefab: {fileID: 6059366032874846202, guid: eba128e88a5e4e844bc4bc1c51be6dc7, type: 3}
   _secondRegionRewardCount: 3
@@ -481,12 +481,12 @@ MonoBehaviour:
   - {fileID: 129514597}
   - {fileID: 1022828483}
   _workbenchOffset: {x: 0, y: 0, z: 0}
-  _workbenchAnchor: {fileID: 129514597}
-  _workbenchDestination: {fileID: 240308794}
+  _workbenchAnchor: {fileID: 0}
+  _workbenchDestination: {fileID: 0}
   _nextSpawnRegion: 2
   _nextDoor: {fileID: 0}
-  _boxSourceArea: {fileID: 276827730}
-  _boxOffset: {x: 12.449999, y: 0, z: 36.36}
+  _boxSourceArea: {fileID: 0}
+  _boxOffset: {x: 0, y: 0, z: 0}
 --- !u!54 &89418937
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1158,11 +1158,6 @@ PrefabInstance:
 --- !u!4 &276827729 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 720011, guid: b1a53c321b7748cd96b1ef4023324c46, type: 3}
-  m_PrefabInstance: {fileID: 276827728}
-  m_PrefabAsset: {fileID: 0}
---- !u!65 &276827730 stripped
-BoxCollider:
-  m_CorrespondingSourceObject: {fileID: 700013, guid: b1a53c321b7748cd96b1ef4023324c46, type: 3}
   m_PrefabInstance: {fileID: 276827728}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &324177992
@@ -3212,12 +3207,12 @@ MonoBehaviour:
   - {fileID: 129514597}
   - {fileID: 1022828483}
   _workbenchOffset: {x: -25.05, y: 0, z: 0}
-  _workbenchAnchor: {fileID: 129514597}
-  _workbenchDestination: {fileID: 819447845}
+  _workbenchAnchor: {fileID: 0}
+  _workbenchDestination: {fileID: 0}
   _nextSpawnRegion: 1
   _nextDoor: {fileID: 276827729}
   _boxSourceArea: {fileID: 129514598}
-  _boxOffset: {x: -25.05, y: 0, z: -0.00000047683716}
+  _boxOffset: {x: 0, y: 0, z: 0}
 --- !u!54 &1449495235
 Rigidbody:
   m_ObjectHideFlags: 0

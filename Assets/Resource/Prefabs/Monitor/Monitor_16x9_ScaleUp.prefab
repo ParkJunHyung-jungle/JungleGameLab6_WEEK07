@@ -4571,6 +4571,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: df4cf494358af934a802f8eacb253c81, type: 2}
   - {fileID: 11400000, guid: af08dd03129bd8a41957b5f6e5fdbf83, type: 2}
   - {fileID: 11400000, guid: 72624913e5b8d184980d818bb50b0844, type: 2}
+  - {fileID: 11400000, guid: b8f0ccd6c532857438c9803eff8ad4a6, type: 2}
   _rarityProgression: {fileID: 11400000, guid: 1756cfd78fbcf15428cd7564b5046bfa, type: 2}
 --- !u!114 &2612928670998550527
 MonoBehaviour:

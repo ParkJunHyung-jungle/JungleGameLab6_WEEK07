@@ -39,6 +39,10 @@ namespace Game.Shop
                     AppendComparison(description, "두 배 보상 확률", $"{definition.GetDoubleRewardChance(level):P0}",
                         $"{definition.GetDoubleRewardChance(nextLevel):P0}", hasNext);
                     break;
+                case UpgradeId.BoxCapacity:
+                    AppendComparison(description, "상자 용량", $"{definition.GetBoxCapacity(level)}개",
+                        $"{definition.GetBoxCapacity(nextLevel)}개", hasNext);
+                    break;
                 case UpgradeId.RareKeycapQuality:
                     AppendRarityEffects(description, definition, level, nextLevel, hasNext);
                     break;

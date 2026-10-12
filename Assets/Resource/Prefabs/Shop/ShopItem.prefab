@@ -279,6 +279,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Shop.ShopItemView
   _nameText: {fileID: 6008029157171945704}
+  _descriptionText: {fileID: 9000001004}
   _levelText: {fileID: 7416201660183604969}
   _costText: {fileID: 4698930045831925064}
   _buttonText: {fileID: 6297327148906904931}

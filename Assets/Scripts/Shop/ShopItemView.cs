@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
-using Game.Upgrades;
-using KeyboardModeling;
+
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,6 +13,7 @@ namespace Game.Shop
 
         [Header("UI References")]
         [SerializeField] private Text _nameText;
+        [SerializeField] private Text _descriptionText;
         [SerializeField] private Text _levelText;
         [SerializeField] private Text _costText;
         [SerializeField] private Text _buttonText;
@@ -54,7 +53,7 @@ namespace Game.Shop
 
         /// <summary>
         /// 보관 중인 강화 설정과 현재 레벨 및 잔액을 사용하여 화면을 갱신한다.
-        /// 이름만 24pt로 표시하고 레벨, 다음 가격과 구매·승급 버튼의 상태를 변경한다.
+        /// 이름만 24pt로 표시하고 상자 용량 설명, 레벨, 다음 가격과 구매·승급 버튼의 상태를 변경한다.
         /// </summary>
         public void Refresh()
         {
@@ -107,6 +106,10 @@ namespace Game.Shop
                         _buttonText.text = "Promote";
                     }
                 }
+            }
+            else if (_definition.Id == UpgradeId.BoxCapacity)
+            {
+                _descriptionText.text = UpgradeDescriptionFormatter.Format(_definition, level);
             }
         }
 

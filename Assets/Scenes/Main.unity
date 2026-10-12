@@ -217,6 +217,7 @@ MonoBehaviour:
   _completionProgress: {fileID: 27118947}
   _returnFallenKeyboards: 1
   _fallReturnHeight: -8
+  _keyboardReturnArea: {fileID: 0}
   _startWithSingleKeyboard: 1
   _openingCeiling: {fileID: 9700000001}
   _fistImpulseSource: {fileID: 9800000001}
@@ -246,7 +247,7 @@ MonoBehaviour:
     _prepareDuration: 0.1
     _swingDuration: 0.18
     _holdDuration: 0.15
-    _showWaveRing: 1
+    _showWaveRing: 0
     _waveSpeed: 22
     _waveHeight: 0.25
     _waveDuration: 0.35

@@ -141,7 +141,7 @@ namespace KeyboardModeling
             {
                 Key key = binding.Key;
                 bool required = (key >= Key.A && key <= Key.Z) || (key >= Key.Digit1 && key <= Key.Digit0) || (key >= Key.F1 && key <= Key.F12);
-                required |= key == Key.Comma || key == Key.Period || key == Key.Slash || key == Key.Semicolon || key == Key.Quote || key == Key.LeftBracket || key == Key.RightBracket || key == Key.Minus || key == Key.Equals;
+                required |= key == Key.Comma || key == Key.Period || key == Key.Slash || key == Key.Semicolon || key == Key.Quote || key == Key.LeftBracket || key == Key.RightBracket || key == Key.Minus || key == Key.Equals || key == Key.Backquote;
                 if (required) result.Add(binding.Keycap.GetComponent<KeycapHealth>());
             }
             return result;

@@ -34,7 +34,11 @@ namespace KeyboardModeling
         private Vector3 _normal;
         private Transform _actuatedKeycap;
         private KeyboardInputController _actuatedKeyboard;
+        private int _diagnosticPressCount;
+        private bool _diagnosticMotion;
+        private bool _diagnosticMotionStarted;
         public bool IsPressing => _isPressing;
+        public string LastPressFailure { get; private set; }
 
         void Awake()
         {
@@ -69,6 +73,11 @@ namespace KeyboardModeling
         {
             if (!_isPressing)
                 return;
+            if (_diagnosticMotion && !_diagnosticMotionStarted)
+            {
+                _diagnosticMotionStarted = true;
+                Debug.Log($"[AutoAttack][MotionTick] Arm={name}, Id={GetInstanceID()}, Delta={Time.unscaledDeltaTime:F4}, Tip={_contactPoint.position}, PressDuration={_pressDuration}, RetractDuration={_retractDuration}", this);
+            }
             _elapsed += Time.unscaledDeltaTime;
             float scale = transform.lossyScale.x;
             Vector3 bottom = _point - _normal * (_pressDepth * scale);
@@ -84,7 +93,12 @@ namespace KeyboardModeling
                 Vector3 hover = _point + _normal * (_hoverHeight * scale);
                 ApplyTipPose(Vector3.Lerp(bottom, hover, Mathf.SmoothStep(0, 1, amount)), _normal);
                 if (amount >= 1)
+                {
                     _isPressing = false;
+                    if (_diagnosticMotion)
+                        Debug.Log($"[AutoAttack][MotionEnd] Arm={name}, Id={GetInstanceID()}, Tip={_contactPoint.position}, Target={_point}, Elapsed={_elapsed:F4}", this);
+                    _diagnosticMotion = false;
+                }
             }
         }
 
@@ -130,24 +144,41 @@ namespace KeyboardModeling
         private bool BeginPress(Transform keycap)
         {
             if (!isActiveAndEnabled || keycap == null)
+            {
+                LastPressFailure = !isActiveAndEnabled ? "ArmInactive" : "KeycapMissing";
                 return false;
+            }
             BoxCollider collider = keycap.GetComponent<BoxCollider>();
             if (collider == null)
+            {
+                LastPressFailure = "BoxColliderMissing";
                 return false;
+            }
             Vector3 point = keycap.TransformPoint(collider.center + Vector3.up * collider.size.y * 0.5f);
             Vector3 normal = keycap.up;
             if (!CanReach(point + normal * (_hoverHeight * transform.lossyScale.x), normal))
+            {
+                Vector3 wrist = transform.InverseTransformPoint(point + normal * (_hoverHeight * transform.lossyScale.x)) + transform.InverseTransformDirection(normal).normalized * _toolLength;
+                LastPressFailure = $"OutOfReach Distance={(wrist - _shoulderOrigin).magnitude:F4}, Min={Mathf.Abs(_upperLength - _lowerLength):F4}, Max={_upperLength + _lowerLength:F4}, Target={point}, Arm={transform.position}, Scale={transform.lossyScale}";
                 return false;
+            }
+            LastPressFailure = null;
             StopPress();
             _point = point;
             _normal = normal;
             _elapsed = 0;
             _actuatedKeycap = keycap;
             _actuatedKeyboard = keycap.GetComponentInParent<KeyboardInputController>();
+            Vector3 previousTip = _contactPoint.position;
             ApplyTipPose(_point, _normal);
             if (_actuatedKeyboard != null)
                 _actuatedKeyboard.SetKeycapActuated(keycap, true);
             _isPressing = true;
+            _diagnosticPressCount++;
+            _diagnosticMotion = _diagnosticPressCount <= 3;
+            _diagnosticMotionStarted = false;
+            if (_diagnosticMotion)
+                Debug.Log($"[AutoAttack][MotionBegin] Arm={name}, Id={GetInstanceID()}, Key={keycap.name}, TipBefore={previousTip}, TipAfter={_contactPoint.position}, Target={_point}, Shoulder={_shoulder.localEulerAngles}, Elbow={_elbow.localEulerAngles}", this);
             return true;
         }
 
@@ -233,6 +264,8 @@ namespace KeyboardModeling
         /// </summary>
         private void StopPress()
         {
+            if (_isPressing && _diagnosticMotion)
+                Debug.Log($"[AutoAttack][MotionStopped] Arm={name}, Id={GetInstanceID()}, Elapsed={_elapsed:F4}, Active={isActiveAndEnabled}", this);
             _isPressing = false;
             ReleaseKeycap();
         }

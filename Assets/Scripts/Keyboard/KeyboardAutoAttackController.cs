@@ -29,6 +29,9 @@ namespace KeyboardModeling
         private double _nextAttackAt;
         private float _attackInterval;
         private bool _unlocked;
+        private string _lastDiagnosticState;
+        private int _diagnosticAttackCount;
+        private double _nextDiagnosticAt;
 
         void Awake()
         {
@@ -67,6 +70,7 @@ namespace KeyboardModeling
 
         void OnDisable()
         {
+            Debug.Log($"[AutoAttack][Disabled] Controller={name}", this);
             if (_station != null)
                 _station.KeyboardChanged -= BindKeyboard;
             else
@@ -79,6 +83,12 @@ namespace KeyboardModeling
         void Update()
         {
             RefreshAttackInterval();
+            LogAttackState();
+            if (_keyboard != null && Time.unscaledTimeAsDouble >= _nextDiagnosticAt)
+            {
+                _nextDiagnosticAt = Time.unscaledTimeAsDouble + 5d;
+                Debug.Log($"[AutoAttack][Heartbeat] Controller={name}, Hits={_diagnosticAttackCount}, Interval={_attackInterval:F3}s, Wait={System.Math.Max(0d, _nextAttackAt - Time.unscaledTimeAsDouble):F3}s, ArmId={_arm.GetInstanceID()}, Pressing={_arm.IsPressing}, Targets={_targets.Count}, TimeScale={Time.timeScale}", this);
+            }
             if (!_unlocked || Time.unscaledTimeAsDouble < _nextAttackAt)
                 return;
             if (_keyboard == null || (_destruction != null && _destruction.IsBroken))
@@ -114,7 +124,19 @@ namespace KeyboardModeling
                 (_destruction != null && _destruction.IsBroken) || !_targets.Contains(target))
                 return false;
             if (!_arm.PressKeyAutomatically(target.transform))
+            {
+                if (_lastDiagnosticState != "ArmRejected")
+                {
+                    Debug.LogWarning($"[AutoAttack][ArmRejected] Controller={name}, Key={target.name}, Reason={_arm.LastPressFailure}", this);
+                    _lastDiagnosticState = "ArmRejected";
+                }
                 return false;
+            }
+            if (_lastDiagnosticState != "Attacking")
+            {
+                Debug.Log($"[AutoAttack][Attacking] Controller={name}, Keyboard={_keyboard.name}, Key={target.name}", this);
+                _lastDiagnosticState = "Attacking";
+            }
             KeyboardInputController keyboard = _keyboard;
             KeyboardDestruction destruction = _destruction;
             KeycapHealth[] areaTargets = _areaTargets;
@@ -124,7 +146,11 @@ namespace KeyboardModeling
             float radius = _upgrades.GetAutoAttackRadius();
             AdvanceAttackClock();
             keyboard.NotifyAutomaticKeycapHit(target.transform);
+            int previousHP = target.CurrentHP;
             target.TakeDamage(damage);
+            _diagnosticAttackCount++;
+            if (_diagnosticAttackCount <= 3)
+                Debug.Log($"[AutoAttack][DamageApplied] Controller={name}, Key={target.name}, HP={previousHP}->{target.CurrentHP}, Damage={damage}, NextWait={System.Math.Max(0d, _nextAttackAt - Time.unscaledTimeAsDouble):F3}s", this);
             if (index >= 0)
                 KeyboardAttackController.ApplyAreaDamage(keyboard, destruction, areaTargets, areaPositions, index, areaPositions[index], radius, damage);
             return true;
@@ -136,13 +162,19 @@ namespace KeyboardModeling
         /// </summary>
         private void BindKeyboard(KeyboardInputController keyboard)
         {
+            _lastDiagnosticState = null;
+            Debug.Log($"[AutoAttack][BindBegin] Controller={name}, Station={(_station != null ? _station.name : "Manual")}, Keyboard={(keyboard != null ? keyboard.name : "None")}", this);
             _keyboard = keyboard;
             _destruction = null;
             _targets.Clear();
             _areaTargets = System.Array.Empty<KeycapHealth>();
             _areaPositions = System.Array.Empty<Vector2>();
             if (_stationFeedback != null)
+            {
+                Debug.Log($"[AutoAttack][FeedbackBegin] Controller={name}", this);
                 _stationFeedback.SetAutomaticKeyboard(_keyboard);
+                Debug.Log($"[AutoAttack][FeedbackEnd] Controller={name}", this);
+            }
             if (_keyboard == null)
                 return;
             _destruction = _keyboard.GetComponent<KeyboardDestruction>();
@@ -159,6 +191,24 @@ namespace KeyboardModeling
                 if (layout.TryGetValue(key, out KeycapHealth target) && target.CurrentHP > 0)
                     _targets.Add(target);
             }
+            Debug.Log($"[AutoAttack][BindEnd] Controller={name}, Targets={_targets.Count}, ArmActive={_arm.isActiveAndEnabled}, Unlocked={_unlocked}, Wait={System.Math.Max(0d, _nextAttackAt - Time.unscaledTimeAsDouble):F3}s", this);
+        }
+
+        /// <summary>
+        /// 현재 공격 조건을 확인하여 상태가 바뀔 때만 진단 로그를 출력한다.
+        /// 키보드와 공격 예약 및 활성 상태를 사용하며 진단 상태만 저장하고 공격 동작은 변경하지 않는다.
+        /// </summary>
+        private void LogAttackState()
+        {
+            string state = !_unlocked ? "Locked"
+                : _keyboard == null ? "NoKeyboard"
+                : _destruction != null && _destruction.IsBroken ? "Broken"
+                : _targets.Count == 0 ? "NoTargets"
+                : Time.unscaledTimeAsDouble < _nextAttackAt ? "Waiting" : "Ready";
+            if (state == "Ready" || (state == "Waiting" && (_lastDiagnosticState == "Attacking" || _lastDiagnosticState == "ArmRejected"))) return;
+            if (_lastDiagnosticState == state) return;
+            _lastDiagnosticState = state;
+            Debug.Log($"[AutoAttack][State] Controller={name}, State={state}, Targets={_targets.Count}, ArmActive={_arm.isActiveAndEnabled}, Wait={System.Math.Max(0d, _nextAttackAt - Time.unscaledTimeAsDouble):F3}s", this);
         }
 
         /// <summary>

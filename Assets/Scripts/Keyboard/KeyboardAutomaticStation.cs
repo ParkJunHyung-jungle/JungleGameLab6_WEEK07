@@ -90,7 +90,9 @@ namespace KeyboardModeling
             destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _interactionController.DestructionFistSprite, HandleBreaking, HandleDestroyed, _interactionController.ConfigureFistAnimation);
             _keyboard = keyboard;
             _onCompleted = onCompleted;
+            Debug.Log($"[AutoAttack][StationNotifyBegin] Station={name}, Keyboard={keyboard.name}, Subscribers={KeyboardChanged?.GetInvocationList().Length ?? 0}", this);
             KeyboardChanged?.Invoke(keyboard);
+            Debug.Log($"[AutoAttack][StationNotifyEnd] Station={name}, Keyboard={keyboard.name}", this);
         }
 
         /// <summary>

@@ -15,7 +15,7 @@ public sealed class KeyboardGoalAppView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Text _completedText;
     [SerializeField] private Text _remainingText;
     [SerializeField] private Text _statusText;
-    [SerializeField] private Image _progressFill;
+    [SerializeField] private Slider _progressFill;
     [SerializeField] private MonitorGoalCloseButton _closeButton;
     private bool _isInputEnabled;
     public bool IsOpen { get; private set; }
@@ -100,6 +100,6 @@ public sealed class KeyboardGoalAppView : MonoBehaviour, IPointerClickHandler
         _statusText.text = remaining == 0
             ? "목표 달성 — 금 키보드 보상 조건 완료"
             : "초기 키보드를 파괴하면 금 키보드 3개를 받습니다.";
-        _progressFill.fillAmount = Mathf.Clamp01((float)completed / required);
+        _progressFill.value = Mathf.Clamp01((float)completed / required);
     }
 }

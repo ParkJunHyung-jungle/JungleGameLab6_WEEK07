@@ -294,7 +294,7 @@ MonoBehaviour:
   _throwVisit: {fileID: 9100000004}
   _door: {fileID: 633399229}
   _doorOpenAngle: 90
-  _requiredInitialKeyboardCount: 10
+  _requiredInitialKeyboardCount: 100
 --- !u!1 &39970281
 GameObject:
   m_ObjectHideFlags: 0
@@ -1426,9 +1426,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 350501781}
     m_Modifications:
-    - target: {fileID: 2166173113089468555, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
-      propertyPath: m_IsActive
-      value: 1
+    - target: {fileID: 316253714710251282, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2612928670998550527, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: monitorCam

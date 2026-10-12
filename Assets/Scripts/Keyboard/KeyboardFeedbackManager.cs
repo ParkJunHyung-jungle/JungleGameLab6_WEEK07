@@ -386,8 +386,12 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private void ClearDebris()
     {
         if (_debrisRenderers == null) return;
+
         foreach (MeshRenderer piece in _debrisRenderers)
-            piece.gameObject.SetActive(false);
+        {
+            if (piece != null)
+                piece.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>

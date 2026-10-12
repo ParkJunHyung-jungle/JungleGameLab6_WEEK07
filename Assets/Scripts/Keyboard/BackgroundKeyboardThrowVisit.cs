@@ -56,7 +56,8 @@ public sealed class BackgroundKeyboardThrowVisit : MonoBehaviour
         if (_activeRegion >= 0) _requestedRegions.Enqueue((_activeRegion, _activeCompletionReward));
         _activeRegion = -1;
         _activeCompletionReward = false;
-        _actor.position = _homePosition;
+        if (_actor != null)
+            _actor.position = _homePosition;
         _visiting = false;
     }
 

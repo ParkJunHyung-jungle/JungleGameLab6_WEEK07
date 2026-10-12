@@ -24026,6 +24026,9 @@ MonoBehaviour:
     _keycap: {fileID: 9093938184275173713}
   _pressDistance: 0.15
   _animationSpeed: 18
+  _stemHeightOffset: 0.1
+  _stemPressDistance: 0.2
+  _stemLengthMultiplier: 3
   _logInput: 1
   _audioSource: {fileID: 5671290076313937310}
   _pressSound: {fileID: 8300000, guid: 5871cb8f54e12774ebe12e9c708bd284, type: 3}

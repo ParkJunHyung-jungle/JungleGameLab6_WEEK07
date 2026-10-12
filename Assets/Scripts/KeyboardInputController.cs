@@ -42,6 +42,17 @@ namespace KeyboardModeling
         private float[] _waveOffsets;
         private readonly Dictionary<Transform, int> _waveBindingIndices = new Dictionary<Transform, int>();
 
+        [Header("Switch Stem Travel")]
+        [SerializeField, Min(0f), Tooltip("축의 기존 위치에서 추가로 올릴 높이입니다. 키보드 모델의 로컬 단위를 사용합니다.")]
+        private float _stemHeightOffset = 0.08f;
+        [SerializeField, Min(0f), Tooltip("키캡 파괴 후 키를 완전히 눌렀을 때 축이 내려가는 거리입니다. 키보드 모델의 로컬 단위를 사용합니다.")]
+        private float _stemPressDistance = 0.2f;
+        [SerializeField, Min(0.01f), Tooltip("축의 세로 길이 배율입니다. 1은 원래 길이이며 가로 두께는 유지합니다.")]
+        private float _stemLengthMultiplier = 1.5f;
+        private Transform[][] _switchStems;
+        private Vector3[][] _stemRestPositions;
+        private Vector3[][] _stemRestScales;
+
         [Header("Debug")]
         [SerializeField] private bool _logInput = true;
         private readonly StringBuilder _pressedKeyNames = new StringBuilder();
@@ -141,6 +152,9 @@ namespace KeyboardModeling
             _actuatedKeys = new bool[_bindings.Length];
             _waveOffsets = new float[_bindings.Length];
             _restPositions = new Vector3[_bindings.Length];
+            _switchStems = new Transform[_bindings.Length][];
+            _stemRestPositions = new Vector3[_bindings.Length][];
+            _stemRestScales = new Vector3[_bindings.Length][];
             _pressAmounts = new float[_bindings.Length];
             _previousPressed = new bool[_bindings.Length];
             _keycapButtons = new KeycapButton[_bindings.Length];
@@ -152,6 +166,8 @@ namespace KeyboardModeling
                 _waveBindingIndices[_bindings[index].Keycap] = index;
                 _keycapButtons[index] = _bindings[index].Keycap.GetComponent<KeycapButton>();
                 _keycapHealths[index] = _bindings[index].Keycap.GetComponent<KeycapHealth>();
+                CacheSwitchStems(index);
+                UpdateSwitchStems(index);
             }
             _hasFocus = Application.isFocused;
         }
@@ -361,10 +377,67 @@ namespace KeyboardModeling
         {
             float targetAmount = isPressed ? 1f : 0f;
             if (_pressAmounts[index] == targetAmount && (targetAmount == 0f || _lastPressDistance == _pressDistance))
+            {
+                UpdateSwitchStems(index);
                 return;
+            }
 
             _pressAmounts[index] = Mathf.MoveTowards(_pressAmounts[index], targetAmount, _animationSpeed * deltaTime);
             _bindings[index].Keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * _pressAmounts[index]) + Vector3.up * _waveOffsets[index];
+            UpdateSwitchStems(index);
+        }
+
+        /// <summary>
+        /// index의 키캡과 같은 가로 위치에 있는 스위치의 움직이는 축을 찾는다.
+        /// 키캡의 부모와 초기 위치를 사용하여 축 Transform, 복귀 위치와 원래 크기를 저장한다.
+        /// </summary>
+        private void CacheSwitchStems(int index)
+        {
+            List<Transform> stems = new List<Transform>();
+            List<Vector3> restPositions = new List<Vector3>();
+            List<Vector3> restScales = new List<Vector3>();
+            Transform keycap = _bindings[index].Keycap;
+            foreach (Transform mechanism in keycap.parent)
+            {
+                if (!mechanism.name.StartsWith("Switch_", StringComparison.Ordinal))
+                    continue;
+
+                Vector3 offset = mechanism.localPosition - _restPositions[index];
+                if (Mathf.Abs(offset.x) > 0.001f || Mathf.Abs(offset.z) > 0.001f)
+                    continue;
+
+                foreach (Transform part in mechanism)
+                {
+                    if (part.name != "MX_Stem_X" && part.name != "MX_Stem_Z" && part.name != "Stabilizer_Stem")
+                        continue;
+
+                    stems.Add(part);
+                    restPositions.Add(part.localPosition);
+                    restScales.Add(part.localScale);
+                }
+                break;
+            }
+            _switchStems[index] = stems.ToArray();
+            _stemRestPositions[index] = restPositions.ToArray();
+            _stemRestScales[index] = restScales.ToArray();
+        }
+
+        /// <summary>
+        /// index의 키캡이 파괴되면 현재 눌림량으로 스위치 축을 아래로 이동한다.
+        /// 키캡 체력, 추가 높이, 눌림 거리와 길이 배율을 사용하여 축의 위치와 세로 크기를 갱신한다.
+        /// </summary>
+        private void UpdateSwitchStems(int index)
+        {
+            float amount = _keycapHealths[index] != null && _keycapHealths[index].CurrentHP == 0
+                ? _pressAmounts[index] : 0f;
+            Vector3 offset = Vector3.up * (_stemHeightOffset - _stemPressDistance * amount);
+            for (int stemIndex = 0; stemIndex < _switchStems[index].Length; stemIndex++)
+            {
+                _switchStems[index][stemIndex].localPosition = _stemRestPositions[index][stemIndex] + offset;
+                Vector3 scale = _stemRestScales[index][stemIndex];
+                scale.y *= _stemLengthMultiplier;
+                _switchStems[index][stemIndex].localScale = scale;
+            }
         }
         /// <summary>
         /// 키캡 애니메이션의 히트스톱 연동 여부를 설정한다.
@@ -389,6 +462,7 @@ namespace KeyboardModeling
                 float amount = pressed || _previousPressed[index] ? 1f : 0f;
                 _pressAmounts[index] = amount;
                 keycap.localPosition = _restPositions[index] + Vector3.down * (_pressDistance * amount) + Vector3.up * _waveOffsets[index];
+                UpdateSwitchStems(index);
                 return;
             }
         }
@@ -440,6 +514,7 @@ namespace KeyboardModeling
                     _bindings[index].Keycap.localPosition = _restPositions[index];
                 _waveOffsets[index] = 0f;
                 _pressAmounts[index] = 0f;
+                UpdateSwitchStems(index);
                 _keycapButtons[index].ResetPressState();
             }
         }

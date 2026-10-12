@@ -126,7 +126,6 @@ namespace KeyboardModeling.Editor
                 foreach (Transform keycap in keycaps)
                     ConfigureKeycap(keycap.gameObject);
             var serialized = new SerializedObject(controller);
-            serialized.FindProperty("_blockShortcuts").boolValue = true;
             SerializedProperty bindings = serialized.FindProperty("_bindings");
             bindings.arraySize = keycaps.Count;
             for (int index = 0; index < keycaps.Count; index++)

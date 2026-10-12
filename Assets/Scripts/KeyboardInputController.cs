@@ -18,10 +18,8 @@ namespace KeyboardModeling
     {
         [Header("Input Mapping")]
         [SerializeField] private bool _inputEnabled = true;
-        [SerializeField] private bool _blockShortcuts = true;
         [SerializeField] private KeyBinding[] _bindings = Array.Empty<KeyBinding>();
         private bool _hasFocus;
-        private bool _captureInput;
         private Key _lastPressedKey;
         private KeycapButton[] _keycapButtons;
         private KeycapHealth[] _keycapHealths;
@@ -75,7 +73,6 @@ namespace KeyboardModeling
             set => SetInputEnabled(value);
         }
 
-        public bool ShortcutCaptureActive => _captureInput;
         public Key LastPressedKey => _lastPressedKey;
         public string CurrentPressedKeys => _currentPressedKeys;
         public KeyboardSpawnProfile SpawnProfile => _spawnProfile;
@@ -187,17 +184,9 @@ namespace KeyboardModeling
         void Update()
         {
             bool hasInputFocus = HasInputFocus();
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-            WindowsKeyboardCapture.SetCaptureEnabled(this, _inputEnabled && _blockShortcuts && hasInputFocus);
-            _captureInput = _blockShortcuts && WindowsKeyboardCapture.IsCapturing;
-            WindowsKeyboardCapture.SetDebugEnabled(_logInput);
-            WindowsKeyboardCapture.LogCapturedEvents();
-#else
-            _captureInput = false;
-#endif
             Keyboard keyboard = Keyboard.current;
             LogInputStatus(hasInputFocus, keyboard != null);
-            if (!_inputEnabled || !hasInputFocus || (!_captureInput && keyboard == null))
+            if (!_inputEnabled || !hasInputFocus || keyboard == null)
             {
                 RestoreKeys();
                 return;
@@ -207,12 +196,7 @@ namespace KeyboardModeling
             for (int index = 0; index < _bindings.Length; index++)
             {
                 bool unityPressed = keyboard != null && (keyboard[_bindings[index].Key].isPressed || keyboard[_bindings[index].Key].wasPressedThisFrame);
-                bool nativePressed = false;
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-                if (_captureInput)
-                    nativePressed = WindowsKeyboardCapture.IsPressed(_bindings[index].Key);
-#endif
-                bool isPressed = unityPressed || nativePressed;
+                bool isPressed = unityPressed;
                 bool stateChanged = isPressed != _previousPressed[index];
                 bool pressedThisFrame = isPressed && stateChanged;
                 pressedKeysChanged |= stateChanged;
@@ -255,7 +239,7 @@ namespace KeyboardModeling
                 }
 
                 if (_logInput && stateChanged)
-                    Debug.Log("[Keyboard][Model] " + (isPressed ? "DOWN " : "UP ") + _bindings[index].Key + " | Unity=" + unityPressed + " Hook=" + nativePressed + " | Target=" + _bindings[index].Keycap.name + " LocalY=" + _bindings[index].Keycap.localPosition.y.ToString("F4"), this);
+                    Debug.Log("[Keyboard][Model] " + (isPressed ? "DOWN " : "UP ") + _bindings[index].Key + " | Unity=" + unityPressed + " | Target=" + _bindings[index].Keycap.name + " LocalY=" + _bindings[index].Keycap.localPosition.y.ToString("F4"), this);
             }
             _lastPressDistance = _pressDistance;
             if (pressedKeysChanged)
@@ -313,10 +297,7 @@ namespace KeyboardModeling
         void OnDisable()
         {
             if (_logInput)
-                Debug.Log("[Keyboard] Controller disabled; releasing capture and keys.", this);
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-            WindowsKeyboardCapture.SetCaptureEnabled(this, false);
-#endif
+                Debug.Log("[Keyboard] Controller disabled; releasing keys.", this);
             RestoreKeys();
         }
 
@@ -325,9 +306,6 @@ namespace KeyboardModeling
             _hasFocus = hasFocus;
             if (!hasFocus)
             {
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-                WindowsKeyboardCapture.SetCaptureEnabled(this, false);
-#endif
                 RestoreKeys();
             }
         }
@@ -339,10 +317,6 @@ namespace KeyboardModeling
         public void SetInputEnabled(bool inputEnabled)
         {
             _inputEnabled = inputEnabled;
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-            if (!inputEnabled)
-                WindowsKeyboardCapture.SetCaptureEnabled(this, false);
-#endif
             if (!inputEnabled && _restPositions != null)
                 RestoreKeys();
         }
@@ -356,11 +330,7 @@ namespace KeyboardModeling
 #if UNITY_EDITOR
             EditorWindow focusedWindow = EditorWindow.focusedWindow;
             bool gameViewFocused = EditorApplication.isPlaying && !EditorApplication.isPaused && focusedWindow != null && focusedWindow.GetType().Name == "GameView";
-#if UNITY_EDITOR_WIN
-            return gameViewFocused && WindowsKeyboardCapture.HasApplicationFocus();
-#else
-            return gameViewFocused;
-#endif
+            return gameViewFocused && Application.isFocused;
 #else
             return _hasFocus && Application.isFocused;
 #endif
@@ -368,27 +338,23 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 입력 경로의 상태 변화와 주기적인 진단 정보를 Console에 출력한다.
-        /// hasInputFocus, hasKeyboard와 설정을 사용하여 포커스, 장치, 훅 상태 및 현재 키를 기록한다.
+        /// hasInputFocus, hasKeyboard와 설정을 사용하여 포커스, 장치 및 현재 키를 기록한다.
         /// </summary>
         private void LogInputStatus(bool hasInputFocus, bool hasKeyboard)
         {
             if (!_logInput)
                 return;
-            int flags = (_inputEnabled ? 1 : 0) | (_blockShortcuts ? 2 : 0) | (hasInputFocus ? 4 : 0) | (hasKeyboard ? 8 : 0) | (_captureInput ? 16 : 0);
+            int flags = (_inputEnabled ? 1 : 0) | (hasInputFocus ? 4 : 0) | (hasKeyboard ? 8 : 0);
             if (flags == _lastStatusFlags && Time.unscaledTime < _nextStatusLogTime)
                 return;
             _lastStatusFlags = flags;
             _nextStatusLogTime = Time.unscaledTime + 2f;
             string focusedWindow = "Player";
-            int hookEvents = 0;
 #if UNITY_EDITOR
             EditorWindow window = EditorWindow.focusedWindow;
             focusedWindow = window == null ? "None" : window.GetType().Name;
 #endif
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-            hookEvents = WindowsKeyboardCapture.EventCount;
-#endif
-            Debug.Log("[Keyboard][Status] Enabled=" + _inputEnabled + " Focus=" + hasInputFocus + " Window=" + focusedWindow + " UnityKeyboard=" + hasKeyboard + " BlockShortcuts=" + _blockShortcuts + " HookActive=" + _captureInput + " HookEvents=" + hookEvents + " Bindings=" + _bindings.Length + " Held=" + _currentPressedKeys, this);
+            Debug.Log("[Keyboard][Status] Enabled=" + _inputEnabled + " Focus=" + hasInputFocus + " Window=" + focusedWindow + " UnityKeyboard=" + hasKeyboard + " Bindings=" + _bindings.Length + " Held=" + _currentPressedKeys, this);
         }
 
         /// <summary>
@@ -524,7 +490,6 @@ namespace KeyboardModeling
         /// </summary>
         private void RestoreKeys()
         {
-            _captureInput = false;
             _currentPressedKeys = "None";
             for (int index = 0; index < _bindings.Length; index++)
             {

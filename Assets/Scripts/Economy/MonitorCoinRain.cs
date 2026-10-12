@@ -28,7 +28,6 @@ public sealed class MonitorCoinRain : MonoBehaviour
     private RectTransform _canvasRoot;
     private readonly Vector3[] _backgroundCorners = new Vector3[4];
     private Wallet _wallet;
-    private long _lastBalance;
     private PlayableGraph _animationGraph;
     private AnimationClipPlayable[] _coinPlayables;
 
@@ -48,12 +47,13 @@ public sealed class MonitorCoinRain : MonoBehaviour
     [SerializeField] private bool _effectEnabled = true;
     [SerializeField, Range(8, 64)] private int _poolSize = 24;
     [SerializeField, Min(0.01f)] private float _spawnInterval = 0.1f;
-    private readonly Queue<(int Type, int Count)> _pendingCoins = new Queue<(int Type, int Count)>();
+    private readonly Queue<(int Type, int Count, bool IsDoubleReward)> _pendingCoins = new Queue<(int Type, int Count, bool IsDoubleReward)>();
     private readonly int[] _nextCoins = new int[4];
     private int _pendingType;
     private int _pendingCount;
+    private bool _pendingIsDoubleReward;
     private float _spawnTimer;
-    public event Action<int> CoinSpawned;
+    public event Action<long, bool> CoinSpawned;
 
     [Header("Canvas Drop")]
     [SerializeField, Min(1f)] private float _coinSize = 28f;
@@ -90,8 +90,8 @@ public sealed class MonitorCoinRain : MonoBehaviour
     }
 
     /// <summary>
-    /// _gameSession의 지갑을 가져와 현재 잔액부터 수입 감지를 시작한다.
-    /// _wallet을 저장하고 잔액 변경 이벤트를 구독한다.
+    /// _gameSession의 지갑을 가져와 이후 지급되는 수입의 감지를 시작한다.
+    /// _wallet을 저장하고 금액과 두 배 판정을 전달하는 수입 이벤트를 구독한다.
     /// </summary>
     void Start()
     {
@@ -114,7 +114,7 @@ public sealed class MonitorCoinRain : MonoBehaviour
     /// </summary>
     void OnDisable()
     {
-        if (_wallet != null) _wallet.BalanceChanged -= HandleBalanceChanged;
+        if (_wallet != null) _wallet.IncomeReceived -= HandleBalanceChanged;
         ClearCoins();
     }
 
@@ -302,44 +302,41 @@ public sealed class MonitorCoinRain : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 지갑 잔액을 기준으로 수입 알림을 연결한다.
-    /// BalanceChanged를 구독하고 초기 잔액이나 비활성 동안의 과거 수입은 재생하지 않는다.
+    /// 현재 지갑에서 새로 지급되는 수입 알림을 연결한다.
+    /// IncomeReceived를 구독하며 초기 잔액이나 비활성 동안의 과거 수입은 재생하지 않는다.
     /// </summary>
     private void ConnectWallet()
     {
-        _lastBalance = _wallet.Balance;
-        _wallet.BalanceChanged += HandleBalanceChanged;
+        _wallet.IncomeReceived += HandleBalanceChanged;
     }
 
     /// <summary>
-    /// balance의 증가분을 활성 모니터 공통 표시 영역 안에서 코인으로 표시한다.
-    /// 증가분을 int로 변환해 단위별 대기열에 추가하며 감소한 잔액은 연출하지 않는다.
+    /// 지급된 income과 isDoubleReward를 활성 모니터의 코인 생성 대기열에 저장한다.
+    /// 최종 금액을 단위별로 분해하며 두 배 판정 결과를 각 코인의 획득 알림에 보존한다.
     /// </summary>
-    private void HandleBalanceChanged(long balance)
+    private void HandleBalanceChanged(long income, bool isDoubleReward)
     {
-        long income = balance - _lastBalance;
-        _lastBalance = balance;
         if (!CanShowCoins || income <= 0) return;
-        QueueIncome(checked((int)income));
+        QueueIncome(checked((int)income), isDoubleReward);
     }
 
     /// <summary>
-    /// amount를 1000, 100, 50, 10 순서로 분해해 종류와 개수를 생성 대기열에 저장한다.
-    /// 획득량은 10의 배수로 처리하며 지갑 잔액은 변경하지 않는다.
+    /// amount를 1000, 100, 50, 10 순서로 분해해 종류·개수·isDoubleReward를 대기열에 저장한다.
+    /// 획득량은 10의 배수로 처리하며 지급 시 확정한 두 배 판정과 지갑 잔액은 변경하지 않는다.
     /// </summary>
-    private void QueueIncome(int amount)
+    private void QueueIncome(int amount, bool isDoubleReward)
     {
         for (int type = 0; type < _coinAmounts.Length; type++)
         {
             int count = amount / _coinAmounts[type];
             amount %= _coinAmounts[type];
-            if (count > 0) _pendingCoins.Enqueue((type, count));
+            if (count > 0) _pendingCoins.Enqueue((type, count, isDoubleReward));
         }
     }
 
     /// <summary>
     /// deltaTime으로 생성 간격을 계산하고 대기열의 코인을 한 개씩 순서대로 표시한다.
-    /// 생성한 코인의 단위 금액을 CoinSpawned로 전달하며 같은 종류의 남은 개수를 차감한다.
+    /// 생성한 코인의 단위 금액과 저장된 두 배 여부를 CoinSpawned로 전달하며 남은 개수를 차감한다.
     /// </summary>
     private void ProcessSpawnQueue(float deltaTime)
     {
@@ -348,14 +345,15 @@ public sealed class MonitorCoinRain : MonoBehaviour
         if (_spawnTimer > 0f) return;
         if (_pendingCount == 0)
         {
-            (int type, int count) = _pendingCoins.Dequeue();
+            (int type, int count, bool isDoubleReward) = _pendingCoins.Dequeue();
             _pendingType = type;
             _pendingCount = count;
+            _pendingIsDoubleReward = isDoubleReward;
         }
         if (!PlayCoin(_pendingType)) return;
         _pendingCount--;
         _spawnTimer = _spawnInterval;
-        CoinSpawned?.Invoke(_coinAmounts[_pendingType]);
+        CoinSpawned?.Invoke(_coinAmounts[_pendingType], _pendingIsDoubleReward);
     }
 
     /// <summary>
@@ -432,6 +430,7 @@ public sealed class MonitorCoinRain : MonoBehaviour
     {
         _pendingCoins.Clear();
         _pendingCount = 0;
+        _pendingIsDoubleReward = false;
         _spawnTimer = 0f;
         if (_coins == null) return;
         for (int index = 0; index < _coins.Length; index++)

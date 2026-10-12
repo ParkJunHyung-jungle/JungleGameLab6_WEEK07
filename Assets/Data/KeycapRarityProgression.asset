@@ -20,31 +20,238 @@ MonoBehaviour:
       - 0
       - 0
       - 0
-  - _requiredCompletedKeyboards: 4
-    _distribution:
-      _weights:
-      - 50
-      - 50
+      - 0
+      - 0
       - 0
       - 0
   - _requiredCompletedKeyboards: 8
     _distribution:
       _weights:
+      - 85
+      - 15
       - 0
-      - 100
       - 0
       - 0
-  - _requiredCompletedKeyboards: 12
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 15
+    _distribution:
+      _weights:
+      - 65
+      - 35
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 22
+    _distribution:
+      _weights:
+      - 55
+      - 35
+      - 10
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 28
+    _distribution:
+      _weights:
+      - 35
+      - 45
+      - 20
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 35
     _distribution:
       _weights:
       - 0
-      - 50
-      - 50
-      - 2
-  - _requiredCompletedKeyboards: 16
+      - 45
+      - 45
+      - 10
+      - 0
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 40
     _distribution:
       _weights:
+      - 0
+      - 30
+      - 50
+      - 20
+      - 0
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 45
+    _distribution:
+      _weights:
+      - 0
+      - 15
+      - 55
+      - 30
+      - 0
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 50
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 50
+      - 40
+      - 10
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 55
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 35
+      - 45
+      - 20
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 60
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 20
       - 50
       - 30
+      - 0
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 65
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 45
+      - 45
+      - 10
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 70
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 30
+      - 50
+      - 20
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 75
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
       - 15
+      - 55
+      - 30
+      - 0
+      - 0
+  - _requiredCompletedKeyboards: 80
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 45
+      - 45
+      - 10
+      - 0
+  - _requiredCompletedKeyboards: 85
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 30
+      - 50
+      - 20
+      - 0
+  - _requiredCompletedKeyboards: 90
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 15
+      - 55
+      - 30
+      - 0
+  - _requiredCompletedKeyboards: 95
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 50
+      - 50
+      - 0
+  - _requiredCompletedKeyboards: 100
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 40
+      - 55
       - 5
+  - _requiredCompletedKeyboards: 108
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 30
+      - 55
+      - 15
+  - _requiredCompletedKeyboards: 116
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 20
+      - 55
+      - 25
+  - _requiredCompletedKeyboards: 123
+    _distribution:
+      _weights:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 10
+      - 50
+      - 40

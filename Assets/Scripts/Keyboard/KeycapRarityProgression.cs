@@ -13,11 +13,7 @@ namespace KeyboardModeling
         [SerializeField]
         private Stage[] _stages =
         {
-            new Stage(0,  new KeycapRarityDistribution(100f, 0f, 0f, 0f)),
-            new Stage(4,  new KeycapRarityDistribution(85f, 15f, 0f, 0f)),
-            new Stage(8,  new KeycapRarityDistribution(70f, 25f, 5f, 0f)),
-            new Stage(12, new KeycapRarityDistribution(60f, 28f, 10f, 2f)),
-            new Stage(16, new KeycapRarityDistribution(50f, 30f, 15f, 5f))
+            new Stage(0, new KeycapRarityDistribution(100f, 0f, 0f, 0f, 0f, 0f, 0f, 0f))
         };
 
         /// <summary>

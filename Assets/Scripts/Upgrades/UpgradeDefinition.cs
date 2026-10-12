@@ -92,10 +92,10 @@ namespace Game.Upgrades
         [SerializeField]
         private KeycapRarityDistribution[] _rarityDistributions =
         {
-            new KeycapRarityDistribution(90f, 8f, 1.8f, 0.2f),
-            new KeycapRarityDistribution(85f, 10.5f, 3.75f, 0.75f),
-            new KeycapRarityDistribution(80f, 12f, 6f, 2f),
-            new KeycapRarityDistribution(70f, 15f, 10f, 5f)
+            new KeycapRarityDistribution(90f, 8f, 1.8f, 0.2f, 0f, 0f, 0f, 0f),
+            new KeycapRarityDistribution(85f, 10.5f, 3.75f, 0.75f, 0f, 0f, 0f, 0f),
+            new KeycapRarityDistribution(80f, 12f, 6f, 2f, 0f, 0f, 0f, 0f),
+            new KeycapRarityDistribution(70f, 15f, 10f, 5f, 0f, 0f, 0f, 0f)
         };
 
         public UpgradeId Id => _id;

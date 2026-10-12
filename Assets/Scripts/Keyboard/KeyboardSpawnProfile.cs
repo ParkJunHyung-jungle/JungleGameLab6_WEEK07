@@ -40,17 +40,19 @@ namespace KeyboardModeling
             public int MaxHP { get; }
             public long Reward { get; }
             public Material ShellMaterial { get; }
+            public AudioClip PressSound { get; }
+            public AudioClip BreakSound { get; }
 
             /// <summary>
             /// key, rarity, maxHP, reward와 shellMaterial로 키캡 생성 결과를 만든다.
-            /// 유효성을 검사한 뒤 확정된 등급·체력·보상·외피 재질을 저장한다.
+            /// 유효성을 검사한 뒤 확정된 등급·체력·보상·외피 재질과 pressSound·breakSound를 저장한다.
             /// </summary>
             public KeycapData(
                 Key key,
                 KeycapRarity rarity,
                 int maxHP,
                 long reward,
-                Material shellMaterial)
+                Material shellMaterial, AudioClip pressSound = null, AudioClip breakSound = null)
             {
                 if (maxHP <= 0 || reward <= 0 ||
                     !Enum.IsDefined(typeof(KeycapRarity), rarity) || shellMaterial == null)
@@ -63,6 +65,8 @@ namespace KeyboardModeling
                 MaxHP = maxHP;
                 Reward = reward;
                 ShellMaterial = shellMaterial;
+                PressSound = pressSound;
+                BreakSound = breakSound;
             }
         }
     }

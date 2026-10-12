@@ -74,6 +74,12 @@ namespace KeyboardModeling
             [SerializeField] private Material _shellMaterial;
 
 
+            [Header("Audio")]
+            [SerializeField] private AudioClip _pressSound;
+            [SerializeField] private AudioClip _breakSound;
+
+            public AudioClip PressSound => _pressSound;
+            public AudioClip BreakSound => _breakSound;
             public KeycapRarity Rarity => _rarity;
             public float HealthMultiplier => _healthMultiplier;
             public float RewardMultiplier => _rewardMultiplier;

@@ -213,8 +213,7 @@ namespace KeyboardModeling
 
                 if (pressedThisFrame)
                 {
-                    float volumeScale = _keycapHealths[index] != null && _keycapHealths[index].CurrentHP == 0 ? 0.05f : 1f;
-                    _audioSource.PlayOneShot(_pressSound, volumeScale);
+                    PlayPressSound(_keycapHealths[index]);
 
                     KeycapPressed?.Invoke(_bindings[index].Keycap);
                     KeyPressed?.Invoke(_bindings[index].Key);
@@ -252,6 +251,17 @@ namespace KeyboardModeling
         }
 
         /// <summary>
+        /// health에 저장된 재질별 눌림음을 재생하고 미지정이면 키보드 기본 클립을 사용한다.
+        /// 파괴된 키캡은 볼륨을 5%로 낮추며 체력과 입력 상태는 변경하지 않는다.
+        /// </summary>
+        private void PlayPressSound(KeycapHealth health)
+        {
+            AudioClip clip = health != null && health.PressSound != null ? health.PressSound : _pressSound;
+            float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
+            _audioSource.PlayOneShot(clip, volume);
+        }
+
+        /// <summary>
         /// 주먹이 충돌한 keycap을 ManualKeycapHit로 전달한다.
         /// 직접 타격 피드백만 알리며 추가 키 입력이나 피해 요청은 발생시키지 않는다.
         /// </summary>
@@ -266,7 +276,7 @@ namespace KeyboardModeling
         /// </summary>
         public void NotifyAreaKeycapHit(Transform keycap)
         {
-            _audioSource.PlayOneShot(_pressSound);
+            PlayPressSound(keycap.GetComponent<KeycapHealth>());
             AreaKeycapHit?.Invoke(keycap);
         }
 
@@ -276,7 +286,7 @@ namespace KeyboardModeling
         /// </summary>
         public void NotifyAutomaticKeycapHit(Transform keycap)
         {
-            _audioSource.PlayOneShot(_pressSound);
+            PlayPressSound(keycap.GetComponent<KeycapHealth>());
             AutomaticKeycapHit?.Invoke(keycap);
         }
 

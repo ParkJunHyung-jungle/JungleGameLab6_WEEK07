@@ -13,16 +13,18 @@ MonoBehaviour:
   m_Name: LuckyReward
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 7
-  _displayName: '행운 보상'
-  _description: '키캡 파괴 시 받는 재화가 두 배가 될 확률을 높입니다.'
-  _levelCosts: 2c01000000000000d0070000000000001027000000000000409c000000000000f049020000000000
+  _displayName: "\uD589\uC6B4 \uBCF4\uC0C1"
+  _description: "\uD0A4\uCEA1 \uD30C\uAD34 \uC2DC \uBC1B\uB294 \uC7AC\uD654\uAC00
+    \uB450 \uBC30\uAC00 \uB420 \uD655\uB960\uC744 \uB192\uC785\uB2C8\uB2E4."
+  _levelCosts: f401000000000000d0070000000000001027000000000000409c000000000000f049020000000000
+  _boxCapacities: 050000000a0000000f00000014000000190000001e000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000
   _handStageNames:
-  - 손 강화
-  - 주먹 강화
-  - 망치 강화
+  - "\uC190 \uAC15\uD654"
+  - "\uC8FC\uBA39 \uAC15\uD654"
+  - "\uB9DD\uCE58 \uAC15\uD654"
   _handFirstPromotionRadius: 1.5
   _handRadiusPerPromotion: 1
   _fistBaseDamage: 5
@@ -38,8 +40,15 @@ MonoBehaviour:
   - 2
   - 3
   _autoPromotionLevel: 6
-  _autoPromotedName: 자동 범위 공격
+  _autoPromotedName: "\uC790\uB3D9 \uBC94\uC704 \uACF5\uACA9"
   _autoPromotionRadius: 1.5
+  _autoRefillStartLevel: 11
+  _autoRefillName: "\uC790\uB3D9 \uBCF4\uCDA9"
+  _autoRefillDelays:
+  - 8
+  - 6
+  - 4
+  - 2
   _areaRadii:
   - 1.5
   - 2

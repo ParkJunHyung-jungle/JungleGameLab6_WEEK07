@@ -13,21 +13,26 @@ MonoBehaviour:
   m_Name: FeverDuration
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 5
-  _displayName: '피버 지속 시간'
-  _description: '피버의 지속 시간을 늘립니다. 다음 피버부터 적용됩니다.'
-  _levelCosts: 2c01000000000000dc050000000000008813000000000000204e000000000000a08601000000000020a1070000000000
+  _displayName: "\uD53C\uBC84 \uC9C0\uC18D \uC2DC\uAC04"
+  _description: "\uD53C\uBC84\uC758 \uC9C0\uC18D \uC2DC\uAC04\uC744 \uB298\uB9BD\uB2C8\uB2E4.
+    \uB2E4\uC74C \uD53C\uBC84\uBD80\uD130 \uC801\uC6A9\uB429\uB2C8\uB2E4."
+  _levelCosts: 2c01000000000000f401000000000000bc02000000000000b004000000000000a08601000000000020a107000000000020a107000000000020a107000000000020a107000000000020a1070000000000
+  _boxCapacities: 050000000a0000000f00000014000000190000001e000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
   _handPromotionLevels: 060000000b000000
   _handStageNames:
-  - 손 강화
-  - 주먹 강화
-  - 망치 강화
+  - "\uC190 \uAC15\uD654"
+  - "\uC8FC\uBA39 \uAC15\uD654"
+  - "\uB9DD\uCE58 \uAC15\uD654"
   _handFirstPromotionRadius: 1.5
   _handRadiusPerPromotion: 1
   _fistBaseDamage: 5
   _fistDamagePerLevel: 1
   _fistChancePerLevel: 0.06
+  _hammerBaseDamage: 10
+  _hammerDamagePerLevel: 2
+  _hammerChancePerLevel: 0.06
   _damageBonuses: 010000000200000003000000
   _autoAttackDamages: 010000000200000003000000
   _autoAttackSpeeds:
@@ -35,8 +40,15 @@ MonoBehaviour:
   - 2
   - 3
   _autoPromotionLevel: 6
-  _autoPromotedName: 자동 범위 공격
+  _autoPromotedName: "\uC790\uB3D9 \uBC94\uC704 \uACF5\uACA9"
   _autoPromotionRadius: 1.5
+  _autoRefillStartLevel: 11
+  _autoRefillName: "\uC790\uB3D9 \uBCF4\uCDA9"
+  _autoRefillDelays:
+  - 8
+  - 6
+  - 4
+  - 2
   _areaRadii:
   - 1.5
   - 2
@@ -49,6 +61,10 @@ MonoBehaviour:
   - 13
   - 15
   - 17
+  - 19
+  - 21
+  - 23
+  - 25
   _baseFeverDuration: 5
   _feverDurationPerLevel: 2
   _feverDamageMultipliers: []

@@ -13,16 +13,19 @@ MonoBehaviour:
   m_Name: HandPower
   m_EditorClassIdentifier: Assembly-CSharp::Game.Upgrades.UpgradeDefinition
   _id: 8
-  _displayName: '손 강화'
-  _description: '손의 추가 피해를 높이고 승급으로 주먹과 망치의 추가 타격을 해금합니다.'
-  _levelCosts: 2c01000000000000f401000000000000bc02000000000000e803000000000000dc05000000000000d007000000000000a00f0000000000007017000000000000983a000000000000307500000000000060ea000000000000c0d401000000000020bf020000000000b01e040000000000801a060000000000
+  _displayName: "\uC190 \uAC15\uD654"
+  _description: "\uC190\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uB192\uC774\uACE0
+    \uC2B9\uAE09\uC73C\uB85C \uC8FC\uBA39\uACFC \uB9DD\uCE58\uC758 \uCD94\uAC00 \uD0C0\uACA9\uC744
+    \uD574\uAE08\uD569\uB2C8\uB2E4."
+  _levelCosts: c800000000000000900100000000000058020000000000008403000000000000b004000000000000dc05000000000000a00f0000000000007017000000000000983a000000000000307500000000000060ea000000000000c0d401000000000020bf020000000000b01e040000000000801a060000000000
+  _boxCapacities: 050000000a0000000f00000014000000190000001e000000
   _doubleRewardChance: 0.1
   _handDamagePerLevel: 1
-  _handPromotionLevels: 060000000b000000
+  _handPromotionLevels: 050000000b000000
   _handStageNames:
-  - 손 강화
-  - 주먹 강화
-  - 망치 강화
+  - "\uC190 \uAC15\uD654"
+  - "\uC8FC\uBA39 \uAC15\uD654"
+  - "\uB9DD\uCE58 \uAC15\uD654"
   _handFirstPromotionRadius: 1.5
   _handRadiusPerPromotion: 1
   _fistBaseDamage: 5
@@ -38,8 +41,15 @@ MonoBehaviour:
   - 2
   - 3
   _autoPromotionLevel: 6
-  _autoPromotedName: 자동 범위 공격
+  _autoPromotedName: "\uC790\uB3D9 \uBC94\uC704 \uACF5\uACA9"
   _autoPromotionRadius: 1.5
+  _autoRefillStartLevel: 11
+  _autoRefillName: "\uC790\uB3D9 \uBCF4\uCDA9"
+  _autoRefillDelays:
+  - 8
+  - 6
+  - 4
+  - 2
   _areaRadii:
   - 1.5
   - 2

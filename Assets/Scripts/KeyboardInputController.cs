@@ -67,6 +67,12 @@ namespace KeyboardModeling
         [SerializeField] private AudioClip _pressSound;
         private GameSettings _gameSettings;
 
+        [Header("Temporary Standalone Destruction")]
+        [Tooltip("임시 독립 씬에서만 켭니다. 외부 초기화로 전환하면 이 설정과 임시 초기화 영역을 제거할 수 있습니다.")]
+        [SerializeField] private bool _initializeTemporaryDestruction;
+        [SerializeField] private KeyboardDestruction _temporaryDestruction;
+        [SerializeField] private GameObject _temporaryFragmentsPrefab;
+
         public bool InputEnabled
         {
             get => _inputEnabled;
@@ -180,6 +186,41 @@ namespace KeyboardModeling
             }
             _hasFocus = Application.isFocused;
         }
+
+        #region Temporary Standalone Destruction
+
+        void Start()
+        {
+            if (_initializeTemporaryDestruction)
+                InitializeTemporaryDestruction();
+        }
+
+        /// <summary>
+        /// 임시 독립 씬의 파괴 컴포넌트를 키 바인딩과 파편 프리팹으로 초기화한다.
+        /// 임시 Inspector 참조를 사용하며 전체 파괴가 시작되면 이 키보드의 입력을 종료한다.
+        /// </summary>
+        private void InitializeTemporaryDestruction()
+        {
+            _temporaryDestruction.Initialize(
+                GetDestructionKeycaps(),
+                _temporaryFragmentsPrefab,
+                null,
+                HandleTemporaryDestructionStarted,
+                () => { },
+                destruction => { });
+        }
+
+        /// <summary>
+        /// 임시 키보드의 전체 파괴 시작 알림을 받아 눌림 상태를 복원한다.
+        /// 이 컨트롤러의 입력과 프레임 갱신을 비활성화하여 추가 타격을 중단한다.
+        /// </summary>
+        private void HandleTemporaryDestructionStarted()
+        {
+            SetInputEnabled(false);
+            enabled = false;
+        }
+
+        #endregion
 
         void Update()
         {

@@ -39,6 +39,13 @@ public sealed class KeyboardFragmentPresenter : MonoBehaviour
     /// </summary>
     public void PlayFragments(Action onFinished)
     {
+        if (_fragmentsPrefab == null)
+        {
+            onFinished?.Invoke();
+            Destroy(gameObject);
+            return;
+        }
+
         GameObject fragments = Instantiate(_fragmentsPrefab, transform.position, transform.rotation);
         _fragments = fragments;
         fragments.transform.localScale = transform.lossyScale;

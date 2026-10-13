@@ -10,6 +10,7 @@ using KeyboardModeling;
 /// 파괴 라이프사이클 이벤트 발행 및 파편 프레젠터 연출 실행을 전담하는 컴포넌트이다.
 /// </summary>
 [DisallowMultipleComponent]
+[RequireComponent(typeof(KeyboardFragmentPresenter))]
 public sealed class KeyboardDestruction : MonoBehaviour
 {
     [Header("Dependencies")]
@@ -32,6 +33,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
 
     void Awake()
     {
+        EnsureFragmentPresenter();
         _feedbackManager = GetComponent<KeyboardFeedbackManager>() ?? FindAnyObjectByType<KeyboardFeedbackManager>();
         if (_feedbackManager != null)
         {
@@ -86,6 +88,8 @@ public sealed class KeyboardDestruction : MonoBehaviour
             return;
         }
 
+        EnsureFragmentPresenter();
+
         Initialize(
             destructionKeys,
             _fragmentPresenter.FragmentsPrefab,
@@ -113,7 +117,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
         _onFinished = onFinished;
         _configureFistAnimation = configureFistAnimation;
 
-        _fragmentPresenter.Initialize(fragmentsPrefab);
+        EnsureFragmentPresenter().Initialize(fragmentsPrefab);
 
         _remainingKeycaps = 0;
         foreach (KeycapHealth health in _requiredKeycaps)
@@ -131,6 +135,21 @@ public sealed class KeyboardDestruction : MonoBehaviour
         {
             _configureFistAnimation(this);
         }
+    }
+
+    /// <summary>
+    /// 파편 연출 컴포넌트가 없으면 탐색하거나 추가하여 반환한다.
+    /// GetComponent 또는 AddComponent로 _fragmentPresenter를 설정한다.
+    /// 보장된 KeyboardFragmentPresenter 컴포넌트를 반환한다.
+    /// </summary>
+    private KeyboardFragmentPresenter EnsureFragmentPresenter()
+    {
+        if (_fragmentPresenter == null)
+        {
+            _fragmentPresenter = GetComponent<KeyboardFragmentPresenter>() ?? gameObject.AddComponent<KeyboardFragmentPresenter>();
+        }
+
+        return _fragmentPresenter;
     }
 
     /// <summary>
@@ -152,7 +171,14 @@ public sealed class KeyboardDestruction : MonoBehaviour
         _onBreaking?.Invoke();
         Breaking?.Invoke();
 
-        _fragmentPresenter.PlayFragments(HandleFinished);
+        if (_fragmentPresenter != null)
+        {
+            _fragmentPresenter.PlayFragments(HandleFinished);
+        }
+        else
+        {
+            HandleFinished();
+        }
     }
 
     /// <summary>
@@ -173,7 +199,10 @@ public sealed class KeyboardDestruction : MonoBehaviour
     /// </summary>
     public void DisableFragmentCollisions()
     {
-        _fragmentPresenter.DisableFragmentCollisions();
+        if (_fragmentPresenter != null)
+        {
+            _fragmentPresenter.DisableFragmentCollisions();
+        }
     }
 
     /// <summary>

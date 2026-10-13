@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -133,7 +135,7 @@ public sealed class KeycapHealth : MonoBehaviour
 
     /// <summary>
     /// 파괴 효과 설정을 사용해 키캡을 파괴 상태로 변경하고 Renderer와 Collider를 끈다.
-    /// Broken 이벤트로 이 키캡을 한 번 알린 뒤 파괴 효과를 생성하고 지정 수명 후 제거한다.
+    /// Broken 이벤트로 이 키캡을 한 번 알린 뒤 풀링된 파괴 효과를 재생한다.
     /// </summary>
     private void Break()
     {
@@ -141,18 +143,206 @@ public sealed class KeycapHealth : MonoBehaviour
         foreach (Renderer renderer in _renderers) renderer.enabled = false;
         foreach (Collider collider in _colliders) collider.enabled = false;
         Broken?.Invoke(this);
-        GameObject effect = Instantiate(_breakMode == BreakMode.Fragments ? _fragmentsPrefab : _particlesPrefab, transform.position, transform.rotation);
-        effect.transform.localScale = transform.lossyScale;
 
         if (_audioSource != null) _audioSource.PlayOneShot(_breakSound);
 
-        foreach (Rigidbody body in effect.GetComponentsInChildren<Rigidbody>())
+        GameObject prefab = _breakMode == BreakMode.Fragments ? _fragmentsPrefab : _particlesPrefab;
+        KeycapBreakEffectPool.PlayEffect(prefab, transform.position, transform.rotation, transform.lossyScale, _fragmentSpeed, _upwardSpeed, _fragmentSpin, _effectLifetime);
+    }
+}
+
+/// <summary>
+/// 키캡 파괴 효과 오브젝트의 재사용 상태와 초기 물리 트랜스폼을 관리하는 풀링 인스턴스 컴포넌트이다.
+/// </summary>
+[DisallowMultipleComponent]
+public sealed class PooledKeycapEffect : MonoBehaviour
+{
+    private struct BodyData
+    {
+        public Rigidbody Body;
+        public Vector3 InitialLocalPosition;
+        public Quaternion InitialLocalRotation;
+    }
+
+    private BodyData[] _bodies;
+    private Coroutine _returnRoutine;
+    private GameObject _prefabKey;
+
+    public GameObject PrefabKey => _prefabKey;
+
+    /// <summary>
+    /// 프리팹 원본 키와 하위 Rigidbody 목록 및 초기 로컬 좌표를 캐시한다.
+    /// prefabKey를 저장하고 각 파편의 초기 위치와 회전을 기록한다.
+    /// </summary>
+    public void Initialize(GameObject prefabKey)
+    {
+        _prefabKey = prefabKey;
+        Rigidbody[] bodies = GetComponentsInChildren<Rigidbody>(true);
+        _bodies = new BodyData[bodies.Length];
+        for (int index = 0; index < bodies.Length; index++)
         {
-            Vector3 outward = body.worldCenterOfMass - transform.TransformPoint(new Vector3(0f, 0.26f, 0f));
-            Vector3 direction = Vector3.ProjectOnPlane(outward + Random.insideUnitSphere * 0.05f, transform.up).normalized;
-            body.AddForce(direction * _fragmentSpeed + transform.up * _upwardSpeed, ForceMode.VelocityChange);
-            body.AddTorque(Random.insideUnitSphere * _fragmentSpin, ForceMode.VelocityChange);
+            _bodies[index] = new BodyData
+            {
+                Body = bodies[index],
+                InitialLocalPosition = bodies[index].transform.localPosition,
+                InitialLocalRotation = bodies[index].transform.localRotation
+            };
         }
-        Destroy(effect, _effectLifetime);
+    }
+
+    /// <summary>
+    /// 파편들의 물리 속도를 0으로 초기화하고 최초 로컬 위치와 회전으로 복원한다.
+    /// 이전 비산으로 흩어진 파편들을 다음 재생을 위해 제자리로 되돌린다.
+    /// </summary>
+    public void ResetState()
+    {
+        if (_bodies == null) return;
+        for (int index = 0; index < _bodies.Length; index++)
+        {
+            Rigidbody body = _bodies[index].Body;
+            if (body != null)
+            {
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                body.transform.localPosition = _bodies[index].InitialLocalPosition;
+                body.transform.localRotation = _bodies[index].InitialLocalRotation;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 키캡 중심과 위쪽 방향을 기준으로 각 파편에 비산 속도와 회전력을 가한다.
+    /// speed, upwardSpeed, spin 값을 사용하여 Rigidbody에 속도 변화를 적용한다.
+    /// </summary>
+    public void ApplyForces(Vector3 keycapPosition, Vector3 keycapUp, float speed, float upwardSpeed, float spin)
+    {
+        if (_bodies == null) return;
+        Vector3 origin = keycapPosition + keycapUp * 0.26f;
+        for (int index = 0; index < _bodies.Length; index++)
+        {
+            Rigidbody body = _bodies[index].Body;
+            if (body == null) continue;
+            Vector3 outward = body.worldCenterOfMass - origin;
+            Vector3 direction = Vector3.ProjectOnPlane(outward + Random.insideUnitSphere * 0.05f, keycapUp).normalized;
+            body.AddForce(direction * speed + keycapUp * upwardSpeed, ForceMode.VelocityChange);
+            body.AddTorque(Random.insideUnitSphere * spin, ForceMode.VelocityChange);
+        }
+    }
+
+    /// <summary>
+    /// 지정한 수명 후에 효과를 풀로 반환하는 코루틴을 시작한다.
+    /// lifetime 동안 대기한 뒤 ReturnToPool을 호출한다.
+    /// </summary>
+    public void StartLifetime(float lifetime)
+    {
+        if (_returnRoutine != null)
+        {
+            StopCoroutine(_returnRoutine);
+        }
+        _returnRoutine = StartCoroutine(LifetimeRoutine(lifetime));
+    }
+
+    /// <summary>
+    /// Time.deltaTime을 사용하여 지정한 수명 동안 대기한 뒤 풀로 회수한다.
+    /// </summary>
+    private IEnumerator LifetimeRoutine(float lifetime)
+    {
+        float elapsed = 0f;
+        while (elapsed < lifetime)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        _returnRoutine = null;
+        ReturnToPool();
+    }
+
+    /// <summary>
+    /// 실행 중인 수명 코루틴을 중단하고 풀 관리자에게 효과를 반환한다.
+    /// </summary>
+    public void ReturnToPool()
+    {
+        if (_returnRoutine != null)
+        {
+            StopCoroutine(_returnRoutine);
+            _returnRoutine = null;
+        }
+        KeycapBreakEffectPool.ReturnEffect(this);
+    }
+}
+
+/// <summary>
+/// 키캡 파괴 효과를 프리팹 종류별 풀로 관리하고 동시 활성 개수 상한을 제어하는 정적 풀 관리자이다.
+/// </summary>
+public static class KeycapBreakEffectPool
+{
+    private const int MAX_CONCURRENT_EFFECTS = 16;
+    private static readonly Dictionary<GameObject, Stack<PooledKeycapEffect>> _availablePools = new Dictionary<GameObject, Stack<PooledKeycapEffect>>();
+    private static readonly List<PooledKeycapEffect> _activeEffects = new List<PooledKeycapEffect>();
+
+    /// <summary>
+    /// 프리팹 종류별 풀에서 인스턴스를 가져와 지정 위치에 효과를 재생하고 상한을 관리한다.
+    /// prefab, position, rotation, scale, 속도 및 수명 설정을 사용하여 효과를 활성화한다.
+    /// </summary>
+    public static void PlayEffect(GameObject prefab, Vector3 position, Quaternion rotation, Vector3 scale, float speed, float upwardSpeed, float spin, float lifetime)
+    {
+        if (prefab == null) return;
+
+        while (_activeEffects.Count >= MAX_CONCURRENT_EFFECTS && _activeEffects.Count > 0)
+        {
+            PooledKeycapEffect oldest = _activeEffects[0];
+            oldest.ReturnToPool();
+        }
+
+        if (!_availablePools.TryGetValue(prefab, out Stack<PooledKeycapEffect> pool))
+        {
+            pool = new Stack<PooledKeycapEffect>();
+            _availablePools[prefab] = pool;
+        }
+
+        PooledKeycapEffect effect = null;
+        while (pool.Count > 0 && effect == null)
+        {
+            PooledKeycapEffect candidate = pool.Pop();
+            if (candidate != null)
+            {
+                effect = candidate;
+            }
+        }
+
+        if (effect == null)
+        {
+            GameObject instance = UnityEngine.Object.Instantiate(prefab);
+            effect = instance.AddComponent<PooledKeycapEffect>();
+            effect.Initialize(prefab);
+        }
+
+        Transform effectTransform = effect.transform;
+        effectTransform.position = position;
+        effectTransform.rotation = rotation;
+        effectTransform.localScale = scale;
+        effect.ResetState();
+        effect.gameObject.SetActive(true);
+        effect.ApplyForces(position, rotation * Vector3.up, speed, upwardSpeed, spin);
+        effect.StartLifetime(lifetime);
+
+        _activeEffects.Add(effect);
+    }
+
+    /// <summary>
+    /// 사용이 끝난 효과 인스턴스를 비활성화하고 해당 프리팹 대기 풀에 반환한다.
+    /// effect를 활성 목록에서 제거하고 상태를 초기화한 뒤 풀 스택에 보관한다.
+    /// </summary>
+    public static void ReturnEffect(PooledKeycapEffect effect)
+    {
+        if (effect == null) return;
+        _activeEffects.Remove(effect);
+        effect.ResetState();
+        effect.gameObject.SetActive(false);
+
+        if (_availablePools.TryGetValue(effect.PrefabKey, out Stack<PooledKeycapEffect> pool))
+        {
+            pool.Push(effect);
+        }
     }
 }

@@ -52,6 +52,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private float[] _flashEndTimes;
     private KeycapHealth[] _flashHealths;
     private readonly Dictionary<Transform, int> _flashIndices = new Dictionary<Transform, int>();
+    private readonly List<int> _activeFlashIndices = new List<int>();
 
     [Header("Debris")]
     [SerializeField] private GameObject _debrisPrefab;
@@ -74,6 +75,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private float[] _lifetimes;
     private Bounds _keyboardBounds;
     private int _nextDebris;
+    private readonly List<int> _activeDebris = new List<int>();
 
     [Header("Hit Stop")]
     [SerializeField, Range(0.005f, 0.5f)] private float _hitStopDuration = 0.25f;
@@ -103,6 +105,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     [SerializeField] private HammerAnimationSettings _hammerAnimation = new HammerAnimationSettings();
     private List<LineRenderer> _shockwaveRenderers = new List<LineRenderer>();
     private Stack<LineRenderer> _availableShockwaves = new Stack<LineRenderer>();
+    private readonly Stack<ShockwaveBuffer> _availableShockwaveBuffers = new Stack<ShockwaveBuffer>();
 
     public Sprite FistSprite => _fistSprite;
     public Sprite HammerSprite => _hammerSprite;
@@ -566,6 +569,10 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             piece.localScale = Vector3.Scale(_sizes[index], _keyboard.transform.lossyScale);
             _debrisRenderers[index].sharedMaterial = material;
             piece.gameObject.SetActive(true);
+            if (!_activeDebris.Contains(index))
+            {
+                _activeDebris.Add(index);
+            }
         }
     }
 
@@ -586,12 +593,19 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             return;
         }
 
-        float deltaTime = Mathf.Min(Time.unscaledDeltaTime, 0.04f);
-        for (int index = 0; index < _debrisRenderers.Length; index++)
+        if (_activeDebris.Count == 0)
         {
+            return;
+        }
+
+        float deltaTime = Mathf.Min(Time.unscaledDeltaTime, 0.04f);
+        for (int i = _activeDebris.Count - 1; i >= 0; i--)
+        {
+            int index = _activeDebris[i];
             Transform piece = _debrisRenderers[index].transform;
             if (!piece.gameObject.activeSelf)
             {
+                _activeDebris.RemoveAt(i);
                 continue;
             }
 
@@ -599,6 +613,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             if (_ages[index] >= _lifetimes[index])
             {
                 piece.gameObject.SetActive(false);
+                _activeDebris.RemoveAt(i);
                 continue;
             }
 
@@ -641,13 +656,15 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             return;
         }
 
-        foreach (MeshRenderer piece in _debrisRenderers)
+        for (int i = 0; i < _activeDebris.Count; i++)
         {
-            if (piece != null)
+            int index = _activeDebris[i];
+            if (_debrisRenderers[index] != null)
             {
-                piece.gameObject.SetActive(false);
+                _debrisRenderers[index].gameObject.SetActive(false);
             }
         }
+        _activeDebris.Clear();
     }
 
     /// <summary>
@@ -657,6 +674,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private void CacheWhiteFlashTargets()
     {
         _flashIndices.Clear();
+        _activeFlashIndices.Clear();
         KeycapButton[] buttons = _keyboard.GetComponentsInChildren<KeycapButton>(true);
         _flashRenderers = new MeshRenderer[buttons.Length];
         _flashOriginalMaterials = new Material[buttons.Length];
@@ -709,6 +727,10 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
         _flashRenderers[index].sharedMaterial = _whiteFlashMaterial;
         _flashEndTimes[index] = Time.unscaledTime + _whiteFlashDuration;
+        if (!_activeFlashIndices.Contains(index))
+        {
+            _activeFlashIndices.Add(index);
+        }
     }
 
     /// <summary>
@@ -728,8 +750,14 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             return;
         }
 
-        for (int index = 0; index < _flashRenderers.Length; index++)
+        if (_activeFlashIndices.Count == 0)
         {
+            return;
+        }
+
+        for (int i = _activeFlashIndices.Count - 1; i >= 0; i--)
+        {
+            int index = _activeFlashIndices[i];
             if (_flashEndTimes[index] == 0f || Time.unscaledTime < _flashEndTimes[index])
             {
                 continue;
@@ -741,6 +769,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             }
 
             _flashEndTimes[index] = 0f;
+            _activeFlashIndices.RemoveAt(i);
         }
     }
 
@@ -755,13 +784,9 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             return;
         }
 
-        for (int index = 0; index < _flashRenderers.Length; index++)
+        for (int i = 0; i < _activeFlashIndices.Count; i++)
         {
-            if (_flashEndTimes[index] == 0f)
-            {
-                continue;
-            }
-
+            int index = _activeFlashIndices[i];
             if (_flashRenderers[index] != null)
             {
                 _flashRenderers[index].sharedMaterial = _flashOriginalMaterials[index];
@@ -769,6 +794,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
             _flashEndTimes[index] = 0f;
         }
+        _activeFlashIndices.Clear();
     }
 
     /// <summary>
@@ -943,9 +969,11 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         float rippleDuration = Mathf.Max(0.01f, _hammerAnimation.WaveDuration);
         Color color = _hammerAnimation.WaveColor;
 
-        float[] arrivalTimes = new float[keycaps.Length];
-        float[] contributions = new float[keycaps.Length];
-        bool[] hit = new bool[keycaps.Length];
+        ShockwaveBuffer buffer = GetShockwaveBuffer(keycaps.Length);
+        float[] arrivalTimes = buffer.ArrivalTimes;
+        float[] contributions = buffer.Contributions;
+        bool[] hit = buffer.Hit;
+        Vector3[] points = buffer.Points;
         float maxArrival = 0f;
 
         for (int index = 0; index < keycaps.Length; index++)
@@ -960,7 +988,6 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         ring.enabled = _hammerAnimation.ShowWaveRing;
         ring.gameObject.SetActive(true);
 
-        Vector3[] points = new Vector3[SHOCKWAVE_SEGMENTS];
         float elapsed = 0f;
 
         while (elapsed <= duration && (_keyboardDestruction == null || !_keyboardDestruction.IsBroken) && keyboard.InputEnabled && keyboard.isActiveAndEnabled)
@@ -1030,6 +1057,60 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
         ring.gameObject.SetActive(false);
         _availableShockwaves.Push(ring);
+        ReleaseShockwaveBuffer(buffer);
+    }
+
+    /// <summary>
+    /// 충격파 연산에 사용할 캐시된 작업 버퍼를 반환하고 필요한 크기로 준비한다.
+    /// count 크기에 맞추어 도착 시각, 변위 기여도 및 타격 여부 배열을 초기화한다.
+    /// </summary>
+    private ShockwaveBuffer GetShockwaveBuffer(int count)
+    {
+        ShockwaveBuffer buffer = _availableShockwaveBuffers.Count > 0 ? _availableShockwaveBuffers.Pop() : new ShockwaveBuffer();
+        buffer.EnsureCapacity(count);
+        return buffer;
+    }
+
+    /// <summary>
+    /// 사용이 끝난 충격파 작업 버퍼를 대기 스택에 반환하여 다음 충격파에서 재사용한다.
+    /// buffer를 _availableShockwaveBuffers에 보관한다.
+    /// </summary>
+    private void ReleaseShockwaveBuffer(ShockwaveBuffer buffer)
+    {
+        if (buffer != null)
+        {
+            _availableShockwaveBuffers.Push(buffer);
+        }
+    }
+
+    /// <summary>
+    /// 충격파 연산에 필요한 포인트 배열과 키캡 연산 작업 배열을 보관하는 재사용 버퍼이다.
+    /// </summary>
+    private sealed class ShockwaveBuffer
+    {
+        public readonly Vector3[] Points = new Vector3[SHOCKWAVE_SEGMENTS];
+        public float[] ArrivalTimes = System.Array.Empty<float>();
+        public float[] Contributions = System.Array.Empty<float>();
+        public bool[] Hit = System.Array.Empty<bool>();
+
+        /// <summary>
+        /// 작업 배열의 크기가 count 이상이 되도록 보장하고 내용을 초기화한다.
+        /// </summary>
+        public void EnsureCapacity(int count)
+        {
+            if (ArrivalTimes.Length < count)
+            {
+                ArrivalTimes = new float[count];
+                Contributions = new float[count];
+                Hit = new bool[count];
+            }
+            else
+            {
+                System.Array.Clear(ArrivalTimes, 0, count);
+                System.Array.Clear(Contributions, 0, count);
+                System.Array.Clear(Hit, 0, count);
+            }
+        }
     }
 
     /// <summary>

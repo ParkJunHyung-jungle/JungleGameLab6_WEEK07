@@ -5,6 +5,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+using Game.Logging;
 using Game.Session;
 using Game.Settings;
 
@@ -22,6 +23,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private MonitorSettingsButton _quitButton;
     [SerializeField] private MonitorSettingsButton _confirmQuitButton;
     [SerializeField] private MonitorSettingsButton _cancelQuitButton;
+    [SerializeField] private MonitorSettingsButton _openLogFolderButton;
     private bool _isInputEnabled;
     private bool _isQuitting;
     public bool IsOpen { get; private set; }
@@ -45,6 +47,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
         _quitButton.Clicked += RequestQuit;
         _confirmQuitButton.Clicked += ConfirmQuit;
         _cancelQuitButton.Clicked += CancelQuit;
+        _openLogFolderButton.Clicked += OpenLogFolder;
         RefreshValues();
         RefreshCanvasState();
     }
@@ -60,6 +63,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
         _quitButton.Clicked -= RequestQuit;
         _confirmQuitButton.Clicked -= ConfirmQuit;
         _cancelQuitButton.Clicked -= CancelQuit;
+        _openLogFolderButton.Clicked -= OpenLogFolder;
     }
 
     void Update()
@@ -111,6 +115,16 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
     private void Close()
     {
         SetOpen(false);
+    }
+
+    /// <summary>
+    /// 설정 창의 로그 폴더 버튼 요청을 받아 현재 CSV를 반영하고 저장 폴더를 연다.
+    /// 기존 메뉴의 열림과 입력 허용 상태를 확인하며 게임 판정과 설정 값은 변경하지 않는다.
+    /// </summary>
+    private void OpenLogFolder()
+    {
+        if (!IsOpen || !_isInputEnabled || _isQuitting || IsQuitConfirmationOpen) return;
+        KeyboardInputLogger.OpenLogFolder();
     }
 
     /// <summary>

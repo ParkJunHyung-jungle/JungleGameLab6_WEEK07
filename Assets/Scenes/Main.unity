@@ -1130,6 +1130,50 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3814156318923512344, guid: 652c438e3b7c20e4cbcfdcaea1e88c60, type: 3}
   m_PrefabInstance: {fileID: 129514595}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &218929196
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 218929198}
+  - component: {fileID: 218929197}
+  m_Layer: 0
+  m_Name: PlaytestLogger
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &218929197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 218929196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cfd7aef454f42178cb9f5e6cad47a71, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Logging.KeyboardInputLogger
+--- !u!4 &218929198
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 218929196}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &240308793
 GameObject:
   m_ObjectHideFlags: 0
@@ -5007,3 +5051,4 @@ SceneRoots:
   - {fileID: 111551562}
   - {fileID: 69554666}
   - {fileID: 952052075}
+  - {fileID: 218929198}

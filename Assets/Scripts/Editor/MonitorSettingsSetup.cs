@@ -26,6 +26,7 @@ public static class MonitorSettingsSetup
             RectTransform desktop = (RectTransform)monitor.transform.Find("DesktopCanvas");
             MonitorSettingsAppView view = desktop.GetComponentInChildren<MonitorSettingsAppView>(true);
             if (view == null) view = CreateApp(desktop);
+            ConfigureLogFolderButton(desktop, view);
             SetReference(view, "_gameSession", monitor.GetComponent<GameSession>());
             SetReference(monitor, "_settingsAppView", view);
             PrefabUtility.SaveAsPrefabAsset(prefab, PREFAB_PATH);
@@ -34,6 +35,24 @@ public static class MonitorSettingsSetup
         {
             PrefabUtility.UnloadPrefabContents(prefab);
         }
+    }
+
+    /// <summary>
+    /// desktop의 기존 설정 창에 로그 폴더 버튼을 추가하고 view의 참조를 연결한다.
+    /// 기존 버튼이 있으면 재사용하며 종료 버튼과 나란히 배치하여 중복 생성을 방지한다.
+    /// </summary>
+    private static void ConfigureLogFolderButton(RectTransform desktop, MonitorSettingsAppView view)
+    {
+        RectTransform window = (RectTransform)desktop.Find("SettingsPopup/Window");
+        Font font = desktop.Find("ShopApp/Name").GetComponent<Text>().font;
+        RectTransform quit = (RectTransform)window.Find("Quit");
+        quit.anchoredPosition = new Vector2(146f, -184f);
+        Transform existing = window.Find("OpenLogFolder");
+        MonitorSettingsButton button = existing != null
+            ? existing.GetComponent<MonitorSettingsButton>()
+            : CreateButton("OpenLogFolder", window, new Vector2(252f, 58f), new Vector2(-146f, -184f),
+                "로그 폴더 열기", font, window.GetComponent<CanvasGroup>(), false);
+        SetReference(view, "_openLogFolderButton", button);
     }
 
     /// <summary>

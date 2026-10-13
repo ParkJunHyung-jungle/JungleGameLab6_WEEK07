@@ -186,9 +186,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 27118942}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c43f93a45b41b294fb37e738db343bfe, type: 3}
+  m_Script: {fileID: 11500000, guid: b8d873bc434c44c384736eca6bb3be34, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardInteractionController
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardWorldController
   _camera: {fileID: 330585545}
   _fixedCam: {fileID: 1022828482}
   _referenceKeyboard: {fileID: 2000000002}

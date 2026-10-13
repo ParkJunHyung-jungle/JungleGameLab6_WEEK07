@@ -19,10 +19,9 @@ using UnityEditor;
 #endif
 
 [RequireComponent(typeof(BoxCollider), typeof(BoxPickupController))]
-public sealed class KeyboardInteractionController : MonoBehaviour
+public class KeyboardInteractionController : MonoBehaviour
 {
     private const int SPAWN_REGION_COUNT = 3;
-    private const int REGION_REFILL_THROW_COUNT = 3;
     private const float FEVER_REFILL_RETRY_INTERVAL = 0.25f;
 
     public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake }
@@ -69,14 +68,14 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private Vector3 _pickupPosition;
     private Quaternion _pickupRotation;
     private bool _canPlaceHeldKeyboard;
-    private readonly Dictionary<Rigidbody, KeyboardState> _keyboards = new Dictionary<Rigidbody, KeyboardState>();
-    private readonly HashSet<KeyboardState> _reservedAutomaticKeyboards = new HashSet<KeyboardState>();
+    private KeyboardHeldMotion _heldMotion;
+    private readonly KeyboardWorldRegistry _world = new KeyboardWorldRegistry();
+    private KeyboardWorldTargeting _targeting;
     public bool IsHoldingKeyboard => _heldKeyboard != null;
     public int SpawnedKeyboardCount { get; private set; }
 
     [Header("Storage Box")]
     private BoxPickupController _boxPickupController;
-    private readonly HashSet<KeyboardState> _storedKeyboards = new HashSet<KeyboardState>();
     private readonly HashSet<KeyboardStorageBox> _observedBoxes = new HashSet<KeyboardStorageBox>();
     private int _guideCount;
     private int _guideCapacity;
@@ -113,14 +112,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private BackgroundKeyboardThrowVisit _regionThrowVisit;
     [SerializeField] private KeyboardCompletionProgress _completionProgress;
     private Transform _spawnRoot;
-    private List<GameObject>[] _regionKeyboards;
-    private int[] _pendingRegionThrows;
-    private int[] _remainingRegionKeyboards;
-    private bool[] _spawnRegionStarted;
-    private int _activeSpawnRegion = -1;
-    public int ActiveSpawnRegion => _activeSpawnRegion;
-    private bool[] _regionWasPopulated;
-    private bool[] _regionRefillTriggered;
+    private readonly KeyboardRegionState _regionState = new KeyboardRegionState();
+    public int ActiveSpawnRegion => _regionState.ActiveRegion;
 
     [Header("Fallen Keyboard Return")]
     [SerializeField] private bool _returnFallenKeyboards;
@@ -141,7 +134,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private GameSession _gameSession;
     [SerializeField] private KeyboardRewardController _rewardController;
     [SerializeField] private KeycapRaritySettings _raritySettings;
-    private readonly System.Random _qualityRandom = new System.Random();
+    private KeyboardPlayableFactory _playableFactory;
     private bool _isPlacingKeyboard;
 
     [Header("Keyboard destruction")]
@@ -192,20 +185,13 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private KeyboardAutomaticStation _viewingAutomaticStation;
 
 
-    void Awake()
+    protected virtual void Awake()
     {
         _boxPickupController = GetComponent<BoxPickupController>();
         if (_boxPickupController == null)
             _boxPickupController = gameObject.AddComponent<BoxPickupController>();
         _boxPickupController.Initialize(_camera);
-        _regionKeyboards = new List<GameObject>[SPAWN_REGION_COUNT];
-        _pendingRegionThrows = new int[SPAWN_REGION_COUNT];
-        _remainingRegionKeyboards = new int[SPAWN_REGION_COUNT];
-        _spawnRegionStarted = new bool[SPAWN_REGION_COUNT];
-        _regionWasPopulated = new bool[SPAWN_REGION_COUNT];
-        _regionRefillTriggered = new bool[SPAWN_REGION_COUNT];
-        for (int index = 0; index < SPAWN_REGION_COUNT; index++)
-            _regionKeyboards[index] = new List<GameObject>();
+        _targeting = new KeyboardWorldTargeting(_camera, _world);
 #if UNITY_EDITOR
         if (_destructionFistSprite == null)
             _destructionFistSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resource/Sprites/Fist.png");
@@ -220,10 +206,13 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _rewardController = FindAnyObjectByType<KeyboardRewardController>();
         _controller = FindAnyObjectByType<MiniGameController>();
         _feverController = FindAnyObjectByType<FeverController>();
+        _playableFactory = new KeyboardPlayableFactory(this, _world, _inGameKeyBoardPrefab,
+            _keyboardFragmentsPrefab, _gameSession, _raritySettings, _rewardController);
         _padPosition = _referenceKeyboard.transform.position;
         _padRotation = _referenceKeyboard.transform.rotation;
         _keyboardBounds = CalculateKeyboardBounds(_referenceKeyboard.transform);
         _padCollider = GetComponent<BoxCollider>();
+        _heldMotion = new KeyboardHeldMotion(_camera);
 
         _padCollider.isTrigger = true;
         _fixedCam.Priority = 0;
@@ -231,7 +220,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         Cursor.visible = false;
     }
 
-    void Start()
+    protected virtual void Start()
     {
         //_placedKeyboard = RegisterKeyboard(_referenceKeyboard.GetComponent<KeyboardInputController>());
         _placedKeyboard = null;
@@ -244,7 +233,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         SpawnSurroundingKeyboards();
     }
 
-    void Update()
+    protected virtual void Update()
     {
         RefreshSpawnRegions();
         if (!Application.isFocused) return;
@@ -301,35 +290,24 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         HandleWorldInteraction();
     }
 
-    void FixedUpdate()
+    protected virtual void FixedUpdate()
     {
         RequestFallenKeyboardReturns();
         if (_heldKeyboard == null) return;
-
-        Rigidbody body = _heldKeyboard.Body;
-        Quaternion rotation = _camera.transform.rotation * Quaternion.Euler(_holdEulerAngles);
-        Vector3 center = _camera.transform.position + _camera.transform.forward * _holdDistance;
-        Vector3 position = center - rotation * Vector3.Scale(_heldKeyboard.Collider.center, body.transform.lossyScale);
-        float amount = 1f - Mathf.Exp(-_followSpeed * Time.fixedDeltaTime);
-
-        Vector3 nextPosition = Vector3.Lerp(body.position, position, amount);
-        Quaternion nextRotation = Quaternion.Slerp(body.rotation, rotation, amount);
-        ConstrainHeldKeyboardPose(_heldKeyboard, ref nextPosition, ref nextRotation);
-
-        body.MovePosition(nextPosition);
-        body.MoveRotation(nextRotation);
+        _heldMotion.Move(_heldKeyboard, _holdDistance, _followSpeed, _holdEulerAngles,
+            _heldKeyboardBlockLayers, _heldKeyboardWallGap);
     }
 
-    void LateUpdate()
+    protected virtual void LateUpdate()
     {
         RefreshGuideState();
     }
 
     //void OnTriggerEnter(Collider other) { TryPlaceKeyboard(other); }
-    void OnTriggerStay(Collider other) { TryPlaceKeyboard(other); }
-    void OnTriggerExit(Collider other) { if (_heldKeyboard != null && other.attachedRigidbody == _heldKeyboard.Body) _canPlaceHeldKeyboard = true; }
+    protected virtual void OnTriggerStay(Collider other) { TryPlaceKeyboard(other); }
+    protected virtual void OnTriggerExit(Collider other) { if (_heldKeyboard != null && other.attachedRigidbody == _heldKeyboard.Body) _canPlaceHeldKeyboard = true; }
 
-    void OnEnable()
+    protected virtual void OnEnable()
     {
         foreach (KeyboardStorageBox box in _observedBoxes)
             if (box != null) box.KeyboardReleased += ReleaseBoxKeyboard;
@@ -345,7 +323,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         }
     }
 
-    void OnDisable()
+    protected virtual void OnDisable()
     {
         CancelFeverSupply();
         if (_boxPickupController.HeldBox != null) _boxPickupController.DropBox();
@@ -379,39 +357,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public KeyboardState RegisterKeyboard(GameObject instance, bool isPlayable = false, int regionIndex = -1)
     {
-        KeyboardInputController keyboard = instance.GetComponent<KeyboardInputController>();
-        if (keyboard != null)
-        {
-            keyboard.SetInputEnabled(false);
-            keyboard.enabled = false;
-        }
-        Collider[] colliders = instance.GetComponentsInChildren<Collider>();
-        bool[] colliderEnabled = new bool[colliders.Length];
-        for (int index = 0; index < colliders.Length; index++) { colliderEnabled[index] = colliders[index].enabled; colliders[index].enabled = false; }
-        Rigidbody body = instance.GetComponent<Rigidbody>();
-        if (body == null) body = instance.AddComponent<Rigidbody>();
-        BoxCollider collider = instance.GetComponent<BoxCollider>();
-        if (collider == null) collider = instance.AddComponent<BoxCollider>();
         Bounds pickupBounds = isPlayable ? _keyboardBounds : CalculateKeyboardBounds(instance.transform);
-        collider.center = pickupBounds.center;
-        collider.size = pickupBounds.size;
-        collider.isTrigger = false;
-        collider.enabled = true;
-        body.isKinematic = false;
-        body.useGravity = true;
-        body.interpolation = RigidbodyInterpolation.Interpolate;
-        KeyboardState state = new KeyboardState(instance, keyboard, body, collider, colliders, colliderEnabled);
-        _keyboards.Add(body, state);
+        KeyboardState state = _world.Register(instance, pickupBounds);
         if (regionIndex >= 0 && regionIndex < SPAWN_REGION_COUNT)
         {
             state.SetSpawnRegionIndex(regionIndex);
-            _remainingRegionKeyboards[regionIndex]++;
-            _regionKeyboards[regionIndex].Add(instance);
-            _regionWasPopulated[regionIndex] = true;
-            if (_pendingRegionThrows[regionIndex] > 0) _pendingRegionThrows[regionIndex]--;
+            _regionState.Register(regionIndex);
         }
         if (isPlayable)
         {
+            KeyboardInputController keyboard = state.Keyboard;
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
             if (_fistImpulseSource != null) destruction.FistImpact += HandleFistImpact;
             destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
@@ -448,7 +403,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void HandleKeyboardBreaking(KeyboardState state)
     {
         SetKeyboardInput(state, false);
-        _keyboards.Remove(state.Body);
+        _world.Remove(state.Body);
 
         if (_heldKeyboard == state)
         {
@@ -507,11 +462,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private void NotifyKeyboardCompleted(KeyboardState state)
     {
-        if (state.SpawnRegionIndex >= 0)
-            _remainingRegionKeyboards[state.SpawnRegionIndex] = Mathf.Max(0, _remainingRegionKeyboards[state.SpawnRegionIndex] - 1);
+        _regionState.Complete(state.SpawnRegionIndex);
         KeyboardCompleted?.Invoke(state);
-        if (state.SpawnRegionIndex == 2 && _activeSpawnRegion == 2
-            && _remainingRegionKeyboards[2] == 0 && _pendingRegionThrows[2] == 0)
+        if (_regionState.IsFinalRegionComplete(state.SpawnRegionIndex))
             FinalRegionCompleted?.Invoke();
     }
 
@@ -586,7 +539,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private bool TryPlaceFeverKeyboard(KeyboardState source)
     {
         if (!_feverSupplyPending || !IsSmashMode || _placedKeyboard != null || _isPlacingKeyboard
-            || !_reservedAutomaticKeyboards.Contains(source)) return false;
+            || !_world.IsReserved(source)) return false;
 
         _isPlacingKeyboard = true;
         KeyboardState target;
@@ -614,9 +567,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         KeyboardProtectionCover cover = source.Root.GetComponentInChildren<KeyboardProtectionCover>();
         if (cover != null) cover.RemoveFrom(target.Root.transform);
 
-        _keyboards.Remove(source.Body);
-        foreach (List<GameObject> region in _regionKeyboards) region.Remove(source.Root);
-        _reservedAutomaticKeyboards.Remove(source);
+        _world.Remove(source.Body);
+        _world.Unreserve(source);
         if (lastDroped == source.Collider.gameObject) lastDroped = null;
         source.Root.SetActive(false);
         Destroy(source.Root);
@@ -658,7 +610,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         ReleaseAutomaticKeyboard(_feverReservedKeyboard, _feverSourcePosition, _feverSourceRotation);
         if (_feverSourceBox != null && _feverReservedKeyboard.Root != null
             && _feverSourceBox.TryStoreKeyboard(_feverReservedKeyboard))
-            _storedKeyboards.Add(_feverReservedKeyboard);
+            _world.Store(_feverReservedKeyboard);
         _feverReservedKeyboard = null;
         _feverSourceBox = null;
     }
@@ -683,8 +635,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         }
         if (nearest == null || !nearest.TryTakeKeyboard(out reserved)) return false;
         _feverSourceBox = nearest;
-        _storedKeyboards.Remove(reserved);
-        _reservedAutomaticKeyboards.Add(reserved);
+        _world.Unstore(reserved);
+        _world.Reserve(reserved);
         reserved.AllowPlacementRetry();
         reserved.Body.isKinematic = true;
         reserved.Body.useGravity = false;
@@ -704,7 +656,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         KeyboardState source = RegisterKeyboard(sourceObject);
         _openingKeyboard = CreatePlayableKeyboard(source);
         _placedKeyboard = _openingKeyboard;
-        _keyboards.Remove(source.Body);
+        _world.Remove(source.Body);
         sourceObject.SetActive(false);
         Destroy(sourceObject);
         Rigidbody body = _placedKeyboard.Body;
@@ -742,9 +694,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private void ActivateSpawnRegion(int regionIndex)
     {
-        if (_spawnRegionStarted[regionIndex]) return;
-        _spawnRegionStarted[regionIndex] = true;
-        _activeSpawnRegion = regionIndex;
+        if (!_regionState.TryActivate(regionIndex)) return;
         switch (regionIndex)
         {
             case 0: SpawnKeyboards(_firstRegion, _firstRegionCount, "FirstRegion", 0, _firstRegionKeyboardPrefab); break;
@@ -760,7 +710,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public void EnterSpawnRegion(int regionIndex, Transform nextDoor, Vector3 offset)
     {
-        if (regionIndex < 0 || regionIndex >= SPAWN_REGION_COUNT || _spawnRegionStarted[regionIndex]) return;
+        if (regionIndex < 0 || regionIndex >= SPAWN_REGION_COUNT || _regionState.IsStarted(regionIndex)) return;
         _regionThrowVisit.RelocateForRegion(offset, regionIndex);
         _completionProgress.BeginRegion(nextDoor);
         ActivateSpawnRegion(regionIndex);
@@ -782,7 +732,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public int GetKeyboardSpawnRegionIndex(Rigidbody body)
     {
-        return _keyboards.TryGetValue(body, out KeyboardState state) ? state.SpawnRegionIndex : -1;
+        return _world.TryGet(body, out KeyboardState state) ? state.SpawnRegionIndex : -1;
     }
 
     /// <summary>
@@ -791,7 +741,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public KeyboardState GetRegisteredKeyboard(Rigidbody body)
     {
-        return _keyboards[body];
+        return _world.Get(body);
     }
 
     /// <summary>
@@ -801,10 +751,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public void DiscardTemporaryKeyboard(GameObject root)
     {
         Rigidbody body = root.GetComponent<Rigidbody>();
-        if (!_keyboards.TryGetValue(body, out KeyboardState state)) return;
-        if (state == _heldKeyboard || state == _placedKeyboard || _storedKeyboards.Contains(state)
-            || _reservedAutomaticKeyboards.Contains(state)) return;
-        _keyboards.Remove(body);
+        if (!_world.TryGet(body, out KeyboardState state)) return;
+        if (state == _heldKeyboard || state == _placedKeyboard || _world.IsStored(state)
+            || _world.IsReserved(state)) return;
+        _world.Remove(body);
         root.SetActive(false);
         Destroy(root);
     }
@@ -840,18 +790,13 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (_regionThrowVisit == null) return;
         for (int index = 0; index < SPAWN_REGION_COUNT; index++)
         {
-            _regionKeyboards[index].RemoveAll(keyboard => keyboard == null);
-            if (_completionProgress != null && _completionProgress.RewardsRequested) continue;
-            if (_regionRefillTriggered[index]) continue;
-            if (_spawnRegionsOnEntry && index != _activeSpawnRegion) continue;
-            if (_remainingRegionKeyboards[index] > 0 || !_regionWasPopulated[index] || _pendingRegionThrows[index] > 0) continue;
-            _regionRefillTriggered[index] = true;
-            _pendingRegionThrows[index] = REGION_REFILL_THROW_COUNT;
-            _regionWasPopulated[index] = false;
+            int throwCount = _regionState.TryBeginRefill(index,
+                _completionProgress != null && _completionProgress.RewardsRequested, _spawnRegionsOnEntry);
+            if (throwCount == 0) continue;
             if (_completionProgress != null)
                 _completionProgress.RequestRegionRewards(index);
             else
-                _regionThrowVisit.RequestThrows(index, REGION_REFILL_THROW_COUNT);
+                _regionThrowVisit.RequestThrows(index, throwCount);
         }
     }
 
@@ -879,10 +824,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void RequestFallenKeyboardReturns()
     {
         if (!_returnFallenKeyboards || _regionThrowVisit == null || !_regionThrowVisit.isActiveAndEnabled) return;
-        foreach (KeyboardState state in _keyboards.Values)
+        foreach (KeyboardState state in _world.Keyboards)
         {
             Rigidbody body = state.Body;
-            if (body == null || !state.Root.activeInHierarchy || state == _heldKeyboard || state == _placedKeyboard || _storedKeyboards.Contains(state) || body.isKinematic) continue;
+            if (body == null || !state.Root.activeInHierarchy || state == _heldKeyboard || state == _placedKeyboard || _world.IsStored(state) || body.isKinematic) continue;
             bool belowHeight = body.position.y <= _fallReturnHeight;
             bool outsideArea = IsOutsideKeyboardReturnArea(body.worldCenterOfMass);
             if (!belowHeight && !outsideArea) continue;
@@ -977,17 +922,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private bool TryGetLookedAtKeyboard(out KeyboardState state)
     {
-        state = null;
-        if (!TryGetInteractionHit(out RaycastHit hit))
-            return false;
-
-        KeyboardAutomaticStation station = hit.collider.GetComponentInParent<KeyboardAutomaticStation>();
-        if (station != null)
-            return false;
-
-        return hit.rigidbody != null && _keyboards.TryGetValue(hit.rigidbody, out state)
-            && !_storedKeyboards.Contains(state) && !_reservedAutomaticKeyboards.Contains(state)
-            && state.Root.activeInHierarchy && state.Collider.enabled;
+        return _targeting.TryGetKeyboard(_rayDistance, _pickupLayers,
+            _boxPickupController.HeldBox, _heldKeyboard, out state);
     }
 
     /// <summary>카메라 중앙 Ray의 첫 충돌이 등록된 키보드이면 집고, 교환에 사용할 원래 위치 및 회전을 저장한다.</summary>
@@ -1005,45 +941,6 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 들고 있는 키보드의 목표 자세가 지정된 벽을 통과하지 않도록 제한한다.
-    /// state의 BoxCollider와 position, rotation을 사용하며 필요한 경우 두 목표 값을 벽 앞의 자세로 변경한다.
-    /// </summary>
-    private void ConstrainHeldKeyboardPose(KeyboardState state, ref Vector3 position, ref Quaternion rotation)
-    {
-        Rigidbody body = state.Body;
-        BoxCollider collider = state.Collider;
-        Vector3 scale = body.transform.lossyScale;
-        Vector3 scaledCenter = Vector3.Scale(collider.center, scale);
-        Vector3 halfExtents = Vector3.Scale(collider.size, new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z))) * 0.5f;
-
-        Vector3 currentCenter = body.position + body.rotation * scaledCenter;
-        Vector3 targetCenter = position + rotation * scaledCenter;
-        Vector3 movement = targetCenter - currentCenter;
-        float distance = movement.magnitude;
-
-        if (distance > 0.0001f && Physics.BoxCast(currentCenter, halfExtents, movement / distance, out RaycastHit hit, body.rotation, distance, _heldKeyboardBlockLayers, QueryTriggerInteraction.Ignore))
-        {
-            Vector3 stoppedCenter = currentCenter + movement / distance * Mathf.Max(0f, hit.distance - _heldKeyboardWallGap);
-            position = stoppedCenter - rotation * scaledCenter;
-        }
-
-        targetCenter = position + rotation * scaledCenter;
-        if (!Physics.CheckBox(targetCenter, halfExtents, rotation, _heldKeyboardBlockLayers, QueryTriggerInteraction.Ignore))
-            return;
-
-        Quaternion previousRotation = body.rotation;
-        if (!Physics.CheckBox(targetCenter, halfExtents, previousRotation, _heldKeyboardBlockLayers, QueryTriggerInteraction.Ignore))
-        {
-            position = targetCenter - previousRotation * scaledCenter;
-            rotation = previousRotation;
-            return;
-        }
-
-        position = body.position;
-        rotation = previousRotation;
-    }
-
-    /// <summary>
     /// state를 손에 든 키보드로 지정하고 위치, 물리와 패드 배치 가능 상태를 갱신한다.
     /// 바닥 집기와 상자 꺼내기에 동일한 잡기 설정을 적용한다.
     /// </summary>
@@ -1053,10 +950,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         state.AllowPlacementRetry();
         _pickupPosition = state.Body.position;
         _pickupRotation = state.Body.rotation;
-        if (!state.Body.isKinematic) { state.Body.linearVelocity = Vector3.zero; state.Body.angularVelocity = Vector3.zero; }
-        state.Body.isKinematic = true;
-        state.Body.useGravity = false;
-        _canPlaceHeldKeyboard = !Physics.ComputePenetration(state.Collider, state.Body.position, state.Body.rotation, _padCollider, _padCollider.transform.position, _padCollider.transform.rotation, out _, out _);
+        _canPlaceHeldKeyboard = _heldMotion.BeginHold(state, _padCollider);
         if (_placedKeyboard == state)
         {
             _placedKeyboard = null;
@@ -1117,35 +1011,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private bool TryGetInteractionHit(out RaycastHit hit)
     {
-        hit = default;
-        float closest = float.PositiveInfinity;
-        Ray ray = _camera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-        foreach (RaycastHit candidate in Physics.RaycastAll(ray, _rayDistance, _pickupLayers, QueryTriggerInteraction.Collide))
-        {
-            KeyboardStorageBox box = candidate.collider.GetComponentInParent<KeyboardStorageBox>();
-            if (box != null && box == _boxPickupController.HeldBox) continue;
-            if (candidate.collider is CharacterController && candidate.collider.GetComponent<PlayerMovement>() != null) continue;
-            if (candidate.collider.isTrigger && (box == null || !box.IsTopInteraction(candidate.collider)
-                || Vector3.Dot(candidate.normal, box.transform.up) < 0.5f)) continue;
-            if (candidate.distance >= closest) continue;
-            closest = candidate.distance;
-            hit = candidate;
-        }
-        foreach (KeyboardState keyboard in _keyboards.Values)
-        {
-            if (!keyboard.Root.activeInHierarchy || !keyboard.Collider.enabled || _storedKeyboards.Contains(keyboard)
-                || _reservedAutomaticKeyboards.Contains(keyboard) || keyboard == _heldKeyboard) continue;
-            if ((_pickupLayers.value & (1 << keyboard.Root.layer)) == 0) continue;
-            if ((keyboard.Collider.ClosestPoint(ray.origin) - ray.origin).sqrMagnitude > 0.000001f) continue;
-            float distance = keyboard.Collider.bounds.size.magnitude + 1f;
-            Ray reverse = new Ray(ray.origin + ray.direction * distance, -ray.direction);
-            if (!keyboard.Collider.Raycast(reverse, out RaycastHit insideHit, distance)) continue;
-            insideHit.distance = 0f;
-            hit = insideHit;
-            closest = 0f;
-            break;
-        }
-        return closest < float.PositiveInfinity;
+        return _targeting.TryGetHit(_rayDistance, _pickupLayers,
+            _boxPickupController.HeldBox, _heldKeyboard, out hit);
     }
 
     /// <summary>
@@ -1174,7 +1041,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (!TryGetStorageKeyboard(out KeyboardState keyboard)) return false;
         if (_boxPickupController.HeldBox.TryStoreKeyboard(keyboard))
         {
-            _storedKeyboards.Add(keyboard);
+            _world.Store(keyboard);
             if (lastDroped == keyboard.Collider.gameObject) lastDroped = null;
         }
         return true;
@@ -1187,7 +1054,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private bool TryTakeKeyboardFromBox(KeyboardStorageBox box)
     {
         if (!box.TryTakeKeyboard(out KeyboardState keyboard)) return false;
-        _storedKeyboards.Remove(keyboard);
+        _world.Unstore(keyboard);
         BeginHoldKeyboard(keyboard);
         Quaternion rotation = _camera.transform.rotation * Quaternion.Euler(_holdEulerAngles);
         keyboard.Body.rotation = rotation;
@@ -1202,7 +1069,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private void ReleaseBoxKeyboard(KeyboardState state)
     {
-        _storedKeyboards.Remove(state);
+        _world.Unstore(state);
     }
 
     private GameObject lastDroped;
@@ -1218,7 +1085,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
 
-        if (other.attachedRigidbody == null || !_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _storedKeyboards.Contains(source) || _reservedAutomaticKeyboards.Contains(source))
+        if (other.attachedRigidbody == null || !_world.TryGet(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _world.IsStored(source) || _world.IsReserved(source))
         {
             return;
         }
@@ -1228,8 +1095,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         {
             target = CreatePlayableKeyboard(source, false);
             station.AcceptKeyboard(target.Keyboard, () => NotifyKeyboardCompleted(target));
-            _keyboards.Remove(target.Body);
-            _keyboards.Remove(source.Body);
+            _world.Remove(target.Body);
+            _world.Remove(source.Body);
             source.Collider.enabled = false;
             lastDroped = null;
             _heldKeyboard = null;
@@ -1239,7 +1106,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         {
             if (target != null && !station.HasKeyboard)
             {
-                _keyboards.Remove(target.Body);
+                _world.Remove(target.Body);
                 Destroy(target.Keyboard.gameObject);
             }
             source.MarkPlacementFailed();
@@ -1275,42 +1142,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     {
         reserved = null;
         if (_isPlacingKeyboard) return false;
-
-        float closestDistance = float.PositiveInfinity;
-
-        foreach (KeyboardState state in _keyboards.Values)
-        {
-            if (state.Root == null || !state.Root.activeInHierarchy ||
-                state.Keyboard != null ||
-                state == _heldKeyboard || state == _placedKeyboard ||
-                state.PlacementFailed || _storedKeyboards.Contains(state) ||
-                _reservedAutomaticKeyboards.Contains(state) ||
-                !state.Collider.enabled ||
-                state.Body.isKinematic || !state.Body.useGravity ||
-                state.Body.position.y <= _fallReturnHeight ||
-                state.Body.linearVelocity.sqrMagnitude > 1f)
-            {
-                continue;
-            }
-
-            float distance = (state.Body.position - placementPosition).sqrMagnitude;
-            if (distance >= closestDistance)
-                continue;
-
-            closestDistance = distance;
-            reserved = state;
-        }
-
-        if (reserved == null)
-            return false;
-
-        _reservedAutomaticKeyboards.Add(reserved);
-        reserved.Body.linearVelocity = Vector3.zero;
-        reserved.Body.angularVelocity = Vector3.zero;
-        reserved.Body.isKinematic = true;
-        reserved.Body.useGravity = false;
-        reserved.Collider.enabled = false;
-        return true;
+        return _world.TryReserveNearest(placementPosition, _heldKeyboard, _placedKeyboard,
+            _fallReturnHeight, out reserved);
     }
 
     /// <summary>
@@ -1322,19 +1155,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         Vector3 originalPosition,
         Quaternion originalRotation)
     {
-        if (source == null || !_reservedAutomaticKeyboards.Remove(source) ||
-            source.Root == null || source.Body == null || source.Collider == null)
-        {
-            return;
-        }
-
-        source.Body.position = originalPosition;
-        source.Body.rotation = originalRotation;
-        source.Body.linearVelocity = Vector3.zero;
-        source.Body.angularVelocity = Vector3.zero;
-        source.Body.isKinematic = false;
-        source.Body.useGravity = true;
-        source.Collider.enabled = true;
+        _world.ReleaseReserved(source, originalPosition, originalRotation);
     }
 
     /// <summary>
@@ -1343,7 +1164,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     public bool TryPlaceReservedAutomaticKeyboard(KeyboardState source, KeyboardAutomaticStation station)
     {
-        if (source == null || !_reservedAutomaticKeyboards.Contains(source) || _isPlacingKeyboard || station.HasKeyboard)
+        if (source == null || !_world.IsReserved(source) || _isPlacingKeyboard || station.HasKeyboard)
         {
             return false;
         }
@@ -1366,7 +1187,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
                 {
                     if (target != null)
                     {
-                        _keyboards.Remove(target.Body);
+                        _world.Remove(target.Body);
                         target.Root.SetActive(false);
                         Destroy(target.Root);
                     }
@@ -1375,13 +1196,11 @@ public sealed class KeyboardInteractionController : MonoBehaviour
                 }
             }
 
-            _keyboards.Remove(target.Body);
-            _keyboards.Remove(source.Body);
+            _world.Remove(target.Body);
+            _world.Remove(source.Body);
 
-            foreach (List<GameObject> region in _regionKeyboards)
-                region.Remove(source.Root);
 
-            _reservedAutomaticKeyboards.Remove(source);
+            _world.Unreserve(source);
 
             if (lastDroped == source.Collider.gameObject)
                 lastDroped = null;
@@ -1399,8 +1218,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// <summary>현재 키보드의 카메라 추적을 중단하고 Rigidbody를 중력에 따라 움직이는 상태로 전환한다.</summary>
     private void DropKeyboard()
     {
-        _heldKeyboard.Body.isKinematic = false;
-        _heldKeyboard.Body.useGravity = true;
+        _heldMotion.Drop(_heldKeyboard);
         lastDroped = _heldKeyboard.Collider.gameObject;
         _heldKeyboard = null;
 
@@ -1424,7 +1242,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             return;
         }
 
-        if (!_keyboards.TryGetValue(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _storedKeyboards.Contains(source) || _reservedAutomaticKeyboards.Contains(source))
+        if (!_world.TryGet(other.attachedRigidbody, out KeyboardState source) || source.PlacementFailed || _world.IsStored(source) || _world.IsReserved(source))
         {
             return;
         }
@@ -1457,7 +1275,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (cover != null)
             cover.RemoveFrom(target.Root.transform);
 
-        _keyboards.Remove(source.Body);
+        _world.Remove(source.Body);
         source.Collider.enabled = false;
         lastDroped = null;
         _heldKeyboard = null;
@@ -1472,65 +1290,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     /// </summary>
     private KeyboardState CreatePlayableKeyboard(KeyboardState source, bool playerControlled = true)
     {
-        KeyboardPlayableVariant variant = source.Root.GetComponent<KeyboardPlayableVariant>();
-        GameObject gamePrefab = variant != null ? variant.GamePrefab : _inGameKeyBoardPrefab;
-        GameObject instance = Instantiate(gamePrefab);
-        try
-        {
-            KeyboardInputController keyboard = instance.GetComponent<KeyboardInputController>();
-            keyboard.SetInputEnabled(false);
-            keyboard.enabled = false;
-            IReadOnlyDictionary<UnityEngine.InputSystem.Key, KeycapHealth> layout = keyboard.GetKeycapLayout();
-            List<KeycapHealth> requiredKeys = keyboard.GetDestructionKeycaps();
-            if (requiredKeys.Count == 0 || _keyboardFragmentsPrefab == null)
-            {
-                throw new InvalidOperationException("Playable keyboard requires destruction keys and fragments.");
-            }
-
-            if (source.PendingProfile == null)
-            {
-                KeyboardSpawnProfile profile = KeyboardProfileGenerator.GenerateProfile(
-                    layout,
-                    new HashSet<KeycapHealth>(requiredKeys),
-                    _gameSession.GetCurrentRarityDistribution(),
-                    _raritySettings,
-                    _rewardController.RewardPerKeycap,
-                    _gameSession.CurrentRarityStage,
-                    _qualityRandom.Next());
-
-                source.StoreProfile(profile);
-            }
-
-            keyboard.InitializeSpawnProfile(source.PendingProfile, layout);
-            foreach (KeyboardSpawnProfile.KeycapData data in source.PendingProfile.Keycaps)
-            {
-                if (data.Rarity != KeycapRarity.Tier7)
-                    continue;
-
-                NeonKeyboardGradient gradient = instance.GetComponent<NeonKeyboardGradient>();
-                if (gradient == null)
-                    gradient = instance.AddComponent<NeonKeyboardGradient>();
-
-                gradient.Configure(data.BandMaterial);
-                break;
-            }
-            KeyboardState target = RegisterKeyboard(instance, playerControlled);
-            target.SetProgressId(source.ProgressId);
-            target.SetSpawnRegionIndex(source.SpawnRegionIndex);
-            return target;
-        }
-        catch
-        {
-            Rigidbody body = instance.GetComponent<Rigidbody>();
-            if (body != null)
-            {
-                _keyboards.Remove(body);
-            }
-
-            instance.SetActive(false);
-            Destroy(instance);
-            throw;
-        }
+        return _playableFactory.Create(source, playerControlled);
     }
 
     /// <summary>

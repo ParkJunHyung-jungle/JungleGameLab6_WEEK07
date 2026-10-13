@@ -24,6 +24,8 @@ namespace KeyboardModeling
         private KeycapButton[] _keycapButtons;
         private KeycapHealth[] _keycapHealths;
         private KeyboardSpawnProfile _spawnProfile;
+        private KeyboardInspectionState _inspection;
+        public KeyboardInspectionState Inspection => _inspection;
 
         public event Action<Key> KeyPressed;
         public event Action<KeycapHealth> AttackRequested;
@@ -137,6 +139,7 @@ namespace KeyboardModeling
         /// <summary>현재 바인딩에서 영문, 숫자, 지정 기호 및 F1~F12에 해당하는 키캡 체력 목록을 반환한다.</summary>
         public List<KeycapHealth> GetDestructionKeycaps()
         {
+            if (_inspection != null) return new List<KeycapHealth>(_inspection.LetterKeycaps);
             List<KeycapHealth> result = new List<KeycapHealth>();
             foreach (KeyBinding binding in _bindings)
             {
@@ -205,11 +208,19 @@ namespace KeyboardModeling
                 {
                     _lastPressedKey = _bindings[index].Key;
                 }
-                AnimateKey(index, isPressed || _actuatedKeys[index], _hitStopEnabled && Time.timeScale == 0f ? 0f : Time.unscaledDeltaTime);
+                if (pressedThisFrame && _inspection != null) _inspection.RecordPress(_bindings[index].Key);
+                AnimateKey(index, isPressed || _actuatedKeys[index] || (_inspection != null && _inspection.IsStuck(_bindings[index].Key)), _hitStopEnabled && Time.timeScale == 0f ? 0f : Time.unscaledDeltaTime);
 
                 if (pressedThisFrame)
                 {
-                    PlayPressSound(_keycapHealths[index]);
+                    if (_inspection == null)
+                        PlayPressSound(_keycapHealths[index]);
+                    else
+                    {
+                        AudioClip clip = _keycapHealths[index].PressSound != null ? _keycapHealths[index].PressSound : _pressSound;
+                        if (!_inspection.TryPlayFaultSound(_bindings[index].Key, clip))
+                            PlayPressSound(_keycapHealths[index]);
+                    }
 
                     KeycapPressed?.Invoke(_bindings[index].Keycap);
                     KeyPressed?.Invoke(_bindings[index].Key);
@@ -220,14 +231,14 @@ namespace KeyboardModeling
                     }
                 }
 
-                _keycapButtons[index].SetPressed(isPressed);
+                if (_inspection == null) _keycapButtons[index].SetPressed(isPressed);
                 if (!_inputEnabled || !isActiveAndEnabled)
                 {
                     RestoreKeys();
                     return;
                 }
 
-                if (pressedThisFrame && _keycapHealths[index] != null &&
+                if ((_inspection == null || _inspection.IsDestructionMode) && pressedThisFrame && _keycapHealths[index] != null &&
                     (_keycapHealths[index].CurrentHP == 0 || _keycapButtons[index].isActiveAndEnabled))
                 {
                     AttackRequested?.Invoke(_keycapHealths[index]);
@@ -313,12 +324,18 @@ namespace KeyboardModeling
         /// <summary>
         /// 실제 키보드 입력 연동을 켜거나 끈다.
         /// inputEnabled를 _inputEnabled에 저장하고 비활성화하면 모든 키를 원위치로 복원한다.
+        /// 검수에서는 이미 눌린 키를 기록하여 활성화만으로 새 타격이 발생하지 않도록 한다.
         /// </summary>
         public void SetInputEnabled(bool inputEnabled)
         {
             _inputEnabled = inputEnabled;
             if (!inputEnabled && _restPositions != null)
                 RestoreKeys();
+            if (inputEnabled && _inspection != null && Keyboard.current != null)
+            {
+                for (int index = 0; index < _bindings.Length; index++)
+                    _previousPressed[index] = Keyboard.current[_bindings[index].Key].isPressed;
+            }
         }
 
         /// <summary>
@@ -497,13 +514,23 @@ namespace KeyboardModeling
                     Debug.Log("[Keyboard][Model] RESET " + _bindings[index].Key, this);
                 _previousPressed[index] = false;
                 _actuatedKeys[index] = false;
-                if (_pressAmounts[index] != 0f || _waveOffsets[index] != 0f)
-                    _bindings[index].Keycap.localPosition = _restPositions[index];
+                bool stuck = _inspection != null && _inspection.IsStuck(_bindings[index].Key);
+                if (_pressAmounts[index] != (stuck ? 1f : 0f) || _waveOffsets[index] != 0f)
+                    _bindings[index].Keycap.localPosition = _restPositions[index] + (stuck ? Vector3.down * _pressDistance : Vector3.zero);
                 _waveOffsets[index] = 0f;
-                _pressAmounts[index] = 0f;
+                _pressAmounts[index] = stuck ? 1f : 0f;
                 UpdateSwitchStems(index);
                 _keycapButtons[index].ResetPressState();
             }
+        }
+
+        /// <summary>
+        /// inspection을 현재 키보드의 고장 상태로 연결한다.
+        /// 입력과 눌림 애니메이션에서 사용할 참조를 저장한다.
+        /// </summary>
+        public void SetInspectionState(KeyboardInspectionState inspection)
+        {
+            _inspection = inspection;
         }
 
         [Serializable]

@@ -46,6 +46,16 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     public event Action<KeyboardState> KeyboardCompleted;
     public event Action FinalRegionCompleted;
 
+    [Header("Keyboard Inspection")]
+    [SerializeField] private bool _inspectionEnabled;
+    [SerializeField, Range(0f, 1f)] private float _faultChance = 0.1f;
+    [SerializeField] private Transform _destructionPlacement;
+    [SerializeField] private CinemachineCamera _destructionCamera;
+    public bool InspectionEnabled => _inspectionEnabled;
+    public bool IsInspecting => _inspectionEnabled && IsSmashMode && _placedKeyboard != null
+        && !_placedKeyboard.Keyboard.Inspection.IsDestructionMode;
+    public event Action<string> InspectionOutcome;
+
     [Header("Fever Keyboard Supply")]
     [SerializeField, Min(0.01f)] private float _feverCarryDuration = 0.35f;
     [SerializeField, Min(0.1f)] private float _feverSupplyTimeout = 5f;
@@ -174,15 +184,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     [Header("monitor")]
     [SerializeField] private MiniGameController _controller;
-    public bool IsMiniGameRunning => _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
+    public bool IsMiniGameRunning => !_inspectionEnabled && _controller.CurrentGame != MiniGameController.MiniGameKind.Idle;
     private bool IsMiniGameBlockingWorldInput => IsMiniGameRunning && _controller.HasKeyboard;
     private bool IsKeyboardBreaking => _placedKeyboard != null && _placedKeyboard.Keyboard.GetComponent<KeyboardDestruction>().IsBroken;
-    public bool CanEnterShop => (_monitorController != null ? _isShopFocused : IsSmashMode)
+    public bool CanEnterShop => !_inspectionEnabled && (_monitorController != null ? _isShopFocused : IsSmashMode)
         && !_feverSupplyPending && !IsMiniGameRunning && !IsKeyboardBreaking;
-    public bool CanEnterMonitor => !_feverSupplyPending && !IsMiniGameRunning && (CanRunMiniGame
+    public bool CanEnterMonitor => !_inspectionEnabled && !_feverSupplyPending && !IsMiniGameRunning && (CanRunMiniGame
         || (_completionProgress != null && _placedKeyboard == null && _heldKeyboard == null && _boxPickupController.HeldBox == null
             && !_isPlacingKeyboard && _viewingAutomaticStation == null));
-    public bool CanRunMiniGame => !_feverSupplyPending && IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
+    public bool CanRunMiniGame => !_inspectionEnabled && !_feverSupplyPending && IsSmashMode && _placedKeyboard != null && !IsKeyboardBreaking;
     [Header("Shop Focus")]
     [SerializeField] private ShopView _shopView;
     [Tooltip("바탕화면을 사용하는 씬에서는 상점 대신 모니터 조작 상태에 입력을 연결합니다.")]
@@ -252,6 +262,19 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         if (EditorApplication.isPaused || EditorWindow.focusedWindow == null || EditorWindow.focusedWindow.GetType().Name != "GameView") return;
 #endif
         bool escapePressed = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+        if (IsInspecting && Keyboard.current != null)
+        {
+            if (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame)
+            {
+                SellInspectedKeyboard();
+                return;
+            }
+            if (Keyboard.current.backspaceKey.wasPressedThisFrame)
+            {
+                MoveToDestructionTable();
+                return;
+            }
+        }
         if (_viewingAutomaticStation != null)
         {
             if (escapePressed)
@@ -270,8 +293,10 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         {
             bool tabPressedOrHeld = Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.tabKey.isPressed);
             bool mousePressedOrHeld = Mouse.current != null && Mouse.current.leftButton.isPressed;
+            bool inspectionCommandHeld = _inspectionEnabled && Keyboard.current != null
+                && (Keyboard.current.enterKey.isPressed || Keyboard.current.numpadEnterKey.isPressed || Keyboard.current.backspaceKey.isPressed);
 
-            if (tabPressedOrHeld || mousePressedOrHeld)
+            if (tabPressedOrHeld || mousePressedOrHeld || inspectionCommandHeld)
             {
                 return;
             }
@@ -290,6 +315,8 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         }
         if (IsSmashMode && escapePressed)
         {
+            if (_inspectionEnabled && _placedKeyboard != null && _placedKeyboard.Keyboard.Inspection.IsDestructionMode)
+                return;
             if (_feverSupplyPending || (!IsMiniGameRunning && !IsKeyboardBreaking))
             {
                 OnExitSmashMode();
@@ -462,7 +489,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             if (_monitorController != null)
                 _monitorController.SetMonitorFocus(false);
             _resumeSmashInput = false;
-            _controller.SetKeyBoard(null);
+            if (!_inspectionEnabled) _controller.SetKeyBoard(null);
         }
     }
 
@@ -473,6 +500,17 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void HandleKeyboardDestroyed(KeyboardState state)
     {
         if (_placedKeyboard != state) return;
+
+        if (_inspectionEnabled)
+        {
+            KeyboardInspectionState inspection = state.Keyboard.Inspection;
+            bool correctDecision = inspection.IsDestructionMode ? inspection.IsFaulty : !inspection.IsFaulty;
+            if (correctDecision) _gameSession.Wallet.Add(100);
+            else _gameSession.Wallet.ApplyPenalty(50);
+            string action = inspection.IsDestructionMode ? "파괴" : "판매";
+            string condition = inspection.IsFaulty ? "고장 키보드" : "정상 키보드";
+            InspectionOutcome?.Invoke($"{condition} {action}: {(correctDecision ? "+100" : "-50")}원");
+        }
 
         if (_openingKeyboard == state)
         {
@@ -626,7 +664,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _feverSourceBox = null;
         _feverSupplyRoutine = null;
         _feverSupplyPending = false;
-        _controller.SetKeyBoard(target.Keyboard);
+        if (!_inspectionEnabled) _controller.SetKeyBoard(target.Keyboard);
         PlacedKeyboardChanged?.Invoke(target.Keyboard);
         ActiveKeyboardChanged?.Invoke(target.Keyboard);
         SetKeyboardInput(target, true);
@@ -713,7 +751,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         body.useGravity = false;
         body.position = _padPosition;
         body.rotation = _padRotation;
-        _controller.SetKeyBoard(_placedKeyboard.Keyboard);
+        if (!_inspectionEnabled) _controller.SetKeyBoard(_placedKeyboard.Keyboard);
         PlacedKeyboardChanged?.Invoke(_placedKeyboard.Keyboard);
         SpawnedKeyboardCount = 1;
         OnEnterSmashMode();
@@ -1450,7 +1488,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         body.useGravity = false;
         body.position = _padPosition;
         body.rotation = _padRotation;
-        _controller.SetKeyBoard(target.Keyboard);
+        if (!_inspectionEnabled) _controller.SetKeyBoard(target.Keyboard);
         PlacedKeyboardChanged?.Invoke(target.Keyboard);
 
         KeyboardProtectionCover cover = source.Root.GetComponentInChildren<KeyboardProtectionCover>();
@@ -1480,6 +1518,15 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             KeyboardInputController keyboard = instance.GetComponent<KeyboardInputController>();
             keyboard.SetInputEnabled(false);
             keyboard.enabled = false;
+            if (_inspectionEnabled)
+            {
+                KeyboardInspectionState inspection = instance.AddComponent<KeyboardInspectionState>();
+                inspection.Initialize(keyboard, _faultChance, _gameSession.Settings);
+                KeyboardState inspected = RegisterKeyboard(instance, playerControlled);
+                inspected.SetProgressId(source.ProgressId);
+                inspected.SetSpawnRegionIndex(source.SpawnRegionIndex);
+                return inspected;
+            }
             IReadOnlyDictionary<UnityEngine.InputSystem.Key, KeycapHealth> layout = keyboard.GetKeycapLayout();
             List<KeycapHealth> requiredKeys = keyboard.GetDestructionKeycaps();
             if (requiredKeys.Count == 0 || _keyboardFragmentsPrefab == null)
@@ -1540,7 +1587,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private void OnEnterSmashMode()
     {
         IsSmashMode = true;
-        _fixedCam.Priority = 20;
+        bool destroying = _inspectionEnabled && _placedKeyboard.Keyboard.Inspection.IsDestructionMode;
+        _fixedCam.Priority = destroying ? 0 : 20;
+        if (_inspectionEnabled) _destructionCamera.Priority = destroying ? 20 : 0;
 
         ActiveKeyboardChanged?.Invoke(ActiveKeyboard);
 
@@ -1557,9 +1606,38 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         _resumeSmashInput = false;
         IsSmashMode = false;
         _fixedCam.Priority = 0;
+        if (_inspectionEnabled) _destructionCamera.Priority = 0;
         if (_placedKeyboard != null) SetKeyboardInput(_placedKeyboard, false);
 
         ActiveKeyboardChanged?.Invoke(null);
+    }
+
+    /// <summary>
+    /// 현재 검수 키보드를 판매하고 정상 여부에 따른 정산과 완료 처리를 수행한다.
+    /// 배치된 키보드를 제거하여 다음 키보드를 검수할 수 있는 상태로 돌아간다.
+    /// </summary>
+    private void SellInspectedKeyboard()
+    {
+        KeyboardState state = _placedKeyboard;
+        SetKeyboardInput(state, false);
+        _keyboards.Remove(state.Body);
+        HandleKeyboardDestroyed(state);
+        Destroy(state.Root);
+    }
+
+    /// <summary>
+    /// 현재 검수 키보드를 설정된 파괴 테이블 위치와 회전으로 이동한다.
+    /// 고장 판정을 유지하고 피해를 허용하며 파괴 카메라와 입력을 활성화한다.
+    /// </summary>
+    private void MoveToDestructionTable()
+    {
+        SetKeyboardInput(_placedKeyboard, false);
+        _placedKeyboard.Body.position = _destructionPlacement.position;
+        _placedKeyboard.Body.rotation = _destructionPlacement.rotation;
+        _placedKeyboard.Keyboard.Inspection.BeginDestruction(_placedKeyboard.Keyboard);
+        OnEnterSmashMode();
+        SetKeyboardInput(_placedKeyboard, false);
+        _resumeSmashInput = true;
     }
 
     /// <summary>

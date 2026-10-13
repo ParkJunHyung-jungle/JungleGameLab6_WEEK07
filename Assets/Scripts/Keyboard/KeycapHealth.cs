@@ -15,6 +15,7 @@ public sealed class KeycapHealth : MonoBehaviour
     [SerializeField, Min(1)] private int _maxHP = 3;
     private int _currentHP;
     private bool _broken;
+    private bool _damageEnabled = true;
     public int MaxHP => _maxHP;
     public int CurrentHP => _currentHP;
     public event Action<KeycapHealth> Broken;
@@ -109,12 +110,24 @@ public sealed class KeycapHealth : MonoBehaviour
     /// </summary>
     public void TakeDamage(int damage)
     {
-        if (_broken || _currentHP <= 0 || damage <= 0) return;
+        if (!_damageEnabled || _broken || _currentHP <= 0 || damage <= 0) return;
         int previousHP = _currentHP;
         _currentHP = Mathf.Max(0, _currentHP - damage);
         UpdateDamageDecal();
         if (_currentHP < previousHP) DamageApplied?.Invoke(this);
         if (_currentHP == 0) Break();
+    }
+
+    /// <summary>
+    /// allowDamage로 검수 또는 파괴 상태를 설정한다.
+    /// 키캡의 최대 및 현재 체력을 1로 설정하고 피해 허용 여부와 균열 표시를 갱신한다.
+    /// </summary>
+    public void ConfigureInspection(bool allowDamage)
+    {
+        _damageEnabled = allowDamage;
+        _maxHP = 1;
+        _currentHP = 1;
+        UpdateDamageDecal();
     }
 
     /// <summary>현재 체력 비율과 세 단계 균열 재질을 사용해 데칼을 갱신하고, 체력이 충분하거나 소진되면 데칼을 숨긴다.</summary>

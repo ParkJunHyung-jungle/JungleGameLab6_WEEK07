@@ -45,6 +45,17 @@ namespace Game.Economy
         }
 
         /// <summary>
+        /// 양수 amount를 판정 벌금으로 차감하고 음수 잔액도 허용한다.
+        /// 변경된 잔액을 BalanceChanged로 전달하며 수입 이벤트는 발생시키지 않는다.
+        /// </summary>
+        public void ApplyPenalty(long amount)
+        {
+            if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));
+            _balance = checked(_balance - amount);
+            NotifyBalanceChanged();
+        }
+
+        /// <summary>
         /// 양수인 amount를 지출할 수 있으면 잔액에서 차감한다.
         /// 성공 여부를 반환하며 구매 레벨 반영 전에는 변경 이벤트를 보내지 않는다.
         /// </summary>

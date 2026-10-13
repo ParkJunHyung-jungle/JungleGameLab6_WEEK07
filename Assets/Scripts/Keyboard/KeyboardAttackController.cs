@@ -106,6 +106,16 @@ namespace KeyboardModeling
                 return;
             }
 
+            if (keyboard.Inspection != null)
+            {
+                if (keyboard.Inspection.IsDestructionMode && health.CurrentHP > 0)
+                {
+                    keyboard.NotifyManualKeycapHit(health.transform);
+                    health.TakeDamage(1);
+                }
+                return;
+            }
+
             KeycapHealth[] keycaps = _keycaps;
             int targetIndex = Array.IndexOf(keycaps, health);
             if (targetIndex < 0)

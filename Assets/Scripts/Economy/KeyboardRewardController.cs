@@ -79,6 +79,12 @@ namespace Game.Economy
         /// </summary>
         private void OnKeycapBroken(KeycapHealth keycap)
         {
+            if (_activeKeyboard != null && _activeKeyboard.Inspection != null)
+            {
+                _gameSession.Wallet.Add(1);
+                RewardGranted?.Invoke(1, keycap.transform.position, false);
+                return;
+            }
             long reward = keycap.HasSpawnData ? keycap.Reward : _rewardPerKeycap;
             float chance = _gameSession.Upgrades.GetDoubleRewardChance();
             bool isDoubleReward = chance > 0f && UnityEngine.Random.value < chance;

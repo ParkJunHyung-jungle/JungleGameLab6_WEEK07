@@ -23,7 +23,37 @@
       </div>
     </header>
 
-    <!-- [최상위] 플레이어 선택 글로벌 카드 -->
+    <!-- CSV 파일 불러오기 & 세션 정보 배너 -->
+    <section class="card session-info-card">
+      <div class="session-header">
+        <div class="session-meta">
+          <span class="session-badge" id="sessionBadge">CSV PLAYTEST SESSION</span>
+          <h2 class="session-id-text" id="sessionIdText">Session: 대기 중 (CSV 파일을 로드하세요)</h2>
+          <div class="session-sub-details" id="sessionSubDetails">
+            <span id="buildVersionText">Build Version: -</span> · 
+            <span id="elapsedTimeText">기록 시간: - 초</span> · 
+            <span id="downCountText">총 누름(Down): 0회</span>
+          </div>
+        </div>
+        <div class="csv-upload-box">
+          <div class="upload-btn-group">
+            <button id="loadDefaultLogBtn" class="csv-upload-btn btn-secondary" title="방금 생성된 테스트 로그 데이터를 즉시 로드합니다">
+              🔄 최신 Playtest 로그 불러오기
+            </button>
+            <label for="csvFileInput" class="csv-upload-btn">
+              📂 내 컴퓨터에서 CSV 선택
+            </label>
+            <button id="resetDataBtn" class="csv-upload-btn btn-danger" title="모든 입력 데이터를 초기화(0회)합니다">
+              🧹 리셋
+            </button>
+          </div>
+          <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+          <span class="upload-hint">또는 CSV 파일을 브라우저에 드래그&드롭</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- [주석 보존: 향후 플레이어/키보드 타입 분리용]
     <section class="player-global-card">
       <div class="player-header-left">
         <div class="player-avatar">🎮</div>
@@ -35,13 +65,13 @@
           </div>
         </div>
       </div>
-
       <div class="player-nav-controls">
         <button id="prevPlayerBtn" class="player-arrow-btn" aria-label="이전 플레이어">◀</button>
         <div class="player-tabs" id="playerTabs"></div>
         <button id="nextPlayerBtn" class="player-arrow-btn" aria-label="다음 플레이어">▶</button>
       </div>
     </section>
+    -->
 
     <!-- View 2: 텐키리스 키보드 히트맵 -->
     <section class="card heatmap-card">
@@ -49,10 +79,10 @@
         <div class="title-with-badge">
           <span>View 2. 키보드 입력 히트맵 (Heatmap)</span>
         </div>
-        <span class="badge" id="typeTotalBadge">Player 1 · Type A: 374회</span>
+        <span class="badge" id="typeTotalBadge">총 Down 입력: 0회</span>
       </div>
 
-      <!-- [하위] 키보드 종류 전환 컨트롤러 (정중앙 대칭 정렬) -->
+      <!-- [주석 보존: 향후 키보드 종류 전환용]
       <div class="keyboard-type-toolbar">
         <div class="type-selector-main">
           <button id="prevTypeBtn" class="type-nav-btn" aria-label="이전 키보드 타입">◀</button>
@@ -64,6 +94,7 @@
         </div>
         <div class="type-tabs" id="typeTabs"></div>
       </div>
+      -->
 
       <div class="card-desc">
         현재 선택된 플레이어와 키보드 기종 기준의 자판 타수 분포입니다. 빈도가 높을수록 붉은색으로 강조됩니다.

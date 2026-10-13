@@ -5,13 +5,13 @@
   --text-main: #f8fafc;
   --text-sub: #94a3b8;
   --accent: #38bdf8;
-  
+
   /* 키캡 기본 */
   --key-base: #1e2536;
   --key-border: #333d52;
   --key-text: #cbd5e1;
   --key-subtext: #64748b;
-  
+
   /* 기본 1u 키 크기 */
   --key-unit: 50px;
   --key-height: 50px;
@@ -76,6 +76,126 @@ body {
   background: rgba(56, 189, 248, 0.15);
   color: var(--accent);
   border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+/* ===================================================
+   [세션 분석] CSV 세션 정보 및 업로드 카드
+   =================================================== */
+.session-info-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 14px;
+  padding: 22px 28px;
+  box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.session-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #38bdf8;
+  display: inline-block;
+}
+
+.session-id-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f8fafc;
+  word-break: break-all;
+}
+
+.session-sub-details {
+  font-size: 13px;
+  color: #94a3b8;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-sub-details span {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.csv-upload-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.upload-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.csv-upload-btn {
+  background: #0284c7;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid #38bdf8;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.csv-upload-btn:hover {
+  background: #0369a1;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(56, 189, 248, 0.6);
+}
+
+.csv-upload-btn.btn-secondary {
+  background: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.csv-upload-btn.btn-secondary:hover {
+  background: #334155;
+  border-color: #94a3b8;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(148, 163, 184, 0.4);
+}
+
+.csv-upload-btn.btn-danger {
+  background: #451a1a;
+  border-color: #ef4444;
+  color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.csv-upload-btn.btn-danger:hover {
+  background: #7f1d1d;
+  border-color: #f87171;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+}
+
+.upload-hint {
+  font-size: 11px;
+  color: #64748b;
 }
 
 /* ===================================================
@@ -367,10 +487,11 @@ body {
   border: 2px solid #374151;
   border-radius: 14px;
   padding: 16px;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.6), 0 8px 20px rgba(0,0,0,0.5);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6), 0 8px 20px rgba(0, 0, 0, 0.5);
 }
 
-.section-main, .section-nav {
+.section-main,
+.section-nav {
   display: flex;
   flex-direction: column;
   gap: var(--key-gap);
@@ -450,13 +571,33 @@ body {
 }
 
 /* 특수 키 너비 */
-.key.w-1-25 { width: calc(var(--key-unit) * 1.25 + var(--key-gap) * 0.25); }
-.key.w-1-5  { width: calc(var(--key-unit) * 1.5  + var(--key-gap) * 0.5); }
-.key.w-1-75 { width: calc(var(--key-unit) * 1.75 + var(--key-gap) * 0.75); }
-.key.w-2    { width: calc(var(--key-unit) * 2    + var(--key-gap) * 1); }
-.key.w-2-25 { width: calc(var(--key-unit) * 2.25 + var(--key-gap) * 1.25); }
-.key.w-2-75 { width: calc(var(--key-unit) * 2.75 + var(--key-gap) * 1.75); }
-.key.w-6-25 { width: calc(var(--key-unit) * 6.25 + var(--key-gap) * 5.25); }
+.key.w-1-25 {
+  width: calc(var(--key-unit) * 1.25 + var(--key-gap) * 0.25);
+}
+
+.key.w-1-5 {
+  width: calc(var(--key-unit) * 1.5 + var(--key-gap) * 0.5);
+}
+
+.key.w-1-75 {
+  width: calc(var(--key-unit) * 1.75 + var(--key-gap) * 0.75);
+}
+
+.key.w-2 {
+  width: calc(var(--key-unit) * 2 + var(--key-gap) * 1);
+}
+
+.key.w-2-25 {
+  width: calc(var(--key-unit) * 2.25 + var(--key-gap) * 1.25);
+}
+
+.key.w-2-75 {
+  width: calc(var(--key-unit) * 2.75 + var(--key-gap) * 1.75);
+}
+
+.key.w-6-25 {
+  width: calc(var(--key-unit) * 6.25 + var(--key-gap) * 5.25);
+}
 
 /* 히트맵 범례 */
 .heatmap-legend {
@@ -524,9 +665,20 @@ body {
   font-weight: 700;
 }
 
-.rank-1 .rank-num { background: #eab308; color: #000; }
-.rank-2 .rank-num { background: #94a3b8; color: #000; }
-.rank-3 .rank-num { background: #b45309; color: #fff; }
+.rank-1 .rank-num {
+  background: #eab308;
+  color: #000;
+}
+
+.rank-2 .rank-num {
+  background: #94a3b8;
+  color: #000;
+}
+
+.rank-3 .rank-num {
+  background: #b45309;
+  color: #fff;
+}
 
 .ranking-stat {
   font-family: monospace;

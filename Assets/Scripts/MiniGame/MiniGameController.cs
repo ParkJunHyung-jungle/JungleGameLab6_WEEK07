@@ -17,6 +17,8 @@ namespace KeyboardModeling
         };
 
         [Header("Schedule")]
+        [Tooltip("켜면 해킹과 목표 키 연타 미니게임을 시작합니다.")]
+        [SerializeField] private bool _miniGamesEnabled;
         [SerializeField] private KeyboardInputController _keyboard;
         [SerializeField, Min(0.1f)] private float _eventInterval = 15f;
         [SerializeField] private FeverController _feverController;
@@ -25,16 +27,17 @@ namespace KeyboardModeling
         private MiniGameKind _currentGame;
         private float _nextEventRemaining;
         private bool CanProcessInput => isActiveAndEnabled && _keyboard != null && _keyboard.InputEnabled && _keyboard.isActiveAndEnabled;
-        private bool IsProgressPaused => !CanProcessInput || Time.timeScale == 0f || (_feverController != null && _feverController.IsFeverActive);
+        private bool IsProgressPaused => !_miniGamesEnabled || !CanProcessInput || Time.timeScale == 0f || (_feverController != null && _feverController.IsFeverActive);
+        public bool MiniGamesEnabled => _miniGamesEnabled;
         public MiniGameKind CurrentGame => _currentGame;
         public float NextEventRemaining => _nextEventRemaining;
         public bool IsSuspended => _currentGame != MiniGameKind.Idle && IsProgressPaused;
         public bool InputAvailable => CanProcessInput;
         public bool HasKeyboard => _keyboard != null;
-        public bool IsEventTimerPaused => _monitorController != null
+        public bool IsEventTimerPaused => !_miniGamesEnabled || (_monitorController != null
             ? !_monitorController.CanAdvanceEventTimer || Time.timeScale == 0f
                 || (_feverController != null && _feverController.IsFeverActive)
-            : IsProgressPaused;
+            : IsProgressPaused);
         public event Action StateChanged;
         public event Action Completed;
 
@@ -130,6 +133,12 @@ namespace KeyboardModeling
 
         void Update()
         {
+            if (!_miniGamesEnabled)
+            {
+                CancelMiniGame();
+                return;
+            }
+
             if (_currentGame == MiniGameKind.Idle)
             {
                 if (IsEventTimerPaused)

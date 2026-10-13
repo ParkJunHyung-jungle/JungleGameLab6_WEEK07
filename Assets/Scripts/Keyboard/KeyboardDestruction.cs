@@ -126,6 +126,16 @@ public sealed class KeyboardDestruction : MonoBehaviour
         health.Broken -= OnKeycapBroken;
         _remainingKeycaps--;
         if (_remainingKeycaps != 0 || IsBroken) return;
+        DestroyKeyboard();
+    }
+
+    /// <summary>
+    /// 남은 키캡 체력과 관계없이 키보드 전체를 한 번 파괴한다.
+    /// 등록된 파괴 콜백과 파편 설정을 사용하여 입력을 종료하고 파괴 연출을 시작한다.
+    /// </summary>
+    public void DestroyKeyboard()
+    {
+        if (IsBroken) return;
         IsBroken = true;
         _onBreaking();
         BreakIntoFragments();

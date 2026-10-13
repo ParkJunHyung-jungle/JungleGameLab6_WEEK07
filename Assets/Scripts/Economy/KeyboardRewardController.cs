@@ -75,10 +75,13 @@ namespace Game.Economy
 
         /// <summary>
         /// keycap의 파괴 알림을 받아 설정된 키캡당 보상을 지급한다.
-        /// 생성 보상과 두 배 확률을 사용해 최종 금액을 지급하고 금액·키캡 위치·두 배 여부를 RewardGranted로 알린다.
+        /// 수동 검사 키보드는 지급을 생략하고 자동작업대는 생성 보상과 두 배 확률로 지급 결과를 알린다.
         /// </summary>
         private void OnKeycapBroken(KeycapHealth keycap)
         {
+            if (_activeKeyboard != null && keycap.transform.IsChildOf(_activeKeyboard.transform))
+                return;
+
             long reward = keycap.HasSpawnData ? keycap.Reward : _rewardPerKeycap;
             float chance = _gameSession.Upgrades.GetDoubleRewardChance();
             bool isDoubleReward = chance > 0f && UnityEngine.Random.value < chance;

@@ -82,6 +82,9 @@ namespace KeyboardModeling
 
         void Update()
         {
+            if (_station == null)
+                return;
+
             RefreshAttackInterval();
             LogAttackState();
             if (_keyboard != null && Time.unscaledTimeAsDouble >= _nextDiagnosticAt)
@@ -114,13 +117,13 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// 자동공격으로 지정한 살아 있는 키캡을 한 번 타격한다.
+        /// 자동작업대에서 지정한 살아 있는 키캡을 한 번 타격한다.
         /// target을 전용 기계팔 함수와 기존 피드백에 전달한 뒤 단일 피해를 적용하며 실제 타격 성공 여부를 반환한다.
         /// </summary>
         public bool AttackKeycap(KeycapHealth target)
         {
             RefreshAttackInterval();
-            if (!_unlocked || Time.unscaledTimeAsDouble < _nextAttackAt || _keyboard == null || target == null || target.CurrentHP <= 0 ||
+            if (_station == null || !_unlocked || Time.unscaledTimeAsDouble < _nextAttackAt || _keyboard == null || target == null || target.CurrentHP <= 0 ||
                 (_destruction != null && _destruction.IsBroken) || !_targets.Contains(target))
                 return false;
             if (!_arm.PressKeyAutomatically(target.transform))

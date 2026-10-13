@@ -24,6 +24,7 @@ namespace KeyboardModeling
         private KeycapButton[] _keycapButtons;
         private KeycapHealth[] _keycapHealths;
         private KeyboardSpawnProfile _spawnProfile;
+        private KeyboardPlayableVariant _playableVariant;
 
         public event Action<Key> KeyPressed;
         public event Action<KeycapHealth> AttackRequested;
@@ -31,6 +32,8 @@ namespace KeyboardModeling
         public event Action<Transform> ManualKeycapHit;
         public event Action<Transform> AutomaticKeycapHit;
         public event Action<Transform> AreaKeycapHit;
+        public event Action DiscardRequested;
+        public event Action SubmissionRequested;
 
         [Header("Key Travel")]
         [SerializeField, Min(0f)] private float _pressDistance = 0.15f;
@@ -65,6 +68,10 @@ namespace KeyboardModeling
         [Header("Audio")]
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _pressSound;
+        [InspectorName("고장 키 소리 피치")]
+        [Tooltip("고장 키의 타이핑 소리를 정상 피치에 곱할 비율입니다. 낮을수록 낮고 느린 소리가 납니다.")]
+        [SerializeField, Range(0.1f, 0.9f)] private float _faultyKeyPitch = 0.55f;
+        private AudioSource _faultyKeyAudioSource;
         private GameSettings _gameSettings;
 
         public bool InputEnabled
@@ -150,6 +157,8 @@ namespace KeyboardModeling
 
         void Awake()
         {
+            _playableVariant = GetComponent<KeyboardPlayableVariant>();
+            InitializeFaultyKeyAudio();
             GameSession session = FindAnyObjectByType<GameSession>();
             _gameSettings = session != null ? session.Settings : null;
             if (_gameSettings != null)
@@ -192,6 +201,17 @@ namespace KeyboardModeling
                 return;
             }
 
+            if (keyboard.backspaceKey.wasPressedThisFrame)
+            {
+                DiscardRequested?.Invoke();
+                return;
+            }
+            if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
+            {
+                SubmissionRequested?.Invoke();
+                return;
+            }
+
             bool pressedKeysChanged = false;
             for (int index = 0; index < _bindings.Length; index++)
             {
@@ -209,28 +229,11 @@ namespace KeyboardModeling
 
                 if (pressedThisFrame)
                 {
-                    PlayPressSound(_keycapHealths[index]);
+                    bool isFaulty = _playableVariant != null && _playableVariant.IsKeyFaulty(_bindings[index].Key);
+                    PlayPressSound(_keycapHealths[index], isFaulty);
 
                     KeycapPressed?.Invoke(_bindings[index].Keycap);
                     KeyPressed?.Invoke(_bindings[index].Key);
-                    if (!_inputEnabled || !isActiveAndEnabled)
-                    {
-                        RestoreKeys();
-                        return;
-                    }
-                }
-
-                _keycapButtons[index].SetPressed(isPressed);
-                if (!_inputEnabled || !isActiveAndEnabled)
-                {
-                    RestoreKeys();
-                    return;
-                }
-
-                if (pressedThisFrame && _keycapHealths[index] != null &&
-                    (_keycapHealths[index].CurrentHP == 0 || _keycapButtons[index].isActiveAndEnabled))
-                {
-                    AttackRequested?.Invoke(_keycapHealths[index]);
                     if (!_inputEnabled || !isActiveAndEnabled)
                     {
                         RestoreKeys();
@@ -247,12 +250,41 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// health에 저장된 재질별 눌림음을 재생하고 미지정이면 키보드 기본 클립을 사용한다.
-        /// 파괴된 키캡은 볼륨을 5%로 낮추며 체력과 입력 상태는 변경하지 않는다.
+        /// 기존 타이핑 소스의 음량과 공간 설정을 복사하여 고장 키 전용 AudioSource를 준비한다.
+        /// _audioSource를 기준으로 자식 소스를 생성하며 정상 타이핑과 파괴음의 피치는 변경하지 않는다.
         /// </summary>
-        private void PlayPressSound(KeycapHealth health)
+        private void InitializeFaultyKeyAudio()
+        {
+            GameObject audioObject = new GameObject("FaultyKeyAudio");
+            audioObject.transform.SetParent(_audioSource.transform, false);
+            _faultyKeyAudioSource = audioObject.AddComponent<AudioSource>();
+            _faultyKeyAudioSource.playOnAwake = false;
+            _faultyKeyAudioSource.outputAudioMixerGroup = _audioSource.outputAudioMixerGroup;
+            _faultyKeyAudioSource.volume = _audioSource.volume;
+            _faultyKeyAudioSource.mute = _audioSource.mute;
+            _faultyKeyAudioSource.spatialBlend = _audioSource.spatialBlend;
+            _faultyKeyAudioSource.panStereo = _audioSource.panStereo;
+            _faultyKeyAudioSource.priority = _audioSource.priority;
+            _faultyKeyAudioSource.dopplerLevel = _audioSource.dopplerLevel;
+            _faultyKeyAudioSource.rolloffMode = _audioSource.rolloffMode;
+            _faultyKeyAudioSource.minDistance = _audioSource.minDistance;
+            _faultyKeyAudioSource.maxDistance = _audioSource.maxDistance;
+        }
+
+        /// <summary>
+        /// health에 저장된 재질별 눌림음을 재생하고 미지정이면 키보드 기본 클립을 사용한다.
+        /// isFaulty이면 전용 소스에서 피치를 낮춰 고장을 알리며 키캡 체력과 입력 상태는 변경하지 않는다.
+        /// </summary>
+        private void PlayPressSound(KeycapHealth health, bool isFaulty = false)
         {
             AudioClip clip = health != null && health.PressSound != null ? health.PressSound : _pressSound;
+            if (isFaulty)
+            {
+                _faultyKeyAudioSource.pitch = _audioSource.pitch * _faultyKeyPitch;
+                _faultyKeyAudioSource.PlayOneShot(clip);
+                return;
+            }
+
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
             _audioSource.PlayOneShot(clip, volume);
         }

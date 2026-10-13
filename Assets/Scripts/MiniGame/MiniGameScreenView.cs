@@ -139,10 +139,16 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 대기 화면의 상세 안내를 갱신한다.
-        /// controller의 다음 이벤트 시간과 타이머 정지 여부를 읽어 _idleDetails에 대기 안내를 표시한다.
+        /// controller의 활성화 설정과 다음 이벤트 시간을 읽어 _idleDetails에 시스템 또는 이벤트 대기 안내를 표시한다.
         /// </summary>
         private void RefreshIdleDetails()
         {
+            if (!_controller.MiniGamesEnabled)
+            {
+                _idleDetails.text = "Security system standing by.";
+                return;
+            }
+
             _idleDetails.text = _controller.IsEventTimerPaused
                 ? "Next event waiting.\nSecurity system standing by."
                 : $"Next event in {Mathf.CeilToInt(_controller.NextEventRemaining):00}s\nComplete events to restore security.";

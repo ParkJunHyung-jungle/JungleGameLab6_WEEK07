@@ -24,6 +24,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     private const int SPAWN_REGION_COUNT = 3;
     private const int REGION_REFILL_THROW_COUNT = 3;
     private const float FEVER_REFILL_RETRY_INTERVAL = 0.25f;
+    private const long KEYBOARD_SUBMISSION_AMOUNT = 100;
 
     public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake }
 
@@ -375,7 +376,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// instance의 입력과 키캡 Collider를 끄고 들기용 물리 상태를 구성하여 등록 상태를 반환한다.
-    /// isPlayable이 true이면 파괴 판정을 초기화하고 regionIndex가 지정된 배경 키보드는 해당 구역 목록에 저장한다.
+    /// isPlayable이면 파괴 판정과 폐기·제출 이벤트를 연결하고 regionIndex가 지정된 배경 키보드는 해당 구역 목록에 저장한다.
     /// </summary>
     public KeyboardState RegisterKeyboard(GameObject instance, bool isPlayable = false, int regionIndex = -1)
     {
@@ -415,8 +416,33 @@ public sealed class KeyboardInteractionController : MonoBehaviour
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
             if (_fistImpulseSource != null) destruction.FistImpact += HandleFistImpact;
             destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
+            keyboard.DiscardRequested += destruction.DestroyKeyboard;
+            keyboard.SubmissionRequested += () => SubmitKeyboard(state);
         }
         return state;
+    }
+
+    /// <summary>
+    /// 현재 검사 중인 state의 정상 여부로 100원을 지급하거나 차감하고 키보드를 제거한다.
+    /// 고장 목록으로 판정하며 입력과 등록을 해제하고 기존 완료 및 다음 키보드 배치 흐름을 갱신한다.
+    /// </summary>
+    private void SubmitKeyboard(KeyboardState state)
+    {
+        if (_placedKeyboard != state || !IsSmashMode || !state.Keyboard.InputEnabled
+            || state.Keyboard.GetComponent<KeyboardDestruction>().IsBroken)
+            return;
+
+        bool isFaulty = state.Root.GetComponent<KeyboardPlayableVariant>().IsFaulty;
+        HandleKeyboardBreaking(state);
+        _feverSupplyPending = false;
+        if (isFaulty)
+            _gameSession.Wallet.ApplyPenalty(KEYBOARD_SUBMISSION_AMOUNT);
+        else
+            _gameSession.Wallet.Add(KEYBOARD_SUBMISSION_AMOUNT);
+
+        HandleKeyboardDestroyed(state);
+        state.Root.SetActive(false);
+        Destroy(state.Root);
     }
 
     /// <summary>
@@ -1468,7 +1494,7 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// source의 최초 배치에서 현재 강화 분포로 생성 결과를 확정하고 플레이용 객체에 적용한다.
-    /// 재시도는 같은 프로필을 사용하고 진행 식별자를 새 상태에 복사하며 준비 실패 시 월드 원본을 유지한다.
+    /// 재시도는 같은 프로필을 사용하고 고장 정보와 진행 식별자를 복사하며 준비 실패 시 월드 원본을 유지한다.
     /// </summary>
     private KeyboardState CreatePlayableKeyboard(KeyboardState source, bool playerControlled = true)
     {
@@ -1477,6 +1503,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         GameObject instance = Instantiate(gamePrefab);
         try
         {
+            if (variant != null)
+                instance.GetComponent<KeyboardPlayableVariant>().CopyFaultStateFrom(variant);
+
             KeyboardInputController keyboard = instance.GetComponent<KeyboardInputController>();
             keyboard.SetInputEnabled(false);
             keyboard.enabled = false;

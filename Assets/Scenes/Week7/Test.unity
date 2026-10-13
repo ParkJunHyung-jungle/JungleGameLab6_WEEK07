@@ -381,18 +381,6 @@ PrefabInstance:
       value: Keyboard_TKL_87
       objectReference: {fileID: 0}
     - target: {fileID: 5033408809425400753, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
-      propertyPath: _initializeTemporaryDestruction
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5033408809425400753, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
-      propertyPath: _temporaryDestruction
-      value: 
-      objectReference: {fileID: 910070002}
-    - target: {fileID: 5033408809425400753, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
-      propertyPath: _temporaryFragmentsPrefab
-      value: 
-      objectReference: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
-    - target: {fileID: 5033408809425400753, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
       propertyPath: _logInput
       value: 0
       objectReference: {fileID: 0}
@@ -463,6 +451,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
       insertIndex: -1
       addedObject: {fileID: 910070004}
+    - targetCorrespondingSourceObject: {fileID: 6087872409866529466, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 910070005}
   m_SourcePrefab: {fileID: 100100000, guid: 63bffb1f169d269429fc92b01b30f6e7, type: 3}
 --- !u!1 &910070000 stripped
 GameObject:
@@ -492,12 +483,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4ea447cb22c44219f6584a4080658f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardDestruction
-  _upwardSpeed: 1.5
-  _outwardSpeed: 0.8
-  _spin: 3
-  _pushDelay: 1
-  _backwardSpeed: 8
-  _lifetimeAfterPush: 5
+  _fragmentPresenter: {fileID: 910070005}
+  _autoInitialize: 1
 --- !u!114 &910070003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -512,6 +499,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardAttackController
   _interactionController: {fileID: 0}
   _keyboard: {fileID: 910070001}
+  _feedbackManager: {fileID: 910070004}
   _gameSession: {fileID: 0}
   _feverController: {fileID: 0}
   _baseDamage: 1
@@ -549,6 +537,25 @@ MonoBehaviour:
   _maximumTravelDistance: 0.85
   _hitStopDuration: 0.25
   _hitStopCooldown: 0.35
+--- !u!114 &910070005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910070000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 586b034dfceabc74c9a11ded31a8710e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardFragmentPresenter
+  _fragmentsPrefab: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
+  _upwardSpeed: 1.5
+  _outwardSpeed: 0.8
+  _spin: 3
+  _pushDelay: 1
+  _backwardSpeed: 8
+  _lifetimeAfterPush: 5
 --- !u!1 &1551592304
 GameObject:
   m_ObjectHideFlags: 0

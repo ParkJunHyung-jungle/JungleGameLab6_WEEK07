@@ -9,9 +9,6 @@ using KeyboardModeling;
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
-    public static event Action<GameManager> PlaytestRoundStarted;
-    public static event Action<GameManager, string, bool> PlaytestRoundEnded;
-    public static event Action PlaytestLogFolderRequested;
 
     [Header("Spawner References")]
     [SerializeField] private KeyboardSpawner _keyboardSpawner;
@@ -34,11 +31,15 @@ public class GameManager : MonoBehaviour
     [Header("Result UI")]
     [SerializeField] private GameObject _resultPanel;
     [SerializeField] private Text _resultText;
-    [SerializeField] private bool _useGuiFallback = true;
+    [SerializeField] private Text _resultTitleText;
+    [SerializeField] private Text _resultScoreText;
 
     [Header("콤보 HUD")]
     [SerializeField] private KeyboardScoreCombo _comboHUD;
     [SerializeField] private KeyboardScoreCombo _enemyScoreCombo;
+    [Header("시간 UI")]
+    [SerializeField] private Text _timeTexts;
+    private Color _defaultTimeTextColor = Color.white;
 
     [Header("Runtime State")]
     private GameObject _activeKeyboard;
@@ -47,19 +48,11 @@ public class GameManager : MonoBehaviour
     private float _remainingTime;
     private float _elapsedRoundTime;
     private bool _isTimerRunning;
-    private bool _playtestRoundActive;
 
     [Header("Enemy Runtime State")]
     private GameObject _activeEnemyKeyboard;
     private KeyboardDestruction _activeEnemyDestruction;
     private Coroutine _enemyRespawnRoutine;
-
-    [Header("Result Runtime State")]
-    private bool _showResultOverlay;
-    private string _resultTitle = string.Empty;
-    private string _resultScoreSummary = string.Empty;
-    private Color _resultColor = Color.white;
-    private Texture2D _backgroundTexture;
 
     public GameObject ActiveKeyboard => _activeKeyboard;
     public GameObject ActiveEnemyKeyboard => _activeEnemyKeyboard;
@@ -67,24 +60,10 @@ public class GameManager : MonoBehaviour
     public float ElapsedRoundTime => _elapsedRoundTime;
     public float RoundTimeLimit => _roundTimeLimit;
     public bool IsTimerRunning => _isTimerRunning;
-    public KeyboardScoreCombo PlaytestPlayerScore => _comboHUD;
-    public KeyboardScoreCombo PlaytestEnemyScore => _enemyScoreCombo;
 
     public event Action<float> TimerUpdated;
     public event Action RoundTimeOut;
     public event Action<float> RoundCleared;
-
-    /// <summary>
-    /// 새 실행의 관찰용 라운드 이벤트 구독을 초기화한다.
-    /// 게임 상태는 유지하며 이전 실행의 로깅 구독만 제거한다.
-    /// </summary>
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetPlaytestObservers()
-    {
-        PlaytestRoundStarted = null;
-        PlaytestRoundEnded = null;
-        PlaytestLogFolderRequested = null;
-    }
 
     void Awake()
     {
@@ -169,6 +148,14 @@ public class GameManager : MonoBehaviour
         {
             _enemyScoreCombo.SetTrackingEnabled(true);
         }
+
+        if (_resultPanel != null)
+        {
+            _resultPanel.SetActive(false);
+        }
+
+        _defaultTimeTextColor = _timeTexts.color;
+        UpdateTimerText(_roundTimeLimit);
     }
 
     void Start()
@@ -201,6 +188,7 @@ public class GameManager : MonoBehaviour
         _elapsedRoundTime += Time.deltaTime;
         _remainingTime = Mathf.Max(0f, _remainingTime - Time.deltaTime);
         TimerUpdated?.Invoke(_remainingTime);
+        UpdateTimerText(_remainingTime);
 
         // 타이머 가동 중일 때 로봇의 타건 처리를 갱신한다.
         if (_enemyTypingController != null)
@@ -214,19 +202,8 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void OnGUI()
-    {
-        if (!_useGuiFallback || !_showResultOverlay)
-        {
-            return;
-        }
-
-        DrawResultOverlay();
-    }
-
     void OnDestroy()
     {
-        NotifyPlaytestRoundEnded("SceneExit", false);
         if (_keyboardSpawner != null)
         {
             _keyboardSpawner.KeyboardSpawned -= HandleKeyboardSpawned;
@@ -239,12 +216,6 @@ public class GameManager : MonoBehaviour
 
         UnsubscribeKeyboardDestruction();
         UnsubscribeEnemyKeyboardDestruction();
-
-        if (_backgroundTexture != null)
-        {
-            Destroy(_backgroundTexture);
-            _backgroundTexture = null;
-        }
     }
 
     /// <summary>
@@ -294,22 +265,20 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        NotifyPlaytestRoundEnded("Restart", false);
         _remainingTime = _roundTimeLimit;
         _elapsedRoundTime = 0f;
         _isTimerRunning = true;
 
-        _showResultOverlay = false;
         if (_resultPanel != null)
         {
             _resultPanel.SetActive(false);
         }
 
+        UpdateTimerText(_remainingTime);
+
         // 게임 제한 시간과 경과 시간을 초기화하고 타이머를 시작한다.
         Debug.Log($"[GameManager] Game Timer Started. Limit: {_roundTimeLimit:F1}s");
         TimerUpdated?.Invoke(_remainingTime);
-        _playtestRoundActive = true;
-        PlaytestRoundStarted?.Invoke(this);
     }
 
     /// <summary>
@@ -319,7 +288,6 @@ public class GameManager : MonoBehaviour
     public void StopRoundTimer()
     {
         _isTimerRunning = false;
-        NotifyPlaytestRoundEnded("Stopped", false);
     }
 
     /// <summary>
@@ -376,6 +344,7 @@ public class GameManager : MonoBehaviour
     private void HandleTimeOut()
     {
         _isTimerRunning = false;
+        UpdateTimerText(0f);
 
         // 제한 시간 초과 로그를 출력하고 타임아웃 이벤트를 알린다.
         Debug.LogWarning($"[GameManager] Round Time Out! Limit of {_roundTimeLimit:F1}s reached.");
@@ -433,25 +402,11 @@ public class GameManager : MonoBehaviour
 
         // 플레이어와 로봇의 점수를 비교하고 결과를 콘솔에 출력한다.
         CompareAndLogScores();
-        NotifyPlaytestRoundEnded("TimeOut", true);
-    }
-
-    void OnApplicationQuit() { NotifyPlaytestRoundEnded("ApplicationQuit", false); }
-
-    /// <summary>
-    /// reason과 complete로 실제 대결 종료를 관찰자에게 한 번 알린다.
-    /// 로깅용 실행 상태만 변경하며 점수와 게임 진행은 변경하지 않는다.
-    /// </summary>
-    private void NotifyPlaytestRoundEnded(string reason, bool complete)
-    {
-        if (!_playtestRoundActive) return;
-        _playtestRoundActive = false;
-        PlaytestRoundEnded?.Invoke(this, reason, complete);
     }
 
     /// <summary>
-    /// 플레이어와 로봇의 점수 및 콤보를 비교하여 승패 결과를 콘솔에 출력하고 화면 중앙 UI에 반영한다.
-    /// _comboHUD와 _enemyScoreCombo의 점수를 비교하여 _resultTitle, _resultScoreSummary, _resultColor 및 UI 컴포넌트를 갱신한다.
+    /// 플레이어와 로봇의 점수 및 콤보를 비교하여 승패 결과를 콘솔에 출력하고 결과 UI에 문구와 수치를 할당한다.
+    /// _comboHUD와 _enemyScoreCombo의 점수를 비교하여 _resultPanel을 활성화하고 텍스트를 갱신한다.
     /// </summary>
     private void CompareAndLogScores()
     {
@@ -461,110 +416,67 @@ public class GameManager : MonoBehaviour
         long enemyScore = _enemyScoreCombo != null ? _enemyScoreCombo.Score : 0L;
         int enemyCombo = _enemyScoreCombo != null ? _enemyScoreCombo.Combo : 0;
 
+        string resultTitle;
         string resultMessage;
         if (playerScore > enemyScore)
         {
+            resultTitle = "플레이어 승리!";
             resultMessage = "플레이어 승리 (Player Win)";
-            _resultTitle = "플레이어 승리!";
-            _resultColor = new Color(0.2f, 1f, 0.3f);
         }
         else if (playerScore < enemyScore)
         {
+            resultTitle = "로봇 승리 (패배)";
             resultMessage = "로봇 승리 (Robot Win)";
-            _resultTitle = "로봇 승리 (패배)";
-            _resultColor = new Color(1f, 0.3f, 0.3f);
         }
         else
         {
+            resultTitle = "무 승 부";
             resultMessage = "무승부 (Draw)";
-            _resultTitle = "무 승 부";
-            _resultColor = new Color(1f, 0.9f, 0.2f);
         }
 
-        _resultScoreSummary = $"플레이어: {playerScore:N0}점 ({playerCombo} COMBO)\n로봇: {enemyScore:N0}점 ({enemyCombo} COMBO)";
+        string resultScoreSummary = $"플레이어: {playerScore:N0}점 ({playerCombo} COMBO)\n로봇: {enemyScore:N0}점 ({enemyCombo} COMBO)";
 
-        // UGUI 패널 및 텍스트 컴포넌트가 연결되어 있다면 활성화하고 내용을 갱신한다.
-        if (_resultPanel != null)
-        {
-            _resultPanel.SetActive(true);
-        }
-
-        if (_resultText != null)
-        {
-            _resultText.text = $"{_resultTitle}\n\n{_resultScoreSummary}";
-        }
-
-        _showResultOverlay = true;
+        // 결과 UI 게임 오브젝트가 존재하면 활성화하고 문구와 점수 수치만 할당한다.
+        ApplyResultUI(resultTitle, resultScoreSummary);
 
         // 플레이어와 로봇의 최종 점수 및 승패 결과를 로그로 기록한다.
         Debug.Log($"[GameManager] 결과 비교 - 플레이어: {playerScore}점 ({playerCombo}콤보) vs 로봇: {enemyScore}점 ({enemyCombo}콤보) => {resultMessage}");
     }
 
     /// <summary>
-    /// 게임 종료 후 플레이어와 로봇의 승패 및 최종 점수를 화면 중앙에 렌더링한다.
-    /// _resultTitle, _resultScoreSummary, _resultColor를 사용하여 화면 중앙에 박스와 텍스트를 출력한다.
+    /// 결과 UI 게임 오브젝트에 판정 문구 및 점수 상세 텍스트를 할당하고 패널을 활성화한다.
+    /// title 승패 판정 타이틀과 scoreSummary 점수/콤보 요약 문자열을 받아 UI 컴포넌트에 반영한다.
     /// </summary>
-    private void DrawResultOverlay()
+    private void ApplyResultUI(string title, string scoreSummary)
     {
-        float boxWidth = 560f;
-        float boxHeight = 280f;
-        float posX = (Screen.width - boxWidth) * 0.5f;
-        float posY = (Screen.height - boxHeight) * 0.5f;
+        _resultPanel.SetActive(true);
+        _resultTitleText.text = title;
+        _resultScoreText.text = scoreSummary;
+        _resultText.text = $"{title}\n\n{scoreSummary}";
+    }
 
-        Rect boxRect = new Rect(posX, posY, boxWidth, boxHeight);
+    /// <summary>
+    /// 남은 제한 시간을 전달받아 시간 UI 텍스트의 문자열과 색상을 갱신한다.
+    /// remainingTime 남은 제한 시간을 입력받아 _timeTexts의 text 및 color를 변경한다.
+    /// </summary>
+    private void UpdateTimerText(float remainingTime)
+    {
+        float clampedTime = Mathf.Max(0f, remainingTime);
+        int minutes = Mathf.FloorToInt(clampedTime / 60f);
+        float seconds = clampedTime % 60f;
 
-        // 어두운 반투명 배경 스타일을 구성한다.
-        if (_backgroundTexture == null)
+        // 1분 이상일 때는 분:초 형식으로 표시하고, 1분 미만일 때는 초.밀리초 형식으로 표시한다.
+        if (minutes > 0)
         {
-            _backgroundTexture = new Texture2D(1, 1);
-            _backgroundTexture.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.08f, 0.92f));
-            _backgroundTexture.Apply();
+            _timeTexts.text = $"{minutes:00}:{seconds:00.00}";
+        }
+        else
+        {
+            _timeTexts.text = $"{seconds:00.00}";
         }
 
-        GUIStyle boxStyle = new GUIStyle(GUI.skin.box)
-        {
-            normal = { background = _backgroundTexture }
-        };
-
-        GUI.Box(boxRect, GUIContent.none, boxStyle);
-
-        // 승패 타이틀 라벨을 화면 중앙 상단에 배치한다.
-        GUIStyle titleStyle = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 36,
-            fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleCenter,
-            normal = { textColor = _resultColor }
-        };
-
-        Rect titleRect = new Rect(posX, posY + 25f, boxWidth, 50f);
-        GUI.Label(titleRect, _resultTitle, titleStyle);
-
-        // 최종 결과 구분선을 중앙에 배치한다.
-        GUIStyle subTitleStyle = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 18,
-            fontStyle = FontStyle.Normal,
-            alignment = TextAnchor.MiddleCenter,
-            normal = { textColor = new Color(0.85f, 0.85f, 0.85f) }
-        };
-
-        Rect subTitleRect = new Rect(posX, posY + 85f, boxWidth, 30f);
-        GUI.Label(subTitleRect, "- 최종 결과 -", subTitleStyle);
-
-        // 플레이어와 로봇의 점수 및 콤보 상세 정보를 출력한다.
-        GUIStyle detailStyle = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 20,
-            fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleCenter,
-            normal = { textColor = Color.white }
-        };
-
-        Rect detailRect = new Rect(posX + 20f, posY + 125f, boxWidth - 40f, 85f);
-        GUI.Label(detailRect, _resultScoreSummary, detailStyle);
-        if (GUI.Button(new Rect(posX + 140f, posY + 230f, 280f, 34f), "로그 폴더 열기"))
-            PlaytestLogFolderRequested?.Invoke();
+        // 제한 시간이 10초 이하이고 타이머가 가동 중일 때는 붉은색 경고 색상으로 전환한다.
+        _timeTexts.color = clampedTime <= 10f && _isTimerRunning ? Color.red : _defaultTimeTextColor;
     }
 
     /// <summary>

@@ -1,0 +1,707 @@
+:root {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --text-main: #f8fafc;
+  --text-sub: #94a3b8;
+  --accent: #38bdf8;
+
+  /* 키캡 기본 */
+  --key-base: #1e2536;
+  --key-border: #333d52;
+  --key-text: #cbd5e1;
+  --key-subtext: #64748b;
+
+  /* 기본 1u 키 크기 */
+  --key-unit: 50px;
+  --key-height: 50px;
+  --key-gap: 6px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding: 32px 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 1160px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 헤더 */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: 16px;
+}
+
+.header-title h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-title p {
+  color: var(--text-sub);
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9999px;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+/* ===================================================
+   [세션 분석] CSV 세션 정보 및 업로드 카드
+   =================================================== */
+.session-info-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 14px;
+  padding: 22px 28px;
+  box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.session-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #38bdf8;
+  display: inline-block;
+}
+
+.session-id-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f8fafc;
+  word-break: break-all;
+}
+
+.session-sub-details {
+  font-size: 13px;
+  color: #94a3b8;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-sub-details span {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.csv-upload-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.upload-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.csv-upload-btn {
+  background: #0284c7;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid #38bdf8;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.csv-upload-btn:hover {
+  background: #0369a1;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(56, 189, 248, 0.6);
+}
+
+.csv-upload-btn.btn-secondary {
+  background: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.csv-upload-btn.btn-secondary:hover {
+  background: #334155;
+  border-color: #94a3b8;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(148, 163, 184, 0.4);
+}
+
+.csv-upload-btn.btn-danger {
+  background: #451a1a;
+  border-color: #ef4444;
+  color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.csv-upload-btn.btn-danger:hover {
+  background: #7f1d1d;
+  border-color: #f87171;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+}
+
+.upload-hint {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* ===================================================
+   [최상위 항목] 플레이어 선택 글로벌 카드 (Player Global Card)
+   =================================================== */
+.player-global-card {
+  background: linear-gradient(135deg, #2e1065 0%, #1e1b4b 50%, #0f172a 100%);
+  border: 1px solid #7c3aed;
+  border-radius: 14px;
+  padding: 20px 28px;
+  box-shadow: 0 10px 30px -5px rgba(124, 58, 237, 0.35);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.player-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.player-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #9333ea, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);
+}
+
+.player-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.player-tag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #c084fc;
+  text-transform: uppercase;
+}
+
+.player-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-id-badge {
+  background: rgba(192, 132, 252, 0.2);
+  color: #e9d5ff;
+  border: 1px solid rgba(192, 132, 252, 0.4);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.player-display-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.player-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-arrow-btn {
+  background: #3b0764;
+  color: #f5d0fe;
+  border: 1px solid #9333ea;
+  border-radius: 8px;
+  width: 42px;
+  height: 42px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.player-arrow-btn:hover {
+  background: #7e22ce;
+  border-color: #c084fc;
+  color: #ffffff;
+  transform: scale(1.08);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.6);
+}
+
+.player-arrow-btn:active {
+  transform: scale(0.95);
+}
+
+.player-tabs {
+  display: flex;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #4c1d95;
+}
+
+.player-tab-btn {
+  background: transparent;
+  border: none;
+  color: #d8b4fe;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.player-tab-btn:hover {
+  color: #ffffff;
+  background: rgba(147, 51, 234, 0.25);
+}
+
+.player-tab-btn.active {
+  background: #7e22ce;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(126, 34, 206, 0.5);
+}
+
+/* ===================================================
+   [하위 항목] 키보드 종류 전환 컨트롤러 (정중앙 정렬 툴바)
+   =================================================== */
+.keyboard-type-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin: 0 auto 24px auto;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.type-selector-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.type-nav-btn {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.type-nav-btn:hover {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: scale(1.08);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.type-nav-btn:active {
+  transform: scale(0.95);
+}
+
+.type-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 260px;
+  text-align: center;
+}
+
+.type-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 3px 12px;
+  border-radius: 9999px;
+  letter-spacing: 0.5px;
+}
+
+.type-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.type-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.type-tab-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.type-tab-btn:hover {
+  color: #f8fafc;
+  border-color: #475569;
+}
+
+.type-tab-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+}
+
+/* 카드 공통 */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-bottom: 20px;
+}
+
+/* ===================================================
+   View 2: 텐키리스 키보드 히트맵
+   =================================================== */
+.keyboard-wrapper {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.keyboard-case {
+  display: inline-flex;
+  gap: 20px;
+  background: #111827;
+  border: 2px solid #374151;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6), 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.section-main,
+.section-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--key-gap);
+}
+
+.kb-row {
+  display: flex;
+  gap: var(--key-gap);
+}
+
+.kb-row.f-row {
+  margin-bottom: 8px;
+}
+
+.f-gap {
+  width: calc(var(--key-unit) * 0.5);
+}
+
+.f-gap-large {
+  width: calc(var(--key-unit) * 0.7);
+}
+
+.nav-spacer {
+  height: var(--key-height);
+}
+
+/* 키캡 스타일 */
+.key {
+  position: relative;
+  height: var(--key-height);
+  width: var(--key-unit);
+  border-radius: 6px;
+  background: var(--key-base);
+  border: 1px solid var(--key-border);
+  color: var(--key-text);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 3px;
+  user-select: none;
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  cursor: default;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+.key:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.6);
+  filter: brightness(1.2);
+  z-index: 10;
+}
+
+.key-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.key-count {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0.9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+}
+
+.key.has-count .key-count {
+  opacity: 1;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* 특수 키 너비 */
+.key.w-1-25 {
+  width: calc(var(--key-unit) * 1.25 + var(--key-gap) * 0.25);
+}
+
+.key.w-1-5 {
+  width: calc(var(--key-unit) * 1.5 + var(--key-gap) * 0.5);
+}
+
+.key.w-1-75 {
+  width: calc(var(--key-unit) * 1.75 + var(--key-gap) * 0.75);
+}
+
+.key.w-2 {
+  width: calc(var(--key-unit) * 2 + var(--key-gap) * 1);
+}
+
+.key.w-2-25 {
+  width: calc(var(--key-unit) * 2.25 + var(--key-gap) * 1.25);
+}
+
+.key.w-2-75 {
+  width: calc(var(--key-unit) * 2.75 + var(--key-gap) * 1.75);
+}
+
+.key.w-6-25 {
+  width: calc(var(--key-unit) * 6.25 + var(--key-gap) * 5.25);
+}
+
+/* 히트맵 범례 */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--text-sub);
+  justify-content: flex-end;
+}
+
+.legend-bar {
+  width: 180px;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(to right, #1e2536, #0284c7, #10b981, #f59e0b, #ef4444);
+  border: 1px solid var(--card-border);
+}
+
+/* ===================================================
+   View 3: 상위 입력 키 순위 (막대 차트)
+   =================================================== */
+.ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.ranking-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.ranking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.ranking-key {
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rank-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #334155;
+  color: #f1f5f9;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.rank-1 .rank-num {
+  background: #eab308;
+  color: #000;
+}
+
+.rank-2 .rank-num {
+  background: #94a3b8;
+  color: #000;
+}
+
+.rank-3 .rank-num {
+  background: #b45309;
+  color: #fff;
+}
+
+.ranking-stat {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+
+.ranking-stat strong {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.bar-track {
+  width: 100%;
+  height: 8px;
+  background: #334155;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #38bdf8, #ef4444);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}

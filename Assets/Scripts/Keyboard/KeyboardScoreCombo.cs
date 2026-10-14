@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -14,6 +15,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     [Header("Input")]
     [SerializeField] private KeyboardInputController _keyboard;
     private KeycapHealth[] _keycaps;
+    private IReadOnlyDictionary<Key, KeycapHealth> _keycapLayout;
 
     [Header("Runtime State")]
     private long _score;
@@ -43,6 +45,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
         if (_keyboard != null)
         {
             _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+            _keycapLayout = _keyboard.GetKeycapLayout();
         }
     }
 
@@ -94,6 +97,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
         if (_keyboard != null)
         {
             _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+            _keycapLayout = _keyboard.GetKeycapLayout();
             if (isActiveAndEnabled)
             {
                 SubscribeEvents();
@@ -102,6 +106,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
         else
         {
             _keycaps = null;
+            _keycapLayout = null;
         }
     }
 
@@ -178,11 +183,16 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     }
 
     /// <summary>
-    /// 정상 처리된 key 입력에 현재 콤보 배율을 적용하여 누적 점수를 증가시킨다.
-    /// 입력 후 공격과 파괴가 실행되기 전에 점수를 반영하고 상태 변경을 알린다.
+    /// key에 연결된 키캡의 현재 체력이 남아 있을 때만 현재 콤보 배율로 누적 점수를 증가시킨다.
+    /// 공격과 파괴 전에 체력을 확인하여 마지막 파괴 입력까지 점수를 지급하고 상태 변경을 알린다.
     /// </summary>
     private void HandleKeyPressed(Key key)
     {
+        if (!_keycapLayout.TryGetValue(key, out KeycapHealth keycap) || keycap == null || keycap.CurrentHP <= 0)
+        {
+            return;
+        }
+
         _score += (int)(BASE_SCORE * Multiplier);
         StateChanged?.Invoke();
     }

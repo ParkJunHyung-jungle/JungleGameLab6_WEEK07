@@ -56,7 +56,7 @@ public static class KeyboardScoreComboSceneSetup
             new Vector2(280f, 32f), "x1배", font, 24, TextAnchor.MiddleCenter);
 
         RectTransform track = CreateRect("TimerTrack", comboGroup, new Vector2(0.5f, 1f),
-            new Vector2(0f, -108f), new Vector2(240f, 10f));
+            new Vector2(0f, -103f), new Vector2(480f, 20f));
         Image background = track.gameObject.AddComponent<Image>();
         background.color = new Color(0f, 0f, 0f, 0.45f);
         background.raycastTarget = false;
@@ -66,7 +66,6 @@ public static class KeyboardScoreComboSceneSetup
         fillRect.offsetMin = new Vector2(1f, 1f);
         fillRect.offsetMax = new Vector2(-1f, -1f);
         Image fill = fillRect.gameObject.AddComponent<Image>();
-        fill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
         fill.type = Image.Type.Filled;
         fill.fillMethod = Image.FillMethod.Horizontal;
         fill.fillOrigin = 0;

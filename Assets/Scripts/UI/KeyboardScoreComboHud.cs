@@ -15,6 +15,23 @@ namespace Game.UI
         [SerializeField] private Text _multiplierText;
         [SerializeField] private Image _timerFill;
 
+        [Header("Gauge Layout")]
+        private RectTransform _timerRect;
+        private Vector2 _timerAnchorMin;
+        private Vector2 _timerAnchorMax;
+        private Vector2 _timerOffsetMin;
+        private Vector2 _timerOffsetMax;
+
+        void Awake()
+        {
+            _timerRect = _timerFill.rectTransform;
+            _timerAnchorMin = _timerRect.anchorMin;
+            _timerAnchorMax = _timerRect.anchorMax;
+            _timerOffsetMin = _timerRect.offsetMin;
+            _timerOffsetMax = _timerRect.offsetMax;
+            _timerFill.type = Image.Type.Simple;
+        }
+
         void OnEnable()
         {
             _scoreCombo.StateChanged += RefreshState;
@@ -44,12 +61,22 @@ namespace Game.UI
         }
 
         /// <summary>
-        /// 남은 유지시간 비율 ratio를 가로 게이지의 채움량에 반영한다.
-        /// 0에서 1 범위로 제한한 값으로 표시만 갱신한다.
+        /// 남은 유지시간 비율 ratio로 게이지의 양 끝을 기존 중앙을 향해 대칭적으로 이동한다.
+        /// 원래 앵커와 여백을 기준으로 너비만 변경하며 중앙 위치와 높이는 유지한다.
         /// </summary>
         private void RefreshTimer(float ratio)
         {
-            _timerFill.fillAmount = Mathf.Clamp01(ratio);
+            float amount = Mathf.Clamp01(ratio);
+            float anchorCenter = (_timerAnchorMin.x + _timerAnchorMax.x) * 0.5f;
+            float offsetCenter = (_timerOffsetMin.x + _timerOffsetMax.x) * 0.5f;
+            _timerRect.anchorMin = new Vector2(
+                Mathf.Lerp(anchorCenter, _timerAnchorMin.x, amount), _timerAnchorMin.y);
+            _timerRect.anchorMax = new Vector2(
+                Mathf.Lerp(anchorCenter, _timerAnchorMax.x, amount), _timerAnchorMax.y);
+            _timerRect.offsetMin = new Vector2(
+                Mathf.Lerp(offsetCenter, _timerOffsetMin.x, amount), _timerOffsetMin.y);
+            _timerRect.offsetMax = new Vector2(
+                Mathf.Lerp(offsetCenter, _timerOffsetMax.x, amount), _timerOffsetMax.y);
         }
     }
 }

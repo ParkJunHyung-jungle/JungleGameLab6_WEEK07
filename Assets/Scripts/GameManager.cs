@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 
 using UnityEngine;
+using UnityEngine.UI;
 
 using KeyboardModeling;
 
@@ -27,6 +28,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private bool _timerEnabled = true;
     [SerializeField, Min(1f)] private float _roundTimeLimit = 60f;
 
+    [Header("Result UI")]
+    [SerializeField] private GameObject _resultPanel;
+    [SerializeField] private Text _resultText;
+    [SerializeField] private bool _useGuiFallback = true;
+
     [Header("콤보 HUD")]
     [SerializeField] private KeyboardScoreCombo _comboHUD;
     [SerializeField] private KeyboardScoreCombo _enemyScoreCombo;
@@ -43,6 +49,13 @@ public class GameManager : MonoBehaviour
     private GameObject _activeEnemyKeyboard;
     private KeyboardDestruction _activeEnemyDestruction;
     private Coroutine _enemyRespawnRoutine;
+
+    [Header("Result Runtime State")]
+    private bool _showResultOverlay;
+    private string _resultTitle = string.Empty;
+    private string _resultScoreSummary = string.Empty;
+    private Color _resultColor = Color.white;
+    private Texture2D _backgroundTexture;
 
     public GameObject ActiveKeyboard => _activeKeyboard;
     public GameObject ActiveEnemyKeyboard => _activeEnemyKeyboard;
@@ -183,6 +196,16 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    void OnGUI()
+    {
+        if (!_useGuiFallback || !_showResultOverlay)
+        {
+            return;
+        }
+
+        DrawResultOverlay();
+    }
+
     void OnDestroy()
     {
         if (_keyboardSpawner != null)
@@ -197,6 +220,12 @@ public class GameManager : MonoBehaviour
 
         UnsubscribeKeyboardDestruction();
         UnsubscribeEnemyKeyboardDestruction();
+
+        if (_backgroundTexture != null)
+        {
+            Destroy(_backgroundTexture);
+            _backgroundTexture = null;
+        }
     }
 
     /// <summary>
@@ -249,6 +278,12 @@ public class GameManager : MonoBehaviour
         _remainingTime = _roundTimeLimit;
         _elapsedRoundTime = 0f;
         _isTimerRunning = true;
+
+        _showResultOverlay = false;
+        if (_resultPanel != null)
+        {
+            _resultPanel.SetActive(false);
+        }
 
         // 게임 제한 시간과 경과 시간을 초기화하고 타이머를 시작한다.
         Debug.Log($"[GameManager] Game Timer Started. Limit: {_roundTimeLimit:F1}s");
@@ -378,8 +413,8 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 플레이어와 로봇의 점수 및 콤보를 비교하여 승패 결과를 콘솔에 출력한다.
-    /// _comboHUD와 _enemyScoreCombo의 Score 및 Combo를 비교하여 결과를 Debug.Log로 출력한다.
+    /// 플레이어와 로봇의 점수 및 콤보를 비교하여 승패 결과를 콘솔에 출력하고 화면 중앙 UI에 반영한다.
+    /// _comboHUD와 _enemyScoreCombo의 점수를 비교하여 _resultTitle, _resultScoreSummary, _resultColor 및 UI 컴포넌트를 갱신한다.
     /// </summary>
     private void CompareAndLogScores()
     {
@@ -393,18 +428,104 @@ public class GameManager : MonoBehaviour
         if (playerScore > enemyScore)
         {
             resultMessage = "플레이어 승리 (Player Win)";
+            _resultTitle = "플레이어 승리!";
+            _resultColor = new Color(0.2f, 1f, 0.3f);
         }
         else if (playerScore < enemyScore)
         {
             resultMessage = "로봇 승리 (Robot Win)";
+            _resultTitle = "로봇 승리 (패배)";
+            _resultColor = new Color(1f, 0.3f, 0.3f);
         }
         else
         {
             resultMessage = "무승부 (Draw)";
+            _resultTitle = "무 승 부";
+            _resultColor = new Color(1f, 0.9f, 0.2f);
         }
+
+        _resultScoreSummary = $"플레이어: {playerScore:N0}점 ({playerCombo} COMBO)\n로봇: {enemyScore:N0}점 ({enemyCombo} COMBO)";
+
+        // UGUI 패널 및 텍스트 컴포넌트가 연결되어 있다면 활성화하고 내용을 갱신한다.
+        if (_resultPanel != null)
+        {
+            _resultPanel.SetActive(true);
+        }
+
+        if (_resultText != null)
+        {
+            _resultText.text = $"{_resultTitle}\n\n{_resultScoreSummary}";
+        }
+
+        _showResultOverlay = true;
 
         // 플레이어와 로봇의 최종 점수 및 승패 결과를 로그로 기록한다.
         Debug.Log($"[GameManager] 결과 비교 - 플레이어: {playerScore}점 ({playerCombo}콤보) vs 로봇: {enemyScore}점 ({enemyCombo}콤보) => {resultMessage}");
+    }
+
+    /// <summary>
+    /// 게임 종료 후 플레이어와 로봇의 승패 및 최종 점수를 화면 중앙에 렌더링한다.
+    /// _resultTitle, _resultScoreSummary, _resultColor를 사용하여 화면 중앙에 박스와 텍스트를 출력한다.
+    /// </summary>
+    private void DrawResultOverlay()
+    {
+        float boxWidth = 560f;
+        float boxHeight = 240f;
+        float posX = (Screen.width - boxWidth) * 0.5f;
+        float posY = (Screen.height - boxHeight) * 0.5f;
+
+        Rect boxRect = new Rect(posX, posY, boxWidth, boxHeight);
+
+        // 어두운 반투명 배경 스타일을 구성한다.
+        if (_backgroundTexture == null)
+        {
+            _backgroundTexture = new Texture2D(1, 1);
+            _backgroundTexture.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.08f, 0.92f));
+            _backgroundTexture.Apply();
+        }
+
+        GUIStyle boxStyle = new GUIStyle(GUI.skin.box)
+        {
+            normal = { background = _backgroundTexture }
+        };
+
+        GUI.Box(boxRect, GUIContent.none, boxStyle);
+
+        // 승패 타이틀 라벨을 화면 중앙 상단에 배치한다.
+        GUIStyle titleStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 36,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = _resultColor }
+        };
+
+        Rect titleRect = new Rect(posX, posY + 25f, boxWidth, 50f);
+        GUI.Label(titleRect, _resultTitle, titleStyle);
+
+        // 최종 결과 구분선을 중앙에 배치한다.
+        GUIStyle subTitleStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 18,
+            fontStyle = FontStyle.Normal,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = new Color(0.85f, 0.85f, 0.85f) }
+        };
+
+        Rect subTitleRect = new Rect(posX, posY + 85f, boxWidth, 30f);
+        GUI.Label(subTitleRect, "- 최종 결과 -", subTitleStyle);
+
+        // 플레이어와 로봇의 점수 및 콤보 상세 정보를 출력한다.
+        GUIStyle detailStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 20,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = Color.white }
+        };
+
+        Rect detailRect = new Rect(posX + 20f, posY + 125f, boxWidth - 40f, 85f);
+        GUI.Label(detailRect, _resultScoreSummary, detailStyle);
     }
 
     /// <summary>

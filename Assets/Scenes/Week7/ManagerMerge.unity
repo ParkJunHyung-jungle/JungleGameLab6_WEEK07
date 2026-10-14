@@ -428,6 +428,17 @@ MonoBehaviour:
   _comboText: {fileID: 0}
   _multiplierText: {fileID: 0}
   _timerFill: {fileID: 0}
+--- !u!114 &197294870 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5968179292458924319, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
+  m_PrefabInstance: {fileID: 139051535}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b28728d75cf0a4b8fc234ceeae15ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardScoreCombo
 --- !u!1 &577925185
 GameObject:
   m_ObjectHideFlags: 0
@@ -480,8 +491,9 @@ MonoBehaviour:
   _animateFirstSpawn: 1
   _respawnDelay: 0.3
   _timerEnabled: 1
-  _roundTimeLimit: 60
-  _comboHUD: {fileID: 0}
+  _roundTimeLimit: 10
+  _comboHUD: {fileID: 197294870}
+  _enemyScoreCombo: {fileID: 0}
 --- !u!4 &577925188
 Transform:
   m_ObjectHideFlags: 0
@@ -1085,10 +1097,10 @@ SceneRoots:
   m_Roots:
   - {fileID: 1020097088}
   - {fileID: 41034346}
-  - {fileID: 577925188}
   - {fileID: 1741883104}
   - {fileID: 1304059275}
   - {fileID: 1765913608}
+  - {fileID: 577925188}
   - {fileID: 892835218}
   - {fileID: 139051535}
   - {fileID: 944290676}

@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
 
     [Header("콤보 HUD")]
     [SerializeField] private KeyboardScoreCombo _comboHUD;
+    [SerializeField] private KeyboardScoreCombo _enemyScoreCombo;
 
     [Header("Runtime State")]
     private GameObject _activeKeyboard;
@@ -53,9 +54,28 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
 
+        // 플레이어 콤보 HUD 컴포넌트를 탐색하여 연결한다.
         if (_comboHUD == null)
         {
-            _comboHUD = FindFirstObjectByType<KeyboardScoreCombo>();
+            Game.UI.KeyboardScoreComboHud hud = FindFirstObjectByType<Game.UI.KeyboardScoreComboHud>();
+            if (hud != null)
+            {
+                _comboHUD = hud.GetComponent<KeyboardScoreCombo>();
+            }
+            else
+            {
+                _comboHUD = FindFirstObjectByType<KeyboardScoreCombo>();
+            }
+        }
+
+        // 로봇의 점수 및 콤보를 추적하는 컴포넌트를 탐색하여 연결한다.
+        if (_enemyScoreCombo == null)
+        {
+            EnemyScoreComboBinding enemyBinding = FindFirstObjectByType<EnemyScoreComboBinding>();
+            if (enemyBinding != null)
+            {
+                _enemyScoreCombo = enemyBinding.GetComponent<KeyboardScoreCombo>();
+            }
         }
     }
 
@@ -227,8 +247,8 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 게임 제한 시간이 만료되었을 때 키보드 입력을 차단하고 후속 처리를 진행한다.
-    /// _activeKeyboard의 입력을 비활성화하고 리스폰 코루틴 및 콤보 타이머를 정지한다.
+    /// 게임 제한 시간이 만료되었을 때 키보드 입력을 차단하고 점수를 비교하는 등 후속 처리를 진행한다.
+    /// _activeKeyboard의 입력을 비활성화하고 리스폰 코루틴 및 콤보 타이머를 정지하며 최종 점수를 비교 출력한다.
     /// </summary>
     private void OnTimeOut()
     {
@@ -256,6 +276,46 @@ public class GameManager : MonoBehaviour
         {
             _comboHUD.SetTimerPaused(true);
         }
+
+        // 제한 시간 종료 시 로봇의 타건 및 라운드도 함께 정지한다.
+        EnemyRoundController enemyRound = FindFirstObjectByType<EnemyRoundController>();
+        if (enemyRound != null && enemyRound.IsRunning)
+        {
+            enemyRound.EndRound();
+        }
+
+        // 플레이어와 로봇의 점수를 비교하고 결과를 콘솔에 출력한다.
+        CompareAndLogScores();
+    }
+
+    /// <summary>
+    /// 플레이어와 로봇의 점수 및 콤보를 비교하여 승패 결과를 콘솔에 출력한다.
+    /// _comboHUD와 _enemyScoreCombo의 Score 및 Combo를 비교하여 결과를 Debug.Log로 출력한다.
+    /// </summary>
+    private void CompareAndLogScores()
+    {
+        long playerScore = _comboHUD != null ? _comboHUD.Score : 0L;
+        int playerCombo = _comboHUD != null ? _comboHUD.Combo : 0;
+
+        long enemyScore = _enemyScoreCombo != null ? _enemyScoreCombo.Score : 0L;
+        int enemyCombo = _enemyScoreCombo != null ? _enemyScoreCombo.Combo : 0;
+
+        string resultMessage;
+        if (playerScore > enemyScore)
+        {
+            resultMessage = "플레이어 승리 (Player Win)";
+        }
+        else if (playerScore < enemyScore)
+        {
+            resultMessage = "로봇 승리 (Robot Win)";
+        }
+        else
+        {
+            resultMessage = "무승부 (Draw)";
+        }
+
+        // 플레이어와 로봇의 최종 점수 및 승패 결과를 로그로 기록한다.
+        Debug.Log($"[GameManager] 결과 비교 - 플레이어: {playerScore}점 ({playerCombo}콤보) vs 로봇: {enemyScore}점 ({enemyCombo}콤보) => {resultMessage}");
     }
 
     /// <summary>

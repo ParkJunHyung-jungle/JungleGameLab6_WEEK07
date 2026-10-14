@@ -13,6 +13,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private KeyboardSpawner _keyboardSpawner;
     [SerializeField] private Transform _keyboardSpawnPoint;
 
+    [Header("Enemy Spawner References")]
+    [SerializeField] private KeyboardSpawner _enemyKeyboardSpawner;
+    [SerializeField] private Transform _enemyKeyboardSpawnPoint;
+    [SerializeField] private EnemyTypingController _enemyTypingController;
+
     [Header("Game Settings")]
     [SerializeField] private bool _spawnOnStart = true;
     [SerializeField] private bool _animateFirstSpawn = true;
@@ -34,7 +39,13 @@ public class GameManager : MonoBehaviour
     private float _elapsedRoundTime;
     private bool _isTimerRunning;
 
+    [Header("Enemy Runtime State")]
+    private GameObject _activeEnemyKeyboard;
+    private KeyboardDestruction _activeEnemyDestruction;
+    private Coroutine _enemyRespawnRoutine;
+
     public GameObject ActiveKeyboard => _activeKeyboard;
+    public GameObject ActiveEnemyKeyboard => _activeEnemyKeyboard;
     public float RemainingTime => _remainingTime;
     public float ElapsedRoundTime => _elapsedRoundTime;
     public float RoundTimeLimit => _roundTimeLimit;
@@ -77,6 +88,56 @@ public class GameManager : MonoBehaviour
                 _enemyScoreCombo = enemyBinding.GetComponent<KeyboardScoreCombo>();
             }
         }
+
+        if (_enemyTypingController == null)
+        {
+            _enemyTypingController = FindFirstObjectByType<EnemyTypingController>();
+        }
+
+        if (_enemyKeyboardSpawnPoint == null)
+        {
+            GameObject placementObj = GameObject.Find("KeyboardPlacement");
+            if (placementObj != null)
+            {
+                _enemyKeyboardSpawnPoint = placementObj.transform;
+            }
+            else if (_enemyTypingController != null)
+            {
+                _enemyKeyboardSpawnPoint = _enemyTypingController.transform;
+            }
+        }
+
+        // 로봇 전용 스포너가 할당되지 않은 경우 플레이어 스포너 설정을 복제하여 생성한다.
+        if (_enemyKeyboardSpawner == null && _keyboardSpawner != null)
+        {
+            GameObject enemySpawnerObj = Instantiate(_keyboardSpawner.gameObject, transform);
+            enemySpawnerObj.name = "EnemyKeyboardSpawner";
+            _enemyKeyboardSpawner = enemySpawnerObj.GetComponent<KeyboardSpawner>();
+        }
+
+        // 로봇의 기존 자체 공급 및 라운드 제어 컴포넌트를 비활성화하여 충돌을 방지한다.
+        EnemyKeyboardProvider enemyProvider = FindFirstObjectByType<EnemyKeyboardProvider>();
+        if (enemyProvider != null)
+        {
+            enemyProvider.enabled = false;
+        }
+
+        EnemyRoundController enemyRound = FindFirstObjectByType<EnemyRoundController>();
+        if (enemyRound != null)
+        {
+            enemyRound.enabled = false;
+        }
+
+        EnemyScoreComboBinding activeBinding = FindFirstObjectByType<EnemyScoreComboBinding>();
+        if (activeBinding != null)
+        {
+            activeBinding.enabled = false;
+        }
+
+        if (_enemyScoreCombo != null)
+        {
+            _enemyScoreCombo.SetTrackingEnabled(true);
+        }
     }
 
     void Start()
@@ -86,9 +147,15 @@ public class GameManager : MonoBehaviour
             _keyboardSpawner.KeyboardSpawned += HandleKeyboardSpawned;
         }
 
+        if (_enemyKeyboardSpawner != null)
+        {
+            _enemyKeyboardSpawner.KeyboardSpawned += HandleEnemyKeyboardSpawned;
+        }
+
         if (_spawnOnStart)
         {
             SpawnKeyboard(_animateFirstSpawn);
+            SpawnEnemyKeyboard(_animateFirstSpawn);
         }
     }
 
@@ -104,6 +171,12 @@ public class GameManager : MonoBehaviour
         _remainingTime = Mathf.Max(0f, _remainingTime - Time.deltaTime);
         TimerUpdated?.Invoke(_remainingTime);
 
+        // 타이머 가동 중일 때 로봇의 타건 처리를 갱신한다.
+        if (_enemyTypingController != null)
+        {
+            _enemyTypingController.Tick(Time.deltaTime);
+        }
+
         if (_remainingTime <= 0f)
         {
             HandleTimeOut();
@@ -117,7 +190,13 @@ public class GameManager : MonoBehaviour
             _keyboardSpawner.KeyboardSpawned -= HandleKeyboardSpawned;
         }
 
+        if (_enemyKeyboardSpawner != null)
+        {
+            _enemyKeyboardSpawner.KeyboardSpawned -= HandleEnemyKeyboardSpawned;
+        }
+
         UnsubscribeKeyboardDestruction();
+        UnsubscribeEnemyKeyboardDestruction();
     }
 
     /// <summary>
@@ -264,24 +343,34 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // 진행 중인 키보드 리스폰이 있다면 중단한다.
+        // 진행 중인 플레이어 키보드 리스폰이 있다면 중단한다.
         if (_respawnRoutine != null)
         {
             StopCoroutine(_respawnRoutine);
             _respawnRoutine = null;
         }
 
-        // 콤보 타이머 감소를 정지하여 최종 상태를 보존한다.
+        // 플레이어 콤보 타이머 감소를 정지하여 최종 상태를 보존한다.
         if (_comboHUD != null)
         {
             _comboHUD.SetTimerPaused(true);
         }
 
-        // 제한 시간 종료 시 로봇의 타건 및 라운드도 함께 정지한다.
-        EnemyRoundController enemyRound = FindFirstObjectByType<EnemyRoundController>();
-        if (enemyRound != null && enemyRound.IsRunning)
+        // 로봇의 타건 및 리스폰도 함께 정지한다.
+        if (_enemyTypingController != null)
         {
-            enemyRound.EndRound();
+            _enemyTypingController.StopAttacking();
+        }
+
+        if (_enemyRespawnRoutine != null)
+        {
+            StopCoroutine(_enemyRespawnRoutine);
+            _enemyRespawnRoutine = null;
+        }
+
+        if (_enemyScoreCombo != null)
+        {
+            _enemyScoreCombo.SetTimerPaused(true);
         }
 
         // 플레이어와 로봇의 점수를 비교하고 결과를 콘솔에 출력한다.
@@ -376,5 +465,165 @@ public class GameManager : MonoBehaviour
 
         SpawnKeyboard(true);
         _respawnRoutine = null;
+    }
+
+    /// <summary>
+    /// 로봇 키보드 생성을 요청하고 완파 이벤트 및 타건 컨트롤러를 등록한다.
+    /// withAnimation 애니메이션 적용 여부를 사용하며 생성된 키보드 게임오브젝트를 반환한다.
+    /// </summary>
+    public GameObject SpawnEnemyKeyboard(bool withAnimation = true)
+    {
+        if (_enemyKeyboardSpawner == null || _enemyKeyboardSpawnPoint == null)
+        {
+            return null;
+        }
+
+        UnsubscribeEnemyKeyboardDestruction();
+
+        // 등록된 로봇 스폰 포인트를 기준으로 키보드 생성을 요청한다.
+        _activeEnemyKeyboard = _enemyKeyboardSpawner.SpawnKeyboard(_enemyKeyboardSpawnPoint, withAnimation);
+
+        if (_activeEnemyKeyboard != null)
+        {
+            _activeEnemyDestruction = _activeEnemyKeyboard.GetComponent<KeyboardDestruction>();
+            if (_activeEnemyDestruction == null)
+            {
+                _activeEnemyDestruction = _activeEnemyKeyboard.AddComponent<KeyboardDestruction>();
+            }
+
+            _activeEnemyDestruction.Breaking += HandleEnemyKeyboardBreaking;
+            _activeEnemyDestruction.Finished += HandleEnemyKeyboardFinished;
+
+            KeyboardInputController inputController = _activeEnemyKeyboard.GetComponent<KeyboardInputController>();
+            if (inputController != null)
+            {
+                inputController.SetInputEnabled(false);
+                inputController.enabled = false;
+            }
+
+            // 생성된 키보드를 로봇 타건 컨트롤러 및 스코어 콤보에 연결한다.
+            if (_enemyTypingController != null)
+            {
+                _enemyTypingController.SetKeyboard(inputController);
+            }
+
+            if (_enemyScoreCombo != null)
+            {
+                _enemyScoreCombo.Keyboard = inputController;
+            }
+        }
+
+        return _activeEnemyKeyboard;
+    }
+
+    /// <summary>
+    /// 로봇 키보드 스폰 및 커버 오픈이 완료되었을 때 로봇 타건 및 콤보 타이머를 시작한다.
+    /// keyboard 생성 완료된 키보드 인스턴스를 전달받으며 로봇 공격과 콤보 측정을 개시한다.
+    /// </summary>
+    private void HandleEnemyKeyboardSpawned(GameObject keyboard)
+    {
+        // 로봇 키보드는 플레이어의 실제 키보드 입력(Keyboard.current)을 받지 않도록 비활성화한다.
+        KeyboardInputController inputController = keyboard.GetComponent<KeyboardInputController>();
+        if (inputController != null)
+        {
+            inputController.SetInputEnabled(false);
+            inputController.enabled = false;
+        }
+
+        // 제한 시간이 이미 만료된 상태라면 타건을 시작하지 않는다.
+        if (_remainingTime <= 0f && _elapsedRoundTime > 0f)
+        {
+            return;
+        }
+
+        // 키보드 교환 연출이 완료되었으므로 로봇 타건과 콤보 타이머를 가동한다.
+        if (_enemyTypingController != null)
+        {
+            _enemyTypingController.StartAttacking();
+        }
+
+        if (_enemyScoreCombo != null)
+        {
+            _enemyScoreCombo.SetTimerPaused(false);
+        }
+    }
+
+    /// <summary>
+    /// 로봇 키보드의 마지막 키캡이 파괴된 순간 로봇 타건을 멈추고 콤보 타이머를 일시정지한다.
+    /// 완파 연출 중에는 타건을 중단하고 교환 완료 전까지 콤보 타이머 감소를 정지한다.
+    /// </summary>
+    private void HandleEnemyKeyboardBreaking()
+    {
+        // 완파 연출 중에는 로봇의 타건을 정지한다.
+        if (_enemyTypingController != null)
+        {
+            _enemyTypingController.StopAttacking();
+        }
+
+        // 로봇 키보드 교환 완료 전까지 콤보 타이머 감소를 일시정지한다.
+        if (_enemyScoreCombo != null)
+        {
+            _enemyScoreCombo.SetTimerPaused(true);
+        }
+    }
+
+    /// <summary>
+    /// 로봇 키보드 완파 연출 완료를 수신하여 새 로봇 키보드 리스폰 코루틴을 시작한다.
+    /// _activeEnemyDestruction의 Finished 이벤트 발생 시 호출되며 리스폰 코루틴을 가동한다.
+    /// </summary>
+    private void HandleEnemyKeyboardFinished()
+    {
+        UnsubscribeEnemyKeyboardDestruction();
+
+        // 제한 시간이 이미 만료되었다면 새 키보드를 리스폰하지 않는다.
+        if (_remainingTime <= 0f && _elapsedRoundTime > 0f)
+        {
+            return;
+        }
+
+        if (_enemyRespawnRoutine != null)
+        {
+            StopCoroutine(_enemyRespawnRoutine);
+        }
+
+        _enemyRespawnRoutine = StartCoroutine(EnemyRespawnRoutine());
+    }
+
+    /// <summary>
+    /// 지연 시간 대기 후 이전 로봇 키보드를 정리하고 새 로봇 키보드를 스폰한다.
+    /// _respawnDelay 대기 시간을 거쳐 슬라이드 애니메이션과 함께 키보드를 새로 스폰한다.
+    /// </summary>
+    private IEnumerator EnemyRespawnRoutine()
+    {
+        float timer = 0f;
+        while (timer < _respawnDelay)
+        {
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        // 이전 로봇 키보드 오브젝트가 남아 있다면 정리하고 새 키보드를 스폰한다.
+        if (_activeEnemyKeyboard != null)
+        {
+            Destroy(_activeEnemyKeyboard);
+            _activeEnemyKeyboard = null;
+        }
+
+        SpawnEnemyKeyboard(true);
+        _enemyRespawnRoutine = null;
+    }
+
+    /// <summary>
+    /// 현재 활성화된 로봇 키보드의 파괴 관련 이벤트 구독을 해제한다.
+    /// _activeEnemyDestruction의 Breaking 및 Finished 이벤트를 해제하고 참조를 초기화한다.
+    /// </summary>
+    private void UnsubscribeEnemyKeyboardDestruction()
+    {
+        if (_activeEnemyDestruction != null)
+        {
+            _activeEnemyDestruction.Breaking -= HandleEnemyKeyboardBreaking;
+            _activeEnemyDestruction.Finished -= HandleEnemyKeyboardFinished;
+            _activeEnemyDestruction = null;
+        }
     }
 }

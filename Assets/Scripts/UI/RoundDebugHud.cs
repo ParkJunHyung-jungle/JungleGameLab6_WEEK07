@@ -68,7 +68,10 @@ public class RoundDebugHud : MonoBehaviour
     /// </summary>
     private void DrawDebugHud()
     {
-        Rect boxRect = new Rect(_hudPosition.x, _hudPosition.y, HUD_WIDTH, HUD_HEIGHT);
+        float posX = _hudPosition.x;
+        float posY = Screen.height - HUD_HEIGHT - _hudPosition.y;
+
+        Rect boxRect = new Rect(posX, posY, HUD_WIDTH, HUD_HEIGHT);
         GUI.Box(boxRect, "=== 라운드 & 타이머 디버그 ===");
 
         GUIStyle labelStyle = new GUIStyle(GUI.skin.label)
@@ -77,7 +80,7 @@ public class RoundDebugHud : MonoBehaviour
             fontStyle = FontStyle.Bold
         };
 
-        float startY = _hudPosition.y + 30f;
+        float startY = posY + 30f;
         float lineHeight = _fontSize + 8f;
 
         // 현재 라운드 상태 결정 및 색상 설정
@@ -101,30 +104,30 @@ public class RoundDebugHud : MonoBehaviour
         }
 
         labelStyle.normal.textColor = statusColor;
-        GUI.Label(new Rect(_hudPosition.x + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"상태: {statusText}", labelStyle);
+        GUI.Label(new Rect(posX + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"상태: {statusText}", labelStyle);
 
         labelStyle.normal.textColor = Color.white;
         startY += lineHeight;
-        GUI.Label(new Rect(_hudPosition.x + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"진행 대상: 키보드 #{_clearedRoundCount + 1}", labelStyle);
+        GUI.Label(new Rect(posX + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"진행 대상: 키보드 #{_clearedRoundCount + 1}", labelStyle);
 
         // 남은 제한 시간 표시 (10초 미만 경고 색상)
         startY += lineHeight;
         float remaining = _gameManager.RemainingTime;
         float limit = _gameManager.RoundTimeLimit;
         labelStyle.normal.textColor = remaining <= 10f && _gameManager.IsTimerRunning ? Color.red : Color.cyan;
-        GUI.Label(new Rect(_hudPosition.x + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"제한 시간: {remaining:F1}초 / {limit:F1}초", labelStyle);
+        GUI.Label(new Rect(posX + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"제한 시간: {remaining:F1}초 / {limit:F1}초", labelStyle);
 
         // 이번 라운드 소요 시간 표시
         startY += lineHeight;
         labelStyle.normal.textColor = Color.white;
         float elapsed = _gameManager.ElapsedRoundTime;
-        GUI.Label(new Rect(_hudPosition.x + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"처치 소요 시간: {elapsed:F2}초", labelStyle);
+        GUI.Label(new Rect(posX + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"처치 소요 시간: {elapsed:F2}초", labelStyle);
 
         // 이전 라운드 기록 표시
         startY += lineHeight;
         labelStyle.normal.textColor = Color.yellow;
         string lastDefeatStr = _lastDefeatTime > 0f ? $"{_lastDefeatTime:F2}초" : "-";
-        GUI.Label(new Rect(_hudPosition.x + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"직전 처치 기록: {lastDefeatStr} (누적 처치: {_clearedRoundCount}개)", labelStyle);
+        GUI.Label(new Rect(posX + 15f, startY, HUD_WIDTH - 30f, lineHeight), $"직전 처치 기록: {lastDefeatStr} (누적 처치: {_clearedRoundCount}개)", labelStyle);
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 using System;
 using System.Collections;
-
+using UnityEngine.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -752,5 +752,11 @@ public class GameManager : MonoBehaviour
             _activeEnemyDestruction.Finished -= HandleEnemyKeyboardFinished;
             _activeEnemyDestruction = null;
         }
+    }
+
+    public void RestartGame()
+    {
+        Scene currentScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(currentScene.buildIndex);
     }
 }

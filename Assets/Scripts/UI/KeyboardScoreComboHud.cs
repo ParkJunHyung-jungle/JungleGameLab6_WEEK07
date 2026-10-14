@@ -11,6 +11,7 @@ namespace Game.UI
         [Header("References")]
         [SerializeField] private KeyboardScoreCombo _scoreCombo;
         [SerializeField] private Text _scoreText;
+        [SerializeField] private string _scoreLabel = "score";
         [SerializeField] private Text _comboText;
         [SerializeField] private Text _multiplierText;
         [SerializeField] private Image _timerFill;
@@ -52,7 +53,7 @@ namespace Game.UI
         /// </summary>
         private void RefreshState()
         {
-            _scoreText.text = $"score: {_scoreCombo.Score}";
+            _scoreText.text = $"{_scoreLabel}: {_scoreCombo.Score}";
             _comboText.text = $"{_scoreCombo.Combo}콤보";
             _multiplierText.text = $"x{_scoreCombo.Multiplier.ToString("0.#", CultureInfo.InvariantCulture)}배";
             _comboText.color = _scoreCombo.StageColor;

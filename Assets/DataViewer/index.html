@@ -16,10 +16,10 @@
           키 입력 데이터 시각화 뷰어
           <span class="badge">Tenkeyless Layout</span>
         </h1>
-        <p>게임 플레이 및 로딩 중 발생한 키보드 입력 빈도를 분석하여 시각화합니다. (Mock Data 기반 예시)</p>
+        <p>게임 플레이 중 발생한 키보드 입력 빈도, APM, 점수 및 라운드 성과를 분석하여 시각화합니다. (다중 CSV 파일 비교 지원)</p>
       </div>
       <div>
-        <span class="badge" id="summaryTotal">총 입력: 374회</span>
+        <span class="badge" id="summaryTotal">총 입력: 0회</span>
       </div>
     </header>
 
@@ -34,8 +34,31 @@
           <h2 class="session-id-text" id="sessionIdText">Session: 대기 중 (CSV 파일을 로드하세요)</h2>
           <div class="session-sub-details" id="sessionSubDetails">
             <span id="buildVersionText">Build Version: -</span> · 
+            <span id="stageModeText" style="display: none;">스테이지: -</span> · 
+            <span id="scoreText" style="display: none;">점수: -</span> · 
+            <span id="apmText" style="display: none;">평균 APM: -</span> · 
             <span id="elapsedTimeText">기록 시간: - 초</span> · 
             <span id="downCountText">총 누름(Down): 0회</span>
+          </div>
+
+          <!-- 다중 세션 핵심 메트릭 요약 그리드 -->
+          <div class="summary-stats-grid" id="summaryStatsGrid" style="display: none;">
+            <div class="summary-stat-box">
+              <span class="summary-stat-label">플레이어 평균 점수</span>
+              <span class="summary-stat-val gold" id="statAvgScore">0점</span>
+            </div>
+            <div class="summary-stat-box">
+              <span class="summary-stat-label">최고 득점 (Peak)</span>
+              <span class="summary-stat-val accent" id="statMaxScore">0점</span>
+            </div>
+            <div class="summary-stat-box">
+              <span class="summary-stat-label">승률 (Win Rate)</span>
+              <span class="summary-stat-val green" id="statWinRate">0%</span>
+            </div>
+            <div class="summary-stat-box">
+              <span class="summary-stat-label">평균 타속 (APM)</span>
+              <span class="summary-stat-val" id="statAvgApm">0 APM</span>
+            </div>
           </div>
 
           <!-- 다중 파일 시 표시될 모드 전환 & 세션 선택 툴바 -->
@@ -87,6 +110,38 @@
         <button type="button" id="prevSessionBtn" class="player-arrow-btn" aria-label="이전 세션" title="이전 세션으로 이동">◀</button>
         <div class="player-tabs" id="sessionTabs"></div>
         <button type="button" id="nextSessionBtn" class="player-arrow-btn" aria-label="다음 세션" title="다음 세션으로 이동">▶</button>
+      </div>
+    </section>
+
+    <!-- View 1: 다중 세션 플레이 성과 비교 테이블 (다중 세션 로드 시 활성화) -->
+    <section class="card comparison-card" id="comparisonCard" style="display: none;">
+      <div class="card-title">
+        <div class="title-with-badge">
+          <span>View 1. 세션별 플레이 성과 비교 (Session Comparison)</span>
+          <span class="badge" id="comparisonCountBadge">0개 세션</span>
+        </div>
+      </div>
+      <div class="card-desc">
+        로드된 모든 세션의 플레이 시간, 타수, 최종 점수 및 승패를 비교합니다. 행을 클릭하면 해당 세션의 상세 키보드 히트맵과 타임라인으로 바로 전환됩니다.
+      </div>
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>파일명</th>
+              <th>스테이지 모드</th>
+              <th>내 점수 (Player)</th>
+              <th>상대 점수 (Enemy)</th>
+              <th>결과</th>
+              <th>총 타수 (Down)</th>
+              <th>평균 APM</th>
+              <th>플레이 시간</th>
+              <th>작업</th>
+            </tr>
+          </thead>
+          <tbody id="comparisonTableBody"></tbody>
+        </table>
       </div>
     </section>
 

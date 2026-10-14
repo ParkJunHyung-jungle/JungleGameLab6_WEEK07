@@ -948,3 +948,178 @@ body {
 .chart-tooltip-body strong {
   color: #ffffff;
 }
+
+/* ===================================================
+   [신규] 다중 세션 플레이 성과 비교 테이블 & 게임 메트릭
+   =================================================== */
+.comparison-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comparison-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: rgba(15, 23, 42, 0.6);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+  min-width: 780px;
+}
+
+.comparison-table th {
+  background: rgba(30, 41, 59, 0.9);
+  color: var(--text-sub);
+  font-weight: 600;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--card-border);
+  white-space: nowrap;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.comparison-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+  color: var(--text-main);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.comparison-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.comparison-row:hover {
+  background-color: rgba(56, 189, 248, 0.08);
+}
+
+.comparison-row.active {
+  background-color: rgba(56, 189, 248, 0.16);
+  border-left: 3px solid var(--accent);
+}
+
+.comparison-row.active td {
+  font-weight: 600;
+}
+
+.table-file-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.table-file-name {
+  color: var(--accent);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-action-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.table-action-btn:hover {
+  background: var(--accent);
+  color: #0f172a;
+}
+
+/* 성과 및 상태 배지 */
+.badge-win {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.badge-lose {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.badge-draw {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.badge-score {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-weight: 700;
+}
+
+.badge-apm {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.badge-stage {
+  background: rgba(14, 165, 233, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.4);
+}
+
+.summary-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.summary-stat-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-stat-label {
+  font-size: 11px;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.summary-stat-val.accent {
+  color: var(--accent);
+}
+
+.summary-stat-val.gold {
+  color: #fbbf24;
+}
+
+.summary-stat-val.green {
+  color: #34d399;
+}

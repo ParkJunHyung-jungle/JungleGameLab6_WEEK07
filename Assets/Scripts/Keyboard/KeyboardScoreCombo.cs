@@ -28,10 +28,10 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 
     public long Score => _score;
     public int Combo => _combo;
-    public float Multiplier => _combo >= 30 ? 2.5f : _combo >= 20 ? 2f : _combo >= 10 ? 1.5f : 1f;
-    public Color StageColor => _combo >= 30 ? Color.red : _combo >= 20 ? new Color(1f, 0.5f, 0f) : _combo >= 10 ? Color.yellow : Color.white;
+    public float Multiplier => _combo >= 150 ? 2.5f : _combo >= 100 ? 2f : _combo >= 50 ? 1.5f : 1f;
+    public Color StageColor => _combo >= 150 ? Color.red : _combo >= 100 ? new Color(1f, 0.5f, 0f) : _combo >= 50 ? Color.yellow : Color.white;
     public float TimeRatio => _combo == 0 ? 0f : _remainingTime / Duration;
-    private float Duration => _combo >= 30 ? 5f : _combo >= 20 ? 6f : _combo >= 10 ? 8f : 10f;
+    private float Duration => _combo >= 150 ? 5f : _combo >= 100 ? 6f : _combo >= 50 ? 8f : 10f;
     public bool IsTimerPaused => _isTimerPaused;
 
     public KeyboardInputController Keyboard

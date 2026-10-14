@@ -14,7 +14,9 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 
     [Header("Input")]
     [SerializeField] private KeyboardInputController _keyboard;
-    private KeycapHealth[] _keycaps;
+    [SerializeField] private bool _includeAutomaticHits;
+    private KeyboardInputController _boundKeyboard;
+    private KeycapHealth[] _keycaps = Array.Empty<KeycapHealth>();
     private IReadOnlyDictionary<Key, KeycapHealth> _keycapLayout;
 
     [Header("Runtime State")]
@@ -22,6 +24,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     private int _combo;
     private float _remainingTime;
     private bool _isTimerPaused;
+    private bool _isTracking = true;
 
     public long Score => _score;
     public int Combo => _combo;
@@ -40,33 +43,24 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     public event Action StateChanged;
     public event Action<float> TimerChanged;
 
-    void Awake()
-    {
-        if (_keyboard != null)
-        {
-            _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
-            _keycapLayout = _keyboard.GetKeycapLayout();
-        }
-    }
-
     void OnEnable()
     {
-        SubscribeEvents();
+        SubscribeKeyboard();
     }
 
     void OnDisable()
     {
-        UnsubscribeEvents();
+        UnsubscribeKeyboard();
     }
 
     void Update()
     {
-        if (_combo == 0 || _isTimerPaused)
+        if (!_isTracking || _combo == 0 || _isTimerPaused)
         {
             return;
         }
 
-        if (_keyboard == null || !_keyboard.InputEnabled)
+        if (_keyboard == null || (!_includeAutomaticHits && !_keyboard.InputEnabled))
         {
             return;
         }
@@ -81,83 +75,14 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     }
 
     /// <summary>
-    /// 대상 키보드 컨트롤러를 설정하고 이벤트 구독을 갱신한다.
-    /// keyboard 입력 컨트롤러를 _keyboard에 저장하고 키캡 목록을 갱신하며 이벤트를 연결한다.
+    /// keyboard를 점수와 콤보를 추적할 현재 키보드로 변경한다.
+    /// 이전 구독을 정리하고 새 입력과 파괴 이벤트를 연결하며 누적 점수와 콤보는 유지한다.
     /// </summary>
     public void SetKeyboard(KeyboardInputController keyboard)
     {
-        if (_keyboard == keyboard)
-        {
-            return;
-        }
-
-        UnsubscribeEvents();
+        UnsubscribeKeyboard();
         _keyboard = keyboard;
-
-        if (_keyboard != null)
-        {
-            _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
-            _keycapLayout = _keyboard.GetKeycapLayout();
-            if (isActiveAndEnabled)
-            {
-                SubscribeEvents();
-            }
-        }
-        else
-        {
-            _keycaps = null;
-            _keycapLayout = null;
-        }
-    }
-
-    /// <summary>
-    /// 현재 연결된 키보드 및 키캡들의 입력 및 파괴 이벤트를 구독한다.
-    /// _keyboard의 KeyPressed와 _keycaps의 Broken 이벤트를 연결한다.
-    /// </summary>
-    private void SubscribeEvents()
-    {
-        if (_keyboard == null)
-        {
-            return;
-        }
-
-        _keyboard.KeyPressed -= HandleKeyPressed;
-        _keyboard.KeyPressed += HandleKeyPressed;
-
-        if (_keycaps != null)
-        {
-            foreach (KeycapHealth keycap in _keycaps)
-            {
-                if (keycap != null)
-                {
-                    keycap.Broken -= HandleKeycapBroken;
-                    keycap.Broken += HandleKeycapBroken;
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// 현재 연결된 키보드 및 키캡들의 이벤트 구독을 해제한다.
-    /// _keyboard의 KeyPressed와 _keycaps의 Broken 이벤트 구독을 해제한다.
-    /// </summary>
-    private void UnsubscribeEvents()
-    {
-        if (_keyboard != null)
-        {
-            _keyboard.KeyPressed -= HandleKeyPressed;
-        }
-
-        if (_keycaps != null)
-        {
-            foreach (KeycapHealth keycap in _keycaps)
-            {
-                if (keycap != null)
-                {
-                    keycap.Broken -= HandleKeycapBroken;
-                }
-            }
-        }
+        SubscribeKeyboard();
     }
 
     /// <summary>
@@ -183,6 +108,70 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     }
 
     /// <summary>
+    /// enabled로 입력 점수와 파괴 콤보의 수집 여부를 변경한다.
+    /// 수집을 멈추면 이벤트와 콤보 타이머를 중단하고 현재 점수와 콤보 상태를 유지한다.
+    /// </summary>
+    public void SetTrackingEnabled(bool enabled)
+    {
+        if (_isTracking == enabled)
+            return;
+        _isTracking = enabled;
+        if (enabled)
+            SubscribeKeyboard();
+        else
+            UnsubscribeKeyboard();
+    }
+
+    /// <summary>
+    /// 새 게임을 위해 점수와 콤보 및 유지시간을 초기화한다.
+    /// 입력값 없이 상태를 0으로 변경하고 타이머 일시정지를 해제하며 연결된 화면에 상태와 빈 게이지를 알린다.
+    /// </summary>
+    public void ResetState()
+    {
+        _score = 0;
+        ResetCombo();
+    }
+
+    /// <summary>
+    /// 설정된 현재 키보드의 입력과 키캡 파괴를 구독한다.
+    /// 수집 상태와 자동 타격 설정을 사용하여 키별 체력 매핑을 갱신하며 키보드가 공급되지 않은 동안에는 구독하지 않는다.
+    /// </summary>
+    private void SubscribeKeyboard()
+    {
+        if (!isActiveAndEnabled || !_isTracking || _keyboard == null || _boundKeyboard != null)
+            return;
+        _boundKeyboard = _keyboard;
+        _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+        _keycapLayout = _keyboard.GetKeycapLayout();
+        _boundKeyboard.KeyPressed += HandleKeyPressed;
+        if (_includeAutomaticHits)
+            _boundKeyboard.AutomaticKeycapHit += HandleAutomaticKeycapHit;
+        foreach (KeycapHealth keycap in _keycaps)
+            keycap.Broken += HandleKeycapBroken;
+    }
+
+    /// <summary>
+    /// 이전에 연결한 키보드의 입력과 파괴 이벤트를 해제한다.
+    /// 저장된 키보드와 키캡 참조를 정리하여 교체되거나 종료된 대상의 중복 수집을 방지한다.
+    /// </summary>
+    private void UnsubscribeKeyboard()
+    {
+        if (_boundKeyboard != null)
+        {
+            _boundKeyboard.KeyPressed -= HandleKeyPressed;
+            _boundKeyboard.AutomaticKeycapHit -= HandleAutomaticKeycapHit;
+        }
+        foreach (KeycapHealth keycap in _keycaps)
+        {
+            if (keycap != null)
+                keycap.Broken -= HandleKeycapBroken;
+        }
+        _boundKeyboard = null;
+        _keycaps = Array.Empty<KeycapHealth>();
+        _keycapLayout = null;
+    }
+
+    /// <summary>
     /// key에 연결된 키캡의 현재 체력이 남아 있을 때만 현재 콤보 배율로 누적 점수를 증가시킨다.
     /// 공격과 파괴 전에 체력을 확인하여 마지막 파괴 입력까지 점수를 지급하고 상태 변경을 알린다.
     /// </summary>
@@ -193,6 +182,26 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
             return;
         }
 
+        AddHitScore();
+    }
+
+    /// <summary>
+    /// 성공한 자동 타격의 keycap 알림을 기존 타건 점수로 처리한다.
+    /// 현재 콤보 배율을 사용하며 플레이어 입력이나 추가 피해 요청은 발생시키지 않는다.
+    /// </summary>
+    private void HandleAutomaticKeycapHit(Transform keycap)
+    {
+        AddHitScore();
+    }
+
+    /// <summary>
+    /// 현재 타건에 콤보 배율을 적용하여 점수를 더한다.
+    /// 수집 상태와 BASE_SCORE 및 Multiplier를 사용하여 누적 점수를 변경하고 화면에 알린다.
+    /// </summary>
+    private void AddHitScore()
+    {
+        if (!_isTracking || !isActiveAndEnabled)
+            return;
         _score += (int)(BASE_SCORE * Multiplier);
         StateChanged?.Invoke();
     }
@@ -204,6 +213,8 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     private void HandleKeycapBroken(KeycapHealth keycap)
     {
         keycap.Broken -= HandleKeycapBroken;
+        if (!_isTracking || !isActiveAndEnabled)
+            return;
         _combo++;
         _remainingTime = Duration;
         StateChanged?.Invoke();

@@ -34,7 +34,9 @@ namespace KeyboardModeling.Editor
                 instance.transform.SetPositionAndRotation(reference.TransformPoint(new Vector3(9.25f, 0, 2.8f)) + reference.rotation * new Vector3(0, 0, .145f * scale), reference.rotation);
                 arm = instance.GetComponent<KeyboardTypingArmController>();
             }
-            SerializedObject armSettings = new SerializedObject(arm);
+            if (!arm.TryGetComponent(out KeyboardTypingArmInputBinding inputBinding))
+                inputBinding = arm.gameObject.AddComponent<KeyboardTypingArmInputBinding>();
+            SerializedObject armSettings = new SerializedObject(inputBinding);
             armSettings.FindProperty("_temporarySmashInput").boolValue = true;
             armSettings.ApplyModifiedPropertiesWithoutUndo();
             ToastPool pool = UnityEngine.Object.FindFirstObjectByType<ToastPool>();

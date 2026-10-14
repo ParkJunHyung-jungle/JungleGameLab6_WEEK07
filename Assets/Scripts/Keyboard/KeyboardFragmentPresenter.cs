@@ -19,17 +19,20 @@ public sealed class KeyboardFragmentPresenter : MonoBehaviour
     [SerializeField, Min(0f)] private float _backwardSpeed = 8f;
     [SerializeField, Min(0.1f)] private float _lifetimeAfterPush = 5f;
     private GameObject _fragments;
+    private Transform _fragmentsParent;
 
     public GameObject FragmentsPrefab => _fragmentsPrefab;
 
     /// <summary>
-    /// 외부에서 전달받은 파편 프리팹을 보관한다.
-    /// fragmentsPrefab을 _fragmentsPrefab 필드에 저장한다.
+    /// 외부에서 전달받은 파편 프리팹과 선택적인 생성물 부모를 보관한다.
+    /// fragmentsPrefab과 fragmentsParent를 저장하며 부모가 지정되면 파편을 해당 공급기의 생성물로 관리한다.
     /// 반환값은 없다.
     /// </summary>
-    public void Initialize(GameObject fragmentsPrefab)
+    public void Initialize(GameObject fragmentsPrefab, Transform fragmentsParent = null)
     {
         _fragmentsPrefab = fragmentsPrefab;
+        if (fragmentsParent != null)
+            _fragmentsParent = fragmentsParent;
     }
 
     /// <summary>
@@ -49,6 +52,8 @@ public sealed class KeyboardFragmentPresenter : MonoBehaviour
         GameObject fragments = Instantiate(_fragmentsPrefab, transform.position, transform.rotation);
         _fragments = fragments;
         fragments.transform.localScale = transform.lossyScale;
+        if (_fragmentsParent != null)
+            fragments.transform.SetParent(_fragmentsParent, true);
 
         Rigidbody[] bodies = fragments.GetComponentsInChildren<Rigidbody>();
         Vector3 center = Vector3.zero;

@@ -31,6 +31,21 @@ public static class KeyboardScoreComboSceneSetup
         if (scoreCombo != null)
             throw new InvalidOperationException("스코어와 콤보가 이미 구성되어 있습니다.");
 
+        GameObject manager = new GameObject("TemporaryGameManager");
+        scoreCombo = manager.AddComponent<KeyboardScoreCombo>();
+        SetReference(scoreCombo, "_keyboard", keyboard);
+        CreateHud(scoreCombo);
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("SCORE_COMBO_SCENE_CONFIGURED " + SCENE_PATH);
+    }
+
+    /// <summary>
+    /// scoreCombo에 연결된 기존 점수와 콤보 화면을 현재 씬에 생성한다.
+    /// 화면 앵커와 글꼴 및 게이지 설정을 사용하여 참조가 연결된 HUD 컴포넌트를 반환한다.
+    /// </summary>
+    public static KeyboardScoreComboHud CreateHud(KeyboardScoreCombo scoreCombo)
+    {
         RectTransform root = CreateRect("ScoreComboHUD", null, Vector2.zero, Vector2.zero, Vector2.zero);
         Canvas canvas = root.gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -40,10 +55,6 @@ public static class KeyboardScoreComboSceneSetup
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
-
-        GameObject manager = new GameObject("TemporaryGameManager");
-        scoreCombo = manager.AddComponent<KeyboardScoreCombo>();
-        SetReference(scoreCombo, "_keyboard", keyboard);
 
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         Text score = CreateText("Score", root, new Vector2(0f, 1f), new Vector2(32f, -124f),
@@ -72,15 +83,13 @@ public static class KeyboardScoreComboSceneSetup
         fill.fillAmount = 0f;
         fill.raycastTarget = false;
 
-        KeyboardScoreComboHud hud = manager.AddComponent<KeyboardScoreComboHud>();
+        KeyboardScoreComboHud hud = scoreCombo.gameObject.AddComponent<KeyboardScoreComboHud>();
         SetReference(hud, "_scoreCombo", scoreCombo);
         SetReference(hud, "_scoreText", score);
         SetReference(hud, "_comboText", combo);
         SetReference(hud, "_multiplierText", multiplier);
         SetReference(hud, "_timerFill", fill);
-        EditorSceneManager.MarkSceneDirty(scene);
-        EditorSceneManager.SaveScene(scene);
-        Debug.Log("SCORE_COMBO_SCENE_CONFIGURED " + SCENE_PATH);
+        return hud;
     }
 
     /// <summary>

@@ -79,9 +79,6 @@ namespace KeyboardModeling.Editor
                 arm.transform.SetParent(root, false);
                 arm.transform.localScale = Vector3.one * scale;
                 arm.transform.localPosition = new Vector3(0, 0, .145f * scale);
-                SerializedObject armSettings = new SerializedObject(arm);
-                armSettings.FindProperty("_temporarySmashInput").boolValue = false;
-                armSettings.ApplyModifiedPropertiesWithoutUndo();
                 arm.gameObject.SetActive(false);
                 KeyboardFeedbackManager feedback = new GameObject("AutomaticFeedback_" + (slot + 1)).AddComponent<KeyboardFeedbackManager>();
                 feedback.transform.SetParent(root, false);

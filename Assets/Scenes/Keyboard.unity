@@ -10971,7 +10971,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6796795038645031112, guid: 6419610cc6647eb479dc2f3e03398ce1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 9200000011}
   m_SourcePrefab: {fileID: 100100000, guid: 6419610cc6647eb479dc2f3e03398ce1, type: 3}
 --- !u!33 &434613870072168
 MeshFilter:
@@ -295454,3 +295457,21 @@ SceneRoots:
   - {fileID: 906595897}
   - {fileID: 385833165}
   - {fileID: 1686552421}
+--- !u!1 &9200000010 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6796795038645031112, guid: 6419610cc6647eb479dc2f3e03398ce1, type: 3}
+  m_PrefabInstance: {fileID: 2144391995}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &9200000011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9200000010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 056aa5b4e3454889a699a70163952a8a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardTypingArmInputBinding
+  _temporarySmashInput: 1

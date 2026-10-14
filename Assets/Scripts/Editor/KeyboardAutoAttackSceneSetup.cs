@@ -89,9 +89,8 @@ namespace KeyboardModeling.Editor
             arm.transform.SetPositionAndRotation(
                 reference.transform.TransformPoint(new Vector3(9.25f, 0, 2.8f)) + reference.transform.rotation * new Vector3(0, 0, .145f * scale),
                 reference.transform.rotation);
-            SerializedObject armSettings = new SerializedObject(arm);
-            armSettings.FindProperty("_temporarySmashInput").boolValue = false;
-            armSettings.ApplyModifiedPropertiesWithoutUndo();
+            if (arm.TryGetComponent(out KeyboardTypingArmInputBinding inputBinding))
+                UnityEngine.Object.DestroyImmediate(inputBinding);
             arm.gameObject.SetActive(false);
 
             KeyboardAutoAttackController auto = new GameObject("AutomaticKeyboardAttack").AddComponent<KeyboardAutoAttackController>();

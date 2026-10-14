@@ -6,6 +6,7 @@ namespace KeyboardModeling
     public sealed class KeyboardTypingArmController : MonoBehaviour
     {
         private const float REACH_MARGIN = 0.0001f;
+        private const float REAR_FACING_YAW = 270f;
 
         [Header("Joints")]
         [SerializeField] private Transform _baseYaw;
@@ -18,12 +19,13 @@ namespace KeyboardModeling
         private float _toolLength;
         private Vector3 _shoulderOrigin;
 
-        [Header("Temporary Smash Input")]
-        [SerializeField] private bool _temporarySmashInput = true;
-        private KeyboardInteractionController _interactionController;
-        private KeyboardInputController _activeKeyboard;
+        [Header("Elbow Constraint")]
+        [SerializeField] private bool _keepElbowBehind;
+        [Tooltip("팔 루트의 로컬 +Z 방향으로 유지할 어깨 기준 팔꿈치 피벗의 최소 거리입니다.")]
+        [SerializeField, Min(0f)] private float _minimumElbowBackOffset = 0.005f;
 
         [Header("Press Motion")]
+        [SerializeField] private bool _useUnscaledTime = true;
         [SerializeField, Min(0.01f)] private float _pressDuration = 0.035f;
         [SerializeField, Min(0.01f)] private float _retractDuration = 0.055f;
         [SerializeField, Min(0f)] private float _hoverHeight = 0.01f;
@@ -52,20 +54,10 @@ namespace KeyboardModeling
         {
             foreach (MeshRenderer renderer in GetComponentsInChildren<MeshRenderer>(true))
                 renderer.enabled = true;
-            KeyboardAutoAttackManager manager = KeyboardAutoAttackManager.Instance;
-            _interactionController = manager != null ? manager.InteractionController : null;
-            if (_interactionController != null && _temporarySmashInput)
-            {
-                _interactionController.ActiveKeyboardChanged += BindKeyboard;
-                BindKeyboard(_interactionController.ActiveKeyboard);
-            }
         }
 
         void OnDisable()
         {
-            if (_interactionController != null)
-                _interactionController.ActiveKeyboardChanged -= BindKeyboard;
-            BindKeyboard(null);
             StopPress();
         }
 
@@ -78,20 +70,28 @@ namespace KeyboardModeling
                 _diagnosticMotionStarted = true;
                 Debug.Log($"[AutoAttack][MotionTick] Arm={name}, Id={GetInstanceID()}, Delta={Time.unscaledDeltaTime:F4}, Tip={_contactPoint.position}, PressDuration={_pressDuration}, RetractDuration={_retractDuration}", this);
             }
-            _elapsed += Time.unscaledDeltaTime;
+            _elapsed += _useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
             float scale = transform.lossyScale.x;
             Vector3 bottom = _point - _normal * (_pressDepth * scale);
             if (_elapsed < _pressDuration)
             {
                 float amount = Mathf.SmoothStep(0, 1, _elapsed / _pressDuration);
-                ApplyTipPose(Vector3.Lerp(_point, bottom, amount), _normal);
+                if (!ApplyTipPose(Vector3.Lerp(_point, bottom, amount), _normal))
+                {
+                    StopPress();
+                    return;
+                }
             }
             else
             {
                 ReleaseKeycap();
                 float amount = Mathf.Clamp01((_elapsed - _pressDuration) / _retractDuration);
                 Vector3 hover = _point + _normal * (_hoverHeight * scale);
-                ApplyTipPose(Vector3.Lerp(bottom, hover, Mathf.SmoothStep(0, 1, amount)), _normal);
+                if (!ApplyTipPose(Vector3.Lerp(bottom, hover, Mathf.SmoothStep(0, 1, amount)), _normal))
+                {
+                    StopPress();
+                    return;
+                }
                 if (amount >= 1)
                 {
                     _isPressing = false;
@@ -121,20 +121,12 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// 플레이어의 임시 스매쉬 입력 연결을 켜거나 끈다.
-        /// enabled를 저장하고 기존 키보드와 교체 이벤트 구독을 정리하며 활성화한 경우에만 다시 구독한다.
+        /// 진행 중인 타건을 취소하고 키캡 눌림 표시를 해제한다.
+        /// 입력값 없이 현재 누름 상태와 대상 참조를 정리한다.
         /// </summary>
-        public void SetTemporaryInputEnabled(bool enabled)
+        public void CancelPress()
         {
-            if (_interactionController != null)
-                _interactionController.ActiveKeyboardChanged -= BindKeyboard;
-            BindKeyboard(null);
-            _temporarySmashInput = enabled;
-            if (enabled && isActiveAndEnabled && _interactionController != null)
-            {
-                _interactionController.ActiveKeyboardChanged += BindKeyboard;
-                BindKeyboard(_interactionController.ActiveKeyboard);
-            }
+            StopPress();
         }
 
         /// <summary>
@@ -156,10 +148,12 @@ namespace KeyboardModeling
             }
             Vector3 point = keycap.TransformPoint(collider.center + Vector3.up * collider.size.y * 0.5f);
             Vector3 normal = keycap.up;
-            if (!CanReach(point + normal * (_hoverHeight * transform.lossyScale.x), normal))
+            float scale = transform.lossyScale.x;
+            if (!TryCalculatePose(point, normal, out Vector3 contactAngles, out string failure) ||
+                !TryCalculatePose(point - normal * (_pressDepth * scale), normal, out _, out failure) ||
+                !TryCalculatePose(point + normal * (_hoverHeight * scale), normal, out _, out failure))
             {
-                Vector3 wrist = transform.InverseTransformPoint(point + normal * (_hoverHeight * transform.lossyScale.x)) + transform.InverseTransformDirection(normal).normalized * _toolLength;
-                LastPressFailure = $"OutOfReach Distance={(wrist - _shoulderOrigin).magnitude:F4}, Min={Mathf.Abs(_upperLength - _lowerLength):F4}, Max={_upperLength + _lowerLength:F4}, Target={point}, Arm={transform.position}, Scale={transform.lossyScale}";
+                LastPressFailure = failure;
                 return false;
             }
             LastPressFailure = null;
@@ -170,7 +164,7 @@ namespace KeyboardModeling
             _actuatedKeycap = keycap;
             _actuatedKeyboard = keycap.GetComponentInParent<KeyboardInputController>();
             Vector3 previousTip = _contactPoint.position;
-            ApplyTipPose(_point, _normal);
+            ApplyPose(contactAngles, _normal);
             if (_actuatedKeyboard != null)
                 _actuatedKeyboard.SetKeycapActuated(keycap, true);
             _isPressing = true;
@@ -183,65 +177,106 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// 스매쉬 입력 대상으로 사용할 키보드를 교체한다.
-        /// keyboard를 저장하고 이전 누름과 입력 구독을 해제한 뒤 새 키캡 입력에 구독한다.
+        /// point와 normal에 도달할 관절 자세를 계산하고 팔 길이와 후방 제약을 확인한다.
+        /// jointAngles의 x, y, z에 베이스 Y축과 어깨 및 팔꿈치 Z축 각도를 반환하며 실패 이유를 failure에 저장한다.
         /// </summary>
-        private void BindKeyboard(KeyboardInputController keyboard)
+        private bool TryCalculatePose(Vector3 point, Vector3 normal, out Vector3 jointAngles, out string failure)
         {
-            if (_activeKeyboard == keyboard)
-                return;
-            if (_activeKeyboard != null)
-                _activeKeyboard.KeycapPressed -= HandleKeycapPressed;
-            StopPress();
-            _activeKeyboard = keyboard;
-            if (_activeKeyboard != null)
-            {
-                _activeKeyboard.KeycapPressed += HandleKeycapPressed;
-            }
-        }
-
-        /// <summary>
-        /// 스매쉬 입력의 모든 키캡을 즉시 타건 함수에 전달한다.
-        /// keycap과 임시 연결 설정만 확인하여 미니게임 여부나 키 종류로 요청을 제한하지 않는다.
-        /// </summary>
-        private void HandleKeycapPressed(Transform keycap)
-        {
-            if (_temporarySmashInput && _interactionController.IsSmashMode)
-                PressKey(keycap);
-        }
-        /// <summary>
-        /// 지정한 막대 끝 목표가 팔의 길이 안에 있는지 확인한다.
-        /// point와 normal로 필요한 손목 위치를 계산하여 도달 가능 여부를 반환한다.
-        /// </summary>
-        private bool CanReach(Vector3 point, Vector3 normal)
-        {
-            Vector3 wrist = transform.InverseTransformPoint(point) + transform.InverseTransformDirection(normal).normalized * _toolLength;
-            float distance = (wrist - _shoulderOrigin).magnitude;
-            return distance < _upperLength + _lowerLength - REACH_MARGIN && distance > Mathf.Abs(_upperLength - _lowerLength) + REACH_MARGIN;
-        }
-
-        /// <summary>
-        /// 막대 끝 좌표에 맞춰 베이스와 어깨·팔꿈치·손목 자세를 계산한다.
-        /// point와 normal을 사용하고 현재 회전과 가까운 평면 방향을 선택하여 관절 Transform을 변경한다.
-        /// </summary>
-        private void ApplyTipPose(Vector3 point, Vector3 normal)
-        {
+            jointAngles = Vector3.zero;
+            failure = null;
             Vector3 wristPosition = transform.InverseTransformPoint(point) + transform.InverseTransformDirection(normal).normalized * _toolLength;
             Vector3 offset = wristPosition - _shoulderOrigin;
-            float horizontal = Mathf.Sqrt(offset.x * offset.x + offset.z * offset.z);
-            float yaw = horizontal > REACH_MARGIN ? Mathf.Atan2(-offset.z, offset.x) * Mathf.Rad2Deg : _baseYaw.localEulerAngles.y;
-            float alternativeYaw = yaw + 180;
-            if (Mathf.Abs(Mathf.DeltaAngle(_baseYaw.localEulerAngles.y, alternativeYaw)) < Mathf.Abs(Mathf.DeltaAngle(_baseYaw.localEulerAngles.y, yaw)))
+            float distance = offset.magnitude;
+            if (distance >= _upperLength + _lowerLength - REACH_MARGIN || distance <= Mathf.Abs(_upperLength - _lowerLength) + REACH_MARGIN)
             {
-                yaw = alternativeYaw;
-                horizontal = -horizontal;
+                failure = $"OutOfReach Distance={distance:F4}, Min={Mathf.Abs(_upperLength - _lowerLength):F4}, Max={_upperLength + _lowerLength:F4}, Target={point}, Arm={transform.position}, Scale={transform.lossyScale}";
+                return false;
             }
+            float horizontal = Mathf.Sqrt(offset.x * offset.x + offset.z * offset.z);
+            float yaw = horizontal > REACH_MARGIN
+                ? Mathf.Atan2(-offset.z, offset.x) * Mathf.Rad2Deg
+                : _keepElbowBehind ? REAR_FACING_YAW : _baseYaw.localEulerAngles.y;
             float cosine = (offset.sqrMagnitude - _upperLength * _upperLength - _lowerLength * _lowerLength) / (2 * _upperLength * _lowerLength);
             float elbow = Mathf.Acos(Mathf.Clamp(cosine, -1, 1));
-            float shoulder = Mathf.Atan2(offset.y, horizontal) - Mathf.PI * 0.5f - Mathf.Atan2(_lowerLength * Mathf.Sin(elbow), _upperLength + _lowerLength * Mathf.Cos(elbow));
-            _baseYaw.localRotation = Quaternion.Euler(0, yaw, 0);
-            _shoulder.localRotation = Quaternion.Euler(0, 0, shoulder * Mathf.Rad2Deg);
-            _elbow.localRotation = Quaternion.Euler(0, 0, elbow * Mathf.Rad2Deg);
+            Vector3 primary = CalculateCandidate(yaw, horizontal, offset.y, elbow);
+            Vector3 alternative = CalculateCandidate(yaw + 180f, -horizontal, offset.y, elbow);
+            bool primaryAllowed = IsPoseAllowed(primary);
+            bool alternativeAllowed = IsPoseAllowed(alternative);
+            if (!primaryAllowed && !alternativeAllowed)
+            {
+                failure = $"ElbowConstraint Target={point}, MinimumBackOffset={_minimumElbowBackOffset:F4}, Arm={transform.position}";
+                return false;
+            }
+            jointAngles = !primaryAllowed || (alternativeAllowed && GetPoseChange(alternative) < GetPoseChange(primary))
+                ? alternative
+                : primary;
+            return true;
+        }
+
+        /// <summary>
+        /// yaw와 수평 및 수직 거리, elbow 라디안 각도로 한 관절 후보를 계산한다.
+        /// 베이스 Y축과 어깨 및 팔꿈치 Z축의 도 단위 각도를 Vector3로 반환한다.
+        /// </summary>
+        private Vector3 CalculateCandidate(float yaw, float horizontal, float vertical, float elbow)
+        {
+            float shoulder = Mathf.Atan2(vertical, horizontal) - Mathf.PI * 0.5f
+                - Mathf.Atan2(_lowerLength * Mathf.Sin(elbow), _upperLength + _lowerLength * Mathf.Cos(elbow));
+            return new Vector3(yaw, shoulder * Mathf.Rad2Deg, elbow * Mathf.Rad2Deg);
+        }
+
+        /// <summary>
+        /// jointAngles 후보의 팔꿈치 피벗이 어깨 기준 후방 여유 거리를 만족하는지 확인한다.
+        /// 팔 루트의 로컬 좌표를 사용하며 후방 제약이 꺼져 있으면 모든 후보를 허용한다.
+        /// </summary>
+        private bool IsPoseAllowed(Vector3 jointAngles)
+        {
+            if (!_keepElbowBehind)
+                return true;
+            Vector3 elbowPosition = _shoulderOrigin
+                + Quaternion.Euler(0f, jointAngles.x, 0f)
+                * (Quaternion.Euler(0f, 0f, jointAngles.y) * _elbow.localPosition);
+            return elbowPosition.z >= _shoulderOrigin.z + _minimumElbowBackOffset;
+        }
+
+        /// <summary>
+        /// jointAngles로 이동할 때 현재 자세에서 변하는 각도의 합을 계산한다.
+        /// 제약이 켜져 있으면 어깨와 팔꿈치도 비교하며 꺼져 있으면 기존 베이스 회전 기준을 유지한다.
+        /// </summary>
+        private float GetPoseChange(Vector3 jointAngles)
+        {
+            float change = Mathf.Abs(Mathf.DeltaAngle(_baseYaw.localEulerAngles.y, jointAngles.x));
+            if (_keepElbowBehind)
+            {
+                change += Mathf.Abs(Mathf.DeltaAngle(_shoulder.localEulerAngles.z, jointAngles.y));
+                change += Mathf.Abs(Mathf.DeltaAngle(_elbow.localEulerAngles.z, jointAngles.z));
+            }
+            return change;
+        }
+
+        /// <summary>
+        /// point와 normal로 유효한 관절 자세를 계산하고 적용한다.
+        /// 성공 여부를 반환하며 실패하면 관절을 변경하지 않고 LastPressFailure에 원인을 저장한다.
+        /// </summary>
+        private bool ApplyTipPose(Vector3 point, Vector3 normal)
+        {
+            if (!TryCalculatePose(point, normal, out Vector3 jointAngles, out string failure))
+            {
+                LastPressFailure = failure;
+                return false;
+            }
+            ApplyPose(jointAngles, normal);
+            return true;
+        }
+
+        /// <summary>
+        /// 검증된 jointAngles와 키캡 normal을 관절 Transform에 적용한다.
+        /// 베이스, 어깨, 팔꿈치 회전과 키캡을 향하는 손목 자세를 변경한다.
+        /// </summary>
+        private void ApplyPose(Vector3 jointAngles, Vector3 normal)
+        {
+            _baseYaw.localRotation = Quaternion.Euler(0f, jointAngles.x, 0f);
+            _shoulder.localRotation = Quaternion.Euler(0f, 0f, jointAngles.y);
+            _elbow.localRotation = Quaternion.Euler(0f, 0f, jointAngles.z);
             Vector3 forward = Vector3.ProjectOnPlane(_baseYaw.forward, normal).normalized;
             _wrist.rotation = Quaternion.LookRotation(forward, -normal);
         }

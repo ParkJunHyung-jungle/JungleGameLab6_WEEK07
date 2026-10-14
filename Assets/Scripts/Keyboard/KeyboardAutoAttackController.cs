@@ -233,7 +233,8 @@ namespace KeyboardModeling
             if (unlocked && !_unlocked)
                 _nextAttackAt = Time.unscaledTimeAsDouble + _attackInterval;
             _unlocked = unlocked;
-            _arm.SetTemporaryInputEnabled(false);
+            if (_arm.TryGetComponent(out KeyboardTypingArmInputBinding inputBinding))
+                inputBinding.SetInputEnabled(false);
             _arm.gameObject.SetActive(unlocked);
         }
 

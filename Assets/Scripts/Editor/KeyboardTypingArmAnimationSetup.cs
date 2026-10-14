@@ -56,6 +56,8 @@ namespace KeyboardModeling.Editor
             EditorSceneManager.OpenScene("Assets/Scenes/Keyboard.unity", OpenSceneMode.Single);
             GameObject keyboard = Array.Find(UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects(), item => item.name == "Keyboard_TKL_87");
             GameObject arm = GameObject.Find("KeyboardTypingArm");
+            if (!arm.TryGetComponent(out KeyboardTypingArmInputBinding keyboardBinding))
+                arm.AddComponent<KeyboardTypingArmInputBinding>();
             PlaceArm(arm, keyboard.transform);
             EditorSceneManager.SaveScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
 
@@ -69,7 +71,11 @@ namespace KeyboardModeling.Editor
             PlaceArm(arm, reference.transform);
             settings = new SerializedObject(arm.GetComponent<KeyboardTypingArmController>());
             KeyboardAutoAttackManagerSetup.ConfigureCurrentScene();
-            settings.FindProperty("_temporarySmashInput").boolValue = true;
+            if (!arm.TryGetComponent(out KeyboardTypingArmInputBinding mainBinding))
+                mainBinding = arm.AddComponent<KeyboardTypingArmInputBinding>();
+            SerializedObject inputSettings = new SerializedObject(mainBinding);
+            inputSettings.FindProperty("_temporarySmashInput").boolValue = true;
+            inputSettings.ApplyModifiedPropertiesWithoutUndo();
             settings.FindProperty("_pressDuration").floatValue = .035f;
             settings.FindProperty("_retractDuration").floatValue = .055f;
             settings.FindProperty("_hoverHeight").floatValue = .01f;

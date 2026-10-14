@@ -27,29 +27,31 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     public float TimeRatio => _combo == 0 ? 0f : _remainingTime / Duration;
     private float Duration => _combo >= 30 ? 5f : _combo >= 20 ? 6f : _combo >= 10 ? 8f : 10f;
 
+    public KeyboardInputController Keyboard
+    {
+        get => _keyboard;
+        set => SetKeyboard(value);
+    }
+
     public event Action StateChanged;
     public event Action<float> TimerChanged;
 
     void Awake()
     {
-        _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+        if (_keyboard != null)
+        {
+            _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+        }
     }
 
     void OnEnable()
     {
-        _keyboard.KeyPressed += HandleKeyPressed;
-        foreach (KeycapHealth keycap in _keycaps)
-            keycap.Broken += HandleKeycapBroken;
+        SubscribeEvents();
     }
 
     void OnDisable()
     {
-        _keyboard.KeyPressed -= HandleKeyPressed;
-        foreach (KeycapHealth keycap in _keycaps)
-        {
-            if (keycap != null)
-                keycap.Broken -= HandleKeycapBroken;
-        }
+        UnsubscribeEvents();
     }
 
     void Update()
@@ -64,6 +66,96 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
             StateChanged?.Invoke();
         }
         TimerChanged?.Invoke(TimeRatio);
+    }
+
+    /// <summary>
+    /// 대상 키보드 컨트롤러를 설정하고 이벤트 구독을 갱신한다.
+    /// keyboard 입력 컨트롤러를 _keyboard에 저장하고 키캡 목록을 갱신하며 이벤트를 연결한다.
+    /// </summary>
+    public void SetKeyboard(KeyboardInputController keyboard)
+    {
+        if (_keyboard == keyboard)
+        {
+            return;
+        }
+
+        UnsubscribeEvents();
+        _keyboard = keyboard;
+
+        if (_keyboard != null)
+        {
+            _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
+            if (isActiveAndEnabled)
+            {
+                SubscribeEvents();
+            }
+        }
+        else
+        {
+            _keycaps = null;
+        }
+    }
+
+    /// <summary>
+    /// 현재 연결된 키보드 및 키캡들의 입력 및 파괴 이벤트를 구독한다.
+    /// _keyboard의 KeyPressed와 _keycaps의 Broken 이벤트를 연결한다.
+    /// </summary>
+    private void SubscribeEvents()
+    {
+        if (_keyboard == null)
+        {
+            return;
+        }
+
+        _keyboard.KeyPressed -= HandleKeyPressed;
+        _keyboard.KeyPressed += HandleKeyPressed;
+
+        if (_keycaps != null)
+        {
+            foreach (KeycapHealth keycap in _keycaps)
+            {
+                if (keycap != null)
+                {
+                    keycap.Broken -= HandleKeycapBroken;
+                    keycap.Broken += HandleKeycapBroken;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 현재 연결된 키보드 및 키캡들의 이벤트 구독을 해제한다.
+    /// _keyboard의 KeyPressed와 _keycaps의 Broken 이벤트 구독을 해제한다.
+    /// </summary>
+    private void UnsubscribeEvents()
+    {
+        if (_keyboard != null)
+        {
+            _keyboard.KeyPressed -= HandleKeyPressed;
+        }
+
+        if (_keycaps != null)
+        {
+            foreach (KeycapHealth keycap in _keycaps)
+            {
+                if (keycap != null)
+                {
+                    keycap.Broken -= HandleKeycapBroken;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 현재 누적된 콤보와 잔여 유지시간을 초기화한다.
+    /// _combo와 _remainingTime을 0으로 재설정하고 상태 및 타이머 변경 이벤트를 호출한다.
+    /// </summary>
+    public void ResetCombo()
+    {
+        _combo = 0;
+        _remainingTime = 0f;
+        StateChanged?.Invoke();
+        TimerChanged?.Invoke(0f);
     }
 
     /// <summary>

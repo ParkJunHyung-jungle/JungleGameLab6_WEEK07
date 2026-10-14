@@ -3,6 +3,8 @@ using System.Collections;
 
 using UnityEngine;
 
+using KeyboardModeling;
+
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -19,6 +21,9 @@ public class GameManager : MonoBehaviour
     [Header("Round Timer Settings")]
     [SerializeField] private bool _timerEnabled = true;
     [SerializeField, Min(1f)] private float _roundTimeLimit = 60f;
+
+    [Header("콤보 HUD")]
+    [SerializeField] private KeyboardScoreCombo _comboHUD;
 
     [Header("Runtime State")]
     private GameObject _activeKeyboard;
@@ -47,6 +52,11 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
+
+        if (_comboHUD == null)
+        {
+            _comboHUD = FindFirstObjectByType<KeyboardScoreCombo>();
+        }
     }
 
     void Start()
@@ -90,7 +100,7 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// KeyboardSpawner에게 키보드 생성을 요청하고 완파 이벤트를 등록한다.
+    /// KeyboardSpawner에게 키보드 생성을 요청하고 완파 이벤트를 등록하며 콤보 HUD에 키보드를 할당한다.
     /// withAnimation 애니메이션 적용 여부를 사용하며 생성된 키보드 게임오브젝트를 반환한다.
     /// </summary>
     public GameObject SpawnKeyboard(bool withAnimation = true)
@@ -107,6 +117,13 @@ public class GameManager : MonoBehaviour
             {
                 _activeDestruction.Breaking += HandleKeyboardBreaking;
                 _activeDestruction.Finished += HandleKeyboardFinished;
+            }
+
+            // 생성된 키보드의 입력을 콤보 HUD에 연결하여 콤보 측정이 이어지도록 한다.
+            if (_comboHUD != null)
+            {
+                KeyboardInputController inputController = _activeKeyboard.GetComponent<KeyboardInputController>();
+                _comboHUD.Keyboard = inputController;
             }
         }
 

@@ -89,6 +89,8 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     [SerializeField] private Sprite _fistSprite;
     [SerializeField] private Material _fistMaterial;
     [SerializeField, Min(0.01f)] private float _fistHeight = 0.9f;
+    [Tooltip("0이면 지정 높이를 사용하고 양수이면 일반 키캡 폭의 배수로 주먹 폭을 맞춥니다.")]
+    [SerializeField, Min(0f)] private float _fistKeycapWidthMultiplier;
     [SerializeField, Min(0f)] private float _fistLift = 0.8f;
     [SerializeField, Min(0.01f)] private float _appearDuration = 0.22f;
     [SerializeField, Min(0.01f)] private float _strikeDuration = 0.16f;
@@ -97,6 +99,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private MaterialPropertyBlock _fistProperties;
     private List<MeshRenderer> _fistRenderers = new List<MeshRenderer>();
     private Stack<MeshRenderer> _availableFists = new Stack<MeshRenderer>();
+    private float _standardKeycapWidth;
     public event Action<Vector3> FistImpact;
 
     [Header("Hammer Strike")]
@@ -354,6 +357,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         }
 
         _keyboardDestruction = _keyboard.GetComponent<KeyboardDestruction>();
+        CacheStandardKeycapWidth();
         CacheWhiteFlashTargets();
 
         BoxCollider collider = _keyboard.GetComponent<BoxCollider>();
@@ -805,8 +809,11 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     private IEnumerator StrikeKeyboard(Vector3 localContact, Action onImpact)
     {
         Camera viewCamera = Camera.main;
-        float fistHeight = _fistHeight;
-        float fistLift = _fistLift;
+        Texture2D texture = _fistSprite.texture;
+        float fistHeight = _fistKeycapWidthMultiplier > 0f && _standardKeycapWidth > 0f
+            ? _standardKeycapWidth * _fistKeycapWidthMultiplier * texture.height / texture.width
+            : _fistHeight;
+        float fistLift = _fistLift * (_keyboard != null ? _keyboard.transform.lossyScale.y : transform.lossyScale.y);
         float appearDuration = _appearDuration;
         float strikeDuration = _strikeDuration;
         float holdDuration = _retreatDuration;
@@ -818,7 +825,6 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         fist.receiveShadows = true;
         fist.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
 
-        Texture2D texture = _fistSprite.texture;
         fist.transform.localScale = new Vector3(fistHeight * texture.width / texture.height, fistHeight, 1f);
         _fistProperties.Clear();
         _fistProperties.SetTexture(_baseMapProperty, texture);
@@ -826,7 +832,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         fist.SetPropertyBlock(_fistProperties);
 
         Transform root = _keyboard != null ? _keyboard.transform : transform;
-        UpdateFistPose(fist, viewCamera, root.TransformPoint(localImpactContact), fistLift, 0f, fistHeight);
+        UpdateFistPose(fist, viewCamera, root.TransformPoint(localImpactContact), fistLift, 0f);
         fist.gameObject.SetActive(true);
 
         float elapsed = 0f;
@@ -835,7 +841,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             yield return null;
             elapsed += Mathf.Min(Time.deltaTime, appearDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
             float progress = Mathf.Clamp01(elapsed / appearDuration);
-            UpdateFistPose(fist, viewCamera, root.TransformPoint(localImpactContact), fistLift, progress, fistHeight);
+            UpdateFistPose(fist, viewCamera, root.TransformPoint(localImpactContact), fistLift, progress);
         }
 
         elapsed = 0f;
@@ -846,11 +852,11 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             float progress = Mathf.Clamp01(elapsed / strikeDuration);
             float strikeProgress = progress * progress;
             Vector3 contactPoint = root.TransformPoint(localImpactContact);
-            UpdateFistPose(fist, viewCamera, contactPoint, fistLift * (1f - strikeProgress), 1f, fistHeight);
+            UpdateFistPose(fist, viewCamera, contactPoint, fistLift * (1f - strikeProgress), 1f);
         }
 
         Vector3 finalContact = root.TransformPoint(localImpactContact);
-        UpdateFistPose(fist, viewCamera, finalContact, 0f, 1f, fistHeight);
+        UpdateFistPose(fist, viewCamera, finalContact, 0f, 1f);
         FistImpact?.Invoke(finalContact);
         onImpact?.Invoke();
 
@@ -866,6 +872,34 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 현재 키보드의 키캡 외피 폭을 키보드 로컬 단위로 측정한다.
+    /// 외피 메시와 변환값으로 구한 폭의 중앙값을 일반 키캡 폭으로 저장한다.
+    /// </summary>
+    private void CacheStandardKeycapWidth()
+    {
+        List<float> widths = new List<float>();
+        foreach (KeycapHealth keycap in _keyboard.GetComponentsInChildren<KeycapHealth>(true))
+        {
+            Transform shell = keycap.transform.Find("PBT_SculptedShell");
+            MeshFilter filter = shell.GetComponent<MeshFilter>();
+            Vector3 worldWidth = shell.TransformVector(Vector3.right * filter.sharedMesh.bounds.size.x);
+            widths.Add(_keyboard.transform.InverseTransformVector(worldWidth).magnitude);
+        }
+        widths.Sort();
+        _standardKeycapWidth = widths.Count > 0 ? widths[widths.Count / 2] : 0f;
+    }
+
+    /// <summary>
+    /// 망치의 impactRotation과 실제 크기로 머리 접촉점이 contact에 닿는 손잡이 위치를 반환한다.
+    /// Quad 단위의 gripLocal과 headLocal에 부모 스케일까지 적용하며 망치 회전을 타격 각도로 변경한다.
+    /// </summary>
+    private Vector3 GetHammerImpactGrip(MeshRenderer hammer, Quaternion impactRotation, Vector3 contact, Vector3 gripLocal, Vector3 headLocal)
+    {
+        hammer.transform.rotation = impactRotation;
+        return contact - hammer.transform.TransformVector(headLocal - gripLocal);
+    }
+
+    /// <summary>
     /// 망치 이미지를 회전시켜 목표 위치를 타격하고 충돌 순간 onImpact를 호출한다.
     /// localContact 좌표와 설정된 각도 및 지속 시간을 사용하여 포즈를 갱신한다.
     /// 완료 시 망치 렌더러를 재사용 풀로 반환한다.
@@ -876,9 +910,8 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         float height = Mathf.Max(0.01f, settings.Height);
         Texture2D texture = _hammerSprite.texture;
         float width = height * texture.width / texture.height;
-        Vector3 gripLocal = new Vector3((settings.GripPoint.x - 0.5f) * width, (settings.GripPoint.y - 0.5f) * height, 0f);
-        Vector3 headLocal = new Vector3((settings.HeadContact.x - 0.5f) * width, (settings.HeadContact.y - 0.5f) * height, 0f);
-        Vector3 headFromGrip = headLocal - gripLocal;
+        Vector3 gripLocal = new Vector3(settings.GripPoint.x - 0.5f, settings.GripPoint.y - 0.5f, 0f);
+        Vector3 headLocal = new Vector3(settings.HeadContact.x - 0.5f, settings.HeadContact.y - 0.5f, 0f);
 
         float startAngle = settings.StartAngle;
         float impactAngle = settings.ImpactAngle;
@@ -907,7 +940,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         hammer.SetPropertyBlock(_fistProperties);
 
         Transform root = _keyboard != null ? _keyboard.transform : transform;
-        Vector3 impactGrip = root.TransformPoint(localContact) - impactRotation * headFromGrip;
+        Vector3 impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
         UpdateHammerPose(hammer, startRotation, impactGrip + startOffset, gripLocal, 0f);
         hammer.gameObject.SetActive(true);
 
@@ -917,14 +950,14 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             yield return null;
             elapsed += Mathf.Min(Time.deltaTime, appearDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
             float progress = Mathf.Clamp01(elapsed / appearDuration);
-            impactGrip = root.TransformPoint(localContact) - impactRotation * headFromGrip;
+            impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
             UpdateHammerPose(hammer, startRotation, impactGrip + startOffset * (1f - progress), gripLocal, progress);
         }
 
         elapsed = 0f;
         while (elapsed < prepareDuration)
         {
-            impactGrip = root.TransformPoint(localContact) - impactRotation * headFromGrip;
+            impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
             UpdateHammerPose(hammer, startRotation, impactGrip, gripLocal, 1f);
             yield return null;
             elapsed += Time.deltaTime;
@@ -938,11 +971,11 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             float progress = Mathf.Clamp01(elapsed / swingDuration);
             progress *= progress;
             Quaternion rotation = baseRotation * Quaternion.Euler(0f, 0f, Mathf.Lerp(startAngle, impactAngle, progress));
-            impactGrip = root.TransformPoint(localContact) - impactRotation * headFromGrip;
+            impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
             UpdateHammerPose(hammer, rotation, impactGrip, gripLocal, 1f);
         }
 
-        impactGrip = root.TransformPoint(localContact) - impactRotation * headFromGrip;
+        impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
         UpdateHammerPose(hammer, impactRotation, impactGrip, gripLocal, 1f);
         onImpact?.Invoke();
 
@@ -1188,13 +1221,14 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     /// <summary>
     /// fist 렌더러를 타격 위치 및 카메라 방향으로 정렬하고 투명도를 설정한다.
-    /// fist 렌더러, viewCamera, contact 접촉 위치, lift 들어올림 거리, alpha 투명도, fistHeight를 사용한다.
+    /// fist의 실제 변환 크기와 viewCamera, contact, lift, alpha를 사용하여 이미지 하단을 접촉점에 맞춘다.
     /// 렌더러의 위치와 회전을 변경한다.
     /// </summary>
-    private void UpdateFistPose(MeshRenderer fist, Camera viewCamera, Vector3 contact, float lift, float alpha, float fistHeight)
+    private void UpdateFistPose(MeshRenderer fist, Camera viewCamera, Vector3 contact, float lift, float alpha)
     {
         Quaternion rotation = GetAttackRotation(viewCamera);
-        fist.transform.SetPositionAndRotation(contact + Vector3.up * (fistHeight * 0.5f + lift), rotation);
+        fist.transform.SetPositionAndRotation(contact + Vector3.up * lift, rotation);
+        fist.transform.position -= fist.transform.TransformVector(Vector3.down * 0.5f);
         fist.GetPropertyBlock(_fistProperties);
         _fistProperties.SetColor(_baseColorProperty, new Color(1f, 1f, 1f, alpha));
         fist.SetPropertyBlock(_fistProperties);
@@ -1202,12 +1236,13 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     /// <summary>
     /// hammer 렌더러를 회전 및 그립 위치에 맞춰 배치하고 투명도를 설정한다.
-    /// hammer 렌더러, rotation 회전, gripWorld 그립 월드 좌표, gripLocal 로컬 그립 좌표, alpha 투명도를 사용한다.
+    /// hammer 렌더러, rotation, gripWorld, Quad 단위 gripLocal과 alpha를 사용하여 실제 스케일로 손잡이를 배치한다.
     /// 렌더러의 위치와 회전을 변경한다.
     /// </summary>
     private void UpdateHammerPose(MeshRenderer hammer, Quaternion rotation, Vector3 gripWorld, Vector3 gripLocal, float alpha)
     {
-        hammer.transform.SetPositionAndRotation(gripWorld - rotation * gripLocal, rotation);
+        hammer.transform.SetPositionAndRotation(gripWorld, rotation);
+        hammer.transform.position -= hammer.transform.TransformVector(gripLocal);
         hammer.GetPropertyBlock(_fistProperties);
         _fistProperties.SetColor(_baseColorProperty, new Color(1f, 1f, 1f, alpha));
         hammer.SetPropertyBlock(_fistProperties);

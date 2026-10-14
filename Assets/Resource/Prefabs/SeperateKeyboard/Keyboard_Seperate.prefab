@@ -28477,7 +28477,7 @@ Transform:
   m_GameObject: {fileID: 5648102524883158503}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.225083, y: 0.84999985, z: -10.308788}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.15, y: 0.15, z: 0.15}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -28836,7 +28836,10 @@ MonoBehaviour:
   _feedbackManager: {fileID: 1556073846386759358}
   _gameSession: {fileID: 0}
   _feverController: {fileID: 0}
+  _scoreCombo: {fileID: 0}
   _baseDamage: 1
+  _comboFistDamage: 1
+  _comboHammerDamage: 1
 --- !u!114 &1556073846386759358
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -28871,18 +28874,19 @@ MonoBehaviour:
   _maximumTravelDistance: 0.85
   _hitStopDuration: 0.25
   _hitStopCooldown: 0.35
-  _fistSprite: {fileID: 0}
-  _fistMaterial: {fileID: 0}
-  _fistHeight: 0.9
+  _fistSprite: {fileID: 21300000, guid: 04e0a1508ba5bf24c856967e39bf1e6d, type: 3}
+  _fistMaterial: {fileID: 2100000, guid: 43c9cbe2ad8adeb47b9aaac1c2d505c9, type: 2}
+  _fistHeight: 2.7
+  _fistKeycapWidthMultiplier: 2
   _fistLift: 0.8
   _appearDuration: 0.22
   _strikeDuration: 0.16
   _retreatDuration: 0.25
   _keycapFistImpactOffset: {x: 0, y: 0, z: 0}
-  _hammerSprite: {fileID: 0}
-  _hammerShockwaveMaterial: {fileID: 0}
+  _hammerSprite: {fileID: 21300000, guid: 2a2d2a4d10436db45a6986a0928df040, type: 3}
+  _hammerShockwaveMaterial: {fileID: 2100000, guid: c8b9a474c4aa2c94ea91dcbb809bd8ef, type: 2}
   _hammerAnimation:
-    _height: 1.8
+    _height: 5.4
     _sideOffset: -1
     _lift: 0.45
     _startAngle: -45

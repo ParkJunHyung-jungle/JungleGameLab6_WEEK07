@@ -307,6 +307,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 892835219}
     - target: {fileID: 4353647113616318531, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
+      propertyPath: _scoreLabel
+      value: PLAYER SCORE
+      objectReference: {fileID: 0}
+    - target: {fileID: 4353647113616318531, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
       propertyPath: _multiplierText
       value: 
       objectReference: {fileID: 892835220}
@@ -321,8 +325,16 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7750679708714643583, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 197294871}
   m_SourcePrefab: {fileID: 100100000, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
+--- !u!1 &139051536 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7750679708714643583, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
+  m_PrefabInstance: {fileID: 139051535}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &159213919
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -434,12 +446,26 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5968179292458924319, guid: 7f3542cef972f504291e69f6c29ee3a3, type: 3}
   m_PrefabInstance: {fileID: 139051535}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 139051536}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b4b28728d75cf0a4b8fc234ceeae15ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardScoreCombo
+--- !u!114 &197294871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 139051536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dc048bada8c73f4a9cd8bd7ba35f58f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.UI.EnemyScoreHud
+  _scoreCombo: {fileID: 159213921}
+  _scoreText: {fileID: 1278239809}
 --- !u!1 &474466165
 GameObject:
   m_ObjectHideFlags: 0
@@ -660,6 +686,38 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 223947857283480640, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_Text
+      value: 'PLAYER SCORE: 0'
+      objectReference: {fileID: 0}
+    - target: {fileID: 223947857283480640, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_FontData.m_BestFit
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 223947857283480640, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_FontData.m_MaxSize
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 223947857283480640, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_FontData.m_MinSize
+      value: 24
+      objectReference: {fileID: 0}
+    - target: {fileID: 223947857283480640, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_FontData.m_FontSize
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 223947857283480640, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_FontData.m_FontStyle
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606328160213390717, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 600
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606328160213390717, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 52
+      objectReference: {fileID: 0}
     - target: {fileID: 4965422550850224927, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -746,7 +804,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 4965422550850224927, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1278239807}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
 --- !u!114 &892835219 stripped
@@ -1053,6 +1114,101 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &1278239806
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1278239807}
+  - component: {fileID: 1278239810}
+  - component: {fileID: 1278239809}
+  - component: {fileID: 1278239808}
+  m_Layer: 5
+  m_Name: EnemyScore
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1278239807
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278239806}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1876925349}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 32, y: -190}
+  m_SizeDelta: {x: 600, y: 44}
+  m_Pivot: {x: 0, y: 1}
+--- !u!114 &1278239808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278239806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.8}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &1278239809
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278239806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 0.35, b: 0.35, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_FontSize: 28
+    m_FontStyle: 0
+    m_BestFit: 1
+    m_MinSize: 20
+    m_MaxSize: 28
+    m_Alignment: 3
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: 'ENEMY SCORE: 0'
+--- !u!222 &1278239810
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278239806}
+  m_CullTransparentMesh: 1
 --- !u!1 &1304059274
 GameObject:
   m_ObjectHideFlags: 0
@@ -1647,6 +1803,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!224 &1876925349 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 4965422550850224927, guid: d521d75a14c8c684aa67daf1a36a515b, type: 3}
+  m_PrefabInstance: {fileID: 892835218}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &9800810001
 GameObject:
   m_ObjectHideFlags: 0

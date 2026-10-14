@@ -47,6 +47,8 @@ public sealed class KeycapHealth : MonoBehaviour
     [SerializeField, Min(0.1f)] private float _effectLifetime = 3f;
     private Renderer[] _renderers;
     private Collider[] _colliders;
+    private bool[] _rendererEnabled;
+    private bool[] _colliderEnabled;
 
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
@@ -66,6 +68,28 @@ public sealed class KeycapHealth : MonoBehaviour
         _shellFilter = transform.Find("PBT_SculptedShell").GetComponent<MeshFilter>();
         _renderers = GetComponentsInChildren<Renderer>();
         _colliders = GetComponentsInChildren<Collider>();
+        _rendererEnabled = new bool[_renderers.Length];
+        _colliderEnabled = new bool[_colliders.Length];
+        for (int index = 0; index < _renderers.Length; index++)
+            _rendererEnabled[index] = _renderers[index].enabled;
+        for (int index = 0; index < _colliders.Length; index++)
+            _colliderEnabled[index] = _colliders[index].enabled;
+    }
+
+    /// <summary>
+    /// maxHP를 최대 체력과 현재 체력으로 적용하고 파괴된 키캡의 원래 표시 상태를 복구한다.
+    /// enableColliders로 입력 가능 여부를 반영하며 파괴 상태와 균열 표시를 초기화한다.
+    /// </summary>
+    public void RestoreKeycap(int maxHP, bool enableColliders)
+    {
+        _maxHP = Mathf.Max(1, maxHP);
+        _currentHP = _maxHP;
+        _broken = false;
+        for (int index = 0; index < _renderers.Length; index++)
+            _renderers[index].enabled = _rendererEnabled[index];
+        for (int index = 0; index < _colliders.Length; index++)
+            _colliders[index].enabled = enableColliders && _colliderEnabled[index];
+        UpdateDamageDecal();
     }
 
     /// <summary>

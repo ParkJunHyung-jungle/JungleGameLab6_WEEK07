@@ -18,6 +18,7 @@ namespace KeyboardModeling
     {
         [Header("Input Mapping")]
         [SerializeField] private bool _inputEnabled = true;
+        [SerializeField] private bool _keyboardCommandsEnabled = true;
         [SerializeField] private KeyBinding[] _bindings = Array.Empty<KeyBinding>();
         private bool _hasFocus;
         private Key _lastPressedKey;
@@ -25,6 +26,7 @@ namespace KeyboardModeling
         private KeycapHealth[] _keycapHealths;
         private KeyboardSpawnProfile _spawnProfile;
         private KeyboardPlayableVariant _playableVariant;
+        private bool _hasNumpadEnterBinding;
 
         public event Action<Key> KeyPressed;
         public event Action<KeycapHealth> AttackRequested;
@@ -180,6 +182,7 @@ namespace KeyboardModeling
             _lastPressDistance = _pressDistance;
             for (int index = 0; index < _bindings.Length; index++)
             {
+                _hasNumpadEnterBinding |= _bindings[index].Key == Key.NumpadEnter;
                 _restPositions[index] = _bindings[index].Keycap.localPosition;
                 _waveBindingIndices[_bindings[index].Keycap] = index;
                 _keycapButtons[index] = _bindings[index].Keycap.GetComponent<KeycapButton>();
@@ -201,12 +204,12 @@ namespace KeyboardModeling
                 return;
             }
 
-            if (keyboard.backspaceKey.wasPressedThisFrame)
+            if (_keyboardCommandsEnabled && keyboard.backspaceKey.wasPressedThisFrame)
             {
                 DiscardRequested?.Invoke();
                 return;
             }
-            if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
+            if (_keyboardCommandsEnabled && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
             {
                 SubmissionRequested?.Invoke();
                 return;
@@ -215,10 +218,13 @@ namespace KeyboardModeling
             bool pressedKeysChanged = false;
             for (int index = 0; index < _bindings.Length; index++)
             {
-                bool unityPressed = keyboard != null && (keyboard[_bindings[index].Key].isPressed || keyboard[_bindings[index].Key].wasPressedThisFrame);
+                bool mapNumpadEnter = !_keyboardCommandsEnabled && !_hasNumpadEnterBinding && _bindings[index].Key == Key.Enter;
+                bool unityPressed = keyboard[_bindings[index].Key].isPressed || keyboard[_bindings[index].Key].wasPressedThisFrame
+                    || (mapNumpadEnter && (keyboard.numpadEnterKey.isPressed || keyboard.numpadEnterKey.wasPressedThisFrame));
                 bool isPressed = unityPressed;
                 bool stateChanged = isPressed != _previousPressed[index];
-                bool pressedThisFrame = isPressed && stateChanged;
+                bool pressedThisFrame = keyboard[_bindings[index].Key].wasPressedThisFrame;
+                bool numpadEnterPressedThisFrame = mapNumpadEnter && keyboard.numpadEnterKey.wasPressedThisFrame;
                 pressedKeysChanged |= stateChanged;
                 _previousPressed[index] = isPressed;
                 if (isPressed)
@@ -228,12 +234,12 @@ namespace KeyboardModeling
                 AnimateKey(index, isPressed || _actuatedKeys[index], _hitStopEnabled && Time.timeScale == 0f ? 0f : Time.unscaledDeltaTime);
 
                 if (pressedThisFrame)
-                {
-                    bool isFaulty = _playableVariant != null && _playableVariant.IsKeyFaulty(_bindings[index].Key);
-                    PlayPressSound(_keycapHealths[index], isFaulty);
+                    ProcessKeyPress(index, _bindings[index].Key);
+                if (numpadEnterPressedThisFrame)
+                    ProcessKeyPress(index, Key.NumpadEnter);
 
-                    KeycapPressed?.Invoke(_bindings[index].Keycap);
-                    KeyPressed?.Invoke(_bindings[index].Key);
+                if (pressedThisFrame || numpadEnterPressedThisFrame)
+                {
                     if (!_inputEnabled || !isActiveAndEnabled)
                     {
                         RestoreKeys();
@@ -247,6 +253,28 @@ namespace KeyboardModeling
             _lastPressDistance = _pressDistance;
             if (pressedKeysChanged)
                 RefreshPressedKeyNames();
+        }
+
+        /// <summary>
+        /// index의 키캡에 연결된 소리를 재생하고 실제 입력 식별자 key를 눌림 이벤트로 전달한다.
+        /// 마지막 입력을 갱신하며 체력 피해와 보상은 구독한 게임 규칙에서 처리한다.
+        /// </summary>
+        private void ProcessKeyPress(int index, Key key)
+        {
+            _lastPressedKey = key;
+            bool isFaulty = _playableVariant != null && _playableVariant.IsKeyFaulty(key);
+            PlayPressSound(_keycapHealths[index], isFaulty);
+            KeycapPressed?.Invoke(_bindings[index].Keycap);
+            KeyPressed?.Invoke(key);
+        }
+
+        /// <summary>
+        /// enabled로 Enter와 Backspace의 폐기·제출 명령 사용 여부를 변경한다.
+        /// 명령을 끄면 해당 키를 일반 바인딩으로 처리하고 숫자패드 Enter는 Enter 키캡에 대응시킨다.
+        /// </summary>
+        public void SetKeyboardCommandsEnabled(bool enabled)
+        {
+            _keyboardCommandsEnabled = enabled;
         }
 
         /// <summary>

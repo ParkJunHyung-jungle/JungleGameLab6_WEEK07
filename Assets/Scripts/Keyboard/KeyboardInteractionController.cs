@@ -135,6 +135,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     [SerializeField] private Transform _openingCeiling;
     private KeyboardState _openingKeyboard;
 
+    [Header("Typing Reward Mode")]
+    [SerializeField] private bool _typingRewardMode;
+
     [Header("Fist Camera Shake")]
     [SerializeField] private CinemachineImpulseSource _fistImpulseSource;
 
@@ -376,13 +379,17 @@ public sealed class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// instance의 입력과 키캡 Collider를 끄고 들기용 물리 상태를 구성하여 등록 상태를 반환한다.
-    /// isPlayable이면 파괴 판정과 폐기·제출 이벤트를 연결하고 regionIndex가 지정된 배경 키보드는 해당 구역 목록에 저장한다.
+    /// isPlayable이면 연출을 초기화하고 타이핑 보상 모드에서는 고장과 본체 파괴 및 폐기·제출 판정을 비활성화한다.
+    /// regionIndex가 지정된 배경 키보드는 해당 구역 목록에 저장한다.
     /// </summary>
     public KeyboardState RegisterKeyboard(GameObject instance, bool isPlayable = false, int regionIndex = -1)
     {
         KeyboardInputController keyboard = instance.GetComponent<KeyboardInputController>();
+        if (_typingRewardMode && instance.TryGetComponent(out KeyboardPlayableVariant variant))
+            variant.SetFaultGenerationEnabled(false);
         if (keyboard != null)
         {
+            keyboard.SetKeyboardCommandsEnabled(!_typingRewardMode);
             keyboard.SetInputEnabled(false);
             keyboard.enabled = false;
         }
@@ -415,9 +422,12 @@ public sealed class KeyboardInteractionController : MonoBehaviour
         {
             KeyboardDestruction destruction = keyboard.gameObject.AddComponent<KeyboardDestruction>();
             if (_fistImpulseSource != null) destruction.FistImpact += HandleFistImpact;
-            destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
-            keyboard.DiscardRequested += destruction.DestroyKeyboard;
-            keyboard.SubmissionRequested += () => SubmitKeyboard(state);
+            destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation, !_typingRewardMode);
+            if (!_typingRewardMode)
+            {
+                keyboard.DiscardRequested += destruction.DestroyKeyboard;
+                keyboard.SubmissionRequested += () => SubmitKeyboard(state);
+            }
         }
         return state;
     }
@@ -1493,13 +1503,13 @@ public sealed class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// source의 최초 배치에서 현재 강화 분포로 생성 결과를 확정하고 플레이용 객체에 적용한다.
+    /// source의 최초 배치에서 강화 분포로 생성 결과를 확정하고 타이핑 보상 모드에서는 기본 흰색 키보드와 일반 등급을 적용한다.
     /// 재시도는 같은 프로필을 사용하고 고장 정보와 진행 식별자를 복사하며 준비 실패 시 월드 원본을 유지한다.
     /// </summary>
     private KeyboardState CreatePlayableKeyboard(KeyboardState source, bool playerControlled = true)
     {
         KeyboardPlayableVariant variant = source.Root.GetComponent<KeyboardPlayableVariant>();
-        GameObject gamePrefab = variant != null ? variant.GamePrefab : _inGameKeyBoardPrefab;
+        GameObject gamePrefab = !_typingRewardMode && variant != null ? variant.GamePrefab : _inGameKeyBoardPrefab;
         GameObject instance = Instantiate(gamePrefab);
         try
         {
@@ -1521,7 +1531,9 @@ public sealed class KeyboardInteractionController : MonoBehaviour
                 KeyboardSpawnProfile profile = KeyboardProfileGenerator.GenerateProfile(
                     layout,
                     new HashSet<KeycapHealth>(requiredKeys),
-                    _gameSession.GetCurrentRarityDistribution(),
+                    _typingRewardMode
+                        ? new KeycapRarityDistribution(100f, 0f, 0f, 0f, 0f, 0f, 0f, 0f)
+                        : _gameSession.GetCurrentRarityDistribution(),
                     _raritySettings,
                     _rewardController.RewardPerKeycap,
                     _gameSession.CurrentRarityStage,

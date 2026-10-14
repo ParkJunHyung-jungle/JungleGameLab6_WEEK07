@@ -99,5 +99,16 @@ namespace Game.Economy
         {
             OnKeycapBroken(keycap);
         }
+
+        /// <summary>
+        /// 타이핑 규칙에서 확정한 amount를 지갑에 지급하고 worldPosition으로 기존 보상 표시 이벤트를 전달한다.
+        /// 0원은 지급과 표시를 생략하고 강화 배율 없이 잔액과 수입 알림을 최종 지급액으로 갱신한다.
+        /// </summary>
+        public void GrantTypingReward(long amount, Vector3 worldPosition)
+        {
+            if (amount == 0) return;
+            _gameSession.Wallet.Add(amount);
+            RewardGranted?.Invoke(amount, worldPosition, false);
+        }
     }
 }

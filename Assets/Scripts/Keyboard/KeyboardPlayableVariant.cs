@@ -48,6 +48,7 @@ namespace KeyboardModeling
         public GameObject GamePrefab => _definition.GamePrefab;
 
         [Header("Keyboard Fault")]
+        [SerializeField] private bool _faultGenerationEnabled = true;
         [InspectorName("고장 여부")]
         [SerializeField] private bool _isFaulty;
         [InspectorName("고장난 키")]
@@ -79,7 +80,7 @@ namespace KeyboardModeling
         /// </summary>
         private void GenerateFaultState()
         {
-            _isFaulty = UnityEngine.Random.value < FAULT_CHANCE;
+            _isFaulty = _faultGenerationEnabled && UnityEngine.Random.value < FAULT_CHANCE;
             if (!_isFaulty)
             {
                 _faultyKeys = Array.Empty<FaultyKey>();
@@ -106,8 +107,21 @@ namespace KeyboardModeling
         /// </summary>
         public void CopyFaultStateFrom(KeyboardPlayableVariant source)
         {
+            _faultGenerationEnabled = source._faultGenerationEnabled;
             _isFaulty = source.IsFaulty;
             _faultyKeys = (FaultyKey[])source._faultyKeys.Clone();
+        }
+
+        /// <summary>
+        /// enabled로 이후 고장 생성 여부를 설정한다.
+        /// 비활성화하면 기존 고장 여부와 고장 키 목록을 비워 정상 키보드로 변경한다.
+        /// </summary>
+        public void SetFaultGenerationEnabled(bool enabled)
+        {
+            _faultGenerationEnabled = enabled;
+            if (enabled) return;
+            _isFaulty = false;
+            _faultyKeys = Array.Empty<FaultyKey>();
         }
 
         /// <summary>

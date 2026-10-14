@@ -306,7 +306,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         Transform shell = keycap.Find("PBT_SculptedShell");
         Material material = shell != null ? shell.GetComponent<MeshRenderer>().sharedMaterial : _debrisPrefab.GetComponent<MeshRenderer>().sharedMaterial;
         if (_flashIndices.TryGetValue(keycap, out int flashIndex) && _flashOriginalMaterials[flashIndex] != null)
-            material = _flashOriginalMaterials[flashIndex];
+            material = GetOriginalKeycapMaterial(flashIndex);
         for (int count = 0; count < _debrisCount; count++)
         {
             int index = _nextDebris;
@@ -456,7 +456,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         {
             if (_flashEndTimes[index] == 0f || Time.unscaledTime < _flashEndTimes[index]) continue;
             if (_flashRenderers[index] != null)
-                _flashRenderers[index].sharedMaterial = _flashOriginalMaterials[index];
+                _flashRenderers[index].sharedMaterial = GetOriginalKeycapMaterial(index);
             _flashEndTimes[index] = 0f;
         }
     }
@@ -472,8 +472,20 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         {
             if (_flashEndTimes[index] == 0f) continue;
             if (_flashRenderers[index] != null)
-                _flashRenderers[index].sharedMaterial = _flashOriginalMaterials[index];
+                _flashRenderers[index].sharedMaterial = GetOriginalKeycapMaterial(index);
             _flashEndTimes[index] = 0f;
         }
+    }
+
+    /// <summary>
+    /// index의 키캡에 적용된 현재 일반 또는 색 상태의 외피 재질을 반환한다.
+    /// 타이핑 상태가 없는 키캡은 최초 캐시를 사용하여 점멸 복원과 부스러기에 기존 재질을 유지한다.
+    /// </summary>
+    private Material GetOriginalKeycapMaterial(int index)
+    {
+        KeycapHealth health = _flashHealths[index];
+        if (health != null && health.TryGetComponent(out KeycapTypingState state))
+            return state.ShellMaterial;
+        return _flashOriginalMaterials[index];
     }
 }

@@ -87,10 +87,10 @@ public sealed class KeyboardDestruction : MonoBehaviour
     }
 
     /// <summary>
-    /// requiredKeycaps의 파괴 이벤트를 구독하고 fragmentsPrefab과 fistSprite를 저장한다.
+    /// requiredKeycaps와 fragmentsPrefab, fistSprite를 저장하고 destroyWhenAllKeycapsBroken일 때만 키캡 파괴 이벤트를 구독한다.
     /// onBreaking, onFinished와 configureFistAnimation을 저장하여 파괴 및 연출 설정 갱신에 사용한다.
     /// </summary>
-    public void Initialize(List<KeycapHealth> requiredKeycaps, GameObject fragmentsPrefab, Sprite fistSprite, Action onBreaking, Action onFinished, Action<KeyboardDestruction> configureFistAnimation)
+    public void Initialize(List<KeycapHealth> requiredKeycaps, GameObject fragmentsPrefab, Sprite fistSprite, Action onBreaking, Action onFinished, Action<KeyboardDestruction> configureFistAnimation, bool destroyWhenAllKeycapsBroken = true)
     {
         if (requiredKeycaps.Count == 0 || fragmentsPrefab == null)
         {
@@ -103,6 +103,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
         _onBreaking = onBreaking;
         _onFinished = onFinished;
         _configureFistAnimation = configureFistAnimation;
+        if (!destroyWhenAllKeycapsBroken) return;
         foreach (KeycapHealth health in _requiredKeycaps)
         {
             if (health.CurrentHP == 0) continue;

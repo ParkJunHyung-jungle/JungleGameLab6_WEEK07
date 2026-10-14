@@ -134,6 +134,7 @@ GameObject:
   - component: {fileID: 9800000001}
   - component: {fileID: 27118947}
   - component: {fileID: 9800000003}
+  - component: {fileID: 9800000004}
   m_Layer: 0
   m_Name: SmashModeTrigger
   m_TagString: Untagged
@@ -224,6 +225,7 @@ MonoBehaviour:
   _keyboardReturnArea: {fileID: 0}
   _startWithSingleKeyboard: 1
   _openingCeiling: {fileID: 9700000001}
+  _typingRewardMode: 1
   _fistImpulseSource: {fileID: 9800000001}
   _gameSession: {fileID: 0}
   _rewardController: {fileID: 0}
@@ -2255,6 +2257,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Monitor_16x9_ScaleUp
       objectReference: {fileID: 0}
+    - target: {fileID: 3702745739173560244, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4294528132114918152, guid: eeba46b795e71854d883e33ac92b8108, type: 3}
       propertyPath: _keyboard
       value: 
@@ -3910,6 +3916,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 130816482576728832, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2126159037437128305, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: _rewards
       value: 
@@ -3954,6 +3964,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4058274546556956987, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4120467617764449812, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: _damage
       value: 5
@@ -3978,9 +3992,25 @@ PrefabInstance:
       propertyPath: _keyboardFragmentsPrefab
       value: 
       objectReference: {fileID: 100, guid: 5dc9afe1dd0444239ccf712060e436a9, type: 3}
+    - target: {fileID: 4850299712002065784, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6268994863583700563, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6287178679820753411, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6473820656794952159, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
       propertyPath: m_Name
       value: AutomaticWorkbench
+      objectReference: {fileID: 0}
+    - target: {fileID: 7728338320389280312, guid: b16566fd032ba8a46b46051829eceb4e, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4955,6 +4985,35 @@ MonoBehaviour:
   _holdViewportPosition: {x: 0.2, y: 0.18}
   _holdDistance: 4
   _followSpeed: 12
+--- !u!114 &9800000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 27118942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cbbaf4432792ad4a9569d2f6a11d843, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardTypingRewardController
+  _interactionController: {fileID: 27118945}
+  _rewardController: {fileID: 1068726015}
+  _normalKeycapHP: 1
+  _regenerationDelay: 0.3
+  _coloredKeycapChance: 0.05
+  _coloredKeycapHP: 5
+  _coloredKeycapInitialCount: 10
+  _coloredKeycapMaterials:
+  - {fileID: 2100000, guid: 4995bc697bbe36f4f94191075357a3a1, type: 2}
+  - {fileID: 2100000, guid: 2be06f4424259a84aa7da8d1da465ab9, type: 2}
+  _normalBreakReward: 0
+  _coloredInputReward: 0
+  _coloredBreakReward: 10
+  _hammerChance: 0.05
+  _counterCamera: {fileID: 330585545}
+  _counterHeight: 0.3
+  _counterCharacterSize: 0.06
 --- !u!1001 &7940145484255243565
 PrefabInstance:
   m_ObjectHideFlags: 0

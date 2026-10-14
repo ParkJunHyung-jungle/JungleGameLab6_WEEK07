@@ -20,6 +20,15 @@ namespace KeyboardModeling
     /// </summary>
     public sealed class KeyboardInputController : MonoBehaviour
     {
+        public static event Action<KeyboardInputController, Key> PlaytestKeyProcessing;
+
+        /// <summary>
+        /// 새 실행의 관찰용 입력 이벤트 구독을 초기화한다.
+        /// 도메인 재로드가 꺼진 에디터에서 이전 로깅 구독을 남기지 않는다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetPlaytestObservers() { PlaytestKeyProcessing = null; }
+
         [Header("Input Mapping")]
         [SerializeField] private bool _inputEnabled = true;
         [SerializeField] private KeyBinding[] _bindings = Array.Empty<KeyBinding>();
@@ -215,6 +224,7 @@ namespace KeyboardModeling
 
                 if (pressedThisFrame)
                 {
+                    PlaytestKeyProcessing?.Invoke(this, _bindings[index].Key);
                     PlayPressSound(_keycapHealths[index]);
 
                     KeycapPressed?.Invoke(_bindings[index].Keycap);

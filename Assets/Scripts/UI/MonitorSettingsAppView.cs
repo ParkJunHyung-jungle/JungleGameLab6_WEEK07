@@ -5,6 +5,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+using Game.Logging;
 using Game.Session;
 using Game.Settings;
 
@@ -22,6 +23,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private MonitorSettingsButton _quitButton;
     [SerializeField] private MonitorSettingsButton _confirmQuitButton;
     [SerializeField] private MonitorSettingsButton _cancelQuitButton;
+    [SerializeField] private MonitorSettingsButton _logFolderButton;
     private bool _isInputEnabled;
     private bool _isQuitting;
     public bool IsOpen { get; private set; }
@@ -45,6 +47,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
         _quitButton.Clicked += RequestQuit;
         _confirmQuitButton.Clicked += ConfirmQuit;
         _cancelQuitButton.Clicked += CancelQuit;
+        _logFolderButton.Clicked += KeyboardInputLogger.OpenLogFolder;
         RefreshValues();
         RefreshCanvasState();
     }
@@ -60,6 +63,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
         _quitButton.Clicked -= RequestQuit;
         _confirmQuitButton.Clicked -= ConfirmQuit;
         _cancelQuitButton.Clicked -= CancelQuit;
+        _logFolderButton.Clicked -= KeyboardInputLogger.OpenLogFolder;
     }
 
     void Update()

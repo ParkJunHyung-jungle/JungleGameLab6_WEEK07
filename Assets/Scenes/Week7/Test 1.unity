@@ -443,7 +443,10 @@ MonoBehaviour:
   _feedbackManager: {fileID: 0}
   _gameSession: {fileID: 0}
   _feverController: {fileID: 0}
+  _scoreCombo: {fileID: 0}
   _baseDamage: 1
+  _comboFistDamage: 1
+  _comboHammerDamage: 1
 --- !u!114 &910070004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -481,6 +484,7 @@ MonoBehaviour:
   _fistSprite: {fileID: 0}
   _fistMaterial: {fileID: 0}
   _fistHeight: 0.9
+  _fistKeycapWidthMultiplier: 0
   _fistLift: 0.8
   _appearDuration: 0.22
   _strikeDuration: 0.16

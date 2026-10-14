@@ -12,6 +12,84 @@ using KeyboardModeling;
 public static class KeyboardScoreComboSceneSetup
 {
     private const string SCENE_PATH = "Assets/Scenes/Week7/Test 1.unity";
+    private const string SCORE_COMPARISON_SCENE_PATH = "Assets/Scenes/Week7/ManagerMerge.unity";
+
+    /// <summary>
+    /// ManagerMerge 씬의 기존 플레이어 점수 아래에 독립적인 적 점수를 연결한다.
+    /// 기존 적 점수 연결이 있으면 재사용하고 없으면 입력 대상이 없는 0점 상태를 생성하여 UI 참조와 씬을 저장한다.
+    /// </summary>
+    [MenuItem("Tools/Keyboard/Configure ManagerMerge Enemy Score")]
+    public static void ConfigureEnemyScore()
+    {
+        if (Application.isPlaying || UnityEngine.SceneManagement.SceneManager.GetActiveScene().isDirty)
+            throw new InvalidOperationException("편집 중인 씬을 저장하고 Edit Mode에서 실행합니다.");
+
+        var scene = EditorSceneManager.OpenScene(SCORE_COMPARISON_SCENE_PATH);
+        GameManager manager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+        SerializedObject managerSettings = new SerializedObject(manager);
+        KeyboardScoreCombo playerScore = (KeyboardScoreCombo)managerSettings.FindProperty("_comboHUD").objectReferenceValue;
+        KeyboardScoreComboHud playerHud = playerScore.GetComponent<KeyboardScoreComboHud>();
+        SerializedObject playerSettings = new SerializedObject(playerHud);
+        Text playerText = (Text)playerSettings.FindProperty("_scoreText").objectReferenceValue;
+        playerSettings.FindProperty("_scoreLabel").stringValue = "PLAYER SCORE";
+        playerSettings.ApplyModifiedPropertiesWithoutUndo();
+        PrefabUtility.RecordPrefabInstancePropertyModifications(playerHud);
+
+        playerText.text = "PLAYER SCORE: 0";
+        playerText.color = Color.white;
+        playerText.fontSize = 36;
+        playerText.fontStyle = FontStyle.Bold;
+        playerText.alignment = TextAnchor.MiddleLeft;
+        playerText.resizeTextForBestFit = true;
+        playerText.resizeTextMinSize = 24;
+        playerText.resizeTextMaxSize = 36;
+        playerText.rectTransform.sizeDelta = new Vector2(600f, 52f);
+        PrefabUtility.RecordPrefabInstancePropertyModifications(playerText);
+        PrefabUtility.RecordPrefabInstancePropertyModifications(playerText.rectTransform);
+
+        Transform enemyTransform = playerText.transform.parent.Find("EnemyScore");
+        Text enemyText = enemyTransform != null ? enemyTransform.GetComponent<Text>()
+            : UnityEngine.Object.Instantiate(playerText, playerText.transform.parent, false);
+        enemyText.name = "EnemyScore";
+        enemyText.text = "ENEMY SCORE: 0";
+        enemyText.fontSize = 28;
+        enemyText.fontStyle = FontStyle.Normal;
+        enemyText.color = new Color(1f, 0.35f, 0.35f);
+        enemyText.resizeTextMinSize = 20;
+        enemyText.resizeTextMaxSize = 28;
+        enemyText.rectTransform.sizeDelta = new Vector2(600f, 44f);
+        enemyText.rectTransform.anchoredPosition = playerText.rectTransform.anchoredPosition + new Vector2(0f, -66f);
+
+        EnemyScoreComboBinding enemyBinding = UnityEngine.Object.FindFirstObjectByType<EnemyScoreComboBinding>();
+        KeyboardScoreCombo enemyScore;
+        if (enemyBinding != null)
+        {
+            SerializedObject bindingSettings = new SerializedObject(enemyBinding);
+            enemyScore = (KeyboardScoreCombo)bindingSettings.FindProperty("_scoreCombo").objectReferenceValue;
+        }
+        else
+        {
+            Transform scoreTransform = playerHud.transform.Find("EnemyScoreState");
+            if (scoreTransform == null)
+            {
+                GameObject scoreObject = new GameObject("EnemyScoreState");
+                scoreObject.transform.SetParent(playerHud.transform, false);
+                enemyScore = scoreObject.AddComponent<KeyboardScoreCombo>();
+            }
+            else
+            {
+                enemyScore = scoreTransform.GetComponent<KeyboardScoreCombo>();
+            }
+        }
+
+        if (!playerHud.TryGetComponent(out EnemyScoreHud enemyHud))
+            enemyHud = playerHud.gameObject.AddComponent<EnemyScoreHud>();
+        SetReference(enemyHud, "_scoreCombo", enemyScore);
+        SetReference(enemyHud, "_scoreText", enemyText);
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("ENEMY_SCORE_UI_CONFIGURED " + SCORE_COMPARISON_SCENE_PATH);
+    }
 
     /// <summary>
     /// Test 1 씬의 키보드에 스코어와 콤보 상태 및 화면 UI를 구성한다.

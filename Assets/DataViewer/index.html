@@ -146,6 +146,41 @@
 
       <div class="ranking-grid" id="rankingList"></div>
     </section>
+
+    <!-- View 4: 시간대별 키보드 타격 횟수 및 타속 추이 그래프 -->
+    <section class="card timeline-chart-card">
+      <div class="card-title">
+        <div class="title-with-badge">
+          <span>View 4. 시간대별 키 타격 횟수 및 타속 추이 (Keystroke Timeline)</span>
+        </div>
+        <div class="timeline-metrics" id="timelineMetrics">
+          <span class="badge metric-badge" id="metricAvgCpm">평균 타속: 0 CPM</span>
+          <span class="badge metric-badge" id="metricPeakCpm">최고 타속: 0 CPM</span>
+          <span class="badge metric-badge" id="metricTotalTime">기록 시간: 0초</span>
+        </div>
+      </div>
+      <div class="timeline-toolbar">
+        <div class="card-desc">
+          시간 흐름에 따른 키보드 타격(Down) 횟수 및 분당 타수(CPM) 추이 그래프입니다. 마우스를 올리면 각 구간의 상세 타수를 확인할 수 있습니다.
+        </div>
+        <div class="interval-selector">
+          <label for="intervalSelect">시간 단위:</label>
+          <select id="intervalSelect" class="interval-select">
+            <option value="auto">자동 (Auto)</option>
+            <option value="1">1초 단위</option>
+            <option value="2">2초 단위</option>
+            <option value="5" selected>5초 단위</option>
+            <option value="10">10초 단위</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 캔버스 차트 영역 -->
+      <div class="chart-container" id="chartContainer">
+        <canvas id="timelineCanvas"></canvas>
+        <div class="chart-tooltip" id="chartTooltip" style="display: none;"></div>
+      </div>
+    </section>
   </div>
 
   <script src="viewer.js"></script>

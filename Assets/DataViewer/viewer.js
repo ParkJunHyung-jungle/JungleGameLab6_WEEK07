@@ -820,6 +820,7 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
   let maxElapsed = 0;
   let totalDownCount = 0;
   const keyCounts = {};
+  const downTimestamps = [];
 
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i].split(",").map(v => v.trim());
@@ -840,6 +841,9 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
       if (normalizedKey) {
         keyCounts[normalizedKey] = (keyCounts[normalizedKey] || 0) + 1;
         totalDownCount++;
+        if (!isNaN(elapsed) && elapsed >= 0) {
+          downTimestamps.push(elapsed);
+        }
       }
     }
   }
@@ -854,7 +858,8 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
     buildVersion,
     maxElapsed,
     totalDownCount,
-    keyCounts
+    keyCounts,
+    downTimestamps
   };
 }
 
@@ -867,27 +872,37 @@ function getAggregatedData() {
       avgDownCount: 0,
       totalElapsed: 0,
       avgElapsed: 0,
+      maxElapsed: 0,
       buildVersions: "-",
       rawTotalCounts: {},
       rawAvgCounts: {},
-      keyCounts: {}
+      keyCounts: {},
+      downTimestamps: []
     };
   }
 
   const count = loadedSessions.length;
   let totalDown = 0;
   let totalElapsed = 0;
+  let overallMaxElapsed = 0;
   const versions = new Set();
   const totalKeys = {};
+  let allTimestamps = [];
 
   loadedSessions.forEach(session => {
     totalDown += session.totalDownCount;
     totalElapsed += session.maxElapsed;
+    if (session.maxElapsed > overallMaxElapsed) {
+      overallMaxElapsed = session.maxElapsed;
+    }
     if (session.buildVersion && session.buildVersion !== "-") {
       versions.add(session.buildVersion);
     }
     for (const [key, val] of Object.entries(session.keyCounts)) {
       totalKeys[key] = (totalKeys[key] || 0) + val;
+    }
+    if (session.downTimestamps && session.downTimestamps.length > 0) {
+      allTimestamps = allTimestamps.concat(session.downTimestamps);
     }
   });
 
@@ -905,10 +920,12 @@ function getAggregatedData() {
     avgDownCount: avgDown,
     totalElapsed: totalElapsed,
     avgElapsed: avgElapsed,
+    maxElapsed: overallMaxElapsed,
     buildVersions: versions.size > 0 ? Array.from(versions).join(", ") : "-",
     rawTotalCounts: totalKeys,
     rawAvgCounts: avgKeys,
-    keyCounts: currentViewMode === "average" ? avgKeys : totalKeys
+    keyCounts: currentViewMode === "average" ? avgKeys : totalKeys,
+    downTimestamps: allTimestamps
   };
 }
 
@@ -955,6 +972,7 @@ function updateView() {
 
     renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
     renderRanking(session.keyCounts, false);
+    renderTimelineChart(session.downTimestamps, false, 1, session.maxElapsed);
     return;
   }
 
@@ -1038,6 +1056,7 @@ function updateView() {
 
     renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
     renderRanking(session.keyCounts, false);
+    renderTimelineChart(session.downTimestamps, false, 1, session.maxElapsed);
     return;
   }
 
@@ -1070,13 +1089,264 @@ function updateView() {
 
   renderKeyboard(agg.keyCounts, isAvg, agg.rawTotalCounts, agg.sessionCount);
   renderRanking(agg.keyCounts, isAvg);
+  renderTimelineChart(agg.downTimestamps, isAvg, agg.sessionCount, agg.maxElapsed);
 }
 
-// 9. 초기화(리셋) 함수
+// 9. 시간대별 키 타격 횟수 및 타속 추이 차트 렌더링
+let currentIntervalSetting = "5"; // "auto" | "1" | "2" | "5" | "10"
+let chartHoverData = null;
+
+function renderTimelineChart(timestamps, isAverage = false, sessionCount = 1, fixedMaxTime = null) {
+  const canvas = document.getElementById("timelineCanvas");
+  const container = document.getElementById("chartContainer");
+  const elAvgCpm = document.getElementById("metricAvgCpm");
+  const elPeakCpm = document.getElementById("metricPeakCpm");
+  const elTotalTime = document.getElementById("metricTotalTime");
+
+  if (!canvas || !container) return;
+
+  const ctx = canvas.getContext("2d");
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  const width = rect.width > 0 ? rect.width : 1000;
+  const height = rect.height > 0 ? rect.height : 300;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+
+  if (!timestamps || timestamps.length === 0) {
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("타임라인 데이터가 없습니다.", width / 2, height / 2);
+    if (elAvgCpm) elAvgCpm.innerText = "평균 타속: 0 CPM";
+    if (elPeakCpm) elPeakCpm.innerText = "최고 타속: 0 CPM";
+    if (elTotalTime) elTotalTime.innerText = "기록 시간: 0초";
+    canvas.chartPoints = [];
+    return;
+  }
+
+  // 1. 최대 시간(초) 및 인터벌 계산
+  const maxElapsed = fixedMaxTime && fixedMaxTime > 0 ? fixedMaxTime : Math.max(...timestamps, 1);
+  let interval = 5;
+  if (currentIntervalSetting === "auto") {
+    if (maxElapsed <= 30) interval = 1;
+    else if (maxElapsed <= 75) interval = 2;
+    else if (maxElapsed <= 240) interval = 5;
+    else interval = 10;
+  } else {
+    interval = parseInt(currentIntervalSetting, 10) || 5;
+  }
+
+  // 2. 버킷 분할 및 카운팅
+  const bucketCount = Math.max(Math.ceil(maxElapsed / interval), 1);
+  const buckets = Array.from({ length: bucketCount }, (_, i) => ({
+    start: i * interval,
+    end: (i + 1) * interval,
+    count: 0
+  }));
+
+  timestamps.forEach(t => {
+    const idx = Math.min(Math.floor(t / interval), bucketCount - 1);
+    if (idx >= 0 && idx < bucketCount) {
+      buckets[idx].count++;
+    }
+  });
+
+  // 평균 모드일 때: 세션당 평균 타수로 정규화
+  if (isAverage && sessionCount > 1) {
+    buckets.forEach(b => {
+      b.count = Number((b.count / sessionCount).toFixed(1));
+    });
+  }
+
+  // 3. 지표 산출
+  const totalCount = isAverage && sessionCount > 1 ? timestamps.length / sessionCount : timestamps.length;
+  const avgCpm = maxElapsed > 0 ? ((totalCount / maxElapsed) * 60).toFixed(0) : "0";
+  const peakBucketCount = Math.max(...buckets.map(b => b.count), 0);
+  const peakCpm = ((peakBucketCount / interval) * 60).toFixed(0);
+
+  if (elAvgCpm) elAvgCpm.innerText = `평균 타속: ${Number(avgCpm).toLocaleString()} CPM`;
+  if (elPeakCpm) elPeakCpm.innerText = `최고 타속: ${Number(peakCpm).toLocaleString()} CPM`;
+  if (elTotalTime) elTotalTime.innerText = `기록 시간: ${maxElapsed.toFixed(1)}초`;
+
+  // 4. 차트 레이아웃 좌표 설정
+  const padding = { left: 56, right: 28, top: 26, bottom: 34 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // Y축 최댓값 계산 (여유율 1.15)
+  const maxY = Math.max(peakBucketCount * 1.18, 4);
+
+  // Y축 눈금선 (4단계)
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  ctx.fillStyle = "#64748b";
+  ctx.font = "11px monospace";
+  ctx.textAlign = "right";
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= 4; i++) {
+    const yVal = (maxY / 4) * i;
+    const yPos = padding.top + chartH - (yVal / maxY) * chartH;
+
+    ctx.beginPath();
+    ctx.moveTo(padding.left, yPos);
+    ctx.lineTo(width - padding.right, yPos);
+    ctx.stroke();
+
+    const displayY = isAverage && yVal % 1 !== 0 ? yVal.toFixed(1) : Math.round(yVal);
+    ctx.fillText(displayY, padding.left - 8, yPos + 4);
+  }
+
+  // X축 시간 라벨
+  ctx.textAlign = "center";
+  const labelInterval = Math.max(Math.ceil(bucketCount / 8), 1);
+  for (let i = 0; i < bucketCount; i += labelInterval) {
+    const xPos = padding.left + (i / (bucketCount - 1 || 1)) * chartW;
+    const timeSec = Math.round(buckets[i].start);
+    const m = Math.floor(timeSec / 60);
+    const s = timeSec % 60;
+    const timeLabel = m > 0 ? `${m}m ${s}s` : `${s}s`;
+
+    ctx.fillText(timeLabel, xPos, height - padding.bottom + 20);
+  }
+
+  // 5. 막대 바 (Bar Chart)
+  const barWidth = Math.max((chartW / bucketCount) * 0.65, 3);
+  buckets.forEach((b, i) => {
+    const xCenter = padding.left + (i / (bucketCount - 1 || 1)) * chartW;
+    const bHeight = (b.count / maxY) * chartH;
+    const yPos = padding.top + chartH - bHeight;
+
+    const barGrad = ctx.createLinearGradient(0, yPos, 0, padding.top + chartH);
+    barGrad.addColorStop(0, "rgba(99, 102, 241, 0.5)");
+    barGrad.addColorStop(1, "rgba(99, 102, 241, 0.08)");
+
+    ctx.fillStyle = barGrad;
+    ctx.fillRect(xCenter - barWidth / 2, yPos, barWidth, bHeight);
+  });
+
+  // 6. 부드러운 스플라인 라인 & 영역 채우기
+  const points = buckets.map((b, i) => ({
+    x: padding.left + (i / (bucketCount - 1 || 1)) * chartW,
+    y: padding.top + chartH - (b.count / maxY) * chartH,
+    bucket: b
+  }));
+
+  // 영역 채우기 그라데이션
+  const areaGrad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+  areaGrad.addColorStop(0, "rgba(56, 189, 248, 0.3)");
+  areaGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, padding.top + chartH);
+  points.forEach((p, i) => {
+    if (i === 0) {
+      ctx.lineTo(p.x, p.y);
+    } else {
+      const prev = points[i - 1];
+      const cx = (prev.x + p.x) / 2;
+      ctx.bezierCurveTo(cx, prev.y, cx, p.y, p.x, p.y);
+    }
+  });
+  ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
+  ctx.closePath();
+  ctx.fillStyle = areaGrad;
+  ctx.fill();
+
+  // 라인(Line)
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    if (i === 0) {
+      ctx.moveTo(p.x, p.y);
+    } else {
+      const prev = points[i - 1];
+      const cx = (prev.x + p.x) / 2;
+      ctx.bezierCurveTo(cx, prev.y, cx, p.y, p.x, p.y);
+    }
+  });
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = "rgba(56, 189, 248, 0.8)";
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0; // 리셋
+
+  // 점(Point) 표시
+  points.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // 7. 마우스 호버 가이드라인 강조
+  if (chartHoverData) {
+    const hp = points[chartHoverData.index];
+    if (hp) {
+      // 세로 가이드라인 점선
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(hp.x, padding.top);
+      ctx.lineTo(hp.x, padding.top + chartH);
+      ctx.stroke();
+      ctx.restore();
+
+      // 호버 원 강조
+      ctx.beginPath();
+      ctx.arc(hp.x, hp.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#38bdf8";
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  // 캔버스 인터랙션 정보 바인딩
+  canvas.chartPoints = points;
+  canvas.chartInterval = interval;
+  canvas.chartIsAverage = isAverage;
+  canvas.chartSessionCount = sessionCount;
+}
+
+// 현재 세션 상태에 맞춰 차트 다시 그리기
+function redrawCurrentChart() {
+  if (loadedSessions.length === 0) {
+    renderTimelineChart([], false, 0, 0);
+    return;
+  }
+  if (loadedSessions.length === 1) {
+    renderTimelineChart(loadedSessions[0].downTimestamps, false, 1, loadedSessions[0].maxElapsed);
+    return;
+  }
+  if (selectedSessionIndex >= 0 && selectedSessionIndex < loadedSessions.length) {
+    const session = loadedSessions[selectedSessionIndex];
+    renderTimelineChart(session.downTimestamps, false, 1, session.maxElapsed);
+    return;
+  }
+  const agg = getAggregatedData();
+  const isAvg = currentViewMode === "average";
+  renderTimelineChart(agg.downTimestamps, isAvg, agg.sessionCount, agg.maxElapsed);
+}
+
+// 10. 초기화(리셋) 함수
 function resetViewer() {
   loadedSessions = [];
   selectedSessionIndex = -1;
   currentViewMode = "total";
+  chartHoverData = null;
 
   const elSessionId = document.getElementById("sessionIdText");
   if (elSessionId) elSessionId.innerText = "Session: 대기 중 (CSV 파일을 로드하세요)";
@@ -1117,8 +1387,12 @@ function resetViewer() {
   const fileInput = document.getElementById("csvFileInput");
   if (fileInput) fileInput.value = "";
 
+  const chartTooltip = document.getElementById("chartTooltip");
+  if (chartTooltip) chartTooltip.style.display = "none";
+
   renderKeyboard({}, false, {}, 0);
   renderRanking({}, false);
+  renderTimelineChart([], false, 0, 0);
 }
 
 // 복수 CSV 파일 읽기 및 세션 목록 업데이트
@@ -1308,4 +1582,83 @@ document.addEventListener("DOMContentLoaded", () => {
       loadFiles(e.dataTransfer.files);
     }
   });
+
+  // 11) 타임라인 차트 마우스 인터랙션 및 시간 단위 변경 리스너
+  setupChartEvents();
 });
+
+// 차트 인터랙션 및 단위 변경 리스너 설정
+function setupChartEvents() {
+  const canvas = document.getElementById("timelineCanvas");
+  const container = document.getElementById("chartContainer");
+  const tooltip = document.getElementById("chartTooltip");
+  const intervalSelect = document.getElementById("intervalSelect");
+
+  if (!canvas || !container || !tooltip) return;
+
+  canvas.addEventListener("mousemove", e => {
+    const points = canvas.chartPoints;
+    if (!points || points.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+
+    let closest = null;
+    let minDist = Infinity;
+    points.forEach((p, idx) => {
+      const dist = Math.abs(p.x - mouseX);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = { p, idx };
+      }
+    });
+
+    if (closest && minDist < 45) {
+      const b = closest.p.bucket;
+      const interval = canvas.chartInterval;
+      const isAvg = canvas.chartIsAverage;
+      const cpm = ((b.count / interval) * 60).toFixed(0);
+      const countLabel = isAvg ? `평균 ${b.count}회` : `${b.count.toLocaleString()}회`;
+
+      chartHoverData = { index: closest.idx };
+
+      tooltip.style.display = "block";
+      tooltip.style.left = closest.p.x + "px";
+      tooltip.style.top = closest.p.y + "px";
+      tooltip.innerHTML = `
+        <div class="chart-tooltip-header">⏱️ ${b.start.toFixed(0)}초 ~ ${b.end.toFixed(0)}초 (${interval}초 구간)</div>
+        <div class="chart-tooltip-body">
+          <div>타격 횟수: <strong>${countLabel}</strong></div>
+          <div>환산 타속: <strong>${Number(cpm).toLocaleString()} CPM</strong></div>
+        </div>
+      `;
+
+      redrawCurrentChart();
+    } else {
+      if (chartHoverData) {
+        chartHoverData = null;
+        tooltip.style.display = "none";
+        redrawCurrentChart();
+      }
+    }
+  });
+
+  canvas.addEventListener("mouseleave", () => {
+    if (chartHoverData) {
+      chartHoverData = null;
+      tooltip.style.display = "none";
+      redrawCurrentChart();
+    }
+  });
+
+  if (intervalSelect) {
+    intervalSelect.addEventListener("change", e => {
+      currentIntervalSetting = e.target.value;
+      redrawCurrentChart();
+    });
+  }
+
+  window.addEventListener("resize", () => {
+    redrawCurrentChart();
+  });
+}

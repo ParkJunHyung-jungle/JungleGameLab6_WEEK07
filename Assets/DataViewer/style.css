@@ -199,6 +199,122 @@ body {
 }
 
 /* ===================================================
+   [다중 세션 분석] 종합 / 평균 툴바 및 파일 태그
+   =================================================== */
+.session-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aggregate-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.view-mode-tabs {
+  display: inline-flex;
+  background: #0f172a;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.mode-tab {
+  background: transparent;
+  color: var(--text-sub);
+  border: none;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mode-tab.active {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.5);
+}
+
+.session-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-sub);
+}
+
+.session-select-dropdown {
+  background: #0f172a;
+  color: var(--text-main);
+  border: 1px solid var(--card-border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  max-width: 320px;
+  transition: border-color 0.2s;
+}
+
+.session-select-dropdown:focus {
+  border-color: var(--accent);
+}
+
+.file-list-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 80px;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.file-tag {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #bae6fd;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-tag .tag-remove-btn {
+  background: none;
+  border: none;
+  color: #7dd3fc;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.file-tag .tag-remove-btn:hover {
+  color: #f87171;
+}
+
+/* ===================================================
    [최상위 항목] 플레이어 선택 글로벌 카드 (Player Global Card)
    =================================================== */
 .player-global-card {
@@ -310,6 +426,27 @@ body {
   padding: 4px;
   border-radius: 10px;
   border: 1px solid #4c1d95;
+  overflow-x: auto;
+  max-width: 580px;
+  white-space: nowrap;
+}
+
+.player-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.player-tabs::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 4px;
+}
+
+.player-tabs::-webkit-scrollbar-thumb {
+  background: #7c3aed;
+  border-radius: 4px;
+}
+
+.player-tabs::-webkit-scrollbar-thumb:hover {
+  background: #9333ea;
 }
 
 .player-tab-btn {

@@ -640,12 +640,14 @@ function getHeatmapColor(count, maxCount) {
 }
 
 // 5. 키보드 히트맵 렌더링
-function renderKeyboard(keyCounts) {
+function renderKeyboard(keyCounts, isAverage = false, rawTotalCounts = {}, sessionCount = 1) {
   const counts = Object.values(keyCounts);
   const maxCount = Math.max(...counts, 1);
 
   const legendText = document.getElementById("maxLegendText");
-  if (legendText) legendText.innerText = "최다 (" + maxCount + "회)";
+  if (legendText) {
+    legendText.innerText = isAverage ? "최다 평균 (" + maxCount.toFixed(1) + "회)" : "최다 (" + maxCount.toLocaleString() + "회)";
+  }
 
   const mainSection = document.getElementById("mainSection");
   const navSection = document.getElementById("navSection");
@@ -653,6 +655,25 @@ function renderKeyboard(keyCounts) {
 
   mainSection.innerHTML = "";
   navSection.innerHTML = "";
+
+  const formatKeyCount = (count) => {
+    if (!count || count === 0) return "";
+    return isAverage ? (count % 1 === 0 ? count : count.toFixed(1)) : count.toLocaleString();
+  };
+
+  const getKeyTitle = (item, count) => {
+    const displayCount = formatKeyCount(count);
+    if (sessionCount > 1 && selectedSessionIndex === -1) {
+      if (isAverage) {
+        const total = rawTotalCounts[item.code] || 0;
+        return `${item.label} (${item.code}): 세션 평균 ${displayCount}회 (총 ${total.toLocaleString()}회 / ${sessionCount}개 세션)`;
+      } else {
+        const avg = (count / sessionCount).toFixed(1);
+        return `${item.label} (${item.code}): 총 ${displayCount}회 (세션 평균 ${avg}회 / ${sessionCount}개 세션)`;
+      }
+    }
+    return `${item.label} (${item.code}): ${displayCount}회`;
+  };
 
   mainLayout.forEach((row, rowIndex) => {
     const rowEl = document.createElement("div");
@@ -675,9 +696,10 @@ function renderKeyboard(keyCounts) {
       keyEl.style.borderColor = style.border;
       keyEl.style.color = style.color;
       keyEl.style.boxShadow = style.boxShadow;
-      keyEl.title = item.label + " (" + item.code + "): " + count + "회";
+      keyEl.title = getKeyTitle(item, count);
 
-      keyEl.innerHTML = "<span class=\"key-label\">" + item.label + "</span><span class=\"key-count\">" + (count > 0 ? count : "") + "</span>";
+      const countStr = formatKeyCount(count);
+      keyEl.innerHTML = "<span class=\"key-label\">" + item.label + "</span><span class=\"key-count\">" + countStr + "</span>";
 
       rowEl.appendChild(keyEl);
     });
@@ -714,9 +736,10 @@ function renderKeyboard(keyCounts) {
       keyEl.style.borderColor = style.border;
       keyEl.style.color = style.color;
       keyEl.style.boxShadow = style.boxShadow;
-      keyEl.title = item.label + " (" + item.code + "): " + count + "회";
+      keyEl.title = getKeyTitle(item, count);
 
-      keyEl.innerHTML = "<span class=\"key-label\">" + item.label + "</span><span class=\"key-count\">" + (count > 0 ? count : "") + "</span>";
+      const countStr = formatKeyCount(count);
+      keyEl.innerHTML = "<span class=\"key-label\">" + item.label + "</span><span class=\"key-count\">" + countStr + "</span>";
 
       rowEl.appendChild(keyEl);
     });
@@ -726,7 +749,7 @@ function renderKeyboard(keyCounts) {
 }
 
 // 6. 상위 키 순위 차트 렌더링
-function renderRanking(keyCounts) {
+function renderRanking(keyCounts, isAverage = false) {
   const rankingList = document.getElementById("rankingList");
   if (!rankingList) return;
   rankingList.innerHTML = "";
@@ -743,6 +766,8 @@ function renderRanking(keyCounts) {
     const percent = totalCount > 0 ? ((count / totalCount) * 100).toFixed(1) : "0.0";
     const barWidth = ((count / maxCount) * 100).toFixed(1);
     const rankClass = index < 3 ? "rank-" + (index + 1) : "";
+    const countDisplay = isAverage ? (count % 1 === 0 ? count : count.toFixed(1)) : count.toLocaleString();
+    const countLabel = isAverage ? `평균 ${countDisplay}회` : `${countDisplay}회`;
 
     const itemEl = document.createElement("div");
     itemEl.className = "ranking-item " + rankClass;
@@ -753,7 +778,7 @@ function renderRanking(keyCounts) {
           <span>${code}</span>
         </div>
         <div class="ranking-stat">
-          <strong>${count}회</strong> (${percent}%)
+          <strong>${countLabel}</strong> (${percent}%)
         </div>
       </div>
       <div class="bar-track">
@@ -765,12 +790,19 @@ function renderRanking(keyCounts) {
   });
 }
 
-// 7. CSV 파싱 및 시각화 반영
-function parseCsvAndRender(csvContent) {
-  if (!csvContent || csvContent.trim().length === 0) return;
+// ===================================================
+// 7. 다중 세션 상태 관리 및 데이터 분석
+// ===================================================
+let loadedSessions = [];
+let currentViewMode = "total"; // "total" | "average"
+let selectedSessionIndex = -1; // -1: 전체, >= 0: loadedSessions 인덱스
+
+// 단일 CSV 텍스트 파싱
+function parseSingleCsv(csvContent, fileName = "Unknown") {
+  if (!csvContent || csvContent.trim().length === 0) return null;
 
   const lines = csvContent.trim().split(/\r?\n/);
-  if (lines.length < 2) return;
+  if (lines.length < 2) return null;
 
   const header = lines[0].split(",").map(h => h.trim().toLowerCase());
   const colIndex = {
@@ -799,8 +831,8 @@ function parseCsvAndRender(csvContent) {
     const event = colIndex.event !== -1 ? row[colIndex.event].toLowerCase() : "";
     const elapsed = colIndex.elapsedSeconds !== -1 ? parseFloat(row[colIndex.elapsedSeconds]) : 0;
 
-    if (rowSessionId) sessionId = rowSessionId;
-    if (rowBuildVersion) buildVersion = rowBuildVersion;
+    if (rowSessionId && sessionId === "-") sessionId = rowSessionId;
+    if (rowBuildVersion && buildVersion === "-") buildVersion = rowBuildVersion;
     if (!isNaN(elapsed) && elapsed > maxElapsed) maxElapsed = elapsed;
 
     if (event === "down") {
@@ -812,31 +844,240 @@ function parseCsvAndRender(csvContent) {
     }
   }
 
-  // 상단 세션 메타데이터 업데이트
-  const elSessionId = document.getElementById("sessionIdText");
-  if (elSessionId) elSessionId.innerText = "Session: " + sessionId;
+  if (sessionId === "-") {
+    sessionId = fileName.replace(/\.csv$/i, "");
+  }
 
-  const elBuild = document.getElementById("buildVersionText");
-  if (elBuild) elBuild.innerText = "Build: " + buildVersion;
-
-  const elElapsed = document.getElementById("elapsedTimeText");
-  if (elElapsed) elElapsed.innerText = "기록 시간: " + maxElapsed.toFixed(2) + "초";
-
-  const elDown = document.getElementById("downCountText");
-  if (elDown) elDown.innerText = "총 누름(Down): " + totalDownCount.toLocaleString() + "회";
-
-  const elSummary = document.getElementById("summaryTotal");
-  if (elSummary) elSummary.innerText = "총 Down 입력: " + totalDownCount.toLocaleString() + "회";
-
-  const elTypeTotal = document.getElementById("typeTotalBadge");
-  if (elTypeTotal) elTypeTotal.innerText = "총 Down 입력: " + totalDownCount.toLocaleString() + "회";
-
-  renderKeyboard(keyCounts);
-  renderRanking(keyCounts);
+  return {
+    fileName,
+    sessionId,
+    buildVersion,
+    maxElapsed,
+    totalDownCount,
+    keyCounts
+  };
 }
 
-// 8. 초기화(리셋) 함수
+// 다중 세션 전체 종합 및 평균 계산
+function getAggregatedData() {
+  if (loadedSessions.length === 0) {
+    return {
+      sessionCount: 0,
+      totalDownCount: 0,
+      avgDownCount: 0,
+      totalElapsed: 0,
+      avgElapsed: 0,
+      buildVersions: "-",
+      rawTotalCounts: {},
+      rawAvgCounts: {},
+      keyCounts: {}
+    };
+  }
+
+  const count = loadedSessions.length;
+  let totalDown = 0;
+  let totalElapsed = 0;
+  const versions = new Set();
+  const totalKeys = {};
+
+  loadedSessions.forEach(session => {
+    totalDown += session.totalDownCount;
+    totalElapsed += session.maxElapsed;
+    if (session.buildVersion && session.buildVersion !== "-") {
+      versions.add(session.buildVersion);
+    }
+    for (const [key, val] of Object.entries(session.keyCounts)) {
+      totalKeys[key] = (totalKeys[key] || 0) + val;
+    }
+  });
+
+  const avgKeys = {};
+  for (const [key, val] of Object.entries(totalKeys)) {
+    avgKeys[key] = Number((val / count).toFixed(2));
+  }
+
+  const avgDown = totalDown / count;
+  const avgElapsed = totalElapsed / count;
+
+  return {
+    sessionCount: count,
+    totalDownCount: totalDown,
+    avgDownCount: avgDown,
+    totalElapsed: totalElapsed,
+    avgElapsed: avgElapsed,
+    buildVersions: versions.size > 0 ? Array.from(versions).join(", ") : "-",
+    rawTotalCounts: totalKeys,
+    rawAvgCounts: avgKeys,
+    keyCounts: currentViewMode === "average" ? avgKeys : totalKeys
+  };
+}
+
+// 8. 뷰 일괄 갱신 함수
+function updateView() {
+  const elSessionId = document.getElementById("sessionIdText");
+  const elBuild = document.getElementById("buildVersionText");
+  const elElapsed = document.getElementById("elapsedTimeText");
+  const elDown = document.getElementById("downCountText");
+  const elSummary = document.getElementById("summaryTotal");
+  const elTypeTotal = document.getElementById("typeTotalBadge");
+  const toolbar = document.getElementById("aggregateToolbar");
+  const fileCountBadge = document.getElementById("fileCountBadge");
+  const fileListTags = document.getElementById("fileListTags");
+  const sessionSelect = document.getElementById("sessionSelect");
+
+  // 글로벌 세션 네비게이션 카드 요소들
+  const sessionGlobalCard = document.getElementById("sessionGlobalCard");
+  const currentSessionAvatar = document.getElementById("currentSessionAvatar");
+  const currentSessionTag = document.getElementById("currentSessionTag");
+  const currentSessionBadge = document.getElementById("currentSessionBadge");
+  const currentSessionName = document.getElementById("currentSessionName");
+  const sessionTabs = document.getElementById("sessionTabs");
+
+  if (loadedSessions.length === 0) {
+    resetViewer();
+    return;
+  }
+
+  // 단일 세션 로드 시
+  if (loadedSessions.length === 1) {
+    if (toolbar) toolbar.style.display = "none";
+    if (fileCountBadge) fileCountBadge.style.display = "none";
+    if (fileListTags) fileListTags.style.display = "none";
+    if (sessionGlobalCard) sessionGlobalCard.style.display = "none";
+
+    const session = loadedSessions[0];
+    if (elSessionId) elSessionId.innerText = "Session: " + session.sessionId;
+    if (elBuild) elBuild.innerText = "Build: " + session.buildVersion;
+    if (elElapsed) elElapsed.innerText = "기록 시간: " + session.maxElapsed.toFixed(2) + "초";
+    if (elDown) elDown.innerText = "총 누름(Down): " + session.totalDownCount.toLocaleString() + "회";
+    if (elSummary) elSummary.innerText = "총 Down 입력: " + session.totalDownCount.toLocaleString() + "회";
+    if (elTypeTotal) elTypeTotal.innerText = "총 Down 입력: " + session.totalDownCount.toLocaleString() + "회";
+
+    renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
+    renderRanking(session.keyCounts, false);
+    return;
+  }
+
+  // 다중 세션 로드 시 (2개 이상)
+  if (toolbar) toolbar.style.display = "flex";
+  if (fileCountBadge) {
+    fileCountBadge.style.display = "inline-block";
+    fileCountBadge.innerText = `${loadedSessions.length}개 파일 분석 중`;
+  }
+  if (fileListTags) {
+    fileListTags.style.display = "flex";
+    fileListTags.innerHTML = "";
+    loadedSessions.forEach((s, idx) => {
+      const tag = document.createElement("span");
+      tag.className = "file-tag";
+      tag.innerHTML = `📄 ${s.fileName} <button type="button" class="tag-remove-btn" title="이 파일 제외" data-index="${idx}">×</button>`;
+      fileListTags.appendChild(tag);
+    });
+  }
+
+  // 글로벌 세션 네비게이션 카드 표시 및 탭 렌더링
+  if (sessionGlobalCard && sessionTabs) {
+    sessionGlobalCard.style.display = "flex";
+    sessionTabs.innerHTML = "";
+
+    // 1) 전체 통합 탭
+    const allTabBtn = document.createElement("button");
+    allTabBtn.type = "button";
+    allTabBtn.className = "player-tab-btn" + (selectedSessionIndex === -1 ? " active" : "");
+    allTabBtn.setAttribute("data-index", "-1");
+    allTabBtn.innerText = "📊 전체 통합";
+    sessionTabs.appendChild(allTabBtn);
+
+    // 2) 개별 세션 탭 목록
+    loadedSessions.forEach((s, idx) => {
+      const tabBtn = document.createElement("button");
+      tabBtn.type = "button";
+      tabBtn.className = "player-tab-btn" + (selectedSessionIndex === idx ? " active" : "");
+      tabBtn.setAttribute("data-index", idx.toString());
+      const shortName = s.fileName.length > 14 ? s.fileName.substring(0, 12) + ".." : s.fileName;
+      tabBtn.innerText = `🎮 ${idx + 1}. ${shortName}`;
+      tabBtn.title = s.fileName;
+      sessionTabs.appendChild(tabBtn);
+    });
+  }
+
+  // 세션 셀렉트 드롭다운 동기화
+  if (sessionSelect) {
+    sessionSelect.innerHTML = `<option value="ALL">전체 통합 분석 (${loadedSessions.length}개 세션)</option>`;
+    loadedSessions.forEach((s, idx) => {
+      const opt = document.createElement("option");
+      opt.value = idx.toString();
+      opt.innerText = `${idx + 1}. ${s.fileName} (${s.sessionId.substring(0, 8)}...)`;
+      sessionSelect.appendChild(opt);
+    });
+    sessionSelect.value = selectedSessionIndex === -1 ? "ALL" : selectedSessionIndex.toString();
+  }
+
+  // 탭 활성화 상태
+  const modeTotalBtn = document.getElementById("modeTotalBtn");
+  const modeAverageBtn = document.getElementById("modeAverageBtn");
+  if (modeTotalBtn && modeAverageBtn) {
+    modeTotalBtn.classList.toggle("active", currentViewMode === "total");
+    modeAverageBtn.classList.toggle("active", currentViewMode === "average");
+  }
+
+  // 1) 특정 개별 세션 조회 중인 경우
+  if (selectedSessionIndex >= 0 && selectedSessionIndex < loadedSessions.length) {
+    const session = loadedSessions[selectedSessionIndex];
+    if (elSessionId) elSessionId.innerText = `[${selectedSessionIndex + 1}/${loadedSessions.length}] Session: ${session.sessionId}`;
+    if (elBuild) elBuild.innerText = "Build: " + session.buildVersion;
+    if (elElapsed) elElapsed.innerText = "기록 시간: " + session.maxElapsed.toFixed(2) + "초";
+    if (elDown) elDown.innerText = "총 누름(Down): " + session.totalDownCount.toLocaleString() + "회";
+    if (elSummary) elSummary.innerText = "개별 Down 입력: " + session.totalDownCount.toLocaleString() + "회";
+    if (elTypeTotal) elTypeTotal.innerText = "개별 Down 입력: " + session.totalDownCount.toLocaleString() + "회";
+
+    if (currentSessionAvatar) currentSessionAvatar.innerText = "🎮";
+    if (currentSessionTag) currentSessionTag.innerText = `INDIVIDUAL SESSION #${selectedSessionIndex + 1}`;
+    if (currentSessionBadge) currentSessionBadge.innerText = `Session ${selectedSessionIndex + 1}`;
+    if (currentSessionName) currentSessionName.innerText = `${session.fileName} (기록 ${session.maxElapsed.toFixed(1)}초, ${session.totalDownCount.toLocaleString()}타)`;
+
+    renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
+    renderRanking(session.keyCounts, false);
+    return;
+  }
+
+  // 2) 전체 다중 세션 종합 또는 평균 조회 중인 경우
+  const agg = getAggregatedData();
+  const isAvg = currentViewMode === "average";
+
+  if (currentSessionAvatar) currentSessionAvatar.innerText = "📊";
+  if (currentSessionTag) currentSessionTag.innerText = `AGGREGATED SESSIONS (${agg.sessionCount} FILES)`;
+  if (currentSessionBadge) currentSessionBadge.innerText = "ALL SESSIONS";
+  if (currentSessionName) {
+    currentSessionName.innerText = isAvg ? `전체 세션 통합 분석 (세션별 평균)` : `전체 세션 통합 분석 (종합 합계)`;
+  }
+
+  if (isAvg) {
+    if (elSessionId) elSessionId.innerText = `총 ${agg.sessionCount}개 세션 평균 (Average 분석)`;
+    if (elBuild) elBuild.innerText = `Build: ${agg.buildVersions}`;
+    if (elElapsed) elElapsed.innerText = `세션 평균 기록 시간: ${agg.avgElapsed.toFixed(1)}초 (총 ${agg.totalElapsed.toFixed(1)}초)`;
+    if (elDown) elDown.innerText = `세션 평균 누름(Down): ${agg.avgDownCount.toFixed(1)}회 (총 ${agg.totalDownCount.toLocaleString()}회)`;
+    if (elSummary) elSummary.innerText = `세션 평균 Down: ${agg.avgDownCount.toFixed(1)}회`;
+    if (elTypeTotal) elTypeTotal.innerText = `세션 평균 Down: ${agg.avgDownCount.toFixed(1)}회`;
+  } else {
+    if (elSessionId) elSessionId.innerText = `총 ${agg.sessionCount}개 세션 종합 (합계 Total 분석)`;
+    if (elBuild) elBuild.innerText = `Build: ${agg.buildVersions}`;
+    if (elElapsed) elElapsed.innerText = `총 기록 시간: ${agg.totalElapsed.toFixed(1)}초 (세션 평균 ${agg.avgElapsed.toFixed(1)}초)`;
+    if (elDown) elDown.innerText = `총 누름(Down): ${agg.totalDownCount.toLocaleString()}회 (세션 평균 ${agg.avgDownCount.toFixed(1)}회)`;
+    if (elSummary) elSummary.innerText = `총 Down 입력: ${agg.totalDownCount.toLocaleString()}회`;
+    if (elTypeTotal) elTypeTotal.innerText = `총 Down 입력: ${agg.totalDownCount.toLocaleString()}회`;
+  }
+
+  renderKeyboard(agg.keyCounts, isAvg, agg.rawTotalCounts, agg.sessionCount);
+  renderRanking(agg.keyCounts, isAvg);
+}
+
+// 9. 초기화(리셋) 함수
 function resetViewer() {
+  loadedSessions = [];
+  selectedSessionIndex = -1;
+  currentViewMode = "total";
+
   const elSessionId = document.getElementById("sessionIdText");
   if (elSessionId) elSessionId.innerText = "Session: 대기 중 (CSV 파일을 로드하세요)";
 
@@ -855,24 +1096,91 @@ function resetViewer() {
   const elTypeTotal = document.getElementById("typeTotalBadge");
   if (elTypeTotal) elTypeTotal.innerText = "총 Down 입력: 0회";
 
+  const toolbar = document.getElementById("aggregateToolbar");
+  if (toolbar) toolbar.style.display = "none";
+
+  const fileCountBadge = document.getElementById("fileCountBadge");
+  if (fileCountBadge) fileCountBadge.style.display = "none";
+
+  const fileListTags = document.getElementById("fileListTags");
+  if (fileListTags) {
+    fileListTags.style.display = "none";
+    fileListTags.innerHTML = "";
+  }
+
+  const sessionGlobalCard = document.getElementById("sessionGlobalCard");
+  if (sessionGlobalCard) sessionGlobalCard.style.display = "none";
+
+  const sessionTabs = document.getElementById("sessionTabs");
+  if (sessionTabs) sessionTabs.innerHTML = "";
+
   const fileInput = document.getElementById("csvFileInput");
   if (fileInput) fileInput.value = "";
 
-  // 히트맵과 랭킹 0으로 클리어
-  renderKeyboard({});
-  renderRanking({});
+  renderKeyboard({}, false, {}, 0);
+  renderRanking({}, false);
 }
 
-// 9. 초기화 및 리스너 등록
+// 복수 CSV 파일 읽기 및 세션 목록 업데이트
+function loadFiles(fileList) {
+  if (!fileList || fileList.length === 0) return;
+
+  const csvFiles = Array.from(fileList).filter(f =>
+    f.name.toLowerCase().endsWith(".csv") ||
+    f.type.includes("csv") ||
+    f.type.includes("text")
+  );
+
+  if (csvFiles.length === 0) {
+    alert("선택된 파일 중 유효한 CSV 파일이 없습니다.");
+    return;
+  }
+
+  const promises = csvFiles.map(file => {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = event => {
+        const parsed = parseSingleCsv(event.target.result, file.name);
+        resolve(parsed);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file, "UTF-8");
+    });
+  });
+
+  Promise.all(promises).then(results => {
+    const validSessions = results.filter(s => s !== null);
+    if (validSessions.length === 0) {
+      alert("CSV 데이터 파싱에 실패했습니다.");
+      return;
+    }
+
+    // 파일 로드 시 기존 세션 대체
+    loadedSessions = validSessions;
+    selectedSessionIndex = -1;
+    updateView();
+  });
+}
+
+// 10. 초기화 및 이벤트 리스너 등록
 document.addEventListener("DOMContentLoaded", () => {
   // 1) 기본 데이터로 첫 화면 렌더링
-  parseCsvAndRender(sampleCsvText);
+  const initialSession = parseSingleCsv(sampleCsvText, "sample_playtest_log.csv");
+  if (initialSession) {
+    loadedSessions = [initialSession];
+    updateView();
+  }
 
-  // 2) 최신 Playtest 로그 즉시 불러오기 버튼
+  // 2) 최신 Playtest 기본 로그 즉시 불러오기 버튼
   const loadDefaultBtn = document.getElementById("loadDefaultLogBtn");
   if (loadDefaultBtn) {
     loadDefaultBtn.addEventListener("click", () => {
-      parseCsvAndRender(sampleCsvText);
+      const defaultSession = parseSingleCsv(sampleCsvText, "sample_playtest_log.csv");
+      if (defaultSession) {
+        loadedSessions = [defaultSession];
+        selectedSessionIndex = -1;
+        updateView();
+      }
     });
   }
 
@@ -884,37 +1192,120 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 4) 파일 선택 input 리스너
+  // 4) 파일 선택 input 리스너 (다중 파일 지원)
   const fileInput = document.getElementById("csvFileInput");
   if (fileInput) {
-    fileInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        parseCsvAndRender(event.target.result);
-      };
-      reader.readAsText(file, "UTF-8");
+    fileInput.addEventListener("change", e => {
+      loadFiles(e.target.files);
     });
   }
 
-  // 5) 드래그 앤 드롭 파일 로더
-  window.addEventListener("dragover", (e) => {
+  // 5) 모드 탭 전환 버튼 (전체 종합 / 세션별 평균)
+  const modeTotalBtn = document.getElementById("modeTotalBtn");
+  const modeAverageBtn = document.getElementById("modeAverageBtn");
+
+  if (modeTotalBtn) {
+    modeTotalBtn.addEventListener("click", () => {
+      currentViewMode = "total";
+      selectedSessionIndex = -1;
+      updateView();
+    });
+  }
+
+  if (modeAverageBtn) {
+    modeAverageBtn.addEventListener("click", () => {
+      currentViewMode = "average";
+      selectedSessionIndex = -1;
+      updateView();
+    });
+  }
+
+  // 6) 세션 선택 드롭다운 리스너
+  const sessionSelect = document.getElementById("sessionSelect");
+  if (sessionSelect) {
+    sessionSelect.addEventListener("change", e => {
+      const val = e.target.value;
+      if (val === "ALL") {
+        selectedSessionIndex = -1;
+      } else {
+        selectedSessionIndex = parseInt(val, 10);
+      }
+      updateView();
+    });
+  }
+
+  // 7) 세션 글로벌 카드 네비게이션 탭 클릭
+  const sessionTabs = document.getElementById("sessionTabs");
+  if (sessionTabs) {
+    sessionTabs.addEventListener("click", e => {
+      const btn = e.target.closest(".player-tab-btn");
+      if (!btn) return;
+      const index = parseInt(btn.getAttribute("data-index"), 10);
+      selectedSessionIndex = index;
+      updateView();
+    });
+  }
+
+  // 8) 이전(◀), 다음(▶) 세션 이동 버튼
+  const prevSessionBtn = document.getElementById("prevSessionBtn");
+  const nextSessionBtn = document.getElementById("nextSessionBtn");
+
+  if (prevSessionBtn) {
+    prevSessionBtn.addEventListener("click", () => {
+      if (loadedSessions.length <= 1) return;
+      if (selectedSessionIndex === -1) {
+        selectedSessionIndex = loadedSessions.length - 1;
+      } else if (selectedSessionIndex === 0) {
+        selectedSessionIndex = -1; // 전체 통합으로 순환
+      } else {
+        selectedSessionIndex--;
+      }
+      updateView();
+    });
+  }
+
+  if (nextSessionBtn) {
+    nextSessionBtn.addEventListener("click", () => {
+      if (loadedSessions.length <= 1) return;
+      if (selectedSessionIndex === -1) {
+        selectedSessionIndex = 0;
+      } else if (selectedSessionIndex === loadedSessions.length - 1) {
+        selectedSessionIndex = -1; // 전체 통합으로 순환
+      } else {
+        selectedSessionIndex++;
+      }
+      updateView();
+    });
+  }
+
+  // 9) 파일 태그 개별 삭제 이벤트 위임
+  const fileListTags = document.getElementById("fileListTags");
+  if (fileListTags) {
+    fileListTags.addEventListener("click", e => {
+      const btn = e.target.closest(".tag-remove-btn");
+      if (!btn) return;
+      const index = parseInt(btn.getAttribute("data-index"), 10);
+      if (!isNaN(index) && index >= 0 && index < loadedSessions.length) {
+        loadedSessions.splice(index, 1);
+        if (selectedSessionIndex === index) {
+          selectedSessionIndex = -1;
+        } else if (selectedSessionIndex > index) {
+          selectedSessionIndex--;
+        }
+        updateView();
+      }
+    });
+  }
+
+  // 10) 드래그 앤 드롭 파일 로더 (복수 파일 동시 드롭 지원)
+  window.addEventListener("dragover", e => {
     e.preventDefault();
   });
 
-  window.addEventListener("drop", (e) => {
+  window.addEventListener("drop", e => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (file.name.endsWith(".csv") || file.type.includes("csv") || file.type.includes("text")) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          parseCsvAndRender(event.target.result);
-        };
-        reader.readAsText(file, "UTF-8");
-      }
+      loadFiles(e.dataTransfer.files);
     }
   });
 });

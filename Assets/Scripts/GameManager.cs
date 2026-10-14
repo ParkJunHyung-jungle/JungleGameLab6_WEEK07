@@ -9,6 +9,9 @@ using KeyboardModeling;
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
+    public static event Action<GameManager> PlaytestRoundStarted;
+    public static event Action<GameManager, string, bool> PlaytestRoundEnded;
+    public static event Action PlaytestLogFolderRequested;
 
     [Header("Spawner References")]
     [SerializeField] private KeyboardSpawner _keyboardSpawner;
@@ -44,6 +47,7 @@ public class GameManager : MonoBehaviour
     private float _remainingTime;
     private float _elapsedRoundTime;
     private bool _isTimerRunning;
+    private bool _playtestRoundActive;
 
     [Header("Enemy Runtime State")]
     private GameObject _activeEnemyKeyboard;
@@ -63,10 +67,24 @@ public class GameManager : MonoBehaviour
     public float ElapsedRoundTime => _elapsedRoundTime;
     public float RoundTimeLimit => _roundTimeLimit;
     public bool IsTimerRunning => _isTimerRunning;
+    public KeyboardScoreCombo PlaytestPlayerScore => _comboHUD;
+    public KeyboardScoreCombo PlaytestEnemyScore => _enemyScoreCombo;
 
     public event Action<float> TimerUpdated;
     public event Action RoundTimeOut;
     public event Action<float> RoundCleared;
+
+    /// <summary>
+    /// 새 실행의 관찰용 라운드 이벤트 구독을 초기화한다.
+    /// 게임 상태는 유지하며 이전 실행의 로깅 구독만 제거한다.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPlaytestObservers()
+    {
+        PlaytestRoundStarted = null;
+        PlaytestRoundEnded = null;
+        PlaytestLogFolderRequested = null;
+    }
 
     void Awake()
     {
@@ -208,6 +226,7 @@ public class GameManager : MonoBehaviour
 
     void OnDestroy()
     {
+        NotifyPlaytestRoundEnded("SceneExit", false);
         if (_keyboardSpawner != null)
         {
             _keyboardSpawner.KeyboardSpawned -= HandleKeyboardSpawned;
@@ -275,6 +294,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        NotifyPlaytestRoundEnded("Restart", false);
         _remainingTime = _roundTimeLimit;
         _elapsedRoundTime = 0f;
         _isTimerRunning = true;
@@ -288,6 +308,8 @@ public class GameManager : MonoBehaviour
         // 게임 제한 시간과 경과 시간을 초기화하고 타이머를 시작한다.
         Debug.Log($"[GameManager] Game Timer Started. Limit: {_roundTimeLimit:F1}s");
         TimerUpdated?.Invoke(_remainingTime);
+        _playtestRoundActive = true;
+        PlaytestRoundStarted?.Invoke(this);
     }
 
     /// <summary>
@@ -297,6 +319,7 @@ public class GameManager : MonoBehaviour
     public void StopRoundTimer()
     {
         _isTimerRunning = false;
+        NotifyPlaytestRoundEnded("Stopped", false);
     }
 
     /// <summary>
@@ -410,6 +433,20 @@ public class GameManager : MonoBehaviour
 
         // 플레이어와 로봇의 점수를 비교하고 결과를 콘솔에 출력한다.
         CompareAndLogScores();
+        NotifyPlaytestRoundEnded("TimeOut", true);
+    }
+
+    void OnApplicationQuit() { NotifyPlaytestRoundEnded("ApplicationQuit", false); }
+
+    /// <summary>
+    /// reason과 complete로 실제 대결 종료를 관찰자에게 한 번 알린다.
+    /// 로깅용 실행 상태만 변경하며 점수와 게임 진행은 변경하지 않는다.
+    /// </summary>
+    private void NotifyPlaytestRoundEnded(string reason, bool complete)
+    {
+        if (!_playtestRoundActive) return;
+        _playtestRoundActive = false;
+        PlaytestRoundEnded?.Invoke(this, reason, complete);
     }
 
     /// <summary>
@@ -470,7 +507,7 @@ public class GameManager : MonoBehaviour
     private void DrawResultOverlay()
     {
         float boxWidth = 560f;
-        float boxHeight = 240f;
+        float boxHeight = 280f;
         float posX = (Screen.width - boxWidth) * 0.5f;
         float posY = (Screen.height - boxHeight) * 0.5f;
 
@@ -526,6 +563,8 @@ public class GameManager : MonoBehaviour
 
         Rect detailRect = new Rect(posX + 20f, posY + 125f, boxWidth - 40f, 85f);
         GUI.Label(detailRect, _resultScoreSummary, detailStyle);
+        if (GUI.Button(new Rect(posX + 140f, posY + 230f, 280f, 34f), "로그 폴더 열기"))
+            PlaytestLogFolderRequested?.Invoke();
     }
 
     /// <summary>

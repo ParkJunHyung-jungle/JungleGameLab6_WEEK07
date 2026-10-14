@@ -4,11 +4,15 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
+using Game.UI;
 using KeyboardModeling;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
+    public static event Action<GameManager> PlaytestRoundStarted;
+    public static event Action<GameManager, string, bool> PlaytestRoundEnded;
+    public static event Action PlaytestLogFolderRequested;
 
     [Header("Spawner References")]
     [SerializeField] private KeyboardSpawner _keyboardSpawner;
@@ -33,6 +37,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Text _resultText;
     [SerializeField] private Text _resultTitleText;
     [SerializeField] private Text _resultScoreText;
+    [SerializeField] private PlaytestLogFolderButton _resultLogFolderButton;
 
     [Header("콤보 HUD")]
     [SerializeField] private KeyboardScoreCombo _comboHUD;
@@ -48,6 +53,7 @@ public class GameManager : MonoBehaviour
     private float _remainingTime;
     private float _elapsedRoundTime;
     private bool _isTimerRunning;
+    private bool _playtestRoundActive;
 
     [Header("Enemy Runtime State")]
     private GameObject _activeEnemyKeyboard;
@@ -60,10 +66,24 @@ public class GameManager : MonoBehaviour
     public float ElapsedRoundTime => _elapsedRoundTime;
     public float RoundTimeLimit => _roundTimeLimit;
     public bool IsTimerRunning => _isTimerRunning;
+    public KeyboardScoreCombo PlaytestPlayerScore => _comboHUD;
+    public KeyboardScoreCombo PlaytestEnemyScore => _enemyScoreCombo;
 
     public event Action<float> TimerUpdated;
     public event Action RoundTimeOut;
     public event Action<float> RoundCleared;
+
+    /// <summary>
+    /// 새 실행의 관찰용 라운드와 로그 폴더 이벤트 구독을 초기화한다.
+    /// 게임 상태는 변경하지 않고 이전 실행의 로깅 구독만 제거한다.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPlaytestObservers()
+    {
+        PlaytestRoundStarted = null;
+        PlaytestRoundEnded = null;
+        PlaytestLogFolderRequested = null;
+    }
 
     void Awake()
     {
@@ -158,6 +178,16 @@ public class GameManager : MonoBehaviour
         UpdateTimerText(_roundTimeLimit);
     }
 
+    void OnEnable()
+    {
+        if (_resultLogFolderButton != null) _resultLogFolderButton.Clicked += RequestPlaytestLogFolder;
+    }
+
+    void OnDisable()
+    {
+        if (_resultLogFolderButton != null) _resultLogFolderButton.Clicked -= RequestPlaytestLogFolder;
+    }
+
     void Start()
     {
         if (_keyboardSpawner != null)
@@ -204,6 +234,7 @@ public class GameManager : MonoBehaviour
 
     void OnDestroy()
     {
+        NotifyPlaytestRoundEnded("SceneExit", false);
         if (_keyboardSpawner != null)
         {
             _keyboardSpawner.KeyboardSpawned -= HandleKeyboardSpawned;
@@ -265,6 +296,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        NotifyPlaytestRoundEnded("Restart", false);
         _remainingTime = _roundTimeLimit;
         _elapsedRoundTime = 0f;
         _isTimerRunning = true;
@@ -279,6 +311,8 @@ public class GameManager : MonoBehaviour
         // 게임 제한 시간과 경과 시간을 초기화하고 타이머를 시작한다.
         Debug.Log($"[GameManager] Game Timer Started. Limit: {_roundTimeLimit:F1}s");
         TimerUpdated?.Invoke(_remainingTime);
+        _playtestRoundActive = true;
+        PlaytestRoundStarted?.Invoke(this);
     }
 
     /// <summary>
@@ -288,6 +322,7 @@ public class GameManager : MonoBehaviour
     public void StopRoundTimer()
     {
         _isTimerRunning = false;
+        NotifyPlaytestRoundEnded("Stopped", false);
     }
 
     /// <summary>
@@ -401,8 +436,28 @@ public class GameManager : MonoBehaviour
         }
 
         // 플레이어와 로봇의 점수를 비교하고 결과를 콘솔에 출력한다.
+        NotifyPlaytestRoundEnded("TimeOut", true);
         CompareAndLogScores();
     }
+
+    void OnApplicationQuit() { NotifyPlaytestRoundEnded("ApplicationQuit", false); }
+
+    /// <summary>
+    /// reason과 complete로 실제 대결 종료를 관찰자에게 한 번 알린다.
+    /// 로깅용 실행 상태만 변경하고 점수와 게임 진행은 변경하지 않는다.
+    /// </summary>
+    private void NotifyPlaytestRoundEnded(string reason, bool complete)
+    {
+        if (!_playtestRoundActive) return;
+        _playtestRoundActive = false;
+        PlaytestRoundEnded?.Invoke(this, reason, complete);
+    }
+
+    /// <summary>
+    /// 결과 화면의 로그 폴더 버튼 클릭을 관찰자에게 전달한다.
+    /// 입력값 없이 C# 이벤트를 발생시키며 파일 열기 처리는 로거가 담당한다.
+    /// </summary>
+    private void RequestPlaytestLogFolder() { PlaytestLogFolderRequested?.Invoke(); }
 
     /// <summary>
     /// 플레이어와 로봇의 점수 및 콤보를 비교하여 승패 결과를 콘솔에 출력하고 결과 UI에 문구와 수치를 할당한다.

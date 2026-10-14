@@ -23,7 +23,7 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private MonitorSettingsButton _quitButton;
     [SerializeField] private MonitorSettingsButton _confirmQuitButton;
     [SerializeField] private MonitorSettingsButton _cancelQuitButton;
-    private MonitorSettingsButton _logFolderButton;
+    [SerializeField] private MonitorSettingsButton _logFolderButton;
     private bool _isInputEnabled;
     private bool _isQuitting;
     public bool IsOpen { get; private set; }
@@ -36,8 +36,6 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private MonitorSettingsSlider _shakeSlider;
     [SerializeField] private Text _sfxPercentage;
     [SerializeField] private Text _shakePercentage;
-
-    void Awake() { CreateLogFolderButton(); }
 
     void OnEnable()
     {
@@ -66,23 +64,6 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
         _confirmQuitButton.Clicked -= ConfirmQuit;
         _cancelQuitButton.Clicked -= CancelQuit;
         _logFolderButton.Clicked -= KeyboardInputLogger.OpenLogFolder;
-    }
-
-    /// <summary>
-    /// 기존 종료 버튼의 표시와 입력 그룹을 복제하여 로그 폴더 열기 버튼을 추가한다.
-    /// 두 버튼을 같은 행에 배치하고 새 버튼 참조와 문구를 저장한다.
-    /// </summary>
-    private void CreateLogFolderButton()
-    {
-        _logFolderButton = Instantiate(_quitButton, _quitButton.transform.parent);
-        _logFolderButton.name = "OpenPlaytestLogFolder";
-        RectTransform quitRect = (RectTransform)_quitButton.transform;
-        RectTransform logRect = (RectTransform)_logFolderButton.transform;
-        float spacing = quitRect.sizeDelta.x * 0.5f + 16f;
-        Vector2 position = quitRect.anchoredPosition;
-        quitRect.anchoredPosition = position + Vector2.right * spacing;
-        logRect.anchoredPosition = position + Vector2.left * spacing;
-        _logFolderButton.GetComponentInChildren<Text>(true).text = "로그 폴더 열기";
     }
 
     void Update()

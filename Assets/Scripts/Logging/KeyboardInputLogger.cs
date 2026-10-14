@@ -319,7 +319,15 @@ namespace Game.Logging
             try
             {
                 Directory.CreateDirectory(_instance._writer.FolderPath);
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = _instance._writer.FolderPath,
+                    UseShellExecute = true
+                })?.Dispose();
+#else
                 Application.OpenURL(new Uri(_instance._writer.FolderPath + Path.DirectorySeparatorChar).AbsoluteUri);
+#endif
             }
             catch (Exception exception)
             {

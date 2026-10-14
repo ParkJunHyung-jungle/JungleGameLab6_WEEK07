@@ -2460,7 +2460,167 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 11) 타임라인 차트 마우스 인터랙션 및 시간 단위 변경 리스너
   setupChartEvents();
+
+  // 12) PDF 인쇄/저장 버튼 리스너 등록
+  setupPdfExportEvents();
+
+  // 13) 이미지(PNG) 저장 버튼 리스너 등록
+  setupImageExportEvents();
 });
+
+// PDF 내보내기 함수 및 이벤트 핸들러
+function exportPdf(targetView) {
+  const classNames = ["print-target-view2", "print-target-view3", "print-target-view4", "print-target-all"];
+  document.body.classList.remove(...classNames);
+
+  if (targetView === "view2") {
+    document.body.classList.add("print-target-view2");
+  } else if (targetView === "view3") {
+    document.body.classList.add("print-target-view3");
+  } else if (targetView === "view4") {
+    document.body.classList.add("print-target-view4");
+  } else {
+    document.body.classList.add("print-target-all");
+  }
+
+  // 캔버스 크기 재조정 후 인쇄 창 호출
+  redrawCurrentChart();
+
+  setTimeout(() => {
+    window.print();
+  }, 120);
+}
+
+// 인쇄 창 닫힌 후 인쇄용 전용 클래스 정리
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("print-target-view2", "print-target-view3", "print-target-view4", "print-target-all");
+  redrawCurrentChart();
+});
+
+function setupPdfExportEvents() {
+  const btnView2 = document.getElementById("printView2Btn");
+  if (btnView2) {
+    btnView2.addEventListener("click", () => exportPdf("view2"));
+  }
+
+  const btnView3 = document.getElementById("printView3Btn");
+  if (btnView3) {
+    btnView3.addEventListener("click", () => exportPdf("view3"));
+  }
+
+  const btnView4 = document.getElementById("printView4Btn");
+  if (btnView4) {
+    btnView4.addEventListener("click", () => exportPdf("view4"));
+  }
+
+  const btnAll = document.getElementById("printAllViewsBtn");
+  if (btnAll) {
+    btnAll.addEventListener("click", () => exportPdf("all"));
+  }
+}
+
+// ===================================================
+// 이미지(PNG) 캡처 및 다운로드 기능
+// ===================================================
+function downloadCanvasAsPng(canvas, fileName) {
+  const link = document.createElement("a");
+  link.download = fileName;
+  link.href = canvas.toDataURL("image/png");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function downloadDataUrl(dataUrl, fileName) {
+  const link = document.createElement("a");
+  link.download = fileName;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+async function exportViewAsImage(sectionId, defaultPrefix) {
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+
+  let sessionSuffix = "ALL";
+  if (selectedSessionIndex >= 0 && loadedSessions[selectedSessionIndex]) {
+    sessionSuffix = loadedSessions[selectedSessionIndex].sessionId.substring(0, 8);
+  } else if (loadedSessions.length === 1 && loadedSessions[0]) {
+    sessionSuffix = loadedSessions[0].sessionId.substring(0, 8);
+  }
+
+  const fileName = `Playtest_${defaultPrefix}_${sessionSuffix}.png`;
+  const buttons = section.querySelectorAll(".pdf-btn, .img-btn");
+  buttons.forEach(b => b.style.visibility = "hidden");
+
+  try {
+    if (typeof html2canvas === "function") {
+      if (sectionId === "view4Section") redrawCurrentChart();
+
+      const canvas = await html2canvas(section, {
+        backgroundColor: "#1e293b",
+        scale: 2, // 2x Retina 고해상도 캡처
+        useCORS: true,
+        logging: false
+      });
+
+      downloadCanvasAsPng(canvas, fileName);
+    } else {
+      const innerCanvas = section.querySelector("canvas");
+      if (innerCanvas) {
+        const dataUrl = innerCanvas.toDataURL("image/png");
+        downloadDataUrl(dataUrl, fileName);
+      } else {
+        alert("이미지 캡처 모듈(html2canvas)을 불러올 수 없습니다.");
+      }
+    }
+  } catch (err) {
+    console.error("이미지 저장 실패:", err);
+    alert("이미지 저장 중 오류가 발생했습니다: " + err.message);
+  } finally {
+    buttons.forEach(b => b.style.visibility = "");
+  }
+}
+
+async function exportAllViewsAsImages() {
+  const btn = document.getElementById("imgAllViewsBtn");
+  const originalText = btn ? btn.innerText : "";
+  if (btn) btn.innerText = "⏳ 이미지 생성 중...";
+
+  try {
+    await exportViewAsImage("view2Section", "View2_Heatmap");
+    await new Promise(r => setTimeout(r, 450));
+    await exportViewAsImage("view3Section", "View3_Ranking");
+    await new Promise(r => setTimeout(r, 450));
+    await exportViewAsImage("view4Section", "View4_Timeline");
+  } finally {
+    if (btn) btn.innerText = originalText;
+  }
+}
+
+function setupImageExportEvents() {
+  const btnView2 = document.getElementById("imgView2Btn");
+  if (btnView2) {
+    btnView2.addEventListener("click", () => exportViewAsImage("view2Section", "View2_Heatmap"));
+  }
+
+  const btnView3 = document.getElementById("imgView3Btn");
+  if (btnView3) {
+    btnView3.addEventListener("click", () => exportViewAsImage("view3Section", "View3_Ranking"));
+  }
+
+  const btnView4 = document.getElementById("imgView4Btn");
+  if (btnView4) {
+    btnView4.addEventListener("click", () => exportViewAsImage("view4Section", "View4_Timeline"));
+  }
+
+  const btnAll = document.getElementById("imgAllViewsBtn");
+  if (btnAll) {
+    btnAll.addEventListener("click", () => exportAllViewsAsImages());
+  }
+}
 
 // 차트 인터랙션 및 단위 변경 리스너 설정
 function setupChartEvents() {

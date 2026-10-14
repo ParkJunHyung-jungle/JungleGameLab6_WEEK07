@@ -1123,3 +1123,293 @@ body {
 .summary-stat-val.green {
   color: #34d399;
 }
+
+/* ===================================================
+   [신규] PDF 인쇄/저장 버튼 및 헤더 액션
+   =================================================== */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.pdf-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(56, 189, 248, 0.25);
+}
+
+.pdf-btn-primary {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.25) 0%, rgba(99, 102, 241, 0.25) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  color: #ffffff;
+  padding: 6px 14px;
+}
+
+.pdf-btn-primary:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.45) 0%, rgba(99, 102, 241, 0.45) 100%);
+  border-color: #38bdf8;
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);
+}
+
+/* 이미지 저장 버튼 (에메랄드 테마) */
+.img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #34d399;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.img-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #34d399;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(52, 211, 153, 0.25);
+}
+
+.img-btn-primary {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(14, 165, 233, 0.25) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.6);
+  color: #ffffff;
+  padding: 6px 14px;
+}
+
+.img-btn-primary:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.45) 0%, rgba(14, 165, 233, 0.45) 100%);
+  border-color: #34d399;
+  box-shadow: 0 4px 14px rgba(52, 211, 153, 0.3);
+}
+
+/* ===================================================
+   [신규] PDF 인쇄 스타일 (@media print)
+   =================================================== */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm 10mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html, body {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+  }
+
+  .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 16px !important;
+  }
+
+  /* 인쇄 시 불필요한 컨트롤 UI 완전 숨김 */
+  .header,
+  .pdf-btn,
+  .img-btn,
+  .csv-upload-box,
+  .aggregate-toolbar,
+  .player-nav-controls,
+  .interval-selector,
+  .chart-tooltip,
+  .tag-remove-btn,
+  .table-action-btn,
+  #sessionGlobalCard,
+  #comparisonCard {
+    display: none !important;
+  }
+
+  /* 카드 공통 스타일: 원래 모양 그대로 유지 */
+  .card {
+    background: #1e293b !important;
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    padding: 20px 24px !important;
+    box-shadow: none !important;
+    margin: 0 0 16px 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ---------------------------------------------------
+     View 2 키보드 히트맵 인쇄 최적화 (원래 구조 100% 보존)
+     --------------------------------------------------- */
+  #view2Section {
+    display: block !important;
+  }
+
+  #view2Section .card-title {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+  }
+
+  #view2Section .card-desc {
+    margin-bottom: 14px !important;
+    color: #94a3b8 !important;
+  }
+
+  #view2Section .keyboard-wrapper {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    overflow: visible !important;
+    padding: 6px 0 12px 0 !important;
+  }
+
+  #view2Section .keyboard-case {
+    display: inline-flex !important;
+    gap: 20px !important;
+    background: #111827 !important;
+    border: 2px solid #374151 !important;
+    border-radius: 14px !important;
+    padding: 16px !important;
+    transform: scale(0.96);
+    transform-origin: center top;
+  }
+
+  #view2Section .heatmap-legend {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin-top: 10px !important;
+  }
+
+  /* ---------------------------------------------------
+     View 3 상위 키 순위 인쇄 최적화 (원래 3열 그리드 보존)
+     --------------------------------------------------- */
+  #view3Section {
+    display: block !important;
+  }
+
+  #view3Section .card-title {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+  }
+
+  #view3Section .card-desc {
+    margin-bottom: 14px !important;
+    color: #94a3b8 !important;
+  }
+
+  #view3Section .ranking-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  /* ---------------------------------------------------
+     View 4 타임라인 차트 인쇄 최적화 (원래 구조 보존)
+     --------------------------------------------------- */
+  #view4Section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  #view4Section .timeline-toolbar {
+    margin-bottom: 4px !important;
+  }
+
+  #view4Section .chart-container {
+    width: 100% !important;
+    height: 380px !important;
+    background: rgba(15, 23, 42, 0.9) !important;
+  }
+
+  #view4Section #timelineCanvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* ---------------------------------------------------
+     단일 뷰 선택 인쇄 시 타겟 외 다른 섹션 완전 숨김
+     --------------------------------------------------- */
+  body.print-target-view2 #view3Section,
+  body.print-target-view2 #view4Section,
+  body.print-target-view2 .session-info-card {
+    display: none !important;
+  }
+
+  body.print-target-view3 #view2Section,
+  body.print-target-view3 #view4Section,
+  body.print-target-view3 .session-info-card {
+    display: none !important;
+  }
+
+  body.print-target-view4 #view2Section,
+  body.print-target-view4 #view3Section,
+  body.print-target-view4 .session-info-card {
+    display: none !important;
+  }
+
+  /* ---------------------------------------------------
+     전체 뷰 통합 인쇄 시: 각 뷰마다 1페이지씩 깔끔하게 분할
+     --------------------------------------------------- */
+  body.print-target-all .session-info-card {
+    display: none !important;
+  }
+
+  body.print-target-all #view2Section {
+    display: block !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  body.print-target-all #view3Section {
+    display: block !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  body.print-target-all #view4Section {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+}

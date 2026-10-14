@@ -100,7 +100,7 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// KeyboardSpawner에게 키보드 생성을 요청하고 완파 이벤트를 등록하며 콤보 HUD에 키보드를 할당한다.
+    /// KeyboardSpawner에게 키보드 생성을 요청하고 완파 이벤트 및 콤보 상태를 연결한다.
     /// withAnimation 애니메이션 적용 여부를 사용하며 생성된 키보드 게임오브젝트를 반환한다.
     /// </summary>
     public GameObject SpawnKeyboard(bool withAnimation = true)
@@ -124,6 +124,11 @@ public class GameManager : MonoBehaviour
             {
                 KeyboardInputController inputController = _activeKeyboard.GetComponent<KeyboardInputController>();
                 _comboHUD.Keyboard = inputController;
+                KeyboardAttackController attackController = _activeKeyboard.GetComponent<KeyboardAttackController>();
+                if (attackController != null)
+                {
+                    attackController.SetScoreCombo(_comboHUD);
+                }
             }
         }
 

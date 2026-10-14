@@ -165,21 +165,33 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 키보드 스폰 및 커버 오픈이 완료되어 입력을 시작할 수 있을 때 타이머를 구동한다.
-    /// keyboard 생성 완료된 키보드 인스턴스를 전달받으며 StartRoundTimer를 호출한다.
+    /// 키보드 스폰 및 커버 오픈이 완료되어 입력을 시작할 수 있을 때 타이머를 구동하고 콤보 타이머를 재개한다.
+    /// keyboard 생성 완료된 키보드 인스턴스를 전달받으며 StartRoundTimer를 호출하고 콤보 타이머 일시정지를 해제한다.
     /// </summary>
     private void HandleKeyboardSpawned(GameObject keyboard)
     {
         StartRoundTimer();
+
+        // 키보드 교환 연출이 완료되어 입력을 시작할 수 있으므로 콤보 타이머를 재개한다.
+        if (_comboHUD != null)
+        {
+            _comboHUD.SetTimerPaused(false);
+        }
     }
 
     /// <summary>
-    /// 키보드의 마지막 키캡이 파괴되어 적을 쓰러트린 순간 타이머를 정지하고 걸린 시간을 기록한다.
-    /// _elapsedRoundTime과 _remainingTime 상태를 사용하며 RoundCleared 이벤트를 호출하고 로그를 기록한다.
+    /// 키보드의 마지막 키캡이 파괴되어 적을 쓰러트린 순간 타이머를 정지하고 걸린 시간을 기록하며 콤보 타이머를 일시정지한다.
+    /// _elapsedRoundTime과 _remainingTime 상태를 사용하며 RoundCleared 이벤트를 호출하고 콤보 타이머를 일시정지한다.
     /// </summary>
     private void HandleKeyboardBreaking()
     {
         StopRoundTimer();
+
+        // 키보드 완파 연출 및 교환 완료 전까지 콤보 타이머 감소를 일시정지한다.
+        if (_comboHUD != null)
+        {
+            _comboHUD.SetTimerPaused(true);
+        }
 
         // 쓰러트리는데 걸린 시간을 로그로 기록하고 클리어 이벤트를 발행한다.
         Debug.Log($"[GameManager] Round Cleared! Defeat Time: {_elapsedRoundTime:F2}s (Limit: {_roundTimeLimit:F1}s, Remaining: {_remainingTime:F2}s)");

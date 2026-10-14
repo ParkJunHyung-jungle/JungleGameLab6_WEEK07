@@ -19,6 +19,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     private long _score;
     private int _combo;
     private float _remainingTime;
+    private bool _isTimerPaused;
 
     public long Score => _score;
     public int Combo => _combo;
@@ -26,6 +27,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     public Color StageColor => _combo >= 30 ? Color.red : _combo >= 20 ? new Color(1f, 0.5f, 0f) : _combo >= 10 ? Color.yellow : Color.white;
     public float TimeRatio => _combo == 0 ? 0f : _remainingTime / Duration;
     private float Duration => _combo >= 30 ? 5f : _combo >= 20 ? 6f : _combo >= 10 ? 8f : 10f;
+    public bool IsTimerPaused => _isTimerPaused;
 
     public KeyboardInputController Keyboard
     {
@@ -56,8 +58,15 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 
     void Update()
     {
-        if (_combo == 0)
+        if (_combo == 0 || _isTimerPaused)
+        {
             return;
+        }
+
+        if (_keyboard == null || !_keyboard.InputEnabled)
+        {
+            return;
+        }
 
         _remainingTime = Mathf.Max(0f, _remainingTime - Time.deltaTime);
         if (_remainingTime == 0f)
@@ -147,6 +156,15 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     }
 
     /// <summary>
+    /// 콤보 타이머 감소의 일시정지 여부를 설정한다.
+    /// isPaused 일시정지 여부를 _isTimerPaused 상태에 반영한다.
+    /// </summary>
+    public void SetTimerPaused(bool isPaused)
+    {
+        _isTimerPaused = isPaused;
+    }
+
+    /// <summary>
     /// 현재 누적된 콤보와 잔여 유지시간을 초기화한다.
     /// _combo와 _remainingTime을 0으로 재설정하고 상태 및 타이머 변경 이벤트를 호출한다.
     /// </summary>
@@ -154,6 +172,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     {
         _combo = 0;
         _remainingTime = 0f;
+        _isTimerPaused = false;
         StateChanged?.Invoke();
         TimerChanged?.Invoke(0f);
     }

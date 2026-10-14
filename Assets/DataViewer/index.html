@@ -18,8 +18,14 @@
         </h1>
         <p>게임 플레이 중 발생한 키보드 입력 빈도, APM, 점수 및 라운드 성과를 분석하여 시각화합니다. (다중 CSV 파일 비교 지원)</p>
       </div>
-      <div>
+      <div class="header-actions">
         <span class="badge" id="summaryTotal">총 입력: 0회</span>
+        <button type="button" class="pdf-btn pdf-btn-primary" id="printAllViewsBtn" title="View 2, 3, 4를 모두 포함하여 PDF로 인쇄/저장합니다">
+          🖨️ View 2·3·4 통합 PDF
+        </button>
+        <button type="button" class="img-btn img-btn-primary" id="imgAllViewsBtn" title="View 2, 3, 4 이미지를 순차적으로 모두 저장합니다">
+          🖼️ 전체 이미지 저장
+        </button>
       </div>
     </header>
 
@@ -146,12 +152,20 @@
     </section>
 
     <!-- View 2: 텐키리스 키보드 히트맵 -->
-    <section class="card heatmap-card">
+    <section class="card heatmap-card" id="view2Section">
       <div class="card-title">
         <div class="title-with-badge">
           <span>View 2. 키보드 입력 히트맵 (Heatmap)</span>
         </div>
-        <span class="badge" id="typeTotalBadge">총 Down 입력: 0회</span>
+        <div class="card-title-actions">
+          <span class="badge" id="typeTotalBadge">총 Down 입력: 0회</span>
+          <button type="button" class="pdf-btn" id="printView2Btn" title="View 2 (키보드 히트맵)을 PDF로 인쇄/저장합니다">
+            📄 View 2 PDF
+          </button>
+          <button type="button" class="img-btn" id="imgView2Btn" title="View 2 (키보드 히트맵)을 고해상도 PNG 이미지로 저장합니다">
+            🖼️ View 2 이미지
+          </button>
+        </div>
       </div>
 
       <!-- [주석 보존: 향후 키보드 종류 전환용]
@@ -191,9 +205,17 @@
     </section>
 
     <!-- View 3: 상위 입력 키 순위 -->
-    <section class="card">
+    <section class="card" id="view3Section">
       <div class="card-title">
         <span>View 3. 상위 입력 키 순위 (Top Pressed Keys)</span>
+        <div class="card-title-actions">
+          <button type="button" class="pdf-btn" id="printView3Btn" title="View 3 (상위 키 순위)를 PDF로 인쇄/저장합니다">
+            📄 View 3 PDF
+          </button>
+          <button type="button" class="img-btn" id="imgView3Btn" title="View 3 (상위 키 순위)를 고해상도 PNG 이미지로 저장합니다">
+            🖼️ View 3 이미지
+          </button>
+        </div>
       </div>
       <div class="card-desc">
         가장 많이 눌린 키를 내림차순으로 정렬한 막대 차트입니다.
@@ -203,15 +225,23 @@
     </section>
 
     <!-- View 4: 시간대별 키보드 타격 횟수 및 타속 추이 그래프 -->
-    <section class="card timeline-chart-card">
+    <section class="card timeline-chart-card" id="view4Section">
       <div class="card-title">
         <div class="title-with-badge">
           <span>View 4. 시간대별 키 타격 횟수 및 타속 추이 (Keystroke Timeline)</span>
         </div>
-        <div class="timeline-metrics" id="timelineMetrics">
-          <span class="badge metric-badge" id="metricAvgCpm">평균 타속: 0 CPM</span>
-          <span class="badge metric-badge" id="metricPeakCpm">최고 타속: 0 CPM</span>
-          <span class="badge metric-badge" id="metricTotalTime">기록 시간: 0초</span>
+        <div class="card-title-actions">
+          <div class="timeline-metrics" id="timelineMetrics">
+            <span class="badge metric-badge" id="metricAvgCpm">평균 타속: 0 CPM</span>
+            <span class="badge metric-badge" id="metricPeakCpm">최고 타속: 0 CPM</span>
+            <span class="badge metric-badge" id="metricTotalTime">기록 시간: 0초</span>
+          </div>
+          <button type="button" class="pdf-btn" id="printView4Btn" title="View 4 (타임라인 차트)를 PDF로 인쇄/저장합니다">
+            📄 View 4 PDF
+          </button>
+          <button type="button" class="img-btn" id="imgView4Btn" title="View 4 (타임라인 차트)를 고해상도 PNG 이미지로 저장합니다">
+            🖼️ View 4 이미지
+          </button>
         </div>
       </div>
       <div class="timeline-toolbar">
@@ -238,6 +268,7 @@
     </section>
   </div>
 
+  <script src="screen-capture.lib.js"></script>
   <script src="viewer.js"></script>
 </body>
 </html>

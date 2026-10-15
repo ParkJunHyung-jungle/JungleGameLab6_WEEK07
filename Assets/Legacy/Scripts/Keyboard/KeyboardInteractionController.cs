@@ -24,7 +24,7 @@ public class KeyboardInteractionController : MonoBehaviour
     private const int SPAWN_REGION_COUNT = 3;
     private const float FEVER_REFILL_RETRY_INTERVAL = 0.25f;
 
-    public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake }
+    public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake, Dispenser }
 
     [Header("Camera and Pad")]
     [SerializeField] private Camera _camera;
@@ -378,6 +378,21 @@ public class KeyboardInteractionController : MonoBehaviour
             destruction.Initialize(keyboard.GetDestructionKeycaps(), _keyboardFragmentsPrefab, _destructionFistSprite, () => HandleKeyboardBreaking(state), () => HandleKeyboardDestroyed(state), ConfigureFistAnimation);
         }
         return state;
+    }
+
+    /// <summary>
+    /// prefab 키보드를 outputPoint 위치에 생성하고 월드 집기 상태로 등록한다.
+    /// prefab의 원래 크기와 outputPoint의 위치·회전을 사용하며 등록된 키보드 상태를 반환한다.
+    /// </summary>
+    public KeyboardState SpawnDispenserKeyboard(GameObject prefab, Transform outputPoint)
+    {
+        GameObject instance = Instantiate(prefab, outputPoint.position, outputPoint.rotation, _spawnRoot);
+        instance.name = $"{prefab.name}_Dispenser_{SpawnedKeyboardCount + 1}";
+        instance.transform.localScale = prefab.transform.localScale;
+
+        KeyboardState keyboard = RegisterKeyboard(instance);
+        SpawnedKeyboardCount++;
+        return keyboard;
     }
 
     /// <summary>
@@ -860,7 +875,7 @@ public class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// 현재 모드와 입력 가능 상태, 들고 있는 키보드와 카메라 중앙 조준 대상을 확인한다.
-    /// 들기 안내를 우선 선택하고 집기 불가능한 상황에서는 가이드 상태를 숨김으로 변경한다.
+    /// 키보드와 상자, 자판기 사용 안내를 선택하고 입력할 수 없는 상황에서는 가이드를 숨긴다.
     /// </summary>
     private void RefreshGuideState()
     {
@@ -892,6 +907,13 @@ public class KeyboardInteractionController : MonoBehaviour
         }
         if (TryGetInteractionHit(out RaycastHit boxHit))
         {
+            KeyboardDispenser dispenser = boxHit.collider.GetComponentInParent<KeyboardDispenser>();
+            if (dispenser != null)
+            {
+                SetGuideState(KeyboardGuideState.Dispenser);
+                return;
+            }
+
             KeyboardStorageBox box = boxHit.collider.GetComponentInParent<KeyboardStorageBox>();
             if (box != null)
             {
@@ -1004,7 +1026,7 @@ public class KeyboardInteractionController : MonoBehaviour
     }
     /// <summary>
     /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.
-    /// 상자 보관, 꺼내기 또는 기존 집기 상태를 변경한다.
+    /// 자판기 구매, 상자 보관과 꺼내기 또는 키보드 집기 상태를 변경한다.
     /// </summary>
     private void HandleWorldInteraction()
     {
@@ -1016,6 +1038,13 @@ public class KeyboardInteractionController : MonoBehaviour
         }
         if (TryGetInteractionHit(out RaycastHit hit))
         {
+            KeyboardDispenser dispenser = hit.collider.GetComponentInParent<KeyboardDispenser>();
+            if (dispenser != null)
+            {
+                dispenser.TryPurchase(this, _gameSession);
+                return;
+            }
+
             KeyboardStorageBox box = hit.collider.GetComponentInParent<KeyboardStorageBox>();
             if (box != null)
             {

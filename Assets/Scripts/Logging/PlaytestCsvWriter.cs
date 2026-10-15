@@ -13,12 +13,18 @@ namespace Game.Logging
         Key, Event, PressSequence, HeldSeconds, EndReason, KeyDownCount, IntervalIndex,
         IntervalKind, Combo, StartElapsedSeconds, EndElapsedSeconds, DurationSeconds,
         DownCount, Apm, PlayerScore, EnemyScore, PlayerScoreStart, PlayerScoreEnd,
-        ScoreDelta, ScorePerSecond, ScorePerMinute, IsComplete
+        ScoreDelta, ScorePerSecond, ScorePerMinute, IsComplete,
+        SchemaVersion, TournamentRunId, RoundIndex, BattleKind, Phase, Owner,
+        KeyboardId, KeyboardSpawnIndex, SpawnKind, InputState, WasBroken,
+        BrokenKeyDownCount, BrokenDownCount, ShopVisitId,
+        SnapshotId, SpecialType, Quantity, Action, OfferSlot, OfferGeneration,
+        Price, CurrencyBefore, CurrencyAfter, LayoutRow, LayoutColumn, EffectId,
+        IsConfirmed, InventoryCapacity, InventoryTotal, ShopTransactionId
     }
 
     public sealed class PlaytestRecord
     {
-        private readonly string[] _values = new string[29];
+        private readonly string[] _values = new string[Enum.GetValues(typeof(PlaytestColumn)).Length];
         public string[] Values => _values;
 
         /// <summary>
@@ -27,6 +33,7 @@ namespace Game.Logging
         /// </summary>
         public PlaytestRecord(string type, double elapsed)
         {
+            Set(PlaytestColumn.SchemaVersion, 3L);
             Set(PlaytestColumn.RecordType, type);
             Set(PlaytestColumn.ElapsedSeconds, elapsed);
         }
@@ -61,7 +68,7 @@ namespace Game.Logging
 
     public sealed class PlaytestCsvWriter
     {
-        private const string HEADER = "session_id,build_version,sequence,record_type,elapsed_seconds,stage_id,stage_run_id,key,event,press_sequence,held_seconds,end_reason,key_down_count,interval_index,interval_kind,combo,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,down_count,apm,player_score,enemy_score,player_score_start,player_score_end,score_delta,score_per_second,score_per_minute,is_complete";
+        private const string HEADER = "session_id,build_version,sequence,record_type,elapsed_seconds,stage_id,stage_run_id,key,event,press_sequence,held_seconds,end_reason,key_down_count,interval_index,interval_kind,combo,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,down_count,apm,player_score,enemy_score,player_score_start,player_score_end,score_delta,score_per_second,score_per_minute,is_complete,schema_version,tournament_run_id,round_index,battle_kind,phase,owner,keyboard_id,keyboard_spawn_index,spawn_kind,input_state,was_broken,broken_key_down_count,broken_down_count,shop_visit_id,snapshot_id,special_type,quantity,action,offer_slot,offer_generation,price,currency_before,currency_after,layout_row,layout_column,effect_id,is_confirmed,inventory_capacity,inventory_total,shop_transaction_id";
         private readonly string _sessionId;
         private readonly string _buildVersion;
         private StreamWriter _writer;

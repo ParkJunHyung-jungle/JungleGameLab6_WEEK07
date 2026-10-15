@@ -12380,6 +12380,96 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &2679031897952931461
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2266294713193943937}
+  - component: {fileID: 218864959123910279}
+  - component: {fileID: 5355856907786012907}
+  m_Layer: 0
+  m_Name: LED_Layer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2266294713193943937
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2679031897952931461}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6484209102016570918}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &218864959123910279
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2679031897952931461}
+  m_Mesh: {fileID: 4300000, guid: 01741c336f9292247b69b45636894273, type: 2}
+--- !u!23 &5355856907786012907
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2679031897952931461}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: a67ebba28beff7146acdeb0c28625a63, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &2689046694914117546
 GameObject:
   m_ObjectHideFlags: 0
@@ -28461,8 +28551,9 @@ GameObject:
   - component: {fileID: 3852333600888127988}
   - component: {fileID: 1556073846386759358}
   - component: {fileID: 4484957135179497554}
+  - component: {fileID: 3967785068815222441}
   m_Layer: 0
-  m_Name: Keyboard_Seperate
+  m_Name: Keyboard_Customize_Test
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -28483,6 +28574,7 @@ Transform:
   m_Children:
   - {fileID: 8222083968963134223}
   - {fileID: 2636247298621614551}
+  - {fileID: 2266294713193943937}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1264139386206111033
@@ -28922,6 +29014,36 @@ MonoBehaviour:
   _pushDelay: 1
   _backwardSpeed: 8
   _lifetimeAfterPush: 5
+--- !u!114 &3967785068815222441
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648102524883158503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f972d9568538a3b4180eadd677f5a94f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomization
+  _ledRenderer: {fileID: 5355856907786012907}
+  _ledEnabled: 1
+  _ledColor: {r: 0, g: 0.8, b: 1, a: 1}
+  _ledIntensity: 3
+  _caseRenderers:
+  - {fileID: 7448335059736704784}
+  - {fileID: 8780478049414863374}
+  - {fileID: 4131874619408227893}
+  - {fileID: 903760536120378401}
+  - {fileID: 5999264866688161344}
+  _caseMaterial: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+  _caseMaterials:
+  - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+  - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+  - {fileID: 2100000, guid: b4362964de1caa6449f0e84cea5dc238, type: 2}
+  - {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
+  - {fileID: 2100000, guid: d76f514a9a2ecec4d9346ff56354ca6e, type: 2}
+  _caseMaterialIndex: 0
 --- !u!1 &5689495446983780148
 GameObject:
   m_ObjectHideFlags: 0
@@ -47219,6 +47341,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 6484209102016570918}
     m_Modifications:
+    - target: {fileID: 389713380623465978, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
     - target: {fileID: 3276249815416262668, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
       propertyPath: m_LocalScale.x
       value: 1
@@ -47271,18 +47397,63 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3509739218139637742, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+    - target: {fileID: 5039035792630386053, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5426396636821735441, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
       propertyPath: m_Name
       value: KeyboardBody_TKL87
       objectReference: {fileID: 0}
+    - target: {fileID: 6531324152275677083, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+    - target: {fileID: 7980249261429116619, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+    - target: {fileID: 8086425790885077973, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+--- !u!23 &903760536120378401 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 389713380623465978, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+  m_PrefabInstance: {fileID: 712209937148672475}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &2636247298621614551 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3276249815416262668, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+  m_PrefabInstance: {fileID: 712209937148672475}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4131874619408227893 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 3509739218139637742, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+  m_PrefabInstance: {fileID: 712209937148672475}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &5999264866688161344 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6531324152275677083, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+  m_PrefabInstance: {fileID: 712209937148672475}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7448335059736704784 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7980249261429116619, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+  m_PrefabInstance: {fileID: 712209937148672475}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &8780478049414863374 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8086425790885077973, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
   m_PrefabInstance: {fileID: 712209937148672475}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &747230504481189889

@@ -1,72 +1,284 @@
 #if UNITY_EDITOR
-using System;
-using System.IO;
+using System.Collections.Generic;
+
+using UnityEngine;
+using UnityEngine.Rendering;
 
 using UnityEditor;
-using UnityEngine;
 
-using KeyboardCustomization;
-
-namespace KeyboardCustomization.Editor
+namespace KeyboardCustomizationTools.Editor
 {
-    /// <summary>
-    /// Keyboard_Seperate_Test 프리팹에 KeyboardCustomizer 컴포넌트를 자동으로 할당하고
-    /// 네온 머티리얼 및 하위 렌더러 캐시를 구성하여 저장하는 에디터 셋업 유틸리티이다.
-    /// </summary>
     [InitializeOnLoad]
     public static class KeyboardCustomizerAssigner
     {
-        private const string PREFAB_PATH = "Assets/Resource/Prefabs/SeperateKeyboard/Keyboard_Seperate_Test.prefab";
+        private const string PREFAB_PATH = "Assets/Resource/Prefabs/SeperateKeyboard/Keyboard_Customize_Test.prefab";
+        private const string MESH_PATH = "Assets/Resource/Meshes/KeyboardCustomizeLED.asset";
+        private const string MATERIAL_PATH = "Assets/Resource/Materials/KeyboardCustomizeLED.mat";
 
         /// <summary>
-        /// Keyboard_Seperate_Test 프리팹 애셋을 로드하여 KeyboardCustomizer 컴포넌트를 구성하고 저장한다.
-        /// 프리팹을 로드하고 컴포넌트 부착, 네온 머티리얼 연결 및 렌더러 캐시를 수행한 뒤 변경 사항을 저장한다.
+        /// 입력 없이 스크립트 로드 후 초기 구성 확인을 예약한다.
+        /// 반환값 없이 에디터 지연 콜백에 설정 확인 메서드를 등록한다.
         /// </summary>
-        [MenuItem("Tools/Keyboard/Assign Customizer to Seperate_Test")]
+        static KeyboardCustomizerAssigner()
+        {
+            EditorApplication.delayCall += SetupIfMissing;
+        }
+
+        /// <summary>
+        /// 대상 프리팹을 확인해 LED 또는 하우징 참조가 없을 때 최초 구성을 실행한다.
+        /// 입력과 반환값 없이 대상 프리팹의 커스터마이즈 구성을 저장한다.
+        /// </summary>
+        private static void SetupIfMissing()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PREFAB_PATH);
+            if (prefab != null && prefab.GetComponent<KeyboardCustomization>() == null)
+            {
+                ExecuteSetup();
+                SetupHousing();
+                return;
+            }
+
+            if (prefab != null)
+            {
+                var serialized = new SerializedObject(prefab.GetComponent<KeyboardCustomization>());
+                if (serialized.FindProperty("_caseRenderers").arraySize == 0)
+                {
+                    SetupHousing();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 대상 프리팹의 하부 케이스와 상단 테두리를 찾아 하우징 참조를 구성한다.
+        /// 입력과 반환값 없이 렌더러 목록과 초기 Material을 프리팹에 저장한다.
+        /// </summary>
+        [MenuItem("Tools/Keyboard/Setup Customize Test Housing")]
+        public static void SetupHousing()
+        {
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(PREFAB_PATH))
+            {
+                GameObject root = scope.prefabContentsRoot;
+                var renderers = new List<MeshRenderer>();
+                Material defaultMaterial = null;
+                foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (renderer.name == "CNC_LowerCase")
+                    {
+                        defaultMaterial = renderer.sharedMaterial;
+                        renderers.Add(renderer);
+                    }
+                    else if (renderer.name.StartsWith("TopBezel_"))
+                    {
+                        renderers.Add(renderer);
+                    }
+                }
+
+                KeyboardCustomization customizer = root.GetComponent<KeyboardCustomization>();
+                var serialized = new SerializedObject(customizer);
+                SerializedProperty targets = serialized.FindProperty("_caseRenderers");
+                targets.arraySize = renderers.Count;
+                for (int index = 0; index < renderers.Count; index++)
+                {
+                    targets.GetArrayElementAtIndex(index).objectReferenceValue = renderers[index];
+                }
+
+                SerializedProperty material = serialized.FindProperty("_caseMaterial");
+                if (material.objectReferenceValue == null)
+                {
+                    material.objectReferenceValue = defaultMaterial;
+                }
+
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                customizer.SetCaseMaterial((Material)material.objectReferenceValue);
+                EditorUtility.SetDirty(customizer);
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// 대상 프리팹의 키캡 배치로 독립 LED 레이어와 제어 컴포넌트를 구성한다.
+        /// 입력과 반환값 없이 Mesh, Material과 프리팹 참조를 저장한다.
+        /// </summary>
+        [MenuItem("Tools/Keyboard/Setup Customize Test LED")]
         public static void ExecuteSetup()
         {
-            GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(PREFAB_PATH);
-            if (prefabAsset == null)
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(PREFAB_PATH))
+            {
+                GameObject root = scope.prefabContentsRoot;
+                Transform layer = root.transform.Find("LED_Layer");
+                if (layer == null)
+                {
+                    layer = new GameObject("LED_Layer", typeof(MeshFilter), typeof(MeshRenderer)).transform;
+                    layer.SetParent(root.transform, false);
+                }
+
+                Mesh mesh = CreateLEDMesh(root.transform);
+                Mesh existingMesh = AssetDatabase.LoadAssetAtPath<Mesh>(MESH_PATH);
+                if (existingMesh == null)
+                {
+                    AssetDatabase.CreateAsset(mesh, MESH_PATH);
+                }
+                else
+                {
+                    EditorUtility.CopySerialized(mesh, existingMesh);
+                    Object.DestroyImmediate(mesh);
+                    mesh = existingMesh;
+                }
+
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(MATERIAL_PATH);
+                if (material == null)
+                {
+                    material = new Material(Shader.Find("Keyboard/LED Layer"));
+                    AssetDatabase.CreateAsset(material, MATERIAL_PATH);
+                }
+
+                layer.GetComponent<MeshFilter>().sharedMesh = mesh;
+                MeshRenderer renderer = layer.GetComponent<MeshRenderer>();
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                KeyboardCustomization customizer = root.GetComponent<KeyboardCustomization>();
+                if (customizer == null)
+                {
+                    customizer = root.AddComponent<KeyboardCustomization>();
+                }
+
+                var serialized = new SerializedObject(customizer);
+                serialized.FindProperty("_ledRenderer").objectReferenceValue = renderer;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                customizer.SetLEDEnabled(serialized.FindProperty("_ledEnabled").boolValue);
+                EditorUtility.SetDirty(customizer);
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log("Keyboard_Customize_Test LED 레이어 설정 완료");
+        }
+
+        /// <summary>
+        /// root 아래 키캡과 스위치 경계로 스위치 영역이 비어 있는 발광 면을 만든다.
+        /// 키별 UV와 정점을 구성한 새 Mesh를 반환한다.
+        /// </summary>
+        private static Mesh CreateLEDMesh(Transform root)
+        {
+            var vertices = new List<Vector3>();
+            var triangles = new List<int>();
+            var uvs = new List<Vector2>();
+            Transform keys = root.Find("Keys_87_SharedPrefabs");
+            foreach (Transform key in keys)
+            {
+                if (!key.name.StartsWith("Key_"))
+                {
+                    continue;
+                }
+
+                MeshFilter filter = key.Find("PBT_SculptedShell").GetComponent<MeshFilter>();
+                Bounds bounds = filter.sharedMesh.bounds;
+                Matrix4x4 matrix = root.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+                var localBounds = new Bounds(matrix.MultiplyPoint3x4(bounds.center), Vector3.zero);
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 offset = new Vector3(
+                        (corner & 1) == 0 ? -bounds.extents.x : bounds.extents.x,
+                        (corner & 2) == 0 ? -bounds.extents.y : bounds.extents.y,
+                        (corner & 4) == 0 ? -bounds.extents.z : bounds.extents.z);
+                    localBounds.Encapsulate(matrix.MultiplyPoint3x4(bounds.center + offset));
+                }
+
+                float y = localBounds.min.y + 0.025f;
+                float left = localBounds.min.x - 0.12f;
+                float right = localBounds.max.x + 0.12f;
+                float back = localBounds.min.z - 0.12f;
+                float front = localBounds.max.z + 0.12f;
+                Transform nearestSwitch = null;
+                float nearestDistance = float.PositiveInfinity;
+                foreach (Transform candidate in keys)
+                {
+                    if (!candidate.name.StartsWith("Switch_"))
+                    {
+                        continue;
+                    }
+
+                    Vector3 delta = candidate.localPosition - key.localPosition;
+                    float distance = delta.x * delta.x + delta.z * delta.z;
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestSwitch = candidate;
+                    }
+                }
+
+                Bounds switchBounds = GetSwitchBounds(root, nearestSwitch);
+                float holeLeft = Mathf.Clamp(switchBounds.min.x - 0.02f, left, right);
+                float holeRight = Mathf.Clamp(switchBounds.max.x + 0.02f, left, right);
+                float holeBack = Mathf.Clamp(switchBounds.min.z - 0.02f, back, front);
+                float holeFront = Mathf.Clamp(switchBounds.max.z + 0.02f, back, front);
+                var footprint = Rect.MinMaxRect(left, back, right, front);
+
+                // 스위치가 드러나도 발광 면이 하우징을 덮지 않도록 중앙을 비운다.
+                AddLEDQuad(Rect.MinMaxRect(left, back, holeLeft, front), footprint, y, vertices, triangles, uvs);
+                AddLEDQuad(Rect.MinMaxRect(holeRight, back, right, front), footprint, y, vertices, triangles, uvs);
+                AddLEDQuad(Rect.MinMaxRect(holeLeft, back, holeRight, holeBack), footprint, y, vertices, triangles, uvs);
+                AddLEDQuad(Rect.MinMaxRect(holeLeft, holeFront, holeRight, front), footprint, y, vertices, triangles, uvs);
+            }
+
+            var mesh = new Mesh { name = "KeyboardCustomizeLED" };
+            mesh.SetVertices(vertices);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        /// <summary>
+        /// root 좌표계와 switchRoot 아래의 Mesh를 사용해 스위치 전체 경계를 계산한다.
+        /// 하우징과 스템을 포함하는 로컬 Bounds를 반환한다.
+        /// </summary>
+        private static Bounds GetSwitchBounds(Transform root, Transform switchRoot)
+        {
+            var result = new Bounds(root.InverseTransformPoint(switchRoot.position), Vector3.zero);
+            foreach (MeshFilter filter in switchRoot.GetComponentsInChildren<MeshFilter>())
+            {
+                Bounds bounds = filter.sharedMesh.bounds;
+                Matrix4x4 matrix = root.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 offset = new Vector3(
+                        (corner & 1) == 0 ? -bounds.extents.x : bounds.extents.x,
+                        (corner & 2) == 0 ? -bounds.extents.y : bounds.extents.y,
+                        (corner & 4) == 0 ? -bounds.extents.z : bounds.extents.z);
+                    result.Encapsulate(matrix.MultiplyPoint3x4(bounds.center + offset));
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// area와 높이 y로 사각 면을 추가하고 footprint를 기준으로 키별 UV를 유지한다.
+        /// 반환값 없이 vertices, triangles, uvs 목록에 면 데이터를 저장한다.
+        /// </summary>
+        private static void AddLEDQuad(Rect area, Rect footprint, float y,
+            List<Vector3> vertices, List<int> triangles, List<Vector2> uvs)
+        {
+            if (area.width <= 0f || area.height <= 0f)
             {
                 return;
             }
 
-            // 프리팹 컨텐츠를 열어 컴포넌트를 부착하고 설정을 직렬화한다.
-            string assetPath = AssetDatabase.GetAssetPath(prefabAsset);
-            using (var scope = new PrefabUtility.EditPrefabContentsScope(assetPath))
-            {
-                GameObject root = scope.prefabContentsRoot;
-                KeyboardCustomizer customizer = root.GetComponent<KeyboardCustomizer>();
-                if (customizer == null)
-                {
-                    customizer = root.AddComponent<KeyboardCustomizer>();
-                }
-
-                // 네온 밴드 머티리얼 애셋을 GUID로 탐색하여 할당한다.
-                string neonMatPath = AssetDatabase.GUIDToAssetPath(NEON_BAND_GUID);
-                if (!string.IsNullOrEmpty(neonMatPath))
-                {
-                    Material neonMat = AssetDatabase.LoadAssetAtPath<Material>(neonMatPath);
-                    if (neonMat != null)
-                    {
-                        var field = typeof(KeyboardCustomizer).GetField("_neonBandMaterial",
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (field != null)
-                        {
-                            field.SetValue(customizer, neonMat);
-                        }
-                    }
-                }
-
-                customizer.CacheRenderers();
-                customizer.ApplyCustomization();
-                EditorUtility.SetDirty(customizer);
-                EditorUtility.SetDirty(root);
-            }
-
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            int start = vertices.Count;
+            vertices.AddRange(new[] { new Vector3(area.xMin, y, area.yMin), new Vector3(area.xMin, y, area.yMax),
+                new Vector3(area.xMax, y, area.yMax), new Vector3(area.xMax, y, area.yMin) });
+            float uMin = Mathf.InverseLerp(footprint.xMin, footprint.xMax, area.xMin);
+            float uMax = Mathf.InverseLerp(footprint.xMin, footprint.xMax, area.xMax);
+            float vMin = Mathf.InverseLerp(footprint.yMin, footprint.yMax, area.yMin);
+            float vMax = Mathf.InverseLerp(footprint.yMin, footprint.yMax, area.yMax);
+            uvs.AddRange(new[] { new Vector2(uMin, vMin), new Vector2(uMin, vMax),
+                new Vector2(uMax, vMax), new Vector2(uMax, vMin) });
+            triangles.AddRange(new[] { start, start + 1, start + 2, start, start + 2, start + 3 });
         }
     }
 }
 #endif
+

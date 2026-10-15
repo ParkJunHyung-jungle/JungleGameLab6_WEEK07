@@ -14,13 +14,25 @@ namespace Game.Player
         [Header("Keyboard")]
         private Rigidbody _keyboardBody;
 
+        /// <summary>
+        /// 작업대에 고정된 키보드의 Rigidbody를 반환한다.
+        /// _keyboardBody를 외부 상호작용 코드가 조회할 수 있게 제공한다.
+        /// </summary>
+        public Rigidbody KeyboardBody => _keyboardBody;
+
         void OnTriggerEnter(Collider other)
         {
             if (_keyboardBody != null)
                 return;
 
             Rigidbody body = other.attachedRigidbody;
-            if (body == null || body.isKinematic || body.GetComponent<KeyboardPickupTarget>() == null)
+            if (body == null || body.isKinematic)
+                return;
+
+            KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickupTarget == null)
+                pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
+            if (pickupTarget == null)
                 return;
 
             _keyboardBody = body;
@@ -30,10 +42,9 @@ namespace Game.Player
             body.useGravity = false;
             body.transform.SetParent(transform, true);
 
-            BoxCollider keyboardCollider = body.GetComponent<BoxCollider>();
-            Vector3 colliderCenter = Vector3.Scale(keyboardCollider.center, body.transform.lossyScale);
-            body.position = transform.position - body.rotation * colliderCenter;
-            StartCoroutine(RotateKeyboardToHolder(body, keyboardCollider));
+            Vector3 localCenterOffset = pickupTarget.GetVisualCenterLocalPosition(body.transform);
+            body.position = transform.position - body.transform.TransformVector(localCenterOffset);
+            StartCoroutine(RotateKeyboardToHolder(body, localCenterOffset));
 
             KeyboardProtectionCover cover = body.GetComponentInChildren<KeyboardProtectionCover>();
             if (cover != null)
@@ -41,10 +52,10 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// keyboardCollider의 중심을 holder 위치에 유지하며 body를 목표 회전까지 보간한다.
-        /// body의 현재 회전에서 시작하고, 키보드가 해제되면 회전을 중단한다.
+        /// 키보드의 시각적 중앙을 holder 위치에 유지하며 body를 목표 회전까지 보간한다.
+        /// body와 localCenterOffset을 사용하며 키보드가 해제되면 회전을 중단한다.
         /// </summary>
-        private IEnumerator RotateKeyboardToHolder(Rigidbody body, BoxCollider keyboardCollider)
+        private IEnumerator RotateKeyboardToHolder(Rigidbody body, Vector3 centerOffset)
         {
             Quaternion startRotation = body.rotation;
             Quaternion targetRotation = transform.rotation * Quaternion.Euler(-57f, 0f, 0f);
@@ -57,7 +68,6 @@ namespace Game.Player
                     -targetRotation.w);
             }
 
-            Vector3 colliderCenter = Vector3.Scale(keyboardCollider.center, body.transform.lossyScale);
             float elapsed = 0f;
             while (_keyboardBody == body && elapsed < ROTATION_DURATION)
             {
@@ -65,7 +75,7 @@ namespace Game.Player
                 float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / ROTATION_DURATION));
                 Quaternion rotation = Quaternion.Slerp(startRotation, targetRotation, progress);
                 body.rotation = rotation;
-                body.position = transform.position - rotation * colliderCenter;
+                body.position = transform.position - body.transform.TransformVector(centerOffset);
                 yield return null;
             }
 
@@ -73,7 +83,7 @@ namespace Game.Player
                 yield break;
 
             body.rotation = targetRotation;
-            body.position = transform.position - targetRotation * colliderCenter;
+            body.position = transform.position - body.transform.TransformVector(centerOffset);
         }
 
         /// <summary>

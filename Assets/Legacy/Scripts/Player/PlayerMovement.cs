@@ -11,6 +11,9 @@ public sealed class PlayerMovement : MonoBehaviour
     [SerializeField] private CinemachineBrain _brain;
     [SerializeField] private CinemachineCamera _inputCam;
     [SerializeField] private InputActionReference _moveInput;
+
+    [Header("Camera")]
+    [SerializeField, Min(0f)] private float _cameraHeight = 4.9f;
     private CharacterController _controller;
     private Vector3 _cameraLocalPosition;
     private bool _wasInputCamReady;
@@ -24,6 +27,8 @@ public sealed class PlayerMovement : MonoBehaviour
     {
         _controller = GetComponent<CharacterController>();
         _cameraLocalPosition = _inputCam.transform.localPosition;
+        _cameraLocalPosition.y = _cameraHeight;
+        _inputCam.transform.localPosition = _cameraLocalPosition;
     }
 
     void OnEnable()

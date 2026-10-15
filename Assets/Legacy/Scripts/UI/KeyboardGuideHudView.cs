@@ -5,8 +5,9 @@ namespace Game.UI
 {
     public sealed class KeyboardGuideHudView : MonoBehaviour
     {
-        private const string PICKUP_GUIDE = "마우스 좌클릭을 눌러 키보드를 집으시오";
+        private const string PICKUP_GUIDE = "마우스 우클릭으로 키보드를 들어 올리기";
         private const string PLACEMENT_GUIDE = "모니터 앞에 키보드를 놓으시오";
+        private const string DISPENSER_GUIDE = "좌클릭으로 키보드 받기";
 
         [Header("References")]
         [SerializeField] private KeyboardInteractionController _interactionController;
@@ -43,8 +44,8 @@ namespace Game.UI
         }
 
         /// <summary>
-        /// state에 맞춰 집기 또는 내려놓기 안내 문구를 선택한다.
-        /// 가이드 텍스트의 내용과 표시 상태를 변경하며 상호작용 상태는 변경하지 않는다.
+        /// state에 맞춰 키보드 집기, 배치, 보관 또는 자판기 사용 안내 문구를 선택한다.
+        /// _guideText의 내용과 표시 상태를 변경하며 상호작용 상태는 변경하지 않는다.
         /// </summary>
         private void RefreshGuide(KeyboardInteractionController.KeyboardGuideState state)
         {
@@ -52,6 +53,7 @@ namespace Game.UI
             {
                 KeyboardInteractionController.KeyboardGuideState.Pickup => PICKUP_GUIDE,
                 KeyboardInteractionController.KeyboardGuideState.Placement => PLACEMENT_GUIDE,
+                KeyboardInteractionController.KeyboardGuideState.Dispenser => DISPENSER_GUIDE,
                 KeyboardInteractionController.KeyboardGuideState.BoxPickup => "좌클릭으로 상자 집기",
                 KeyboardInteractionController.KeyboardGuideState.BoxHolding => "좌클릭으로 상자 내려놓기",
                 KeyboardInteractionController.KeyboardGuideState.BoxStore => $"좌클릭으로 키보드 넣기 ({_interactionController.GuideCount}/{_interactionController.GuideCapacity})",

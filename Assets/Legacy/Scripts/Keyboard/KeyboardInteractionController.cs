@@ -24,7 +24,7 @@ public class KeyboardInteractionController : MonoBehaviour
     private const int SPAWN_REGION_COUNT = 3;
     private const float FEVER_REFILL_RETRY_INTERVAL = 0.25f;
 
-    public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake }
+    public enum KeyboardGuideState { Hidden, Pickup, Placement, BoxPickup, BoxHolding, BoxStore, BoxFull, BoxTake, Dispenser }
 
     [Header("Camera and Pad")]
     [SerializeField] private Camera _camera;
@@ -286,7 +286,13 @@ public class KeyboardInteractionController : MonoBehaviour
 
             return;
         }
-        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
+        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null) return;
+        if (Mouse.current.rightButton.wasPressedThisFrame)
+        {
+            PickUpKeyboardIntoHands();
+            return;
+        }
+        if (!Mouse.current.leftButton.wasPressedThisFrame) return;
         HandleWorldInteraction();
     }
 
@@ -854,7 +860,7 @@ public class KeyboardInteractionController : MonoBehaviour
 
     /// <summary>
     /// 현재 모드와 입력 가능 상태, 들고 있는 키보드와 카메라 중앙 조준 대상을 확인한다.
-    /// 들기 안내를 우선 선택하고 집기 불가능한 상황에서는 가이드 상태를 숨김으로 변경한다.
+    /// 키보드와 상자, 자판기 사용 안내를 선택하고 입력할 수 없는 상황에서는 가이드를 숨긴다.
     /// </summary>
     private void RefreshGuideState()
     {
@@ -886,6 +892,13 @@ public class KeyboardInteractionController : MonoBehaviour
         }
         if (TryGetInteractionHit(out RaycastHit boxHit))
         {
+            KeyboardDispenser dispenser = boxHit.collider.GetComponentInParent<KeyboardDispenser>();
+            if (dispenser != null)
+            {
+                SetGuideState(KeyboardGuideState.Dispenser);
+                return;
+            }
+
             KeyboardStorageBox box = boxHit.collider.GetComponentInParent<KeyboardStorageBox>();
             if (box != null)
             {
@@ -895,7 +908,7 @@ public class KeyboardInteractionController : MonoBehaviour
             }
         }
 
-        bool canPickUp = TryGetLookedAtKeyboard(out KeyboardState state) && state != _placedKeyboard;
+        bool canPickUp = TryGetLookedAtKeyboard(out _);
         SetGuideState(canPickUp ? KeyboardGuideState.Pickup : KeyboardGuideState.Hidden);
     }
 
@@ -941,6 +954,23 @@ public class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
+    /// 카메라 중앙에 조준한 키보드를 손에 든 상태로 전환한다.
+    /// 조준한 키보드 상태를 사용하며, 배치 키보드라면 미니게임 참조와 배치 상태를 해제한다.
+    /// </summary>
+    private void PickUpKeyboardIntoHands()
+    {
+        if (_heldKeyboard != null || _boxPickupController.HeldBox != null || _isPlacingKeyboard || _feverSupplyPending)
+            return;
+        if (!TryGetLookedAtKeyboard(out KeyboardState state))
+            return;
+
+        if (state == _placedKeyboard)
+            _controller.SetKeyBoard(null);
+
+        BeginHoldKeyboard(state);
+    }
+
+    /// <summary>
     /// state를 손에 든 키보드로 지정하고 위치, 물리와 패드 배치 가능 상태를 갱신한다.
     /// 바닥 집기와 상자 꺼내기에 동일한 잡기 설정을 적용한다.
     /// </summary>
@@ -981,7 +1011,7 @@ public class KeyboardInteractionController : MonoBehaviour
     }
     /// <summary>
     /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.
-    /// 상자 보관, 꺼내기 또는 기존 집기 상태를 변경한다.
+    /// 자판기 키보드 배출, 상자 보관과 꺼내기 또는 키보드 집기 상태를 변경한다.
     /// </summary>
     private void HandleWorldInteraction()
     {
@@ -993,6 +1023,18 @@ public class KeyboardInteractionController : MonoBehaviour
         }
         if (TryGetInteractionHit(out RaycastHit hit))
         {
+            KeyboardDispenser dispenser = hit.collider.GetComponentInParent<KeyboardDispenser>();
+            if (dispenser != null)
+            {
+                if (dispenser.TryDispense(out GameObject keyboardRoot))
+                {
+                    keyboardRoot.transform.SetParent(_spawnRoot, true);
+                    RegisterKeyboard(keyboardRoot);
+                    SpawnedKeyboardCount++;
+                }
+                return;
+            }
+
             KeyboardStorageBox box = hit.collider.GetComponentInParent<KeyboardStorageBox>();
             if (box != null)
             {

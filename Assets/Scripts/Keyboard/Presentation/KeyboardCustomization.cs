@@ -21,19 +21,22 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField, Min(0f)] private float _ledIntensity = 3f;
     private MaterialPropertyBlock _propertyBlock;
 
+    [Header("Shared Materials")]
+    [FormerlySerializedAs("_caseMaterials")]
+    [Tooltip("키보드 테두리와 키캡 모두 사용하는 공유 Material")]
+    [SerializeField] private Material[] _materials = new Material[0];
+
     [Header("Case: 키보드 테두리(상하좌우 아래)")]
     [FormerlySerializedAs("_housingRenderers")]
     [SerializeField] private MeshRenderer[] _caseRenderers = new MeshRenderer[0];
     [FormerlySerializedAs("_housingMaterial")]
     [FormerlySerializedAs("_casseMaterial")]
     [SerializeField] private Material _caseMaterial;
-    [SerializeField] private Material[] _caseMaterials = new Material[0];
     [SerializeField, Min(0)] private int _caseMaterialIndex;
 
     [Header("Keycaps")]
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
     [SerializeField] private Material _keycapMaterial;
-    [SerializeField] private Material[] _keycapMaterials = new Material[0];
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
 
     [Header("Switches")]
@@ -167,12 +170,12 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// index 입력으로 Keycap Material 배열 항목을 선택해 전체 키캡에 적용한다.
+    /// index 입력으로 공유 Material 배열 항목을 선택해 전체 키캡에 적용한다.
     /// 반환값 없이 선택 인덱스와 재질을 변경하며 범위 밖 입력은 무시한다.
     /// </summary>
     public void SetKeycapMaterialIndex(int index)
     {
-        if (index < 0 || index >= _keycapMaterials.Length)
+        if (index < 0 || index >= _materials.Length)
         {
             return;
         }
@@ -182,15 +185,15 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// Keycap Material 배열과 인덱스로 공통 재질을 선택해 전체 키캡을 갱신한다.
+    /// 공유 Material 배열과 인덱스로 공통 재질을 선택해 전체 키캡을 갱신한다.
     /// 반환값 없이 유효한 항목을 반영하며 빈 배열에서는 직접 지정한 재질을 사용한다.
     /// </summary>
     private void ApplySelectedKeycapMaterial()
     {
-        if (_keycapMaterials.Length > 0)
+        if (_materials.Length > 0)
         {
-            _keycapMaterialIndex = Mathf.Clamp(_keycapMaterialIndex, 0, _keycapMaterials.Length - 1);
-            _keycapMaterial = _keycapMaterials[_keycapMaterialIndex];
+            _keycapMaterialIndex = Mathf.Clamp(_keycapMaterialIndex, 0, _materials.Length - 1);
+            _keycapMaterial = _materials[_keycapMaterialIndex];
         }
 
         ApplyKeycapMaterial();
@@ -232,12 +235,12 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// index 입력으로 Case Material 배열의 항목을 선택하고 케이스에 적용한다.
+    /// index 입력으로 공유 Material 배열의 항목을 선택하고 케이스에 적용한다.
     /// 반환값 없이 선택 인덱스와 재질을 변경하며 범위 밖 입력은 무시한다.
     /// </summary>
     public void SetCaseMaterialIndex(int index)
     {
-        if (index < 0 || index >= _caseMaterials.Length)
+        if (index < 0 || index >= _materials.Length)
         {
             return;
         }
@@ -247,15 +250,15 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// Case Material 배열과 선택 인덱스로 현재 재질을 결정해 케이스에 적용한다.
+    /// 공유 Material 배열과 선택 인덱스로 현재 재질을 결정해 케이스에 적용한다.
     /// 반환값 없이 유효한 배열 항목을 반영하며 빈 배열에서는 직접 지정한 재질을 사용한다.
     /// </summary>
     private void ApplySelectedCaseMaterial()
     {
-        if (_caseMaterials.Length > 0)
+        if (_materials.Length > 0)
         {
-            _caseMaterialIndex = Mathf.Clamp(_caseMaterialIndex, 0, _caseMaterials.Length - 1);
-            _caseMaterial = _caseMaterials[_caseMaterialIndex];
+            _caseMaterialIndex = Mathf.Clamp(_caseMaterialIndex, 0, _materials.Length - 1);
+            _caseMaterial = _materials[_caseMaterialIndex];
         }
 
         ApplyCaseMaterial();
@@ -317,4 +320,5 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _ledRenderer.SetPropertyBlock(_propertyBlock);
     }
 }
+
 

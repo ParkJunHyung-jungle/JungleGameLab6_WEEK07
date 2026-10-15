@@ -15,7 +15,7 @@ MonoBehaviour:
   _type: 1
   _topHousingMaterial: {fileID: 2100000, guid: 794f0db3eb283b546b2d078b8b6ba4b3, type: 2}
   _bottomHousingMaterial: {fileID: 2100000, guid: 71a7ea23368f8774d83fa7b13e4cdcfe, type: 2}
-  _stemMaterial: {fileID: 2100000, guid: 1ec738c6989e9f54cb8027d2a531a28d, type: 2}
+  _stemMaterial: {fileID: 2100000, guid: ea89b2db33fa46548baccf9021c579f6, type: 2}
   _keyDownSound: {fileID: 0}
   _keyUpSound: {fileID: 0}
   _volume: 1

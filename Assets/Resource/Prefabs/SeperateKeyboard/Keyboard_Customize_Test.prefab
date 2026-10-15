@@ -29044,6 +29044,11 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
   - {fileID: 2100000, guid: d76f514a9a2ecec4d9346ff56354ca6e, type: 2}
   _caseMaterialIndex: 0
+  _keycapRenderers: []
+  _keycapMaterial: {fileID: 0}
+  _keycapMaterials: []
+  _defaulitMaterials: []
+  _keycapMaterialIndex: 0
 --- !u!1 &5689495446983780148
 GameObject:
   m_ObjectHideFlags: 0

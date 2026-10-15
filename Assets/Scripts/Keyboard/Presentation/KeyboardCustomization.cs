@@ -30,9 +30,17 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private Material[] _caseMaterials = new Material[0];
     [SerializeField, Min(0)] private int _caseMaterialIndex;
 
+    [Header("Keycaps")]
+    [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
+    [SerializeField] private Material _keycapMaterial;
+    [SerializeField] private Material[] _keycapMaterials = new Material[0];
+    [SerializeField] private Material[] _defaulitMaterials = new Material[0];
+    [SerializeField, Min(0)] private int _keycapMaterialIndex;
+
     void OnEnable()
     {
         ApplySelectedCaseMaterial();
+        ApplySelectedKeycapMaterial();
         if (_ledRenderer != null)
         {
             ApplyLED();
@@ -61,10 +69,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
 #if UNITY_EDITOR
     /// <summary>
-    /// Inspector 변경 처리가 끝난 뒤 Case 선택값과 렌더러 목록으로 외관을 갱신한다.
+    /// Inspector 변경 처리가 끝난 뒤 Case와 키캡 선택값 및 렌더러 목록으로 외관을 갱신한다.
     /// 반환값 없이 프리팹 변경을 기록하고 에디터 화면의 재렌더링을 요청한다.
     /// </summary>
-    private void ApplyCaseEditorPreview()
+    public void ApplyCaseEditorPreview()
     {
         if (this == null)
         {
@@ -72,10 +80,22 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         ApplySelectedCaseMaterial();
+        ApplySelectedKeycapMaterial();
         if (!Application.IsPlaying(gameObject))
         {
             EditorUtility.SetDirty(this);
             foreach (MeshRenderer renderer in _caseRenderers)
+            {
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                EditorUtility.SetDirty(renderer);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
+            }
+
+            foreach (MeshRenderer renderer in _keycapRenderers)
             {
                 if (renderer == null)
                 {
@@ -91,6 +111,71 @@ public sealed class KeyboardCustomization : MonoBehaviour
         SceneView.RepaintAll();
     }
 #endif
+
+    /// <summary>
+    /// material 입력을 전체 키캡의 공통 재질로 저장하고 연결된 키캡에 적용한다.
+    /// 반환값 없이 키캡 외형 재질을 변경하며 null 입력은 무시한다.
+    /// </summary>
+    public void SetKeycapMaterial(Material material)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        _keycapMaterial = material;
+        ApplyKeycapMaterial();
+    }
+
+    /// <summary>
+    /// index 입력으로 Keycap Material 배열 항목을 선택해 전체 키캡에 적용한다.
+    /// 반환값 없이 선택 인덱스와 재질을 변경하며 범위 밖 입력은 무시한다.
+    /// </summary>
+    public void SetKeycapMaterialIndex(int index)
+    {
+        if (index < 0 || index >= _keycapMaterials.Length)
+        {
+            return;
+        }
+
+        _keycapMaterialIndex = index;
+        ApplySelectedKeycapMaterial();
+    }
+
+    /// <summary>
+    /// Keycap Material 배열과 인덱스로 공통 재질을 선택해 전체 키캡을 갱신한다.
+    /// 반환값 없이 유효한 항목을 반영하며 빈 배열에서는 직접 지정한 재질을 사용한다.
+    /// </summary>
+    private void ApplySelectedKeycapMaterial()
+    {
+        if (_keycapMaterials.Length > 0)
+        {
+            _keycapMaterialIndex = Mathf.Clamp(_keycapMaterialIndex, 0, _keycapMaterials.Length - 1);
+            _keycapMaterial = _keycapMaterials[_keycapMaterialIndex];
+        }
+
+        ApplyKeycapMaterial();
+    }
+
+    /// <summary>
+    /// 선택한 공통 Material과 키캡 렌더러 목록으로 키캡 재질을 갱신한다.
+    /// 반환값 없이 살아 있는 키캡만 변경하며 파괴된 키캡과 미선택 재질은 건너뛴다.
+    /// </summary>
+    private void ApplyKeycapMaterial()
+    {
+        if (_keycapMaterial == null)
+        {
+            return;
+        }
+
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = _keycapMaterial;
+            }
+        }
+    }
 
     /// <summary>
     /// material 입력을 하우징 재질로 저장하고 연결된 케이스 파츠에 적용한다.

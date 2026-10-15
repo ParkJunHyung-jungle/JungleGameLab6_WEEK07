@@ -35,6 +35,7 @@ namespace KeyboardCustomizationTools.Editor
             {
                 ExecuteSetup();
                 SetupHousing();
+                SetupKeycaps();
                 return;
             }
 
@@ -45,7 +46,53 @@ namespace KeyboardCustomizationTools.Editor
                 {
                     SetupHousing();
                 }
+
+                if (serialized.FindProperty("_keycapRenderers").arraySize == 0)
+                {
+                    SetupKeycaps();
+                }
             }
+        }
+
+        /// <summary>
+        /// 대상 프리팹의 키캡 아래에서 각인을 제외한 외형 렌더러를 수집한다.
+        /// 입력과 반환값 없이 키캡 재질 교체용 참조를 저장하며 Material 배열은 유지한다.
+        /// </summary>
+        [MenuItem("Tools/Keyboard/Setup Customize Test Keycaps")]
+        public static void SetupKeycaps()
+        {
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(PREFAB_PATH))
+            {
+                GameObject root = scope.prefabContentsRoot;
+                var renderers = new List<MeshRenderer>();
+                foreach (Transform key in root.transform.Find("Keys_87_SharedPrefabs"))
+                {
+                    if (!key.name.StartsWith("Key_"))
+                    {
+                        continue;
+                    }
+
+                    foreach (MeshRenderer renderer in key.GetComponentsInChildren<MeshRenderer>(true))
+                    {
+                        if (renderer.name != "Printed_Legend")
+                        {
+                            renderers.Add(renderer);
+                        }
+                    }
+                }
+
+                var serialized = new SerializedObject(root.GetComponent<KeyboardCustomization>());
+                SerializedProperty targets = serialized.FindProperty("_keycapRenderers");
+                targets.arraySize = renderers.Count;
+                for (int index = 0; index < renderers.Count; index++)
+                {
+                    targets.GetArrayElementAtIndex(index).objectReferenceValue = renderers[index];
+                }
+
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>

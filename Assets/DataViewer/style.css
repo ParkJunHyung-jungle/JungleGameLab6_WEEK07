@@ -1215,6 +1215,222 @@ body {
 }
 
 /* ===================================================
+   [View 5] 사용자별 점수 속도 & APM 구간 중첩 비교
+   =================================================== */
+.overlay-comparison-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.btn-sample-toggle {
+  background: rgba(244, 114, 182, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(244, 114, 182, 0.4);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-sample-toggle:hover {
+  background: rgba(244, 114, 182, 0.25);
+  border-color: #f472b6;
+}
+
+.overlay-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 13px;
+}
+
+.overlay-option-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overlay-option-group label {
+  color: var(--text-sub);
+}
+
+.overlay-number-input, .overlay-select, .overlay-text-input {
+  background: #0f172a;
+  border: 1px solid var(--card-border);
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.overlay-number-input {
+  width: 65px;
+}
+
+.overlay-text-input {
+  width: 140px;
+}
+
+.overlay-annotation-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.overlay-small-btn {
+  background: #334155;
+  color: var(--text-main);
+  border: 1px solid var(--card-border);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.overlay-small-btn:hover {
+  background: #475569;
+  border-color: var(--accent);
+}
+
+.overlay-small-btn.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.overlay-small-btn.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.overlay-notice {
+  color: #facc15;
+  font-size: 12px;
+  font-weight: 600;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.overlay-series-chips-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overlay-chips-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+
+.overlay-series-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.overlay-chip {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.overlay-chip:hover {
+  border-color: var(--accent);
+}
+
+.overlay-chip.hidden-chip {
+  opacity: 0.35;
+  text-decoration: line-through;
+  border-style: dashed;
+}
+
+.overlay-chip-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.overlay-chip-title {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.overlay-chip-sub {
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+/* 서브 차트 박스 */
+.overlay-chart-box {
+  background: #14171d;
+  border: 1px solid #232832;
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.overlay-chart-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.overlay-chart-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.overlay-chart-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.overlay-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  background: #121419;
+  border: 1px solid #242933;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.overlay-canvas-wrapper canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+/* ===================================================
    [신규] PDF 인쇄 스타일 (@media print)
    =================================================== */
 @media print {
@@ -1369,23 +1585,53 @@ body {
   }
 
   /* ---------------------------------------------------
+     View 5 중첩 비교 차트 인쇄 최적화
+     --------------------------------------------------- */
+  #view5Section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  #view5Section .overlay-toolbar,
+  #view5Section .overlay-series-chips-wrapper,
+  #view5Section .btn-sample-toggle {
+    display: none !important;
+  }
+
+  #view5Section .overlay-canvas-wrapper {
+    width: 100% !important;
+    height: 340px !important;
+  }
+
+  /* ---------------------------------------------------
      단일 뷰 선택 인쇄 시 타겟 외 다른 섹션 완전 숨김
      --------------------------------------------------- */
   body.print-target-view2 #view3Section,
   body.print-target-view2 #view4Section,
+  body.print-target-view2 #view5Section,
   body.print-target-view2 .session-info-card {
     display: none !important;
   }
 
   body.print-target-view3 #view2Section,
   body.print-target-view3 #view4Section,
+  body.print-target-view3 #view5Section,
   body.print-target-view3 .session-info-card {
     display: none !important;
   }
 
   body.print-target-view4 #view2Section,
   body.print-target-view4 #view3Section,
+  body.print-target-view4 #view5Section,
   body.print-target-view4 .session-info-card {
+    display: none !important;
+  }
+
+  body.print-target-view5 #view2Section,
+  body.print-target-view5 #view3Section,
+  body.print-target-view5 #view4Section,
+  body.print-target-view5 .session-info-card {
     display: none !important;
   }
 
@@ -1409,6 +1655,13 @@ body {
   }
 
   body.print-target-all #view4Section {
+    display: flex !important;
+    flex-direction: column !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  body.print-target-all #view5Section {
     display: flex !important;
     flex-direction: column !important;
   }

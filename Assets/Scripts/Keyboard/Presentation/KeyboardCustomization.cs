@@ -34,13 +34,17 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
     [SerializeField] private Material _keycapMaterial;
     [SerializeField] private Material[] _keycapMaterials = new Material[0];
-    [SerializeField] private Material[] _defaulitMaterials = new Material[0];
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
+
+    [Header("Switches")]
+    [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
+    [SerializeField] private SwitchType _switchType = SwitchType.Red;
 
     void OnEnable()
     {
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
+        if (_switches.Length > 0) SetSwitchType(_switchType);
         if (_ledRenderer != null)
         {
             ApplyLED();
@@ -81,6 +85,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
+        if (_switches.Length > 0) SetSwitchType(_switchType);
         if (!Application.IsPlaying(gameObject))
         {
             EditorUtility.SetDirty(this);
@@ -105,12 +110,46 @@ public sealed class KeyboardCustomization : MonoBehaviour
                 EditorUtility.SetDirty(renderer);
                 PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
             }
+
+            foreach (KeyboardSwitch keyboardSwitch in _switches)
+            {
+                foreach (MeshRenderer renderer in keyboardSwitch.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    EditorUtility.SetDirty(renderer);
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
+                }
+            }
         }
 
         EditorApplication.QueuePlayerLoopUpdate();
         SceneView.RepaintAll();
     }
 #endif
+
+    /// <summary>
+    /// type 입력을 모든 축 컴포넌트에 전달해 외형과 사운드 선택을 일괄 변경한다.
+    /// 모든 축에 데이터가 있을 때만 적용하며 성공 여부와 현재 선택 타입을 갱신한다.
+    /// </summary>
+    public bool SetSwitchType(SwitchType type)
+    {
+        if (_switches.Length == 0) return false;
+        foreach (KeyboardSwitch keyboardSwitch in _switches)
+        {
+            if (!keyboardSwitch.HasSwitchType(type))
+            {
+                Debug.LogWarning($"{keyboardSwitch.name}: {type} 축 데이터가 없어 변경하지 않았습니다.", this);
+                return false;
+            }
+        }
+
+        foreach (KeyboardSwitch keyboardSwitch in _switches)
+        {
+            keyboardSwitch.ChangeSwitch(type);
+        }
+
+        _switchType = type;
+        return true;
+    }
 
     /// <summary>
     /// material 입력을 전체 키캡의 공통 재질로 저장하고 연결된 키캡에 적용한다.

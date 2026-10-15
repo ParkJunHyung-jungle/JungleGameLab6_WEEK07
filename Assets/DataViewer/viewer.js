@@ -1347,6 +1347,9 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
     apm: header.indexOf("apm"),
     playerScore: header.indexOf("player_score"),
     enemyScore: header.indexOf("enemy_score"),
+    scoreDelta: header.indexOf("score_delta"),
+    scorePerSecond: header.indexOf("score_per_second"),
+    scorePerMinute: header.indexOf("score_per_minute"),
     isComplete: header.indexOf("is_complete")
   };
 
@@ -1360,6 +1363,8 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
   const keyCounts = {};
   const downTimestamps = [];
   const scoreSnapshots = [];
+  const intervalSummaries = [];
+  const stageStarts = [];
   let finalPlayerScore = null;
   let finalEnemyScore = null;
   let stageDuration = 0;
@@ -1389,6 +1394,8 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
     const rowEndReason = col.endReason !== -1 ? row[col.endReason] : "";
     const rowDuration = col.duration !== -1 ? row[col.duration] : "";
     const rowIsComplete = col.isComplete !== -1 ? row[col.isComplete] : "";
+    const rowScoreDelta = col.scoreDelta !== -1 ? row[col.scoreDelta] : "";
+    const rowScorePerSecond = col.scorePerSecond !== -1 ? row[col.scorePerSecond] : "";
 
     if (rowSessionId && sessionId === "-") sessionId = rowSessionId;
     if (rowBuildVersion && buildVersion === "-") buildVersion = rowBuildVersion;
@@ -1422,15 +1429,28 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
           }
         }
       } else if (rowRecordType === "IntervalSummary") {
-        if (rowApm !== "") {
-          const apmVal = parseFloat(rowApm);
-          if (!isNaN(apmVal)) apmList.push(apmVal);
-        }
-        if (rowCombo !== "") {
-          const comboVal = parseInt(rowCombo, 10);
-          if (!isNaN(comboVal) && comboVal > maxCombo) maxCombo = comboVal;
-        }
+        const apmVal = rowApm !== "" ? parseFloat(rowApm) : NaN;
+        if (!isNaN(apmVal)) apmList.push(apmVal);
+        const comboVal = rowCombo !== "" ? parseInt(rowCombo, 10) : NaN;
+        if (!isNaN(comboVal) && comboVal > maxCombo) maxCombo = comboVal;
+
+        const startElapsed = col.startElapsed !== -1 && row[col.startElapsed] !== "" ? parseFloat(row[col.startElapsed]) : elapsed;
+        const endElapsed = col.endElapsed !== -1 && row[col.endElapsed] !== "" ? parseFloat(row[col.endElapsed]) : elapsed;
+        const sps = rowScorePerSecond !== "" ? parseFloat(rowScorePerSecond) : 0;
+        const delta = rowScoreDelta !== "" ? parseFloat(rowScoreDelta) : 0;
+        const dur = rowDuration !== "" ? parseFloat(rowDuration) : (endElapsed - startElapsed);
+
+        intervalSummaries.push({
+          startElapsed: !isNaN(startElapsed) ? startElapsed : elapsed,
+          endElapsed: !isNaN(endElapsed) ? endElapsed : elapsed,
+          scorePerSecond: !isNaN(sps) ? sps : 0,
+          apm: !isNaN(apmVal) ? apmVal : 0,
+          combo: !isNaN(comboVal) ? comboVal : 0,
+          scoreDelta: !isNaN(delta) ? delta : 0,
+          duration: !isNaN(dur) ? dur : 0
+        });
       } else if (rowRecordType === "StageStart") {
+        if (!isNaN(elapsed)) stageStarts.push(elapsed);
         if (rowPlayerScore !== "") finalPlayerScore = parseInt(rowPlayerScore, 10);
         if (rowEnemyScore !== "") finalEnemyScore = parseInt(rowEnemyScore, 10);
       } else if (rowRecordType === "StageEnd") {
@@ -1496,6 +1516,8 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
     keyCounts,
     downTimestamps,
     scoreSnapshots,
+    intervalSummaries,
+    stageStarts,
     finalPlayerScore: finalPlayerScore !== null ? finalPlayerScore : 0,
     finalEnemyScore: finalEnemyScore !== null ? finalEnemyScore : 0,
     hasScoreData: finalPlayerScore !== null,
@@ -1755,6 +1777,7 @@ function updateView() {
     renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
     renderRanking(session.keyCounts, false);
     renderTimelineChart(session.downTimestamps, false, 1, session.maxElapsed);
+    renderOverlayComparison();
     return;
   }
 
@@ -1886,6 +1909,7 @@ function updateView() {
     renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
     renderRanking(session.keyCounts, false);
     renderTimelineChart(session.downTimestamps, false, 1, session.maxElapsed);
+    renderOverlayComparison();
     return;
   }
 
@@ -1936,6 +1960,7 @@ function updateView() {
   renderKeyboard(agg.keyCounts, isAvg, agg.rawTotalCounts, agg.sessionCount);
   renderRanking(agg.keyCounts, isAvg);
   renderTimelineChart(agg.downTimestamps, isAvg, agg.sessionCount, agg.maxElapsed);
+  renderOverlayComparison();
 }
 
 // 9. 시간대별 키 타격 횟수 및 타속 추이 차트 렌더링
@@ -2254,6 +2279,7 @@ function resetViewer() {
   renderKeyboard({}, false, {}, 0);
   renderRanking({}, false);
   renderTimelineChart([], false, 0, 0);
+  renderOverlayComparison();
 }
 
 // 복수 CSV 파일 읽기 및 세션 목록 업데이트 (누적 추가 지원)
@@ -2313,12 +2339,8 @@ function loadFiles(fileList) {
 
 // 10. 초기화 및 이벤트 리스너 등록
 document.addEventListener("DOMContentLoaded", () => {
-  // 1) 기본 데이터로 첫 화면 렌더링
-  const initialSession = parseSingleCsv(sampleCsvText, "sample_playtest_log.csv");
-  if (initialSession) {
-    loadedSessions = [initialSession];
-    updateView();
-  }
+  // 1) 웹 처음 열었을 때는 샘플 데이터를 자동 로드하지 않고 빈 상태로 초기화
+  resetViewer();
 
   // 2) 최신 Playtest 기본 로그 즉시 불러오기 버튼
   const loadDefaultBtn = document.getElementById("loadDefaultLogBtn");
@@ -2470,7 +2492,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // PDF 내보내기 함수 및 이벤트 핸들러
 function exportPdf(targetView) {
-  const classNames = ["print-target-view2", "print-target-view3", "print-target-view4", "print-target-all"];
+  const classNames = ["print-target-view2", "print-target-view3", "print-target-view4", "print-target-view5", "print-target-all"];
   document.body.classList.remove(...classNames);
 
   if (targetView === "view2") {
@@ -2479,12 +2501,15 @@ function exportPdf(targetView) {
     document.body.classList.add("print-target-view3");
   } else if (targetView === "view4") {
     document.body.classList.add("print-target-view4");
+  } else if (targetView === "view5") {
+    document.body.classList.add("print-target-view5");
   } else {
     document.body.classList.add("print-target-all");
   }
 
   // 캔버스 크기 재조정 후 인쇄 창 호출
   redrawCurrentChart();
+  redrawOverlayCharts();
 
   setTimeout(() => {
     window.print();
@@ -2493,8 +2518,9 @@ function exportPdf(targetView) {
 
 // 인쇄 창 닫힌 후 인쇄용 전용 클래스 정리
 window.addEventListener("afterprint", () => {
-  document.body.classList.remove("print-target-view2", "print-target-view3", "print-target-view4", "print-target-all");
+  document.body.classList.remove("print-target-view2", "print-target-view3", "print-target-view4", "print-target-view5", "print-target-all");
   redrawCurrentChart();
+  redrawOverlayCharts();
 });
 
 function setupPdfExportEvents() {
@@ -2511,6 +2537,11 @@ function setupPdfExportEvents() {
   const btnView4 = document.getElementById("printView4Btn");
   if (btnView4) {
     btnView4.addEventListener("click", () => exportPdf("view4"));
+  }
+
+  const btnView5 = document.getElementById("printView5Btn");
+  if (btnView5) {
+    btnView5.addEventListener("click", () => exportPdf("view5"));
   }
 
   const btnAll = document.getElementById("printAllViewsBtn");
@@ -2552,12 +2583,13 @@ async function exportViewAsImage(sectionId, defaultPrefix) {
   }
 
   const fileName = `Playtest_${defaultPrefix}_${sessionSuffix}.png`;
-  const buttons = section.querySelectorAll(".pdf-btn, .img-btn");
+  const buttons = section.querySelectorAll(".pdf-btn, .img-btn, .btn-sample-toggle");
   buttons.forEach(b => b.style.visibility = "hidden");
 
   try {
     if (typeof html2canvas === "function") {
       if (sectionId === "view4Section") redrawCurrentChart();
+      if (sectionId === "view5Section") redrawOverlayCharts();
 
       const canvas = await html2canvas(section, {
         backgroundColor: "#1e293b",
@@ -2595,6 +2627,8 @@ async function exportAllViewsAsImages() {
     await exportViewAsImage("view3Section", "View3_Ranking");
     await new Promise(r => setTimeout(r, 450));
     await exportViewAsImage("view4Section", "View4_Timeline");
+    await new Promise(r => setTimeout(r, 450));
+    await exportViewAsImage("view5Section", "View5_Overlay");
   } finally {
     if (btn) btn.innerText = originalText;
   }
@@ -2614,6 +2648,11 @@ function setupImageExportEvents() {
   const btnView4 = document.getElementById("imgView4Btn");
   if (btnView4) {
     btnView4.addEventListener("click", () => exportViewAsImage("view4Section", "View4_Timeline"));
+  }
+
+  const btnView5 = document.getElementById("imgView5Btn");
+  if (btnView5) {
+    btnView5.addEventListener("click", () => exportViewAsImage("view5Section", "View5_Overlay"));
   }
 
   const btnAll = document.getElementById("imgAllViewsBtn");
@@ -2695,5 +2734,508 @@ function setupChartEvents() {
 
   window.addEventListener("resize", () => {
     redrawCurrentChart();
+    redrawOverlayCharts();
   });
+}
+
+// ===================================================================
+// [View 5] 사용자별 점수 속도 & APM 구간 중첩 비교 (Multi-User Overlay)
+// ===================================================================
+
+const OVERLAY_PALETTE = [
+  { color: "#f472b6", dash: [4, 4], name: "Pink Dot" },      // 1순위: 분홍 점선 (image1/2 핑크)
+  { color: "#facc15", dash: [8, 6], name: "Yellow Dash" },   // 2순위: 노랑 파선 (image1/2 옐로우)
+  { color: "#38bdf8", dash: [], name: "Blue Solid" },        // 3순위: 파랑 실선 (image1/2 블루)
+  { color: "#4ade80", dash: [4, 4], name: "Green Dot" },     // 4순위: 민트그린 점선
+  { color: "#c084fc", dash: [10, 5], name: "Purple Dash" },  // 5순위: 보라 파선
+  { color: "#fb923c", dash: [], name: "Orange Solid" },      // 6순위: 주황 실선
+  { color: "#2dd4bf", dash: [6, 4], name: "Teal Dash" },     // 7순위: 청록 파선
+  { color: "#f87171", dash: [3, 3], name: "Red Dot" }        // 8순위: 레드 점선
+];
+
+let activeOverlaySeries = [];
+let overlayVisibilityMap = new Map(); // series id -> boolean
+let hoveredOverlayTime = null;
+let overlayEventsInitialized = false;
+
+// 회차(Round) 및 사용자별 데이터 시리즈 빌드
+// 파일 1개 = 1명의 사용자 (User 1, User 2, ...), 100초 기준 다회차 분할 (100초 이하인 경우 1줄 유지)
+function buildOverlaySeries() {
+  const roundDurationInput = document.getElementById("overlayRoundDuration");
+  const roundDuration = (roundDurationInput ? parseFloat(roundDurationInput.value) : 100) || 100;
+  const intervalModeSelect = document.getElementById("overlayIntervalMode");
+  const mode = intervalModeSelect ? intervalModeSelect.value : "auto";
+
+  const series = [];
+  if (!loadedSessions || loadedSessions.length === 0) {
+    return series;
+  }
+
+  // 로드된 각 세션(파일)을 순회
+  loadedSessions.forEach((session, fileIdx) => {
+    const userNumber = fileIdx + 1;
+    const userLabel = `User ${userNumber}`;
+
+    // 기준 시작 시간 산출 (StageStart 기준 우선, 없으면 최초 타임스탬프)
+    let baseStart = 0;
+    if (session.stageStarts && session.stageStarts.length > 0) {
+      baseStart = session.stageStarts[0];
+    } else if (session.minElapsed !== Infinity && session.minElapsed > 0) {
+      baseStart = session.minElapsed;
+    }
+
+    const maxTime = session.maxElapsed || (baseStart + 10);
+    const recordedDuration = session.playDuration > 0 ? session.playDuration : Math.max(0, maxTime - baseStart);
+
+    // 100초를 초과한 긴 파일일 때만 2회차, 3회차로 분할, 그렇지 않으면 무조건 1회차(1줄)
+    const totalRounds = recordedDuration > roundDuration ? Math.ceil(recordedDuration / roundDuration) : 1;
+
+    for (let r = 1; r <= totalRounds; r++) {
+      const rStart = baseStart + (r - 1) * roundDuration;
+      const rEnd = rStart + roundDuration;
+      const scoreSegments = [];
+      const apmSegments = [];
+
+      // CSV 기록 구간 (IntervalSummary) 사용 조건: 모드가 "combo"이고 해당 인터벌이 2개 이상일 때
+      const hasValidIntervals = session.intervalSummaries && session.intervalSummaries.length >= 2;
+      if (mode === "combo" && hasValidIntervals) {
+        let lastEndRel = 0;
+        session.intervalSummaries.forEach(interval => {
+          const startRaw = interval.startElapsed;
+          const endRaw = interval.endElapsed;
+          if (endRaw < rStart || startRaw > rEnd) return;
+
+          const relStart = Math.max(0, Math.min(roundDuration, startRaw - rStart));
+          const relEnd = Math.max(0, Math.min(roundDuration, endRaw - rStart));
+
+          if (relEnd > relStart) {
+            // 빈 틈이 있으면 0으로 메꿈
+            if (relStart > lastEndRel) {
+              scoreSegments.push({ start: lastEndRel, end: relStart, value: 0 });
+              apmSegments.push({ start: lastEndRel, end: relStart, value: 0 });
+            }
+            scoreSegments.push({ start: relStart, end: relEnd, value: interval.scorePerSecond || 0 });
+            apmSegments.push({ start: relStart, end: relEnd, value: Math.round(interval.apm || 0) });
+            lastEndRel = relEnd;
+          }
+        });
+
+        // 라운드 종료(roundDuration)까지 남은 구간을 0으로 채움
+        if (lastEndRel < roundDuration) {
+          scoreSegments.push({ start: lastEndRel, end: roundDuration, value: 0 });
+          apmSegments.push({ start: lastEndRel, end: roundDuration, value: 0 });
+        }
+      } else {
+        // 균등 윈도우 집계 (기본 "auto" 및 "window_10"은 10초, "window_5"는 5초)
+        const windowSize = mode === "window_5" ? 5 : 10;
+        const snapshots = session.scoreSnapshots || [];
+        const timestamps = session.downTimestamps || [];
+
+        for (let sec = 0; sec < roundDuration; sec += windowSize) {
+          const segStart = sec;
+          const segEnd = Math.min(roundDuration, sec + windowSize);
+          const dur = segEnd - segStart;
+          if (dur <= 0) break;
+
+          const absStart = rStart + segStart;
+          const absEnd = rStart + segEnd;
+
+          // 키 다운 APM 집계
+          const downCount = timestamps.filter(t => t >= absStart && t < absEnd).length;
+          const apm = Math.round((downCount / dur) * 60);
+
+          // 점수 획득 속도 (점/초) 집계
+          const inWinSnaps = snapshots.filter(s => s.elapsed >= absStart && s.elapsed <= absEnd);
+          let sps = 0;
+          if (inWinSnaps.length >= 2) {
+            const delta = inWinSnaps[inWinSnaps.length - 1].score - inWinSnaps[0].score;
+            sps = Math.max(0, delta / dur);
+          } else if (downCount > 0) {
+            // 1타당 10점 기반 환산
+            sps = Math.max(0, (downCount * 10) / dur);
+          }
+
+          // CSV의 IntervalSummary에 점수/초가 있으면 보정 참조
+          const matchedInterval = (session.intervalSummaries || []).find(it => absStart >= it.startElapsed && absStart < it.endElapsed);
+          if (matchedInterval && matchedInterval.scorePerSecond > 0 && sps === 0) {
+            sps = matchedInterval.scorePerSecond;
+          }
+
+          scoreSegments.push({ start: segStart, end: segEnd, value: Math.round(sps * 10) / 10 });
+          apmSegments.push({ start: segStart, end: segEnd, value: apm });
+        }
+      }
+
+      // 시리즈 등록
+      const seriesId = `session-${fileIdx}-round-${r}`;
+      const colorIdx = series.length % OVERLAY_PALETTE.length;
+      const palette = OVERLAY_PALETTE[colorIdx];
+
+      const shortFileName = session.fileName.replace(/\.csv$/i, "").replace(/^Playtest_/, "");
+      const cleanFileTag = shortFileName.length > 20 ? shortFileName.substring(0, 18) + "…" : shortFileName;
+      const label = totalRounds > 1
+        ? `${userLabel} (${cleanFileTag}) - ${r}회차`
+        : `${userLabel} (${cleanFileTag})`;
+
+      series.push({
+        id: seriesId,
+        label: label,
+        user: userLabel,
+        round: r,
+        color: palette.color,
+        dash: palette.dash,
+        visible: overlayVisibilityMap.has(seriesId) ? overlayVisibilityMap.get(seriesId) : true,
+        scoreSegments,
+        apmSegments
+      });
+    }
+  });
+
+  return series;
+}
+
+// 시리즈 범례 칩 UI 갱신
+function renderOverlayChips() {
+  const container = document.getElementById("overlaySeriesChips");
+  const badge = document.getElementById("overlaySeriesCountBadge");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (activeOverlaySeries.length === 0) {
+    if (badge) badge.innerText = "0개 파일 로드됨 (0줄 표시)";
+    container.innerHTML = `<span style="color:#64748b;font-size:12px;padding:4px 0;">비교할 CSV 파일을 상단에서 추가해주세요. (파일 1개 = 1줄, 100초 기준)</span>`;
+    return;
+  }
+
+  if (badge) {
+    const fileCount = loadedSessions.length;
+    const lineCount = activeOverlaySeries.length;
+    badge.innerText = `${fileCount}개 파일 로드됨 (${lineCount}줄 표시)`;
+  }
+
+  activeOverlaySeries.forEach(s => {
+    const chip = document.createElement("div");
+    chip.className = `overlay-chip ${s.visible ? "" : "hidden-chip"}`;
+    chip.title = "클릭하여 이 곡선의 표시/숨김을 토글합니다";
+
+    chip.innerHTML = `
+      <div class="overlay-chip-swatch" style="background: ${s.color};"></div>
+      <div class="overlay-chip-info">
+        <span class="overlay-chip-title">${s.label}</span>
+        <span class="overlay-chip-sub">${s.visible ? "표시 중" : "숨김 (클릭시 표시)"}</span>
+      </div>
+    `;
+
+    chip.addEventListener("click", () => {
+      s.visible = !s.visible;
+      overlayVisibilityMap.set(s.id, s.visible);
+      renderOverlayChips();
+      redrawOverlayCharts();
+    });
+
+    container.appendChild(chip);
+  });
+}
+
+// 캔버스 크기 및 디바이스 픽셀 비율(HiDPI) 초기화
+function setupOverlayCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const parentW = canvas.parentElement ? canvas.parentElement.clientWidth : 0;
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width > 50 ? rect.width : (parentW > 50 ? parentW : 1000);
+  const h = rect.height > 50 ? rect.height : 380;
+
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+  return { ctx, width: w, height: h };
+}
+
+// 순수 계단형 차트 그리기 (image1, image2 스타일 1:1 재현, 어노테이션 제거)
+function drawOverlayStepChart(canvasId, type) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const { ctx, width, height } = setupOverlayCanvas(canvas);
+
+  const margin = { top: 38, right: 30, bottom: 48, left: 65 };
+  const plotW = Math.max(100, width - margin.left - margin.right);
+  const plotH = Math.max(100, height - margin.top - margin.bottom);
+
+  const roundDurationInput = document.getElementById("overlayRoundDuration");
+  const maxTime = (roundDurationInput ? parseFloat(roundDurationInput.value) : 100) || 100;
+
+  // Y축 최대값 산출
+  let maxY = type === "score" ? 400 : 2500;
+  activeOverlaySeries.filter(s => s.visible).forEach(s => {
+    const segs = type === "score" ? s.scoreSegments : s.apmSegments;
+    segs.forEach(seg => {
+      if (seg.value > maxY) maxY = seg.value;
+    });
+  });
+
+  // 깔끔한 단위로 올림
+  maxY = type === "score" ? Math.ceil(maxY / 100) * 100 : Math.ceil(maxY / 500) * 500;
+  if (maxY <= 0) maxY = type === "score" ? 400 : 2500;
+
+  // 1) 전체 캔버스 배경
+  ctx.fillStyle = "#14171d";
+  ctx.fillRect(0, 0, width, height);
+
+  // 2) 플롯 내부 배경
+  ctx.fillStyle = "#121419";
+  ctx.fillRect(margin.left, margin.top, plotW, plotH);
+
+  // 좌표 변환 함수
+  const getX = t => margin.left + (Math.max(0, Math.min(maxTime, t)) / maxTime) * plotW;
+  const getY = v => margin.top + plotH - (Math.max(0, v) / maxY) * plotH;
+
+  // 3) Y축 가로 눈금선 및 텍스트
+  ctx.strokeStyle = "#222730";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillStyle = "#94a3b8";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
+  const yTicksCount = type === "score" ? 4 : 5;
+  for (let i = 0; i <= yTicksCount; i++) {
+    const yVal = (maxY / yTicksCount) * i;
+    const py = getY(yVal);
+
+    ctx.beginPath();
+    ctx.moveTo(margin.left, py);
+    ctx.lineTo(margin.left + plotW, py);
+    ctx.stroke();
+
+    let label = Math.round(yVal);
+    if (type === "apm" && yVal >= 1000) {
+      label = (yVal / 1000).toFixed(1).replace(".0", "") + "k";
+    }
+    ctx.fillText(label, margin.left - 10, py);
+  }
+
+  // 4) X축 세로 눈금선 및 텍스트 (0, 20, 40, 60, 80, 100)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  const xStep = maxTime <= 100 ? 20 : Math.ceil(maxTime / 5 / 10) * 10;
+  for (let t = 0; t <= maxTime; t += xStep) {
+    const px = getX(t);
+
+    ctx.beginPath();
+    ctx.moveTo(px, margin.top);
+    ctx.lineTo(px, margin.top + plotH);
+    ctx.stroke();
+
+    ctx.fillText(t, px, margin.top + plotH + 10);
+  }
+
+  // 5) 플롯 외곽 테두리
+  ctx.strokeStyle = "#2a313e";
+  ctx.strokeRect(margin.left, margin.top, plotW, plotH);
+
+  // 6) X/Y축 라벨
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("스테이지 시작 후 시간 (초)", margin.left + plotW / 2, height - 16);
+
+  ctx.save();
+  ctx.translate(16, margin.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(type === "score" ? "획득 점수 (점/초)" : "입력 속도 (APM)", 0, 0);
+  ctx.restore();
+
+  // 데이터가 없을 때의 안내 문구
+  if (activeOverlaySeries.length === 0) {
+    ctx.fillStyle = "rgba(148, 163, 184, 0.45)";
+    ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("비교할 CSV 파일을 업로드하면 0~100초 구간 중첩 그래프가 표시됩니다.", margin.left + plotW / 2, margin.top + plotH / 2);
+    return;
+  }
+
+  // 7) 순수 계단형(Step-after) 라인 및 정점 동그라미 렌더링
+  activeOverlaySeries.filter(s => s.visible).forEach(s => {
+    const segs = type === "score" ? s.scoreSegments : s.apmSegments;
+    if (!segs || segs.length === 0) return;
+
+    ctx.strokeStyle = s.color;
+    ctx.fillStyle = s.color;
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash(s.dash || []);
+
+    // 7-1) 계단형 선 그리기
+    ctx.beginPath();
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const x1 = getX(seg.start);
+      const x2 = getX(seg.end);
+      const y = getY(seg.value);
+
+      if (i === 0) {
+        ctx.moveTo(x1, y);
+      } else {
+        ctx.lineTo(x1, y);
+      }
+      ctx.lineTo(x2, y);
+    }
+    ctx.stroke();
+
+    // 7-2) 정점 원형 마커 그리기
+    ctx.setLineDash([]);
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const x1 = getX(seg.start);
+      const y = getY(seg.value);
+
+      ctx.beginPath();
+      ctx.arc(x1, y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (i === segs.length - 1) {
+        const x2 = getX(seg.end);
+        ctx.beginPath();
+        ctx.arc(x2, y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  });
+
+  // 8) 마우스 호버 가이드라인
+  if (hoveredOverlayTime !== null && hoveredOverlayTime >= 0 && hoveredOverlayTime <= maxTime) {
+    const hoverX = getX(hoveredOverlayTime);
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.75)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(hoverX, margin.top);
+    ctx.lineTo(hoverX, margin.top + plotH);
+    ctx.stroke();
+  }
+}
+
+function redrawOverlayCharts() {
+  drawOverlayStepChart("overlayScoreCanvas", "score");
+  drawOverlayStepChart("overlayApmCanvas", "apm");
+}
+
+function renderOverlayComparison() {
+  activeOverlaySeries = buildOverlaySeries();
+  renderOverlayChips();
+  redrawOverlayCharts();
+
+  if (!overlayEventsInitialized) {
+    setupOverlayChartEvents();
+    overlayEventsInitialized = true;
+  }
+}
+
+// 호버 십자선 동기화 및 툴팁 인터랙션 등록
+function setupOverlayChartEvents() {
+  const canvasScore = document.getElementById("overlayScoreCanvas");
+  const canvasApm = document.getElementById("overlayApmCanvas");
+  const tooltipScore = document.getElementById("overlayScoreTooltip");
+  const tooltipApm = document.getElementById("overlayApmTooltip");
+
+  function bindHover(canvas, tooltip, type) {
+    if (!canvas || !tooltip) return;
+
+    canvas.addEventListener("mousemove", e => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const margin = { top: 38, right: 30, bottom: 48, left: 65 };
+      const plotW = rect.width - margin.left - margin.right;
+      const roundDurationInput = document.getElementById("overlayRoundDuration");
+      const maxTime = (roundDurationInput ? parseFloat(roundDurationInput.value) : 100) || 100;
+
+      if (mouseX >= margin.left && mouseX <= margin.left + plotW) {
+        hoveredOverlayTime = ((mouseX - margin.left) / plotW) * maxTime;
+        hoveredOverlayTime = Math.max(0, Math.min(maxTime, hoveredOverlayTime));
+
+        let tooltipHtml = `<div class="chart-tooltip-header">⏱️ ${hoveredOverlayTime.toFixed(1)}초 지점</div><div class="chart-tooltip-body">`;
+        let hasData = false;
+
+        activeOverlaySeries.filter(s => s.visible).forEach(s => {
+          const segs = type === "score" ? s.scoreSegments : s.apmSegments;
+          const match = segs.find(seg => hoveredOverlayTime >= seg.start && hoveredOverlayTime <= seg.end);
+          if (match) {
+            hasData = true;
+            const valStr = type === "score" ? `${match.value.toFixed(1)} 점/초` : `${Math.round(match.value)} APM`;
+            tooltipHtml += `
+              <div style="display:flex;align-items:center;gap:6px;margin:3px 0;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${s.color};"></span>
+                <span>${s.label}: <strong>${valStr}</strong></span>
+              </div>
+            `;
+          }
+        });
+        tooltipHtml += `</div>`;
+
+        if (hasData) {
+          tooltip.style.display = "block";
+          tooltip.style.left = mouseX + "px";
+          tooltip.style.top = mouseY + "px";
+          tooltip.innerHTML = tooltipHtml;
+        } else {
+          tooltip.style.display = "none";
+        }
+      } else {
+        hoveredOverlayTime = null;
+        tooltip.style.display = "none";
+      }
+
+      redrawOverlayCharts();
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      hoveredOverlayTime = null;
+      tooltip.style.display = "none";
+      redrawOverlayCharts();
+    });
+  }
+
+  bindHover(canvasScore, tooltipScore, "score");
+  bindHover(canvasApm, tooltipApm, "apm");
+
+  // 1판 기준 시간 변경 리스너
+  const roundDurationInput = document.getElementById("overlayRoundDuration");
+  if (roundDurationInput) {
+    roundDurationInput.addEventListener("change", () => {
+      renderOverlayComparison();
+    });
+  }
+
+  // 구간 계산 기준 변경 리스너
+  const intervalModeSelect = document.getElementById("overlayIntervalMode");
+  if (intervalModeSelect) {
+    intervalModeSelect.addEventListener("change", () => {
+      renderOverlayComparison();
+    });
+  }
+
+  // View 5 PDF 인쇄 버튼
+  const printView5Btn = document.getElementById("printView5Btn");
+  if (printView5Btn) {
+    printView5Btn.addEventListener("click", () => {
+      window.print();
+    });
+  }
+
+  // View 5 PNG 이미지 저장 버튼
+  const imgView5Btn = document.getElementById("imgView5Btn");
+  if (imgView5Btn) {
+    imgView5Btn.addEventListener("click", () => {
+      if (typeof captureCardToImage === "function") {
+        captureCardToImage("view5Section", "View5_MultiUser_Overlay");
+      }
+    });
+  }
 }

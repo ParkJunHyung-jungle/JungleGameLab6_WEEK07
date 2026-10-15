@@ -78,8 +78,17 @@ namespace KeyboardModeling
         [Header("Audio")]
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _pressSound;
+        [SerializeField] private FmodSwitchSound _fmodSwitchSound;
         private GameSettings _gameSettings;
 
+        private enum FmodSwitchSound
+        {
+            Disabled,
+            Blue,
+            Brown,
+            Sans,
+            Red
+        }
 
         public bool InputEnabled
         {
@@ -263,14 +272,25 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// health에 저장된 재질별 눌림음을 재생하고 미지정이면 키보드 기본 클립을 사용한다.
-        /// 파괴된 키캡은 볼륨을 5%로 낮추며 체력과 입력 상태는 변경하지 않는다.
+        /// 선택한 FMOD 스위치 이벤트를 키보드 위치에서 AudioManager로 재생한다.
+        /// 그 외에는 health의 재질별 눌림음이나 기본 클립을 사용하며 파괴된 키캡의 볼륨을 5%로 낮춘다.
         /// </summary>
         private void PlayPressSound(KeycapHealth health)
         {
-            AudioClip clip = health != null && health.PressSound != null ? health.PressSound : _pressSound;
+            if (_fmodSwitchSound != FmodSwitchSound.Disabled)
+            {
+                var sound = _fmodSwitchSound switch
+                {
+                    FmodSwitchSound.Brown => FMODEvents.instance.BrownSwitch,
+                    FmodSwitchSound.Sans => FMODEvents.instance.SansSwitch,
+                    FmodSwitchSound.Red => FMODEvents.instance.RedSwitch,
+                    _ => FMODEvents.instance.BlueSwitch
+                };
+                AudioManager.instance.PlayOneShot(sound, transform.position);
+                return;
+            }
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
-            _audioSource.PlayOneShot(clip, volume);
+            _audioSource.PlayOneShot(_pressSound, volume);
         }
 
         /// <summary>

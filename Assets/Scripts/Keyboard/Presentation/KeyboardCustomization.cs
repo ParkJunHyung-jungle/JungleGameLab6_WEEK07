@@ -43,11 +43,16 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
     [SerializeField] private SwitchType _switchType = SwitchType.Red;
 
+    [Header("Plate")]
+    [SerializeField] private KeyboardPlate _plate;
+    [SerializeField] private PlateType _plateType = PlateType.Brass;
+
     void OnEnable()
     {
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
         if (_switches.Length > 0) SetSwitchType(_switchType);
+        if (_plate != null) SetPlateType(_plateType);
         if (_ledRenderer != null)
         {
             ApplyLED();
@@ -89,6 +94,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
         if (_switches.Length > 0) SetSwitchType(_switchType);
+        if (_plate != null) SetPlateType(_plateType);
         if (!Application.IsPlaying(gameObject))
         {
             EditorUtility.SetDirty(this);
@@ -122,12 +128,30 @@ public sealed class KeyboardCustomization : MonoBehaviour
                     PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
                 }
             }
+
+            if (_plate != null)
+            {
+                MeshRenderer renderer = _plate.GetComponent<MeshRenderer>();
+                EditorUtility.SetDirty(renderer);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
+            }
         }
 
         EditorApplication.QueuePlayerLoopUpdate();
         SceneView.RepaintAll();
     }
 #endif
+
+    /// <summary>
+    /// type 입력을 Plate 컴포넌트에 전달해 재질을 변경한다.
+    /// 성공 여부를 반환하며 성공할 때만 현재 선택 타입을 저장한다.
+    /// </summary>
+    public bool SetPlateType(PlateType type)
+    {
+        if (_plate == null || !_plate.ChangePlate(type)) return false;
+        _plateType = type;
+        return true;
+    }
 
     /// <summary>
     /// type 입력을 모든 축 컴포넌트에 전달해 외형과 사운드 선택을 일괄 변경한다.

@@ -264,6 +264,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1264139386206111033, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: _fmodSwitchSound
+      value: 4
+      objectReference: {fileID: 0}
     - target: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
       propertyPath: m_Name
       value: Keyboard_Customize_Test
@@ -364,6 +368,20 @@ MonoBehaviour:
       Data3: 450794891
       Data4: 1324151617
     Path: event:/SFX/KeyBoard/Switch/Sans
+  <RedSwitch>k__BackingField:
+    Guid:
+      Data1: 191871004
+      Data2: 1185196984
+      Data3: 302908047
+      Data4: -2044697214
+    Path: event:/SFX/KeyBoard/Switch/Red
+  <BreakKeyCap>k__BackingField:
+    Guid:
+      Data1: -715810010
+      Data2: 1209485294
+      Data3: -1633832268
+      Data4: -29979577
+    Path: event:/SFX/KeyBoard/KeyCaps/BreakKeyCap
 --- !u!114 &1383630399
 MonoBehaviour:
   m_ObjectHideFlags: 0

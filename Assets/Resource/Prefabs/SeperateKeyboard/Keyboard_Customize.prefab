@@ -34531,7 +34531,7 @@ GameObject:
   - component: {fileID: 4484957135179497554}
   - component: {fileID: 3967785068815222441}
   m_Layer: 0
-  m_Name: Keyboard_Customize_Test
+  m_Name: Keyboard_Customize
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -86,7 +86,8 @@ namespace KeyboardModeling
             Disabled,
             Blue,
             Brown,
-            Sans
+            Sans,
+            Red
         }
 
         public bool InputEnabled
@@ -282,6 +283,7 @@ namespace KeyboardModeling
                 {
                     FmodSwitchSound.Brown => FMODEvents.instance.BrownSwitch,
                     FmodSwitchSound.Sans => FMODEvents.instance.SansSwitch,
+                    FmodSwitchSound.Red => FMODEvents.instance.RedSwitch,
                     _ => FMODEvents.instance.BlueSwitch
                 };
                 AudioManager.instance.PlayOneShot(sound, transform.position);

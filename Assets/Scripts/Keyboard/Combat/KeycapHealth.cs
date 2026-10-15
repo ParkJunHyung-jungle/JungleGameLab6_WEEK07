@@ -132,7 +132,8 @@ public sealed class KeycapHealth : MonoBehaviour
 
     /// <summary>
     /// 파괴 효과 설정을 사용해 키캡을 파괴 상태로 변경하고 Renderer와 Collider를 끈다.
-    /// Broken 이벤트로 이 키캡을 한 번 알린 뒤 풀링된 파괴 효과를 재생한다.
+    /// Broken 이벤트로 이 키캡을 한 번 알리고 키캡 위치에서 파괴음과 풀링된 파괴 효과를 재생한다.
+    /// FMODEvents가 있는 씬은 BreakKeyCap을 AudioManager로 재생하며 그 외에는 기존 파괴음을 사용한다.
     /// </summary>
     private void Break()
     {
@@ -141,7 +142,10 @@ public sealed class KeycapHealth : MonoBehaviour
         foreach (Collider collider in _colliders) collider.enabled = false;
         Broken?.Invoke(this);
 
-        if (_audioSource != null) _audioSource.PlayOneShot(_breakSound);
+        if (FMODEvents.instance != null)
+            AudioManager.instance.PlayOneShot(FMODEvents.instance.BreakKeyCap, transform.position);
+        else if (_audioSource != null)
+            _audioSource.PlayOneShot(_breakSound);
 
         GameObject prefab = _breakMode == BreakMode.Fragments ? _fragmentsPrefab : _particlesPrefab;
         KeycapBreakEffectPool.PlayEffect(prefab, transform.position, transform.rotation, transform.lossyScale, _fragmentSpeed, _upwardSpeed, _fragmentSpin, _effectLifetime);

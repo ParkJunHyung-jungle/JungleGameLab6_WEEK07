@@ -7,6 +7,8 @@ public class FMODEvents : MonoBehaviour
     [field: SerializeField] public EventReference BlueSwitch { get; private set; }
     [field: SerializeField] public EventReference BrownSwitch { get; private set; }
     [field: SerializeField] public EventReference SansSwitch { get; private set; }
+    [field: SerializeField] public EventReference RedSwitch { get; private set; }
+    [field: SerializeField] public EventReference BreakKeyCap { get; private set; }
 
 
     public static FMODEvents instance { get; private set; }

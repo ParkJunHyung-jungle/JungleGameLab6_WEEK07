@@ -564,6 +564,20 @@ MonoBehaviour:
       Data3: 450794891
       Data4: 1324151617
     Path: event:/SFX/KeyBoard/Switch/Sans
+  <RedSwitch>k__BackingField:
+    Guid:
+      Data1: 191871004
+      Data2: 1185196984
+      Data3: 302908047
+      Data4: -2044697214
+    Path: event:/SFX/KeyBoard/Switch/Red
+  <BreakKeyCap>k__BackingField:
+    Guid:
+      Data1: -715810010
+      Data2: 1209485294
+      Data3: -1633832268
+      Data4: -29979577
+    Path: event:/SFX/KeyBoard/KeyCaps/BreakKeyCap
 --- !u!114 &985836980
 MonoBehaviour:
   m_ObjectHideFlags: 0

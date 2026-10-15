@@ -381,21 +381,6 @@ public class KeyboardInteractionController : MonoBehaviour
     }
 
     /// <summary>
-    /// prefab 키보드를 outputPoint 위치에 생성하고 월드 집기 상태로 등록한다.
-    /// prefab의 원래 크기와 outputPoint의 위치·회전을 사용하며 등록된 키보드 상태를 반환한다.
-    /// </summary>
-    public KeyboardState SpawnDispenserKeyboard(GameObject prefab, Transform outputPoint)
-    {
-        GameObject instance = Instantiate(prefab, outputPoint.position, outputPoint.rotation, _spawnRoot);
-        instance.name = $"{prefab.name}_Dispenser_{SpawnedKeyboardCount + 1}";
-        instance.transform.localScale = prefab.transform.localScale;
-
-        KeyboardState keyboard = RegisterKeyboard(instance);
-        SpawnedKeyboardCount++;
-        return keyboard;
-    }
-
-    /// <summary>
     /// Inspector에 설정한 주먹 및 망치 이미지, 크기, 이동과 타격 설정을 destruction에 전달한다.
     /// 일반 키보드와 자동 작업대 키보드의 파괴 연출 설정을 동일하게 변경한다.
     /// </summary>
@@ -1026,7 +1011,7 @@ public class KeyboardInteractionController : MonoBehaviour
     }
     /// <summary>
     /// 현재 손 상태와 중앙 조준 결과로 한 번의 클릭 동작을 처리한다.
-    /// 자판기 구매, 상자 보관과 꺼내기 또는 키보드 집기 상태를 변경한다.
+    /// 자판기 키보드 배출, 상자 보관과 꺼내기 또는 키보드 집기 상태를 변경한다.
     /// </summary>
     private void HandleWorldInteraction()
     {
@@ -1041,7 +1026,12 @@ public class KeyboardInteractionController : MonoBehaviour
             KeyboardDispenser dispenser = hit.collider.GetComponentInParent<KeyboardDispenser>();
             if (dispenser != null)
             {
-                dispenser.TryPurchase(this, _gameSession);
+                if (dispenser.TryDispense(out GameObject keyboardRoot))
+                {
+                    keyboardRoot.transform.SetParent(_spawnRoot, true);
+                    RegisterKeyboard(keyboardRoot);
+                    SpawnedKeyboardCount++;
+                }
                 return;
             }
 

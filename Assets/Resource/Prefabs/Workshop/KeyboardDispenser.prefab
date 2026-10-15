@@ -678,7 +678,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardDispenser
   _keyboardPrefabs:
   - {fileID: 6004080589864425764, guid: 8864b463991158c42bdd2215fcb33c48, type: 3}
-  _purchaseCost: 0
   _outputPoint: {fileID: 4295207499575152616}
   _ejectImpulse: 1.5
 --- !u!1 &6318645693137856959

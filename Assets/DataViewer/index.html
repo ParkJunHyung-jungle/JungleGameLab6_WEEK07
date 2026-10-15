@@ -20,8 +20,8 @@
       </div>
       <div class="header-actions">
         <span class="badge" id="summaryTotal">총 입력: 0회</span>
-        <button type="button" class="pdf-btn pdf-btn-primary" id="printAllViewsBtn" title="View 2, 3, 4를 모두 포함하여 PDF로 인쇄/저장합니다">
-          🖨️ View 2·3·4 통합 PDF
+        <button type="button" class="pdf-btn pdf-btn-primary" id="printAllViewsBtn" title="View 2, 3, 4, 5를 모두 포함하여 PDF로 인쇄/저장합니다">
+          🖨️ View 2·3·4·5 통합 PDF
         </button>
         <button type="button" class="img-btn img-btn-primary" id="imgAllViewsBtn" title="View 2, 3, 4 이미지를 순차적으로 모두 저장합니다">
           🖼️ 전체 이미지 저장
@@ -264,6 +264,77 @@
       <div class="chart-container" id="chartContainer">
         <canvas id="timelineCanvas"></canvas>
         <div class="chart-tooltip" id="chartTooltip" style="display: none;"></div>
+      </div>
+    </section>
+
+    <!-- View 5: 같은 구간의 획득 점수 속도 & 콤보 이벤트 구간별 APM 중첩 비교 (Multi-User Overlay) -->
+    <section class="card overlay-comparison-card" id="view5Section">
+      <div class="card-title">
+        <div class="title-with-badge">
+          <span>View 5. 같은 구간의 획득 점수 속도 & 콤보 이벤트 구간별 APM 중첩 비교 (Multi-User Overlay)</span>
+          <span class="badge" id="overlaySeriesCountBadge">0개 파일 로드됨</span>
+        </div>
+        <div class="card-title-actions">
+          <button type="button" class="pdf-btn" id="printView5Btn" title="View 5를 PDF로 인쇄/저장합니다">
+            📄 View 5 PDF
+          </button>
+          <button type="button" class="img-btn" id="imgView5Btn" title="View 5 차트를 고해상도 PNG 이미지로 저장합니다">
+            🖼️ View 5 이미지
+          </button>
+        </div>
+      </div>
+
+      <div class="card-desc">
+        서로 다른 파일(사용자)과 100초 기준 다회차 플레이 데이터를 0~100초 동일 시간 축에 계단형(Step)으로 겹쳐서 비교합니다.
+      </div>
+
+      <!-- View 5 설정 툴바 -->
+      <div class="overlay-toolbar">
+        <div class="overlay-option-group">
+          <label for="overlayRoundDuration">1판 기준 시간:</label>
+          <input type="number" id="overlayRoundDuration" value="100" min="10" max="600" class="overlay-number-input">
+          <span>초</span>
+        </div>
+
+        <div class="overlay-option-group">
+          <label for="overlayIntervalMode">구간 계산 기준:</label>
+          <select id="overlayIntervalMode" class="overlay-select">
+            <option value="auto" selected>자동 (10초 균등 윈도우 / 콤보 구간)</option>
+            <option value="window_10">10초 균등 윈도우 집계</option>
+            <option value="window_5">5초 정밀 윈도우 집계</option>
+            <option value="combo">CSV 기록 콤보 구간 (IntervalSummary)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 로드된 시리즈 (사용자/회차) 칩 목록 -->
+      <div class="overlay-series-chips-wrapper">
+        <span class="overlay-chips-label">비교 시리즈 (클릭하여 선 표시/숨김 토글):</span>
+        <div class="overlay-series-chips" id="overlaySeriesChips"></div>
+      </div>
+
+      <!-- 서브 차트 1: 같은 구간의 획득 점수 속도 (image1.png 디자인 1:1 재현) -->
+      <div class="overlay-chart-box">
+        <div class="overlay-chart-header">
+          <h3 class="overlay-chart-title">같은 구간의 획득 점수 속도</h3>
+          <span class="overlay-chart-subtitle">X축: 스테이지 시작 후 시간 (초) | Y축: 획득 점수 (점/초)</span>
+        </div>
+        <div class="overlay-canvas-wrapper" id="overlayScoreWrapper">
+          <canvas id="overlayScoreCanvas"></canvas>
+          <div class="chart-tooltip" id="overlayScoreTooltip" style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- 서브 차트 2: 콤보 이벤트 구간별 APM (Image2.png 디자인 1:1 재현) -->
+      <div class="overlay-chart-box">
+        <div class="overlay-chart-header">
+          <h3 class="overlay-chart-title">콤보 이벤트 구간별 APM</h3>
+          <span class="overlay-chart-subtitle">X축: 스테이지 시작 후 시간 (초) | Y축: 입력 속도 (APM)</span>
+        </div>
+        <div class="overlay-canvas-wrapper" id="overlayApmWrapper">
+          <canvas id="overlayApmCanvas"></canvas>
+          <div class="chart-tooltip" id="overlayApmTooltip" style="display: none;"></div>
+        </div>
       </div>
     </section>
   </div>

@@ -287,10 +287,8 @@ namespace KeyboardModeling
                 AudioManager.instance.PlayOneShot(sound, transform.position);
                 return;
             }
-
-            AudioClip clip = health != null && health.PressSound != null ? health.PressSound : _pressSound;
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
-            _audioSource.PlayOneShot(clip, volume);
+            _audioSource.PlayOneShot(_pressSound, volume);
         }
 
         /// <summary>

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 
+using Game.Tournament;
 using KeyboardModeling;
 
 namespace Game.Logging
@@ -22,6 +24,18 @@ namespace Game.Logging
         private readonly Dictionary<Key, long> _downCounts = new Dictionary<Key, long>();
         private readonly Dictionary<Key, int> _sampledFrames = new Dictionary<Key, int>();
         private readonly HashSet<Key> _blocked = new HashSet<Key>();
+        private readonly Dictionary<KeyboardInputController, KeyboardState> _keyboards = new Dictionary<KeyboardInputController, KeyboardState>();
+        private readonly ConditionalWeakTable<KeyboardInputController, KeyboardState> _effectContexts = new ConditionalWeakTable<KeyboardInputController, KeyboardState>();
+        private KeyboardInputController _processingKeyboard;
+        private GameManager _battleSource;
+        private int _playerSpawnIndex;
+        private int _enemySpawnIndex;
+        private TournamentController _shopSource;
+        private string _shopVisitId;
+        private string _shopRunId;
+        private int _shopRound;
+        private string _shopBattleKind;
+        private double _shopStart;
         private PlaytestCsvWriter _writer;
         private PlaytestStageRecorder _stages;
         private Keyboard _device;
@@ -77,6 +91,11 @@ namespace Game.Logging
             GameManager.PlaytestRoundStarted += HandleRoundStarted;
             GameManager.PlaytestRoundEnded += HandleRoundEnded;
             GameManager.PlaytestLogFolderRequested += OpenLogFolder;
+            GameManager.PlaytestKeyboardReady += HandleKeyboardReady;
+            TournamentController.PlaytestShopStateChanged += HandleShopState;
+            TournamentController.PlaytestInventorySnapshotRequested += HandleInventorySnapshot;
+            TournamentController.PlaytestShopAction += HandleShopAction;
+            TournamentKeyboardEffects.PlaytestEffectObserved += HandleSpecialEffect;
             KeyboardInputController.PlaytestKeyProcessing += HandleKeyProcessing;
             InputSystem.onDeviceChange += HandleDeviceChange;
             _writer.Flush();
@@ -218,7 +237,9 @@ namespace Game.Logging
         {
             if (_closed || !SynchronizeFocus()) return;
             SynchronizeDevice();
-            if (_device != null) SampleKey(_device[key]);
+            _processingKeyboard = keyboard;
+            try { if (_device != null) SampleKey(_device[key]); }
+            finally { _processingKeyboard = null; }
         }
 
         /// <summary>
@@ -259,6 +280,8 @@ namespace Game.Logging
             double now = Time.realtimeSinceStartupAsDouble;
             PlaytestRecord row = new PlaytestRecord("KeyInput", now);
             _stages.AddStageContext(row);
+            GameManager source = GameManager.Instance;
+            if (source != null) PlaytestStageRecorder.AddTournamentContext(row, source.PlaytestTournament);
             row.Set(PlaytestColumn.Key, key.ToString());
             row.Set(PlaytestColumn.Event, down ? "Down" : "Up");
             if (down)
@@ -266,6 +289,7 @@ namespace Game.Logging
                 long count = _downCounts.TryGetValue(key, out long previous) ? previous + 1 : 1;
                 _downCounts[key] = count;
                 row.Set(PlaytestColumn.KeyDownCount, count);
+                AddTargetContext(row, key);
                 long sequence = _writer.Write(row);
                 _tracked.Add(key, new PressState(sequence, now));
                 _stages.AddDown();
@@ -296,7 +320,249 @@ namespace Game.Logging
         /// source에서 시작한 실제 대결을 CSV 집계기에 전달한다.
         /// 새 실행 식별자와 시작 스냅샷을 준비한다.
         /// </summary>
-        private void HandleRoundStarted(GameManager source) { if (!_closed) _stages.Begin(source); }
+        private void HandleRoundStarted(GameManager source)
+        {
+            if (_closed) return;
+            _keyboards.Clear();
+            _battleSource = source;
+            _playerSpawnIndex = 0;
+            _enemySpawnIndex = 0;
+            _stages.Begin(source);
+        }
+
+        /// <summary>
+        /// source에서 등장 완료된 keyboard를 isEnemy 소유자의 새 키보드로 기록한다.
+        /// 실제 대전 ID는 유지하고 소유자별 생성 순번 및 체력 매핑만 저장한다.
+        /// </summary>
+        private void HandleKeyboardReady(GameManager source, GameObject keyboard, bool isEnemy)
+        {
+            if (_closed || source != _battleSource || !_stages.IsActive) return;
+            KeyboardInputController input = keyboard.GetComponent<KeyboardInputController>();
+            if (_keyboards.ContainsKey(input)) return;
+            int index = isEnemy ? ++_enemySpawnIndex : ++_playerSpawnIndex;
+            PlaytestRecord row = new PlaytestRecord("KeyboardSpawn", Time.realtimeSinceStartupAsDouble);
+            _stages.AddStageContext(row);
+            row.Set(PlaytestColumn.Phase, "Battle");
+            row.Set(PlaytestColumn.Owner, isEnemy ? "Enemy" : "Player");
+            KeyboardState state = new KeyboardState(input, index, row);
+            _keyboards.Add(input, state);
+            _effectContexts.Remove(input);
+            _effectContexts.Add(input, state);
+            state.AddContext(row);
+            _writer.Write(row);
+            TournamentKeyboardEffects effects = keyboard.GetComponent<TournamentKeyboardEffects>();
+            if (effects != null) WriteKeyboardLayout(state, effects);
+            _writer.Flush();
+        }
+
+        /// <summary>
+        /// state가 식별하는 실제 키보드의 effects 배치를 키별 상세 행으로 기록한다.
+        /// 기본 키와 기믹 유형 및 행열 좌표를 읽으며 배치 난수나 게임 상태는 변경하지 않는다.
+        /// </summary>
+        private void WriteKeyboardLayout(KeyboardState state, TournamentKeyboardEffects effects)
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            string snapshotId = Guid.NewGuid().ToString("N");
+            foreach (KeyValuePair<Key, KeycapHealth> binding in state.Layout)
+            {
+                PlaytestRecord row = new PlaytestRecord("KeyboardLayout", now);
+                state.AddBattleContext(row);
+                Vector2Int coordinate = effects.GetPlaytestCoordinates(binding.Value);
+                row.Set(PlaytestColumn.SnapshotId, snapshotId);
+                row.Set(PlaytestColumn.Key, binding.Key.ToString());
+                row.Set(PlaytestColumn.SpecialType, effects.GetPlaytestType(binding.Value).ToString());
+                row.Set(PlaytestColumn.LayoutRow, coordinate.x);
+                row.Set(PlaytestColumn.LayoutColumn, coordinate.y);
+                _writer.Write(row);
+            }
+        }
+
+        /// <summary>
+        /// source의 보유 구성을 reason 시점의 양측 스냅샷으로 기록한다.
+        /// 대전 시작에만 활성 대전 식별자를 붙이고 초기화 전 실제 수량과 재화를 읽는다.
+        /// </summary>
+        private void HandleInventorySnapshot(TournamentController source, string reason)
+        {
+            if (_closed) return;
+            WriteInventory(source, source.Inventory, "Player", reason, Guid.NewGuid().ToString("N"));
+            WriteInventory(source, source.PlaytestEnemyInventory, "Enemy", reason, Guid.NewGuid().ToString("N"));
+            _writer.Flush();
+        }
+
+        /// <summary>
+        /// inventory의 기본 및 기믹별 수량을 owner와 reason 및 snapshotId로 묶어 기록한다.
+        /// source의 실제 재화와 용량을 복사하며 보유 상태를 변경하지 않는다.
+        /// </summary>
+        private void WriteInventory(TournamentController source, TournamentInventory inventory, string owner,
+            string reason, string snapshotId)
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            for (int type = 0; type <= (int)SpecialKeycapType.All; type++)
+            {
+                PlaytestRecord row = new PlaytestRecord("InventorySnapshot", now);
+                if (reason == "BattleStart") _stages.AddStageContext(row);
+                PlaytestStageRecorder.AddTournamentContext(row, source);
+                if (reason == "TournamentStart")
+                {
+                    row.Set(PlaytestColumn.Phase, "Preparing");
+                    row.Set(PlaytestColumn.BattleKind, "TimedRound");
+                }
+                row.Set(PlaytestColumn.SnapshotId, snapshotId);
+                row.Set(PlaytestColumn.Action, reason);
+                row.Set(PlaytestColumn.Owner, owner);
+                row.Set(PlaytestColumn.SpecialType, ((SpecialKeycapType)type).ToString());
+                row.Set(PlaytestColumn.Quantity, type == 0 ? Mathf.Max(0, inventory.Capacity - inventory.Total)
+                    : inventory.GetCount((SpecialKeycapType)type));
+                row.Set(PlaytestColumn.InventoryCapacity, inventory.Capacity);
+                row.Set(PlaytestColumn.InventoryTotal, inventory.Total);
+                row.Set(PlaytestColumn.CurrencyAfter, source.Currency);
+                if (ReferenceEquals(source, _shopSource)) row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
+                _writer.Write(row);
+            }
+        }
+
+        /// <summary>
+        /// source의 확정된 상점 관찰값 observation을 슬롯과 거래 식별자로 기록한다.
+        /// 구매 확정에만 최종 보유 스냅샷을 연결하고 선택과 취소는 재화 지출로 계산하지 않는다.
+        /// </summary>
+        private void HandleShopAction(TournamentController source, TournamentShopObservation observation)
+        {
+            if (_closed) return;
+            PlaytestRecord row = new PlaytestRecord("ShopAction", Time.realtimeSinceStartupAsDouble);
+            PlaytestStageRecorder.AddTournamentContext(row, source);
+            if (ReferenceEquals(source, _shopSource)) row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
+            row.Set(PlaytestColumn.ShopTransactionId, observation.TransactionId);
+            row.Set(PlaytestColumn.Action, observation.Action);
+            row.Set(PlaytestColumn.Owner, "Player");
+            if (observation.Slot >= 0) row.Set(PlaytestColumn.OfferSlot, observation.Slot);
+            row.Set(PlaytestColumn.OfferGeneration, observation.Generation);
+            if (observation.Action != "Reroll") row.Set(PlaytestColumn.SpecialType, observation.Type.ToString());
+            row.Set(PlaytestColumn.Quantity, observation.Quantity);
+            row.Set(PlaytestColumn.Price, observation.Price);
+            row.Set(PlaytestColumn.CurrencyBefore, observation.CurrencyBefore);
+            row.Set(PlaytestColumn.CurrencyAfter, observation.CurrencyAfter);
+            row.Set(PlaytestColumn.IsConfirmed, observation.Confirmed);
+            string snapshotId = observation.Action == "PurchaseConfirmed" ? Guid.NewGuid().ToString("N") : null;
+            if (snapshotId != null) row.Set(PlaytestColumn.SnapshotId, snapshotId);
+            _writer.Write(row);
+            if (snapshotId != null) WriteInventory(source, source.Inventory, "Player", "PurchaseConfirmed", snapshotId);
+            _writer.Flush();
+        }
+
+        /// <summary>
+        /// source의 key에서 관찰한 type 기믹 상태를 action과 reason 및 effectId로 기록한다.
+        /// 원래 키보드의 대전 식별자를 유지하며 파괴, 대기, 발동과 취소를 구분한다.
+        /// </summary>
+        private void HandleSpecialEffect(TournamentKeyboardEffects source, Key key, SpecialKeycapType type,
+            string action, string reason, string effectId)
+        {
+            if (_closed || !_effectContexts.TryGetValue(source.PlaytestKeyboard, out KeyboardState state)) return;
+            PlaytestRecord row = new PlaytestRecord("SpecialKeycapEvent", Time.realtimeSinceStartupAsDouble);
+            state.AddBattleContext(row);
+            if (source.PlaytestTournament != null)
+                row.Set(PlaytestColumn.Phase, source.PlaytestTournament.Phase.ToString());
+            row.Set(PlaytestColumn.Key, key.ToString());
+            row.Set(PlaytestColumn.SpecialType, type.ToString());
+            row.Set(PlaytestColumn.Action, action);
+            row.Set(PlaytestColumn.EndReason, reason);
+            row.Set(PlaytestColumn.EffectId, effectId);
+            _writer.Write(row);
+        }
+
+        /// <summary>
+        /// key의 Down 직전 실제 키캡 상태와 입력 가능 여부를 row에 저장한다.
+        /// 처음 파괴한 입력과 메뉴 및 교체 중 입력은 재입력 횟수에서 제외한다.
+        /// </summary>
+        private void AddTargetContext(PlaytestRecord row, Key key)
+        {
+            GameManager source = GameManager.Instance;
+            if (source == null || source != _battleSource || !_stages.IsActive || !source.IsTimerRunning)
+            {
+                row.Set(PlaytestColumn.InputState, "NotInBattle");
+                return;
+            }
+            GameObject active = source.ActiveKeyboard;
+            KeyboardInputController input = active != null ? active.GetComponent<KeyboardInputController>() : null;
+            if (input == null || !_keyboards.TryGetValue(input, out KeyboardState state))
+            {
+                row.Set(PlaytestColumn.InputState, "KeyboardReplacing");
+                return;
+            }
+            state.AddContext(row);
+            row.Set(PlaytestColumn.Owner, "Player");
+            if (!_stages.CanCountDown())
+                row.Set(PlaytestColumn.InputState, "Menu");
+            else if (!input.isActiveAndEnabled || !input.InputEnabled)
+                row.Set(PlaytestColumn.InputState, "InputDisabled");
+            else if (_processingKeyboard != null && _processingKeyboard != input)
+                row.Set(PlaytestColumn.InputState, "OtherKeyboard");
+            else if (!state.Layout.TryGetValue(key, out KeycapHealth health) || health == null)
+                row.Set(PlaytestColumn.InputState, "Unmapped");
+            else
+            {
+                bool broken = health.CurrentHP <= 0;
+                row.Set(PlaytestColumn.InputState, broken ? "Broken" : "Alive");
+                row.Set(PlaytestColumn.WasBroken, broken);
+                if (!broken) return;
+                long count = state.BrokenCounts.TryGetValue(key, out long previous) ? previous + 1 : 1;
+                state.BrokenCounts[key] = count;
+                row.Set(PlaytestColumn.BrokenKeyDownCount, count);
+                _stages.AddBrokenDown();
+            }
+        }
+
+        /// <summary>
+        /// source의 상점 열림과 닫힘 통지를 reason으로 구분하여 기록한다.
+        /// 폐기 화면 전환은 포함하며 다음 대전 준비 또는 중단 시 체류 시간을 마감한다.
+        /// </summary>
+        private void HandleShopState(TournamentController source, bool isOpen, string reason)
+        {
+            if (_closed) return;
+            if (!isOpen)
+            {
+                if (ReferenceEquals(source, _shopSource)) CloseShop(reason, reason == "NextBattle");
+                return;
+            }
+            if (ReferenceEquals(source, _shopSource)) return;
+            CloseShop("Replaced", false);
+            _shopSource = source;
+            _shopVisitId = Guid.NewGuid().ToString("N");
+            _shopRunId = source.PlaytestRunId;
+            _shopRound = source.Round;
+            _shopBattleKind = source.PlaytestBattleKind;
+            _shopStart = Time.realtimeSinceStartupAsDouble;
+            PlaytestRecord row = new PlaytestRecord("ShopStart", _shopStart);
+            PlaytestStageRecorder.AddTournamentContext(row, source);
+            row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
+            row.Set(PlaytestColumn.StartElapsedSeconds, _shopStart);
+            _writer.Write(row);
+            _writer.Flush();
+        }
+
+        /// <summary>
+        /// 열려 있는 상점의 실제 경과 시간을 reason과 complete로 한 번 마감한다.
+        /// 입력값으로 종료 사유와 완료 여부를 저장하고 상점 추적 상태를 비운다.
+        /// </summary>
+        private void CloseShop(string reason, bool complete)
+        {
+            if (_shopVisitId == null) return;
+            double now = Time.realtimeSinceStartupAsDouble;
+            PlaytestRecord row = new PlaytestRecord("ShopEnd", now);
+            PlaytestStageRecorder.AddTournamentContext(row, _shopSource);
+            row.Set(PlaytestColumn.TournamentRunId, _shopRunId);
+            row.Set(PlaytestColumn.RoundIndex, _shopRound);
+            row.Set(PlaytestColumn.BattleKind, _shopBattleKind);
+            row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
+            row.Set(PlaytestColumn.StartElapsedSeconds, _shopStart);
+            row.Set(PlaytestColumn.EndElapsedSeconds, now);
+            row.Set(PlaytestColumn.DurationSeconds, now - _shopStart);
+            row.Set(PlaytestColumn.EndReason, reason);
+            row.Set(PlaytestColumn.IsComplete, complete);
+            _writer.Write(row);
+            _shopSource = null;
+            _shopVisitId = null;
+            _writer.Flush();
+        }
 
         /// <summary>
         /// source의 reason과 complete 종료 통지를 집계기에 전달한다.
@@ -351,6 +617,11 @@ namespace Game.Logging
             if (_closed) return;
             ReleaseTrackedKeys(reason);
             _stages.Abort(reason);
+            CloseShop(reason, false);
+            GameManager source = GameManager.Instance;
+            TournamentController tournament = source != null ? source.PlaytestTournament : null;
+            if (tournament != null && tournament.Inventory != null && tournament.Result == null)
+                HandleInventorySnapshot(tournament, reason);
             PlaytestRecord row = new PlaytestRecord("SessionEnd", Time.realtimeSinceStartupAsDouble);
             row.Set(PlaytestColumn.EndReason, reason);
             row.Set(PlaytestColumn.IsComplete, complete);
@@ -359,10 +630,61 @@ namespace Game.Logging
             GameManager.PlaytestRoundStarted -= HandleRoundStarted;
             GameManager.PlaytestRoundEnded -= HandleRoundEnded;
             GameManager.PlaytestLogFolderRequested -= OpenLogFolder;
+            GameManager.PlaytestKeyboardReady -= HandleKeyboardReady;
+            TournamentController.PlaytestShopStateChanged -= HandleShopState;
+            TournamentController.PlaytestInventorySnapshotRequested -= HandleInventorySnapshot;
+            TournamentController.PlaytestShopAction -= HandleShopAction;
+            TournamentKeyboardEffects.PlaytestEffectObserved -= HandleSpecialEffect;
             KeyboardInputController.PlaytestKeyProcessing -= HandleKeyProcessing;
             InputSystem.onDeviceChange -= HandleDeviceChange;
             _stages.MenuInputSamplingRequested -= SampleMenuKeys;
             _writer.Close();
+        }
+
+        private sealed class KeyboardState
+        {
+            private readonly string _id = Guid.NewGuid().ToString("N");
+            private readonly int _index;
+            private readonly PlaytestRecord _battleContext;
+            private readonly IReadOnlyDictionary<Key, KeycapHealth> _layout;
+            private readonly Dictionary<Key, long> _brokenCounts = new Dictionary<Key, long>();
+            public IReadOnlyDictionary<Key, KeycapHealth> Layout => _layout;
+            public Dictionary<Key, long> BrokenCounts => _brokenCounts;
+
+            /// <summary>
+            /// input의 실제 키캡 매핑과 index 생성 순번 및 battleContext 입장 문맥을 보관한다.
+            /// 새 키보드의 식별자와 키별 재입력 집계 상태를 생성한다.
+            /// </summary>
+            public KeyboardState(KeyboardInputController input, int index, PlaytestRecord battleContext)
+            {
+                _index = index;
+                _battleContext = battleContext;
+                _layout = input.GetKeycapLayout();
+            }
+
+            /// <summary>
+            /// row에 키보드 식별자와 생성 순번 및 보충 여부를 저장한다.
+            /// 입력 행과 입장 이벤트를 같은 키보드로 연결하며 게임 상태는 변경하지 않는다.
+            /// </summary>
+            public void AddContext(PlaytestRecord row)
+            {
+                row.Set(PlaytestColumn.KeyboardId, _id);
+                row.Set(PlaytestColumn.KeyboardSpawnIndex, _index);
+                row.Set(PlaytestColumn.SpawnKind, _index == 1 ? "Initial" : "Replacement");
+            }
+
+            /// <summary>
+            /// row에 입장 당시 대전과 토너먼트 및 소유자 문맥을 복사한다.
+            /// 지연된 효과가 다음 대전으로 섞이지 않도록 저장한 식별자를 사용한다.
+            /// </summary>
+            public void AddBattleContext(PlaytestRecord row)
+            {
+                AddContext(row);
+                foreach (PlaytestColumn column in new[] { PlaytestColumn.StageId, PlaytestColumn.StageRunId,
+                    PlaytestColumn.TournamentRunId, PlaytestColumn.RoundIndex, PlaytestColumn.BattleKind,
+                    PlaytestColumn.Phase, PlaytestColumn.Owner })
+                    row.Set(column, _battleContext.Values[(int)column]);
+            }
         }
 
         private readonly struct PressState

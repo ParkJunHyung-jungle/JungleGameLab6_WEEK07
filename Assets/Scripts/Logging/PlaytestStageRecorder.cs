@@ -3,6 +3,7 @@ using System;
 using UnityEngine;
 
 using Game.Shop;
+using Game.Tournament;
 
 namespace Game.Logging
 {
@@ -20,6 +21,7 @@ namespace Game.Logging
         private double _intervalStart;
         private long _intervalScore;
         private long _downCount;
+        private long _brokenDownCount;
         private int _intervalIndex;
         private int _intervalCombo;
         private int _previousCombo;
@@ -57,6 +59,7 @@ namespace Game.Logging
             _intervalIndex = 0;
             _intervalCombo = 0;
             _downCount = 0;
+            _brokenDownCount = 0;
             _lastScore = _player != null ? _player.Score : 0L;
             _intervalScore = _lastScore;
             _previousCombo = _player != null ? _player.Combo : 0;
@@ -86,6 +89,22 @@ namespace Game.Logging
             if (!IsActive) return;
             record.Set(PlaytestColumn.StageId, _stageId);
             record.Set(PlaytestColumn.StageRunId, _runId);
+            AddTournamentContext(record, _source.PlaytestTournament);
+            if (_source.PlaytestTournament != null && _source.IsTimerRunning)
+                record.Set(PlaytestColumn.Phase, "Battle");
+        }
+
+        /// <summary>
+        /// tournament의 현재 실행과 대전 번호 및 진행 상태를 record에 복사한다.
+        /// 비토너먼트 모드에서는 해당 열을 비워 두고 게임 상태는 변경하지 않는다.
+        /// </summary>
+        public static void AddTournamentContext(PlaytestRecord record, TournamentController tournament)
+        {
+            if (tournament == null) return;
+            record.Set(PlaytestColumn.TournamentRunId, tournament.PlaytestRunId);
+            record.Set(PlaytestColumn.RoundIndex, tournament.Round);
+            record.Set(PlaytestColumn.BattleKind, tournament.PlaytestBattleKind);
+            record.Set(PlaytestColumn.Phase, tournament.Phase.ToString());
         }
 
         /// <summary>
@@ -94,12 +113,27 @@ namespace Game.Logging
         /// </summary>
         public void AddDown()
         {
-            if (!IsActive || _isClosingMenu) return;
-            foreach (MonitorSettingsAppView menu in _settingsMenus) if (menu != null && menu.IsOpen) return;
-            foreach (ShopView menu in _shops) if (menu != null && menu.IsOpen) return;
-            foreach (KeyboardGoalAppView menu in _goalMenus) if (menu != null && menu.IsOpen) return;
-            _downCount++;
+            if (CanCountDown()) _downCount++;
         }
+
+        /// <summary>
+        /// 현재 실행과 메뉴 상태로 대전 입력 집계 가능 여부를 반환한다.
+        /// 입력값 없이 기존 APM 제외 조건을 재입력 집계에서도 공유한다.
+        /// </summary>
+        public bool CanCountDown()
+        {
+            if (!IsActive || _isClosingMenu) return false;
+            foreach (MonitorSettingsAppView menu in _settingsMenus) if (menu != null && menu.IsOpen) return false;
+            foreach (ShopView menu in _shops) if (menu != null && menu.IsOpen) return false;
+            foreach (KeyboardGoalAppView menu in _goalMenus) if (menu != null && menu.IsOpen) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// 실제 대전에서 관찰한 파괴 위치 재입력 한 건을 가산한다.
+        /// 입력값 없이 현재 대전의 종료 요약에 사용할 누적 횟수를 변경한다.
+        /// </summary>
+        public void AddBrokenDown() { _brokenDownCount++; }
 
         /// <summary>
         /// source의 확정 상태를 reason과 complete에 따라 한 번 마감한다.
@@ -121,6 +155,7 @@ namespace Game.Logging
             row.Set(PlaytestColumn.EnemyScore, enemyScore);
             row.Set(PlaytestColumn.EndReason, reason);
             row.Set(PlaytestColumn.IsComplete, complete);
+            row.Set(PlaytestColumn.BrokenDownCount, _brokenDownCount);
             _writer.Write(row);
             if (_player != null) _player.StateChanged -= ObservePlayerState;
             if (_enemy != null) _enemy.StateChanged -= ObserveEnemyState;

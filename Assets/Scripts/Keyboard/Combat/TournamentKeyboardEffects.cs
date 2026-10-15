@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -5,10 +6,14 @@ using UnityEngine.InputSystem;
 
 using KeyboardModeling;
 
+using Random = UnityEngine.Random;
+
 namespace Game.Tournament
 {
     public sealed class TournamentKeyboardEffects : MonoBehaviour
     {
+        public static event Action<TournamentKeyboardEffects, Key, SpecialKeycapType, string, string, string> PlaytestEffectObserved;
+
         [Header("Runtime")]
         private readonly Queue<int> _pending = new Queue<int>();
         private readonly Dictionary<KeycapHealth, int> _indices = new Dictionary<KeycapHealth, int>();
@@ -19,9 +24,14 @@ namespace Game.Tournament
         private KeyboardFeedbackManager _feedback;
         private KeycapHealth[] _keycaps;
         private SpecialKeycapType[] _types;
+        private Key[] _keys;
+        private string[] _effectIds;
         private Vector2Int[] _coordinates;
         private Vector2[] _positions;
         private KeyboardNeighborLayout _neighbors;
+
+        public KeyboardInputController PlaytestKeyboard => _keyboard;
+        public TournamentController PlaytestTournament => _tournament;
 
         /// <summary>
         /// tournament와 inventory, score 및 layout으로 새 키보드의 체력, 특수 유형과 행열을 구성한다.
@@ -39,6 +49,8 @@ namespace Game.Tournament
             Dictionary<Key, Vector2Int> coordinates = layout.CreateCoordinates();
             _keycaps = new KeycapHealth[bindings.Count];
             _types = new SpecialKeycapType[bindings.Count];
+            _keys = new Key[bindings.Count];
+            _effectIds = new string[bindings.Count];
             _coordinates = new Vector2Int[bindings.Count];
             _positions = new Vector2[bindings.Count];
             List<int> slots = new List<int>();
@@ -46,6 +58,7 @@ namespace Game.Tournament
             foreach (KeyValuePair<Key, KeycapHealth> binding in bindings)
             {
                 _keycaps[index] = binding.Value;
+                _keys[index] = binding.Key;
                 _coordinates[index] = coordinates[binding.Key];
                 Vector3 position = transform.InverseTransformPoint(binding.Value.transform.position);
                 _positions[index] = new Vector2(position.x, position.z);
@@ -69,24 +82,42 @@ namespace Game.Tournament
         private void HandleBroken(KeycapHealth keycap)
         {
             keycap.Broken -= HandleBroken;
-            if (!_tournament.IsBattleActive) return;
             int index = _indices[keycap];
-            if (_types[index] == SpecialKeycapType.Bonus) _score.ActivateBonus(3f);
-            else _pending.Enqueue(index);
+            _effectIds[index] = Guid.NewGuid().ToString("N");
+            ObserveEffect(index, "Broken", "");
+            if (!_tournament.IsBattleActive)
+            {
+                ObserveEffect(index, "Skipped", "BattleInactive");
+                return;
+            }
+            if (_types[index] == SpecialKeycapType.Bonus)
+            {
+                _score.ActivateBonus(3f);
+                ObserveEffect(index, "Activated", "");
+            }
+            else
+            {
+                _pending.Enqueue(index);
+                ObserveEffect(index, "Queued", "");
+            }
         }
 
         void LateUpdate()
         {
-            if (!_tournament.IsBattleActive) { _pending.Clear(); return; }
+            if (!_tournament.IsBattleActive) { CancelPendingEffects("BattleInactive"); return; }
             while (_pending.Count > 0 && !_destruction.IsBroken)
             {
                 int center = _pending.Dequeue();
                 SpecialKeycapType type = _types[center];
                 if (type == SpecialKeycapType.All)
                 {
-                    _feedback.PlayHammerShockwave(_keyboard, _keycaps, _positions, center, ApplyWaveDamage, false, false);
+                    bool started = false;
+                    _feedback.PlayHammerShockwave(_keyboard, _keycaps, _positions, center, ApplyWaveDamage, false, false,
+                        () => { started = true; ObserveEffect(center, "Activated", ""); });
+                    if (!started) ObserveEffect(center, "Skipped", "WaveUnavailable");
                     continue;
                 }
+                ObserveEffect(center, "Activated", "");
                 if (type == SpecialKeycapType.Explosion)
                 {
                     int count = Mathf.Min(12, _neighbors.GetNeighborCount(center));
@@ -116,8 +147,46 @@ namespace Game.Tournament
             ApplyDamage(_indices[keycap], 2);
         }
 
+        /// <summary>
+        /// keycap의 실제 배치 유형을 반환한다.
+        /// 초기화된 인덱스를 읽으며 배치나 난수 상태는 변경하지 않는다.
+        /// </summary>
+        public SpecialKeycapType GetPlaytestType(KeycapHealth keycap) { return _types[_indices[keycap]]; }
+
+        /// <summary>
+        /// keycap에 실제 적용한 행과 열 좌표를 반환한다.
+        /// 기존 배치 배열을 읽으며 키보드 상태는 변경하지 않는다.
+        /// </summary>
+        public Vector2Int GetPlaytestCoordinates(KeycapHealth keycap) { return _coordinates[_indices[keycap]]; }
+
+        /// <summary>
+        /// index의 기믹 파괴 또는 발동 상태를 action과 reason으로 알린다.
+        /// 실제 키와 유형 및 효과 식별자를 전달하며 피해나 점수를 계산하지 않는다.
+        /// </summary>
+        private void ObserveEffect(int index, string action, string reason)
+        {
+            PlaytestEffectObserved?.Invoke(this, _keys[index], _types[index], action, reason, _effectIds[index]);
+        }
+
+        /// <summary>
+        /// 실행되지 못한 대기 효과를 reason의 취소 이벤트로 알리고 비운다.
+        /// 입력 사유만 기록하며 기존 대기 효과의 폐기 동작을 유지한다.
+        /// </summary>
+        private void CancelPendingEffects(string reason)
+        {
+            while (_pending.Count > 0) ObserveEffect(_pending.Dequeue(), "Cancelled", reason);
+        }
+
+        /// <summary>
+        /// 새 실행에서 기믹 효과 관찰 이벤트를 초기화한다.
+        /// 입력값 없이 이전 플레이 실행의 정적 구독을 제거한다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetPlaytestObservers() { PlaytestEffectObserved = null; }
+
         void OnDestroy()
         {
+            CancelPendingEffects("KeyboardDestroyed");
             foreach (KeycapHealth keycap in _indices.Keys)
                 if (keycap != null) keycap.Broken -= HandleBroken;
         }

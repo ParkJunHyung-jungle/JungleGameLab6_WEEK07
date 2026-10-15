@@ -138,11 +138,14 @@ namespace Game.Player
         /// </summary>
         private void PickUpKeyboard(Rigidbody body)
         {
-            WorkbenchKeyboardHolder holder = body.GetComponentInParent<WorkbenchKeyboardHolder>();
-            if (holder != null)
+            foreach (MonoBehaviour behaviour in body.GetComponentsInParent<MonoBehaviour>())
             {
+                if (behaviour is not IKeyboardHolder holder)
+                    continue;
+
                 holder.ReleaseKeyboard(body);
                 body.transform.SetParent(null, true);
+                break;
             }
 
             _heldKeyboardBody = body;

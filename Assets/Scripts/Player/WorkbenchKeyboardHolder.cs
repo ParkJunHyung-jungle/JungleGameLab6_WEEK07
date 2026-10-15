@@ -7,7 +7,7 @@ using KeyboardModeling;
 namespace Game.Player
 {
     [RequireComponent(typeof(BoxCollider))]
-    public sealed class WorkbenchKeyboardHolder : MonoBehaviour
+    public sealed class WorkbenchKeyboardHolder : MonoBehaviour, IKeyboardHolder
     {
         private const float ROTATION_DURATION = 0.35f;
 

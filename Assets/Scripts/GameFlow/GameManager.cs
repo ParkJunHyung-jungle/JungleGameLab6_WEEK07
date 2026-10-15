@@ -1,9 +1,12 @@
 using System;
 using System.Collections;
-using UnityEngine.SceneManagement;
+
 using UnityEngine;
+using UnityEngine.SceneManagement;
+
 using UnityEngine.UI;
 
+using Game.Tournament;
 using Game.UI;
 using KeyboardModeling;
 
@@ -31,6 +34,15 @@ public class GameManager : MonoBehaviour
     [Header("Round Timer Settings")]
     [SerializeField] private bool _timerEnabled = true;
     [SerializeField, Min(1f)] private float _roundTimeLimit = 60f;
+
+    [Header("Tournament")]
+    [SerializeField] private TournamentController _tournamentController;
+    private bool _battlePreparing;
+    private bool _isSuddenDeath;
+    private bool _playerReady;
+    private bool _enemyReady;
+    private int _playerClearFrame = -1;
+    private int _enemyClearFrame = -1;
 
     [Header("Result UI")]
     [SerializeField] private GameObject _resultPanel;
@@ -68,10 +80,14 @@ public class GameManager : MonoBehaviour
     public bool IsTimerRunning => _isTimerRunning;
     public KeyboardScoreCombo PlaytestPlayerScore => _comboHUD;
     public KeyboardScoreCombo PlaytestEnemyScore => _enemyScoreCombo;
+    public string PlaytestStageName => _tournamentController == null ? "TimedRound"
+        : $"Tournament/Round{_tournamentController.Round}/{(_isSuddenDeath ? "SuddenDeath" : "TimedRound")}";
 
     public event Action<float> TimerUpdated;
     public event Action RoundTimeOut;
     public event Action<float> RoundCleared;
+    public event Action<GameObject, bool> TournamentKeyboardCreated;
+    public event Action<int> TournamentBattleFinished;
 
     /// <summary>
     /// 새 실행의 관찰용 라운드와 로그 폴더 이벤트 구독을 초기화한다.
@@ -200,7 +216,12 @@ public class GameManager : MonoBehaviour
             _enemyKeyboardSpawner.KeyboardSpawned += HandleEnemyKeyboardSpawned;
         }
 
-        if (_spawnOnStart)
+        if (_tournamentController != null)
+        {
+            _tournamentController.Initialize(this, _enemyTypingController);
+            _tournamentController.BeginTournament();
+        }
+        else if (_spawnOnStart)
         {
             SpawnKeyboard(_animateFirstSpawn);
             SpawnEnemyKeyboard(_animateFirstSpawn);
@@ -216,6 +237,12 @@ public class GameManager : MonoBehaviour
 
         // 게임 플레이 전체 경과 시간과 남은 제한 시간(카운트다운)을 갱신한다.
         _elapsedRoundTime += Time.deltaTime;
+        if (_isSuddenDeath)
+        {
+            _timeTexts.text = "연장전";
+            _enemyTypingController.Tick(Time.deltaTime);
+            return;
+        }
         _remainingTime = Mathf.Max(0f, _remainingTime - Time.deltaTime);
         TimerUpdated?.Invoke(_remainingTime);
         UpdateTimerText(_remainingTime);
@@ -230,6 +257,15 @@ public class GameManager : MonoBehaviour
         {
             HandleTimeOut();
         }
+    }
+
+    void LateUpdate()
+    {
+        if (!_isSuddenDeath || !_isTimerRunning || (_playerClearFrame < 0 && _enemyClearFrame < 0)) return;
+        int result = _playerClearFrame < 0 ? -1 : _enemyClearFrame < 0 ? 1
+            : _playerClearFrame == _enemyClearFrame ? 0 : _playerClearFrame < _enemyClearFrame ? 1 : -1;
+        FreezeTournamentBattle("SuddenDeath");
+        TournamentBattleFinished?.Invoke(result);
     }
 
     void OnDestroy()
@@ -259,6 +295,7 @@ public class GameManager : MonoBehaviour
 
         // 등록된 스폰 포인트를 기준으로 키보드 생성을 요청한다.
         _activeKeyboard = _keyboardSpawner.SpawnKeyboard(_keyboardSpawnPoint, withAnimation);
+        if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(_activeKeyboard, false);
 
         if (_activeKeyboard != null)
         {
@@ -274,11 +311,6 @@ public class GameManager : MonoBehaviour
             {
                 KeyboardInputController inputController = _activeKeyboard.GetComponent<KeyboardInputController>();
                 _comboHUD.Keyboard = inputController;
-                KeyboardAttackController attackController = _activeKeyboard.GetComponent<KeyboardAttackController>();
-                if (attackController != null)
-                {
-                    attackController.SetScoreCombo(_comboHUD);
-                }
             }
         }
 
@@ -326,11 +358,96 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
+    /// duration과 suddenDeath로 새 토너먼트 대전을 준비하고 이전 키보드 및 점수 상태를 정리한다.
+    /// 양쪽 등장 완료 후 동시에 시작하며 연장전에서는 점수를 보존하고 콤보와 효과를 초기화한다.
+    /// </summary>
+    public void BeginTournamentBattle(float duration, bool suddenDeath)
+    {
+        _isTimerRunning = false;
+        _battlePreparing = true;
+        _isSuddenDeath = suddenDeath;
+        _playerReady = false;
+        _enemyReady = false;
+        _playerClearFrame = -1;
+        _enemyClearFrame = -1;
+        _roundTimeLimit = duration;
+        _remainingTime = duration;
+        _elapsedRoundTime = 0f;
+        UnsubscribeKeyboardDestruction();
+        UnsubscribeEnemyKeyboardDestruction();
+        _keyboardSpawner.CancelSpawn();
+        _enemyKeyboardSpawner.CancelSpawn();
+        _comboHUD.Keyboard = null;
+        _enemyScoreCombo.Keyboard = null;
+        if (_activeKeyboard != null) Destroy(_activeKeyboard);
+        if (_activeEnemyKeyboard != null) Destroy(_activeEnemyKeyboard);
+        if (suddenDeath)
+        {
+            _comboHUD.ResetBattleEffects();
+            _enemyScoreCombo.ResetBattleEffects();
+        }
+        else
+        {
+            _comboHUD.ResetState();
+            _enemyScoreCombo.ResetState();
+        }
+        _comboHUD.SetTrackingEnabled(false);
+        _enemyScoreCombo.SetTrackingEnabled(false);
+        _resultPanel.SetActive(false);
+        SpawnKeyboard(true);
+        SpawnEnemyKeyboard(true);
+        UpdateTimerText(duration);
+    }
+
+    /// <summary>양쪽 준비 상태로 동시 시작을 판정하고 입력, 로봇 및 관찰용 대전 기록을 시작한다.</summary>
+    private void TryStartTournamentBattle()
+    {
+        if (!_battlePreparing || !_playerReady || !_enemyReady) return;
+        _battlePreparing = false;
+        _comboHUD.SetTrackingEnabled(true);
+        _enemyScoreCombo.SetTrackingEnabled(true);
+        _comboHUD.SetTimerPaused(false);
+        _enemyScoreCombo.SetTimerPaused(false);
+        StartRoundTimer();
+        _activeKeyboard.GetComponent<KeyboardInputController>().SetInputEnabled(true);
+        _enemyTypingController.StartAttacking();
+    }
+
+    /// <summary>reason으로 대전을 마감하고 입력, 생성, 점수 수집 및 지연된 교체를 중단한다.</summary>
+    private void FreezeTournamentBattle(string reason)
+    {
+        _isTimerRunning = false;
+        _battlePreparing = false;
+        _enemyTypingController.StopAttacking();
+        _keyboardSpawner.CancelSpawn();
+        _enemyKeyboardSpawner.CancelSpawn();
+        if (_respawnRoutine != null) StopCoroutine(_respawnRoutine);
+        if (_enemyRespawnRoutine != null) StopCoroutine(_enemyRespawnRoutine);
+        _respawnRoutine = null;
+        _enemyRespawnRoutine = null;
+        if (_activeKeyboard != null) _activeKeyboard.GetComponent<KeyboardInputController>().SetInputEnabled(false);
+        _comboHUD.SetTimerPaused(true);
+        _enemyScoreCombo.SetTimerPaused(true);
+        _comboHUD.SetTrackingEnabled(false);
+        _enemyScoreCombo.SetTrackingEnabled(false);
+        NotifyPlaytestRoundEnded(reason, true);
+    }
+
+    /// <summary>
     /// 키보드 스폰 및 커버 오픈이 완료되었을 때 최초 1회 게임 타이머를 구동하고 콤보 타이머를 재개한다.
     /// keyboard 생성 완료된 키보드 인스턴스를 전달받으며 초기 타이머 시작 및 콤보 타이머 일시정지를 해제한다.
     /// </summary>
     private void HandleKeyboardSpawned(GameObject keyboard)
     {
+        if (_tournamentController != null)
+        {
+            KeyboardInputController input = keyboard.GetComponent<KeyboardInputController>();
+            _playerReady = true;
+            input.SetInputEnabled(_isTimerRunning && !_battlePreparing);
+            if (_isTimerRunning) _comboHUD.SetTimerPaused(false);
+            TryStartTournamentBattle();
+            return;
+        }
         // 제한 시간이 이미 만료된 상태라면 새 키보드의 입력을 차단하고 타이머를 시작하지 않는다.
         if (_remainingTime <= 0f && _elapsedRoundTime > 0f)
         {
@@ -361,6 +478,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void HandleKeyboardBreaking()
     {
+        if (_isSuddenDeath && _isTimerRunning) _playerClearFrame = Time.frameCount;
         // 키보드 완파 연출 및 교환 완료 전까지 콤보 타이머 감소만 일시정지한다.
         if (_comboHUD != null)
         {
@@ -393,6 +511,13 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void OnTimeOut()
     {
+        if (_tournamentController != null)
+        {
+            int result = _comboHUD.Score.CompareTo(_enemyScoreCombo.Score);
+            FreezeTournamentBattle("TimeOut");
+            TournamentBattleFinished?.Invoke(result);
+            return;
+        }
         Debug.Log("라운드 종료");
 
         // 현재 활성화된 키보드가 존재하면 입력을 즉시 차단한다.
@@ -555,6 +680,7 @@ public class GameManager : MonoBehaviour
     private void HandleKeyboardFinished()
     {
         UnsubscribeKeyboardDestruction();
+        if (_tournamentController != null && (!_isTimerRunning || _isSuddenDeath)) return;
 
         // 제한 시간이 이미 만료되었다면 새 키보드를 리스폰하지 않는다.
         if (_remainingTime <= 0f && _elapsedRoundTime > 0f)
@@ -609,6 +735,7 @@ public class GameManager : MonoBehaviour
 
         // 등록된 로봇 스폰 포인트를 기준으로 키보드 생성을 요청한다.
         _activeEnemyKeyboard = _enemyKeyboardSpawner.SpawnKeyboard(_enemyKeyboardSpawnPoint, withAnimation);
+        if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(_activeEnemyKeyboard, true);
 
         if (_activeEnemyKeyboard != null)
         {
@@ -649,6 +776,20 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void HandleEnemyKeyboardSpawned(GameObject keyboard)
     {
+        if (_tournamentController != null)
+        {
+            KeyboardInputController input = keyboard.GetComponent<KeyboardInputController>();
+            input.SetInputEnabled(false);
+            input.enabled = false;
+            _enemyReady = true;
+            if (_isTimerRunning && !_battlePreparing)
+            {
+                _enemyTypingController.StartAttacking();
+                _enemyScoreCombo.SetTimerPaused(false);
+            }
+            TryStartTournamentBattle();
+            return;
+        }
         // 로봇 키보드는 플레이어의 실제 키보드 입력(Keyboard.current)을 받지 않도록 비활성화한다.
         KeyboardInputController inputController = keyboard.GetComponent<KeyboardInputController>();
         if (inputController != null)
@@ -681,6 +822,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void HandleEnemyKeyboardBreaking()
     {
+        if (_isSuddenDeath && _isTimerRunning) _enemyClearFrame = Time.frameCount;
         // 완파 연출 중에는 로봇의 타건을 정지한다.
         if (_enemyTypingController != null)
         {
@@ -701,6 +843,7 @@ public class GameManager : MonoBehaviour
     private void HandleEnemyKeyboardFinished()
     {
         UnsubscribeEnemyKeyboardDestruction();
+        if (_tournamentController != null && (!_isTimerRunning || _isSuddenDeath)) return;
 
         // 제한 시간이 이미 만료되었다면 새 키보드를 리스폰하지 않는다.
         if (_remainingTime <= 0f && _elapsedRoundTime > 0f)
@@ -754,9 +897,10 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    /// <summary>현재 씬을 다시 열어 게임 상태를 초기화하며 빌드 목록에 없는 작업 씬도 경로로 재시작한다.</summary>
     public void RestartGame()
     {
         Scene currentScene = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(currentScene.buildIndex);
+        SceneManager.LoadScene(currentScene.path);
     }
 }

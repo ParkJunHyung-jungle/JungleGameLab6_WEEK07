@@ -42,6 +42,13 @@ namespace KeyboardModeling
         public bool IsPressing => _isPressing;
         public string LastPressFailure { get; private set; }
 
+        /// <summary>duration의 40%를 누름, 60%를 복귀 시간으로 설정하여 대전별 팔 동작을 변경한다.</summary>
+        public void ConfigureTournamentMotion(float duration)
+        {
+            _pressDuration = Mathf.Max(0.01f, duration * 0.4f);
+            _retractDuration = Mathf.Max(0.01f, duration * 0.6f);
+        }
+
         void Awake()
         {
             _upperLength = _elbow.localPosition.magnitude;

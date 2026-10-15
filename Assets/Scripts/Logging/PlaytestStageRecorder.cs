@@ -50,7 +50,7 @@ namespace Game.Logging
             _player = source.PlaytestPlayerScore;
             _enemy = source.PlaytestEnemyScore;
             _lastEnemyScore = _enemy != null ? _enemy.Score : 0L;
-            _stageId = source.gameObject.scene.path + "/TimedRound";
+            _stageId = source.gameObject.scene.path + "/" + source.PlaytestStageName;
             _runId = Guid.NewGuid().ToString("N");
             _stageStart = Time.realtimeSinceStartupAsDouble;
             _intervalStart = _stageStart;

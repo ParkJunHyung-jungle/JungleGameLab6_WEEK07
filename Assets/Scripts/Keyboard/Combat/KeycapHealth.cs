@@ -295,12 +295,25 @@ public static class KeycapBreakEffectPool
     private static readonly List<PooledKeycapEffect> _activeEffects = new List<PooledKeycapEffect>();
 
     /// <summary>
+    /// 새 실행 시작 시 이전 실행의 파괴 효과 풀과 활성 목록을 비운다.
+    /// 도메인 재로드가 꺼진 에디터에서도 삭제된 효과 인스턴스의 참조가 남지 않도록 한다.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPool()
+    {
+        _availablePools.Clear();
+        _activeEffects.Clear();
+    }
+
+    /// <summary>
     /// 프리팹 종류별 풀에서 인스턴스를 가져와 지정 위치에 효과를 재생하고 상한을 관리한다.
     /// prefab, position, rotation, scale, 속도 및 수명 설정을 사용하여 효과를 활성화한다.
     /// </summary>
     public static void PlayEffect(GameObject prefab, Vector3 position, Quaternion rotation, Vector3 scale, float speed, float upwardSpeed, float spin, float lifetime)
     {
         if (prefab == null) return;
+
+        _activeEffects.RemoveAll(effect => effect == null);
 
         while (_activeEffects.Count >= MAX_CONCURRENT_EFFECTS && _activeEffects.Count > 0)
         {

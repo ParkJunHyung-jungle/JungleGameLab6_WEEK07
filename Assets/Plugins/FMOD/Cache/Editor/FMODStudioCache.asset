@@ -27,6 +27,33 @@ MonoBehaviour:
   MinDistance: 1
   MaxDistance: 20
   Length: 0
+--- !u!114 &-5959799819313080128
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ceb653cd98e289a4e8697a1af55201f2, type: 3}
+  m_Name: event:/SFX/KeyBoard/Switch/Sans
+  m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EditorEventRef
+  Path: event:/SFX/KeyBoard/Switch/Sans
+  Guid:
+    Data1: -32070428
+    Data2: 1291412373
+    Data3: 450794891
+    Data4: 1324151617
+  Banks:
+  - {fileID: 3460293529884904195}
+  IsStream: 0
+  Is3D: 1
+  IsOneShot: 1
+  Parameters: []
+  MinDistance: 1
+  MaxDistance: 20
+  Length: 0
 --- !u!114 &-964123893572665019
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -60,20 +87,20 @@ MonoBehaviour:
   m_Name: FMODStudioCache
   m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EventCache
   EditorBanks:
-  - {fileID: -964123893572665019}
-  - {fileID: 5704274569149300883}
-  - {fileID: 9175406901410911011}
+  - {fileID: 2526086736239291188}
+  - {fileID: 8417463351753205364}
+  - {fileID: 3460293529884904195}
   EditorEvents:
-  - {fileID: 8241701739981643003}
-  - {fileID: 678133531559744190}
-  - {fileID: -6977323810809938421}
+  - {fileID: 959303910077767439}
+  - {fileID: 1353858197400055068}
+  - {fileID: -5959799819313080128}
   EditorParameters: []
   MasterBanks:
-  - {fileID: 5704274569149300883}
+  - {fileID: 8417463351753205364}
   StringsBanks:
-  - {fileID: -964123893572665019}
+  - {fileID: 2526086736239291188}
   cacheVersion: 131861
-  cacheTime: 639276727791791830
+  cacheTime: 639276894303812420
   SerializableEventsDict:
   - key: event:/SFX/KeyBoard/Switch/BrownSwitch
     index: 0
@@ -108,6 +135,98 @@ MonoBehaviour:
   MinDistance: 1
   MaxDistance: 20
   Length: 0
+--- !u!114 &959303910077767439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ceb653cd98e289a4e8697a1af55201f2, type: 3}
+  m_Name: event:/SFX/KeyBoard/Switch/BrownSwitch
+  m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EditorEventRef
+  Path: event:/SFX/KeyBoard/Switch/BrownSwitch
+  Guid:
+    Data1: -416014041
+    Data2: 1080270025
+    Data3: 2019034516
+    Data4: -896893305
+  Banks:
+  - {fileID: 3460293529884904195}
+  IsStream: 0
+  Is3D: 1
+  IsOneShot: 1
+  Parameters: []
+  MinDistance: 1
+  MaxDistance: 20
+  Length: 0
+--- !u!114 &1353858197400055068
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ceb653cd98e289a4e8697a1af55201f2, type: 3}
+  m_Name: event:/SFX/KeyBoard/Switch/BlueSwitch
+  m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EditorEventRef
+  Path: event:/SFX/KeyBoard/Switch/BlueSwitch
+  Guid:
+    Data1: 714337182
+    Data2: 1247155301
+    Data3: 1394622130
+    Data4: -1158505385
+  Banks:
+  - {fileID: 3460293529884904195}
+  IsStream: 0
+  Is3D: 1
+  IsOneShot: 1
+  Parameters: []
+  MinDistance: 1
+  MaxDistance: 20
+  Length: 0
+--- !u!114 &2526086736239291188
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c18180ecb35941f4682ae60107b85b7c, type: 3}
+  m_Name: bank:/Master.strings.bank
+  m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EditorBankRef
+  Path: Assets/FMODBank/Master.strings.bank
+  Name: Master.strings
+  StudioPath: bank:/Master.strings
+  lastModified: 639276894303719710
+  FileSizes:
+  - Name: 
+    Value: 938
+  Exists: 1
+--- !u!114 &3460293529884904195
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c18180ecb35941f4682ae60107b85b7c, type: 3}
+  m_Name: bank:/SFX.bank
+  m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EditorBankRef
+  Path: Assets/FMODBank/SFX.bank
+  Name: SFX
+  StudioPath: bank:/SFX
+  lastModified: 639276894303812420
+  FileSizes: []
+  Exists: 1
 --- !u!114 &5704274569149300883
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -155,6 +274,24 @@ MonoBehaviour:
   MinDistance: 1
   MaxDistance: 20
   Length: 0
+--- !u!114 &8417463351753205364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c18180ecb35941f4682ae60107b85b7c, type: 3}
+  m_Name: bank:/Master.bank
+  m_EditorClassIdentifier: FMODUnityEditor::FMODUnity.EditorBankRef
+  Path: Assets/FMODBank/Master.bank
+  Name: Master
+  StudioPath: bank:/Master
+  lastModified: 639276894303606751
+  FileSizes: []
+  Exists: 1
 --- !u!114 &9175406901410911011
 MonoBehaviour:
   m_ObjectHideFlags: 0

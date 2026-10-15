@@ -61,7 +61,12 @@ namespace Game.Logging
             _ownsSession = true;
             DontDestroyOnLoad(gameObject);
             string sessionId = Guid.NewGuid().ToString("N");
-            _writer = new PlaytestCsvWriter(Path.Combine(Application.persistentDataPath, "PlaytestLogs"), sessionId, Application.version);
+#if UNITY_EDITOR
+            string logFolder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "PlaytestLogs"));
+#else
+            string logFolder = Path.Combine(Application.persistentDataPath, "PlaytestLogs");
+#endif
+            _writer = new PlaytestCsvWriter(logFolder, sessionId, Application.version);
             _stages = new PlaytestStageRecorder(_writer);
             _stages.MenuInputSamplingRequested += SampleMenuKeys;
             _writer.Write(new PlaytestRecord("SessionStart", Time.realtimeSinceStartupAsDouble));

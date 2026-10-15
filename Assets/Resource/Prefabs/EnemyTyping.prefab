@@ -46,7 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.EnemyTypingController
   _arm: {fileID: 5134945796577139868}
-  _attacksPerSecond: 8
+  _attacksPerSecond: 20
   _damage: 2
 --- !u!1001 &3947587878484690620
 PrefabInstance:
@@ -127,6 +127,14 @@ PrefabInstance:
     - target: {fileID: 8181452537449830944, guid: 6419610cc6647eb479dc2f3e03398ce1, type: 3}
       propertyPath: _useUnscaledTime
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8181452537449830944, guid: 6419610cc6647eb479dc2f3e03398ce1, type: 3}
+      propertyPath: _pressDuration
+      value: 0.014
+      objectReference: {fileID: 0}
+    - target: {fileID: 8181452537449830944, guid: 6419610cc6647eb479dc2f3e03398ce1, type: 3}
+      propertyPath: _retractDuration
+      value: 0.021
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

@@ -11,6 +11,7 @@ using KeyboardModeling;
 public sealed class KeyboardScoreCombo : MonoBehaviour
 {
     private const int BASE_SCORE = 10;
+    private const int KEYCAP_BREAK_SCORE = 10;
 
     [Header("Input")]
     [SerializeField] private KeyboardInputController _keyboard;
@@ -207,14 +208,15 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     }
 
     /// <summary>
-    /// 실제 파괴된 keycap의 이벤트 구독을 해제하고 콤보를 한 번 증가시킨다.
-    /// 증가한 단계의 전체 유지시간으로 타이머를 갱신하고 상태와 가득 찬 게이지를 알린다.
+    /// 실제 파괴된 keycap의 이벤트 구독을 해제하고 파괴 직전 콤보 배율로 파괴 점수를 한 번 지급한다.
+    /// KEYCAP_BREAK_SCORE와 Multiplier로 점수를 더하고 콤보 및 유지시간을 갱신한 뒤 변경 상태를 알린다.
     /// </summary>
     private void HandleKeycapBroken(KeycapHealth keycap)
     {
         keycap.Broken -= HandleKeycapBroken;
         if (!_isTracking || !isActiveAndEnabled)
             return;
+        _score += (int)(KEYCAP_BREAK_SCORE * Multiplier);
         _combo++;
         _remainingTime = Duration;
         StateChanged?.Invoke();

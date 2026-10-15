@@ -34907,10 +34907,7 @@ MonoBehaviour:
   _feedbackManager: {fileID: 1556073846386759358}
   _gameSession: {fileID: 0}
   _feverController: {fileID: 0}
-  _scoreCombo: {fileID: 0}
   _baseDamage: 1
-  _comboFistDamage: 1
-  _comboHammerDamage: 1
 --- !u!114 &1556073846386759358
 MonoBehaviour:
   m_ObjectHideFlags: 0

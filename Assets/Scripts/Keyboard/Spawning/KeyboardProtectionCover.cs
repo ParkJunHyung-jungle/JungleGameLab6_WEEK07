@@ -15,8 +15,8 @@ namespace KeyboardModeling
         private bool _isRemoving;
 
         /// <summary>
-        /// 배치 완료된 keyboard에 기존 로컬 자세로 커버를 맞춘 뒤 제거 연출을 시작한다.
-        /// 월드 배율을 유지하여 분리하고 위로 이동한 다음 왼쪽으로 이동하여 커버를 소멸시킨다.
+        /// keyboard의 자세에 커버를 맞춰 부모에서 분리하고 제거 연출을 시작한다.
+        /// keyboard를 사용해 커버의 월드 자세를 유지하며 이후 이동이 끝나면 파괴한다.
         /// </summary>
         public void RemoveFrom(Transform keyboard)
         {
@@ -30,15 +30,22 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// 설정된 거리와 시간을 사용해 커버를 월드 Y 방향과 -X 방향으로 순서대로 이동한다.
-        /// Time.deltaTime으로 진행하므로 게임 정지 중에는 이동을 멈추고 완료 시 객체를 제거한다.
+        /// 커버를 키보드 표면 바깥쪽으로 띄운 뒤 기울어진 면을 따라 아래로 이동시켜 제거한다.
+        /// 커버의 방향과 설정된 거리 및 시간을 사용하며 이동이 끝나면 객체를 파괴한다.
         /// </summary>
         private IEnumerator RemoveRoutine()
         {
             Vector3 start = transform.position;
-            Vector3 lifted = start + Vector3.up * _liftDistance;
+            Vector3 surfaceUp = transform.up;
+            Vector3 lifted = start + surfaceUp * _liftDistance;
+            Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, surfaceUp);
+            if (downhill.sqrMagnitude < 0.0001f)
+                downhill = -transform.forward;
+            else
+                downhill.Normalize();
+
             yield return MoveTo(start, lifted, _liftDuration);
-            yield return MoveTo(lifted, lifted + Vector3.left * _slideDistance, _slideDuration);
+            yield return MoveTo(lifted, lifted + downhill * _slideDistance, _slideDuration);
             Destroy(gameObject);
         }
 

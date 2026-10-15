@@ -315,164 +315,6 @@ body {
 }
 
 /* ===================================================
-   [최상위 항목] 플레이어 선택 글로벌 카드 (Player Global Card)
-   =================================================== */
-.player-global-card {
-  background: linear-gradient(135deg, #2e1065 0%, #1e1b4b 50%, #0f172a 100%);
-  border: 1px solid #7c3aed;
-  border-radius: 14px;
-  padding: 20px 28px;
-  box-shadow: 0 10px 30px -5px rgba(124, 58, 237, 0.35);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.player-header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.player-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #9333ea, #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);
-}
-
-.player-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.player-tag {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  color: #c084fc;
-  text-transform: uppercase;
-}
-
-.player-name-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.player-id-badge {
-  background: rgba(192, 132, 252, 0.2);
-  color: #e9d5ff;
-  border: 1px solid rgba(192, 132, 252, 0.4);
-  padding: 3px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-}
-
-.player-display-name {
-  font-size: 20px;
-  font-weight: 800;
-  color: #ffffff;
-}
-
-.player-nav-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.player-arrow-btn {
-  background: #3b0764;
-  color: #f5d0fe;
-  border: 1px solid #9333ea;
-  border-radius: 8px;
-  width: 42px;
-  height: 42px;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.player-arrow-btn:hover {
-  background: #7e22ce;
-  border-color: #c084fc;
-  color: #ffffff;
-  transform: scale(1.08);
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.6);
-}
-
-.player-arrow-btn:active {
-  transform: scale(0.95);
-}
-
-.player-tabs {
-  display: flex;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 4px;
-  border-radius: 10px;
-  border: 1px solid #4c1d95;
-  overflow-x: auto;
-  max-width: 580px;
-  white-space: nowrap;
-}
-
-.player-tabs::-webkit-scrollbar {
-  height: 4px;
-}
-
-.player-tabs::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.8);
-  border-radius: 4px;
-}
-
-.player-tabs::-webkit-scrollbar-thumb {
-  background: #7c3aed;
-  border-radius: 4px;
-}
-
-.player-tabs::-webkit-scrollbar-thumb:hover {
-  background: #9333ea;
-}
-
-.player-tab-btn {
-  background: transparent;
-  border: none;
-  color: #d8b4fe;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.player-tab-btn:hover {
-  color: #ffffff;
-  background: rgba(147, 51, 234, 0.25);
-}
-
-.player-tab-btn.active {
-  background: #7e22ce;
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(126, 34, 206, 0.5);
-}
-
-/* ===================================================
    [하위 항목] 키보드 종류 전환 컨트롤러 (정중앙 정렬 툴바)
    =================================================== */
 .keyboard-type-toolbar {
@@ -1468,12 +1310,10 @@ body {
   .img-btn,
   .csv-upload-box,
   .aggregate-toolbar,
-  .player-nav-controls,
   .interval-selector,
   .chart-tooltip,
   .tag-remove-btn,
   .table-action-btn,
-  #sessionGlobalCard,
   #comparisonCard {
     display: none !important;
   }
@@ -1666,3 +1506,33 @@ body {
     flex-direction: column !important;
   }
 }
+/* 스크롤 위치와 무관하게 데이터 선택과 화면 이동을 제공한다. */
+html { scroll-behavior: smooth; scroll-padding-top: var(--viewer-nav-offset, 140px); }
+.viewer-nav {
+  position: sticky; top: 8px; z-index: 100;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px 16px; border: 1px solid #475569; border-radius: 12px;
+  background: rgba(15, 23, 42, .97); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.viewer-nav-data { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.viewer-nav button, .viewer-nav select {
+  min-height: 36px; border: 1px solid #475569; border-radius: 6px;
+  background: #1e293b; color: #f8fafc; padding: 6px 10px; font: inherit; font-size: 13px;
+}
+.viewer-nav select { min-width: 0; max-width: 280px; flex: 1 1 150px; }
+.viewer-nav-data label { font-size: 12px; color: #94a3b8; }
+.viewer-nav button { cursor: pointer; }
+.viewer-nav button:disabled, .viewer-nav select:disabled { opacity: .45; cursor: default; }
+.viewer-nav-links { display: flex; gap: 6px; overflow-x: auto; }
+.viewer-nav-links a { white-space: nowrap; text-decoration: none; color: #cbd5e1; font-size: 13px; padding: 7px 12px; border-radius: 6px; }
+.viewer-nav-links a:hover, .viewer-nav-links a.active { color: #fff; background: #0369a1; }
+.viewer-nav :focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.viewer-nav [hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 600px) {
+  .viewer-nav { padding: 10px; top: 0; }
+  .viewer-nav select { max-width: 100%; flex-basis: 120px; }
+  .viewer-nav-links a { padding: 7px 9px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print { .viewer-nav { display: none !important; } }

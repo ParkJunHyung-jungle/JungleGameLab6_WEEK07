@@ -1,7 +1,11 @@
+using System.Collections;
+
 using UnityEngine;
 
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+
+using Unity.Cinemachine;
 
 using KeyboardModeling;
 
@@ -26,9 +30,11 @@ namespace Game.Player
         [SerializeField] private Camera _camera;
         [SerializeField] private InputActionReference _clickInput;
         [SerializeField] private InputActionReference _coverInput;
+        [SerializeField] private InputActionReference _moveInput;
         [SerializeField] private float _interactionDistance = 3f;
         [SerializeField] private LayerMask _interactionLayers = ~0;
         [SerializeField] private Text _interactionPrompt;
+        private readonly RaycastHit[] _interactionHits = new RaycastHit[32];
 
         [Header("Keyboard Cover")]
         [SerializeField] private KeyboardProtectionCover _keyboardProtectionCoverPrefab;
@@ -42,6 +48,35 @@ namespace Game.Player
         private Vector3 _heldKeyboardCenterOffset;
         private bool _heldKeyboardWasKinematic;
         private bool _heldKeyboardUsedGravity;
+
+        [Header("Keyboard Edit")]
+        [SerializeField] private Transform _keyboardEditPosition;
+        [SerializeField, Min(0.1f)] private float _keyboardEditDistance = 2.5f;
+        [SerializeField] private CinemachinePanTilt _cameraPanTilt;
+        [SerializeField] private CinemachineInputAxisController _cameraInputAxisController;
+        [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
+        private KeyboardInputController _editingKeyboard;
+        private Coroutine _cameraTransition;
+        private Vector3 _savedPlayerPosition;
+        private Quaternion _savedCameraRotation;
+        private bool _moveInputWasEnabled;
+        private bool _cameraInputWasEnabled;
+        private bool _isKeyboardEditMode;
+
+        void Awake()
+        {
+            if (_camera == null)
+                _camera = Camera.main;
+
+            if (_cameraPanTilt == null)
+                _cameraPanTilt = GetComponentInChildren<CinemachinePanTilt>();
+
+            if (_cameraInputAxisController == null)
+                _cameraInputAxisController = GetComponentInChildren<CinemachineInputAxisController>();
+
+            if (_moveInput == null)
+                _moveInput = FindMoveInputReference();
+        }
 
         void OnEnable()
         {
@@ -59,6 +94,7 @@ namespace Game.Player
             _clickInput.action.Disable();
             _coverInput.action.started -= HandleCoverStarted;
             _coverInput.action.Disable();
+            ResetKeyboardEditMode();
             DropHeldKeyboard();
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -80,16 +116,38 @@ namespace Game.Player
         /// </summary>
         private void HandleClickStarted(InputAction.CallbackContext context)
         {
+            if (_isKeyboardEditMode || _cameraTransition != null)
+                return;
+
             TryInteract();
         }
 
         /// <summary>
-        /// 우클릭 입력이 시작되면 손에 든 키보드의 커버 상태를 전환한다.
-        /// context 입력을 받으며 커버가 있으면 제거 연출을, 없으면 커버 생성을 실행한다.
+        /// 우클릭 입력으로 작업대 키보드 편집 모드를 전환하거나 손에 든 키보드의 커버를 조작한다.
+        /// context 입력을 받으며 조준 대상과 편집 상태에 따라 진입, 종료 또는 커버 전환을 실행한다.
         /// </summary>
         private void HandleCoverStarted(InputAction.CallbackContext context)
         {
-            ToggleHeldKeyboardCover();
+            if (_cameraTransition != null)
+                return;
+
+            if (_isKeyboardEditMode)
+            {
+                ExitKeyboardEditMode();
+                return;
+            }
+
+            if (_heldKeyboardBody != null)
+            {
+                ToggleHeldKeyboardCover();
+                return;
+            }
+
+            if (TryGetInteractionHit(out RaycastHit hit)
+                && TryGetWorkbenchKeyboard(hit, out WorkbenchKeyboardHolder holder, out KeyboardInputController keyboard, out Vector3 aimPoint))
+            {
+                EnterKeyboardEditMode(keyboard, holder, aimPoint);
+            }
         }
 
         /// <summary>
@@ -113,6 +171,13 @@ namespace Game.Player
             if (dispenser != null)
             {
                 dispenser.TryDispense(out _);
+                return true;
+            }
+
+            WorkbenchKeyboardHolder workbenchHolder = hit.collider.GetComponentInParent<WorkbenchKeyboardHolder>();
+            if (workbenchHolder != null && workbenchHolder.KeyboardBody != null)
+            {
+                PickUpKeyboard(workbenchHolder.KeyboardBody);
                 return true;
             }
 
@@ -152,7 +217,11 @@ namespace Game.Player
         private void UpdateInteractionPrompt()
         {
             string prompt = string.Empty;
-            if (_heldKeyboardBody != null)
+            if (_isKeyboardEditMode)
+            {
+                prompt = "우클릭으로 키보드 편집 모드 나가기";
+            }
+            else if (_heldKeyboardBody != null)
             {
                 prompt = _heldKeyboardBody.GetComponentInChildren<KeyboardProtectionCover>() == null
                     ? "좌클릭 던지기 / 우클릭 커버 덮기"
@@ -162,12 +231,202 @@ namespace Game.Player
             {
                 if (hit.collider.GetComponentInParent<KeyboardDispenser>() != null)
                     prompt = "좌클릭으로 키보드 받기";
+                else if (hit.collider.GetComponentInParent<WorkbenchKeyboardHolder>() != null)
+                    prompt = "좌클릭으로 키보드 들기 / 우클릭으로 편집";
                 else if (hit.collider.GetComponentInParent<KeyboardPickupTarget>() != null)
                     prompt = "좌클릭으로 키보드 들기";
             }
 
             _interactionPrompt.text = prompt;
             _interactionPrompt.enabled = prompt.Length > 0;
+        }
+
+        /// <summary>
+        /// hit이 작업대에 고정된 키보드인지 확인하고 입력 컨트롤러와 조준점을 반환한다.
+        /// hit의 WorkbenchKeyboardHolder와 키보드 렌더러 bounds의 중앙을 사용한다.
+        /// </summary>
+        private bool TryGetWorkbenchKeyboard(
+            RaycastHit hit,
+            out WorkbenchKeyboardHolder holder,
+            out KeyboardInputController keyboard,
+            out Vector3 aimPoint)
+        {
+            holder = hit.collider.GetComponentInParent<WorkbenchKeyboardHolder>();
+            keyboard = null;
+            aimPoint = Vector3.zero;
+            if (holder == null || holder.KeyboardBody == null)
+                return false;
+
+            Rigidbody keyboardBody = holder.KeyboardBody;
+            keyboard = keyboardBody.GetComponent<KeyboardInputController>();
+            KeyboardPickupTarget pickupTarget = keyboardBody.GetComponent<KeyboardPickupTarget>();
+            if (keyboard == null || pickupTarget == null)
+                return false;
+
+            Vector3 centerOffset = pickupTarget.GetVisualCenterLocalPosition(keyboardBody.transform);
+            aimPoint = keyboardBody.transform.TransformPoint(centerOffset);
+            return true;
+        }
+
+        /// <summary>
+        /// 작업대 키보드 입력을 켜고 플레이어를 편집 위치로 이동시키며 카메라를 키보드 중심으로 돌린다.
+        /// keyboard, holder, aimPoint를 사용하고 입력 상태를 저장하며 앵커가 없으면 작업대 기준 위치를 계산한다.
+        /// </summary>
+        private void EnterKeyboardEditMode(
+            KeyboardInputController keyboard,
+            WorkbenchKeyboardHolder holder,
+            Vector3 aimPoint)
+        {
+            if (_camera == null
+                || _moveInput == null
+                || _moveInput.action == null
+                || _cameraPanTilt == null
+                || _cameraInputAxisController == null)
+            {
+                Debug.LogError(
+                    $"키보드 편집 모드 참조 누락: Camera={_camera != null}, " +
+                    $"MoveInput={_moveInput?.action != null}, PanTilt={_cameraPanTilt != null}, " +
+                    $"CameraInput={_cameraInputAxisController != null}.",
+                    this);
+                return;
+            }
+
+            _isKeyboardEditMode = true;
+            _editingKeyboard = keyboard;
+            _savedPlayerPosition = transform.position;
+            _savedCameraRotation = _camera.transform.rotation;
+            _moveInputWasEnabled = _moveInput.action.enabled;
+            _cameraInputWasEnabled = _cameraInputAxisController.enabled;
+
+            _moveInput.action.Disable();
+            _cameraInputAxisController.enabled = false;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            keyboard.SetInputEnabled(true);
+
+            Vector3 targetPlayerPosition;
+            if (_keyboardEditPosition != null)
+            {
+                targetPlayerPosition = _keyboardEditPosition.position;
+            }
+            else
+            {
+                targetPlayerPosition = holder.transform.position - holder.transform.forward * _keyboardEditDistance;
+                targetPlayerPosition.y = transform.position.y;
+            }
+
+            Vector3 targetCameraPosition = _camera.transform.position + targetPlayerPosition - transform.position;
+            Vector3 direction = aimPoint - targetCameraPosition;
+            Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
+            BeginCameraTransition(targetRotation, targetPlayerPosition);
+        }
+
+        /// <summary>
+        /// 로드된 입력 액션 참조 중 PlayerMove를 찾아 반환한다.
+        /// 씬 인스턴스에 이동 입력 참조가 없을 때 같은 액션 에셋을 재사용한다.
+        /// </summary>
+        private InputActionReference FindMoveInputReference()
+        {
+            InputActionReference[] inputReferences = Resources.FindObjectsOfTypeAll<InputActionReference>();
+            foreach (InputActionReference inputReference in inputReferences)
+            {
+                if (inputReference.name == "PlayerMove")
+                    return inputReference;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 편집 중인 키보드 입력을 되돌리고 플레이어와 카메라를 진입 전 상태로 복귀시킨다.
+        /// 저장한 위치와 회전을 사용하며 전환 완료 후 플레이어 입력과 커서 잠금을 복원한다.
+        /// </summary>
+        private void ExitKeyboardEditMode()
+        {
+            _isKeyboardEditMode = false;
+            if (_editingKeyboard != null)
+                _editingKeyboard.SetInputEnabled(false);
+
+            BeginCameraTransition(_savedCameraRotation, _savedPlayerPosition);
+        }
+
+        /// <summary>
+        /// 카메라 회전과 플레이어 위치를 목표 상태까지 보간하는 코루틴을 시작한다.
+        /// targetRotation과 targetPlayerPosition을 사용하며 진행 중 전환을 새 전환으로 교체한다.
+        /// </summary>
+        private void BeginCameraTransition(Quaternion targetRotation, Vector3 targetPlayerPosition)
+        {
+            if (_cameraTransition != null)
+                StopCoroutine(_cameraTransition);
+
+            _cameraTransition = StartCoroutine(TransitionCameraRotation(targetRotation, targetPlayerPosition));
+        }
+
+        /// <summary>
+        /// 현재 시야와 플레이어 위치를 목표 회전 및 위치까지 부드럽게 보간한다.
+        /// targetRotation, targetPlayerPosition, Time.deltaTime을 사용하며 종료 전환 후 조작 상태를 복원한다.
+        /// </summary>
+        private IEnumerator TransitionCameraRotation(Quaternion targetRotation, Vector3 targetPlayerPosition)
+        {
+            Vector3 startPlayerPosition = transform.position;
+            Quaternion startRotation = _camera.transform.rotation;
+            float elapsed = 0f;
+            while (elapsed < _cameraTransitionDuration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _cameraTransitionDuration));
+                Quaternion rotation = Quaternion.Slerp(startRotation, targetRotation, progress);
+                transform.position = Vector3.Lerp(startPlayerPosition, targetPlayerPosition, progress);
+                _cameraPanTilt.ForceCameraPosition(_camera.transform.position, rotation);
+                yield return null;
+            }
+
+            transform.position = targetPlayerPosition;
+            _cameraPanTilt.ForceCameraPosition(_camera.transform.position, targetRotation);
+            _cameraTransition = null;
+            if (!_isKeyboardEditMode)
+                RestoreKeyboardEditInput();
+        }
+
+        /// <summary>
+        /// 편집 모드 진입 전에 저장한 키보드·이동·카메라 입력과 커서 상태를 복원한다.
+        /// 저장 상태를 사용해 입력을 되돌리고 편집 중인 키보드 참조를 비운다.
+        /// </summary>
+        private void RestoreKeyboardEditInput()
+        {
+            if (_editingKeyboard != null)
+                _editingKeyboard.SetInputEnabled(false);
+
+            _editingKeyboard = null;
+            if (_moveInputWasEnabled)
+                _moveInput.action.Enable();
+            else
+                _moveInput.action.Disable();
+
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            _cameraInputAxisController.enabled = _cameraInputWasEnabled;
+        }
+
+        /// <summary>
+        /// 비활성화 시 진행 중인 전환을 정리하고 플레이어 위치와 입력 및 카메라 상태를 복원한다.
+        /// 편집 상태나 전환 코루틴을 확인하고 카메라를 저장한 방향으로 즉시 되돌린다.
+        /// </summary>
+        private void ResetKeyboardEditMode()
+        {
+            if (!_isKeyboardEditMode && _editingKeyboard == null && _cameraTransition == null)
+                return;
+
+            if (_cameraTransition != null)
+            {
+                StopCoroutine(_cameraTransition);
+                _cameraTransition = null;
+            }
+
+            _isKeyboardEditMode = false;
+            transform.position = _savedPlayerPosition;
+            _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _savedCameraRotation);
+            RestoreKeyboardEditInput();
         }
 
         /// <summary>
@@ -190,18 +449,56 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 화면 중앙에서 상호작용 거리 안의 콜라이더를 찾는다.
-        /// 카메라와 상호작용 거리 및 레이어를 사용하고 감지한 RaycastHit을 반환한다.
+        /// 화면 중앙에서 상호작용 거리 안의 콜라이더나 작업대 키보드 보관함을 찾는다.
+        /// 카메라와 상호작용 거리 및 레이어를 사용하고 가장 가까운 유효 RaycastHit을 반환한다.
         /// </summary>
         private bool TryGetInteractionHit(out RaycastHit hit)
         {
             Ray ray = _camera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            return Physics.Raycast(ray, out hit, _interactionDistance, _interactionLayers, QueryTriggerInteraction.Ignore);
+            int hitCount = Physics.RaycastNonAlloc(
+                ray,
+                _interactionHits,
+                _interactionDistance,
+                _interactionLayers,
+                QueryTriggerInteraction.Collide);
+            int holderHitIndex = -1;
+            int solidHitIndex = -1;
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider candidate = _interactionHits[i].collider;
+                if (candidate.GetComponentInParent<WorkbenchKeyboardHolder>() != null)
+                {
+                    if (holderHitIndex < 0 || _interactionHits[i].distance < _interactionHits[holderHitIndex].distance)
+                        holderHitIndex = i;
+                }
+                else if (!candidate.isTrigger
+                    && (solidHitIndex < 0 || _interactionHits[i].distance < _interactionHits[solidHitIndex].distance))
+                {
+                    solidHitIndex = i;
+                }
+            }
+
+            if (holderHitIndex >= 0
+                && (solidHitIndex < 0 || _interactionHits[holderHitIndex].distance < _interactionHits[solidHitIndex].distance))
+            {
+                hit = _interactionHits[holderHitIndex];
+                return true;
+            }
+
+            if (solidHitIndex >= 0)
+            {
+                hit = _interactionHits[solidHitIndex];
+                return true;
+            }
+
+            hit = default;
+            return false;
         }
 
         /// <summary>
-        /// 조준한 키보드의 Rigidbody를 손에 든 상태로 전환한다.
-        /// body의 콜라이더 중심 오프셋과 기존 물리 설정을 저장하고 물리 이동을 멈춘다.
+        /// 조준한 키보드의 시각적 중앙을 손 위치에 맞춰 든 상태로 전환한다.
+        /// body의 중앙 오프셋과 기존 물리 설정을 저장하고 물리 이동을 멈춘다.
         /// </summary>
         private void PickUpKeyboard(Rigidbody body)
         {
@@ -218,8 +515,13 @@ namespace Game.Player
             _heldKeyboardBody = body;
             _heldKeyboardWasKinematic = body.isKinematic;
             _heldKeyboardUsedGravity = body.useGravity;
-            BoxCollider keyboardCollider = body.GetComponent<BoxCollider>();
-            Vector3 localCenter = keyboardCollider != null ? keyboardCollider.center : body.centerOfMass;
+            KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickupTarget == null)
+                pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
+
+            Vector3 localCenter = pickupTarget != null
+                ? pickupTarget.GetVisualCenterLocalPosition(body.transform)
+                : Vector3.zero;
             _heldKeyboardCenterOffset = Vector3.Scale(localCenter, body.transform.lossyScale);
 
             if (!body.isKinematic)
@@ -233,7 +535,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 손에 든 키보드의 콜라이더 중심을 커서보다 약간 위의 카메라 앞 위치로 이동시킨다.
+        /// 손에 든 키보드의 시각적 중앙을 커서보다 약간 위의 카메라 앞 위치로 이동시킨다.
         /// heldKeyboardDistance, heldKeyboardCenterHeight와 heldKeyboardEulerAngles를 사용해 목표 자세를 갱신한다.
         /// </summary>
         private void FollowHeldKeyboard()

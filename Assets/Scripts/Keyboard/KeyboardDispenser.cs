@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 using Game.Player;
+using KeyboardModeling;
 
 public sealed class KeyboardDispenser : MonoBehaviour
 {
@@ -23,7 +24,7 @@ public sealed class KeyboardDispenser : MonoBehaviour
         if (_keyboardPrefabs.Count == 0 || _outputPoint == null)
             return false;
 
-        GameObject prefab = null;
+        GameObject stockPrefab = null;
         int startIndex = Random.Range(0, _keyboardPrefabs.Count);
         for (int offset = 0; offset < _keyboardPrefabs.Count; offset++)
         {
@@ -31,15 +32,35 @@ public sealed class KeyboardDispenser : MonoBehaviour
             if (candidate == null)
                 continue;
 
-            prefab = candidate;
+            stockPrefab = candidate;
             break;
         }
 
-        if (prefab == null)
+        if (stockPrefab == null)
             return false;
 
-        keyboardRoot = Instantiate(prefab, _outputPoint.position, _outputPoint.rotation);
-        keyboardRoot.transform.localScale = prefab.transform.localScale;
+        KeyboardPlayableVariant variant = stockPrefab.GetComponent<KeyboardPlayableVariant>();
+        GameObject playablePrefab = variant != null && variant.GamePrefab != null
+            ? variant.GamePrefab
+            : stockPrefab;
+
+        keyboardRoot = Instantiate(playablePrefab, _outputPoint.position, _outputPoint.rotation);
+        keyboardRoot.transform.localScale = stockPrefab.transform.localScale;
+        if (playablePrefab != stockPrefab && keyboardRoot.GetComponent<BoxCollider>() == null)
+        {
+            BoxCollider stockCollider = stockPrefab.GetComponent<BoxCollider>();
+            if (stockCollider != null)
+            {
+                BoxCollider keyboardCollider = keyboardRoot.AddComponent<BoxCollider>();
+                keyboardCollider.center = stockCollider.center;
+                keyboardCollider.size = stockCollider.size;
+            }
+        }
+
+        KeyboardInputController inputController = keyboardRoot.GetComponent<KeyboardInputController>();
+        if (inputController != null)
+            inputController.SetInputEnabled(false);
+
         keyboardRoot.AddComponent<KeyboardPickupTarget>();
         Rigidbody keyboardBody = keyboardRoot.GetComponent<Rigidbody>();
         if (keyboardBody == null)

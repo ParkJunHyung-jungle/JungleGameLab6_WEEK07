@@ -33,12 +33,6 @@ namespace Game.Player
             if (pickupTarget == null)
                 return;
 
-            BoxCollider keyboardCollider = body.GetComponent<BoxCollider>();
-            if (keyboardCollider == null)
-                keyboardCollider = body.GetComponentInChildren<BoxCollider>();
-            if (keyboardCollider == null)
-                return;
-
             _keyboardBody = body;
             _originalIsKinematic = body.isKinematic;
             _originalUseGravity = body.useGravity;
@@ -49,8 +43,7 @@ namespace Game.Player
             body.useGravity = false;
             body.transform.SetParent(transform, true);
 
-            Vector3 localCenterOffset = body.transform.InverseTransformPoint(
-                keyboardCollider.transform.TransformPoint(keyboardCollider.center));
+            Vector3 localCenterOffset = pickupTarget.GetVisualCenterLocalPosition(body.transform);
             body.position = _keyboardMountPoint.position - body.transform.TransformVector(localCenterOffset);
             StartCoroutine(RotateKeyboardToDisplay(body, localCenterOffset));
 
@@ -60,7 +53,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 키보드를 장착 기준점의 회전으로 부드럽게 돌리고 충돌체 중심을 장착 위치에 맞춘다.
+        /// 키보드를 장착 기준점의 회전으로 부드럽게 돌리고 시각적 중앙을 장착 위치에 맞춘다.
         /// body와 localCenterOffset을 사용하며 매 프레임 키보드의 회전과 위치를 갱신한다.
         /// </summary>
         private IEnumerator RotateKeyboardToDisplay(Rigidbody body, Vector3 localCenterOffset)

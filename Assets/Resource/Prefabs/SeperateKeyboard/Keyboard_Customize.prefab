@@ -34751,7 +34751,7 @@ MonoBehaviour:
   _logInput: 0
   _audioSource: {fileID: 2644093605205143613}
   _pressSound: {fileID: 8300000, guid: 5871cb8f54e12774ebe12e9c708bd284, type: 3}
-  _fmodSwitchSound: 0
+  _fmodSwitchSound: 1
 --- !u!54 &5218247408755053347
 Rigidbody:
   m_ObjectHideFlags: 0

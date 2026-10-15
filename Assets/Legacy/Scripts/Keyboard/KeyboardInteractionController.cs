@@ -286,7 +286,13 @@ public class KeyboardInteractionController : MonoBehaviour
 
             return;
         }
-        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
+        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null) return;
+        if (Mouse.current.rightButton.wasPressedThisFrame)
+        {
+            PickUpKeyboardIntoHands();
+            return;
+        }
+        if (!Mouse.current.leftButton.wasPressedThisFrame) return;
         HandleWorldInteraction();
     }
 
@@ -895,7 +901,7 @@ public class KeyboardInteractionController : MonoBehaviour
             }
         }
 
-        bool canPickUp = TryGetLookedAtKeyboard(out KeyboardState state) && state != _placedKeyboard;
+        bool canPickUp = TryGetLookedAtKeyboard(out _);
         SetGuideState(canPickUp ? KeyboardGuideState.Pickup : KeyboardGuideState.Hidden);
     }
 
@@ -937,6 +943,23 @@ public class KeyboardInteractionController : MonoBehaviour
             OnEnterSmashMode();
             return;
         }
+        BeginHoldKeyboard(state);
+    }
+
+    /// <summary>
+    /// 카메라 중앙에 조준한 키보드를 손에 든 상태로 전환한다.
+    /// 조준한 키보드 상태를 사용하며, 배치 키보드라면 미니게임 참조와 배치 상태를 해제한다.
+    /// </summary>
+    private void PickUpKeyboardIntoHands()
+    {
+        if (_heldKeyboard != null || _boxPickupController.HeldBox != null || _isPlacingKeyboard || _feverSupplyPending)
+            return;
+        if (!TryGetLookedAtKeyboard(out KeyboardState state))
+            return;
+
+        if (state == _placedKeyboard)
+            _controller.SetKeyBoard(null);
+
         BeginHoldKeyboard(state);
     }
 

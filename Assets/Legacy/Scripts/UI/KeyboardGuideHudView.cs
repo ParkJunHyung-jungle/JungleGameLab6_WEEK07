@@ -5,7 +5,7 @@ namespace Game.UI
 {
     public sealed class KeyboardGuideHudView : MonoBehaviour
     {
-        private const string PICKUP_GUIDE = "마우스 좌클릭을 눌러 키보드를 집으시오";
+        private const string PICKUP_GUIDE = "마우스 우클릭으로 키보드를 들어 올리기";
         private const string PLACEMENT_GUIDE = "모니터 앞에 키보드를 놓으시오";
 
         [Header("References")]

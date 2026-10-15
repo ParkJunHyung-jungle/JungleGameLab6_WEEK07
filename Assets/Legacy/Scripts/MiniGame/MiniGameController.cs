@@ -18,6 +18,7 @@ namespace KeyboardModeling
 
         [Header("Schedule")]
         [SerializeField] private KeyboardInputController _keyboard;
+        [SerializeField] private bool _miniGamesEnabled = true;
         [SerializeField, Min(0.1f)] private float _eventInterval = 15f;
         [SerializeField] private FeverController _feverController;
         [Tooltip("바탕화면을 사용하는 씬의 타이머와 상점 예외 정책을 연결합니다.")]
@@ -132,7 +133,7 @@ namespace KeyboardModeling
         {
             if (_currentGame == MiniGameKind.Idle)
             {
-                if (IsEventTimerPaused)
+                if (!_miniGamesEnabled || IsEventTimerPaused)
                     return;
                 _nextEventRemaining = Mathf.Max(0f, _nextEventRemaining - Time.deltaTime);
 

@@ -1,16 +1,28 @@
 using UnityEngine;
+using FMODUnity;
 
 public class FMODEvents : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    [field: Header("Keyboard SFX")]
+    [field: SerializeField] public EventReference BlueSwitch { get; private set; }
+    [field: SerializeField] public EventReference BrownSwitch { get; private set; }
+    [field: SerializeField] public EventReference SansSwitch { get; private set; }
+
+
+    public static FMODEvents instance { get; private set; }
+    private void Awake()
     {
-        
+        if (instance != null)
+        {
+            Debug.LogError("Found more than one FMOD Events instance in the scene.");
+        }
+
+        instance = this;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void OnDestroy()
     {
-        
+        if (instance == this)
+            instance = null;
     }
 }

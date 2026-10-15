@@ -75,8 +75,12 @@ MonoBehaviour:
   cacheVersion: 131861
   cacheTime: 639276727791791830
   SerializableEventsDict:
-  - key: event:/SFX/KeyBoard/Switch/Blue_Switch
+  - key: event:/SFX/KeyBoard/Switch/BrownSwitch
     index: 0
+  - key: event:/SFX/KeyBoard/Switch/BlueSwitch
+    index: 1
+  - key: event:/SFX/KeyBoard/Switch/Sans
+    index: 2
 --- !u!114 &678133531559744190
 MonoBehaviour:
   m_ObjectHideFlags: 0

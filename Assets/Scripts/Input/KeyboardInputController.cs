@@ -263,14 +263,13 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// health에 저장된 재질별 눌림음을 재생하고 미지정이면 키보드 기본 클립을 사용한다.
+        /// 키보드 기본 눌림음을 재생하며 health는 파괴 여부에 따른 볼륨 조절에 사용한다.
         /// 파괴된 키캡은 볼륨을 5%로 낮추며 체력과 입력 상태는 변경하지 않는다.
         /// </summary>
         private void PlayPressSound(KeycapHealth health)
         {
-            AudioClip clip = health != null && health.PressSound != null ? health.PressSound : _pressSound;
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
-            _audioSource.PlayOneShot(clip, volume);
+            _audioSource.PlayOneShot(_pressSound, volume);
         }
 
         /// <summary>

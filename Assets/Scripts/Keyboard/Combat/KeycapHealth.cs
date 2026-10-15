@@ -52,9 +52,7 @@ public sealed class KeycapHealth : MonoBehaviour
 
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
-    [SerializeField] private AudioClip _pressSound;
     [SerializeField] private AudioClip _breakSound;
-    public AudioClip PressSound => _pressSound;
 
     void Awake()
     {
@@ -71,7 +69,7 @@ public sealed class KeycapHealth : MonoBehaviour
     }
 
     /// <summary>
-    /// data의 등급·체력·보상·외피 재질과 설정된 효과음을 새 키캡에 한 번 적용한다.
+    /// data의 등급·체력·보상·외피 재질과 파괴음을 새 키캡에 한 번 적용한다.
     /// 최대·현재 체력과 등급 상태를 저장하고 외피 및 균열 표시를 갱신한다.
     /// </summary>
     public void InitializeSpawnData(KeyboardSpawnProfile.KeycapData data)
@@ -86,7 +84,6 @@ public sealed class KeycapHealth : MonoBehaviour
         _rarity = data.Rarity;
         _reward = data.Reward;
         _hasSpawnData = true;
-        if (data.PressSound != null) _pressSound = data.PressSound;
         if (data.BreakSound != null) _breakSound = data.BreakSound;
 
         if (_supportsRarity)

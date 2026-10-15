@@ -32,6 +32,7 @@ namespace KeyboardModeling
         [Header("Input Mapping")]
         [SerializeField] private bool _inputEnabled = true;
         [SerializeField] private KeyBinding[] _bindings = Array.Empty<KeyBinding>();
+        private bool _alphabetKeysRequired;
         private bool _hasFocus;
         private Key _lastPressedKey;
         private KeycapButton[] _keycapButtons;
@@ -148,13 +149,17 @@ namespace KeyboardModeling
             return layout;
         }
 
-        /// <summary>현재 바인딩에서 영문, 숫자, 지정 기호 및 F1~F12에 해당하는 키캡 체력 목록을 반환한다.</summary>
+        /// <summary>토너먼트의 완파 대상을 A~Z로 제한하며 기존 씬의 대상 설정은 변경하지 않는다.</summary>
+        public void UseAlphabetDestructionKeys() { _alphabetKeysRequired = true; }
+
+        /// <summary>현재 바인딩과 영문 키 제한 상태로 완파 대상 키캡 목록을 생성하여 반환한다.</summary>
         public List<KeycapHealth> GetDestructionKeycaps()
         {
             List<KeycapHealth> result = new List<KeycapHealth>();
             foreach (KeyBinding binding in _bindings)
             {
                 Key key = binding.Key;
+                if (_alphabetKeysRequired && (key < Key.A || key > Key.Z)) continue;
                 bool required = (key >= Key.A && key <= Key.Z) || (key >= Key.Digit1 && key <= Key.Digit0) || (key >= Key.F1 && key <= Key.F12);
                 required |= key == Key.Comma || key == Key.Period || key == Key.Slash || key == Key.Semicolon || key == Key.Quote || key == Key.LeftBracket || key == Key.RightBracket || key == Key.Minus || key == Key.Equals || key == Key.Backquote;
                 if (required) result.Add(binding.Keycap.GetComponent<KeycapHealth>());

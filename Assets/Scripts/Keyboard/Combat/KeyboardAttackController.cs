@@ -7,7 +7,7 @@ using Game.Session;
 namespace KeyboardModeling
 {
     /// <summary>
-    /// 키보드 입력에 따른 기본 손 타격, 콤보 또는 강화 기반 주먹과 망치 추가 타격,
+    /// 키보드 입력에 따른 기본 손 타격과 기존 강화 기반 주먹 및 망치 추가 타격,
     /// 범위 피해 및 충격파 피해를 계산하고 대상 키캡에 적용하는 공격 처리 전담 컴포넌트이다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -25,7 +25,6 @@ namespace KeyboardModeling
         private KeycapHealth[] _keycaps = Array.Empty<KeycapHealth>();
         private Vector2[] _keycapPositions = Array.Empty<Vector2>();
         private KeycapHealth _directHitTarget;
-        private KeyboardNeighborLayout _neighborLayout;
 
         [Header("Dependencies")]
         [Tooltip("화면 효과 및 타격 시각 연출을 담당하는 매니저입니다.")]
@@ -34,22 +33,9 @@ namespace KeyboardModeling
         [SerializeField] private GameSession _gameSession;
         [Tooltip("피버가 없는 씬에서는 비워 둘 수 있습니다.")]
         [SerializeField] private FeverController _feverController;
-        [Tooltip("연결하면 강화 확률 대신 현재 콤보 단계로 추가 공격을 선택합니다.")]
-        [SerializeField] private KeyboardScoreCombo _scoreCombo;
 
         [Header("Attack")]
         [SerializeField, Min(1)] private int _baseDamage = 1;
-        [SerializeField, Min(1)] private int _comboFistDamage = 1;
-        [SerializeField, Min(1)] private int _comboHammerDamage = 1;
-
-        /// <summary>
-        /// scoreCombo를 추가 공격 단계의 상태 공급자로 연결한다.
-        /// 참조만 저장하며 콤보와 점수 및 키보드 상태는 변경하지 않는다.
-        /// </summary>
-        public void SetScoreCombo(KeyboardScoreCombo scoreCombo)
-        {
-            _scoreCombo = scoreCombo;
-        }
 
         void OnEnable()
         {
@@ -104,7 +90,6 @@ namespace KeyboardModeling
             _keycaps = Array.Empty<KeycapHealth>();
             _keycapPositions = Array.Empty<Vector2>();
             _directHitTarget = null;
-            _neighborLayout = null;
 
             if (_activeKeyboard != null)
             {
@@ -118,14 +103,13 @@ namespace KeyboardModeling
                     _keycaps[index].DamageApplied += HandleDamageApplied;
                 }
 
-                _neighborLayout = new KeyboardNeighborLayout(_keycapPositions);
                 _activeKeyboard.AttackRequested += OnAttackRequested;
             }
         }
 
         /// <summary>
-        /// health에 기본 손 피해를 적용하고 연결된 콤보 또는 기존 강화로 추가 타격을 선택한다.
-        /// 입력 직전 콤보와 피버 배율을 보관하여 같은 입력의 파괴로 선택 단계가 바뀌지 않도록 한다.
+        /// health에 기본 손 피해를 적용하고 기존 강화 설정으로 추가 타격을 선택한다.
+        /// 강화의 피해 및 확률과 피버 배율을 사용하며 콤보에 따른 추가 타격은 발생시키지 않는다.
         /// 반환값은 없다.
         /// </summary>
         private void OnAttackRequested(KeycapHealth health)
@@ -156,18 +140,11 @@ namespace KeyboardModeling
             int damage = Mathf.CeilToInt((_baseDamage + damageBonus) * multiplier);
             int fistDamage = Mathf.CeilToInt(fistBaseDamage * multiplier);
             int hammerDamage = Mathf.CeilToInt(hammerBaseDamage * multiplier);
-            int combo = _scoreCombo != null ? _scoreCombo.Combo : 0;
 
             ApplyManualAttack(keyboard, destruction, health, damage, 0, 0f, true);
 
             if (destruction != null && destruction.IsBroken)
             {
-                return;
-            }
-
-            if (_scoreCombo != null)
-            {
-                PlayComboAttack(keyboard, destruction, health, combo, multiplier);
                 return;
             }
 
@@ -179,56 +156,6 @@ namespace KeyboardModeling
             if (hammerDamage > 0 && hammerChance > 0f && UnityEngine.Random.value < hammerChance)
             {
                 _feedbackManager.PlayHammerStrike(health.transform, () => ApplyHammerAttack(keyboard, destruction, health, hammerDamage));
-            }
-        }
-
-        /// <summary>
-        /// 입력 시 보관한 combo와 multiplier로 추가 공격 하나를 선택하고 연출을 요청한다.
-        /// 주먹은 단계별 주변 개수와 설정 피해를 보관하고 망치는 전체 충격파 경로를 재사용한다.
-        /// </summary>
-        private void PlayComboAttack(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth health, int combo, float multiplier)
-        {
-            KeyboardBonusAttack attack = KeyboardComboAttackPolicy.SelectAttack(combo, UnityEngine.Random.value);
-            if (attack == KeyboardBonusAttack.Fist)
-            {
-                int neighborCount = KeyboardComboAttackPolicy.GetNeighborCount(combo);
-                int damage = Mathf.CeilToInt(_comboFistDamage * multiplier);
-                _feedbackManager.PlayKeycapStrike(health.transform,
-                    () => ApplyComboFistAttack(keyboard, destruction, health, damage, neighborCount));
-            }
-            else if (attack == KeyboardBonusAttack.Hammer)
-            {
-                int damage = Mathf.CeilToInt(_comboHammerDamage * multiplier);
-                _feedbackManager.PlayHammerStrike(health.transform,
-                    () => ApplyHammerAttack(keyboard, destruction, health, damage));
-            }
-        }
-
-        /// <summary>
-        /// health에 주먹의 직접 damage를 적용하고 가까운 neighborCount개 칸에 같은 피해를 적용한다.
-        /// 입력 당시 범위를 유지하고 파괴된 주변 칸은 건너뛰며 광역 피해로 피버를 충전하지 않는다.
-        /// </summary>
-        private void ApplyComboFistAttack(KeyboardInputController keyboard, KeyboardDestruction destruction, KeycapHealth health, int damage, int neighborCount)
-        {
-            if (keyboard == null || health == null || keyboard != _activeKeyboard
-                || !keyboard.InputEnabled || !keyboard.isActiveAndEnabled
-                || (destruction != null && destruction.IsBroken)) return;
-
-            int targetIndex = Array.IndexOf(_keycaps, health);
-            if (targetIndex < 0) return;
-            KeycapHealth[] keycaps = _keycaps;
-            KeyboardNeighborLayout layout = _neighborLayout;
-            ApplyManualAttack(keyboard, destruction, health, damage, 0, 0f, false);
-
-            int count = Mathf.Min(neighborCount, layout.GetNeighborCount(targetIndex));
-            for (int index = 0; index < count; index++)
-            {
-                if (keyboard != _activeKeyboard || !keyboard.InputEnabled || !keyboard.isActiveAndEnabled
-                    || (destruction != null && destruction.IsBroken)) return;
-                KeycapHealth neighbor = keycaps[layout.GetNeighbor(targetIndex, index)];
-                if (neighbor.CurrentHP <= 0) continue;
-                keyboard.NotifyAreaKeycapHit(neighbor.transform);
-                neighbor.TakeDamage(damage);
             }
         }
 

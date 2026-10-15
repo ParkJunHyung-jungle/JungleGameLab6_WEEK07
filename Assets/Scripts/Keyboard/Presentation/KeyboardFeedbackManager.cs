@@ -300,7 +300,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     /// keyboard, keycaps, positions 배열과 targetIndex 타격 인덱스, 키캡 도달 시 호출할 onKeycapReached 콜백을 입력으로 받는다.
     /// 코루틴을 실행하여 LineRenderer 링과 키캡 물결 변위를 갱신한다.
     /// </summary>
-    public void PlayHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex, Action<KeycapHealth> onKeycapReached = null)
+    public void PlayHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex, Action<KeycapHealth> onKeycapReached = null, bool showRing = true, bool requireInput = true)
     {
         if (keyboard == null || keycaps == null || targetIndex < 0 || targetIndex >= keycaps.Length)
         {
@@ -317,7 +317,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
         Bounds bounds = shell.sharedMesh.bounds;
         Vector3 contact = keyboard.transform.InverseTransformPoint(shell.transform.TransformPoint(bounds.center + Vector3.up * bounds.extents.y));
-        StartCoroutine(SpreadHammerShockwave(keyboard, keycaps, positions, positions[targetIndex], contact.y + 0.03f, onKeycapReached));
+        StartCoroutine(SpreadHammerShockwave(keyboard, keycaps, positions, positions[targetIndex], contact.y + 0.03f, onKeycapReached, showRing, requireInput));
     }
 
     /// <summary>
@@ -995,7 +995,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     /// keyboard와 keycaps 배열, positions 좌표, center 중심과 planeHeight 높이, onKeycapReached 콜백을 사용한다.
     /// 각 키캡 도달 시 onKeycapReached를 호출하고 종료 시 키캡 변위를 원래 위치로 복원한다.
     /// </summary>
-    private IEnumerator SpreadHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, Vector2 center, float planeHeight, Action<KeycapHealth> onKeycapReached)
+    private IEnumerator SpreadHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, Vector2 center, float planeHeight, Action<KeycapHealth> onKeycapReached, bool showRing, bool requireInput)
     {
         float speed = Mathf.Max(0.01f, _hammerAnimation.WaveSpeed);
         float height = _hammerAnimation.WaveHeight;
@@ -1016,14 +1016,17 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         }
 
         float duration = maxArrival + rippleDuration;
-        LineRenderer ring = GetShockwaveRenderer();
-        ring.widthMultiplier = _hammerAnimation.WaveWidth;
-        ring.enabled = _hammerAnimation.ShowWaveRing;
-        ring.gameObject.SetActive(true);
+        LineRenderer ring = showRing ? GetShockwaveRenderer() : null;
+        if (ring != null)
+        {
+            ring.widthMultiplier = _hammerAnimation.WaveWidth;
+            ring.enabled = _hammerAnimation.ShowWaveRing;
+            ring.gameObject.SetActive(true);
+        }
 
         float elapsed = 0f;
 
-        while (elapsed <= duration && (_keyboardDestruction == null || !_keyboardDestruction.IsBroken) && keyboard.InputEnabled && keyboard.isActiveAndEnabled)
+        while (elapsed <= duration && (_keyboardDestruction == null || !_keyboardDestruction.IsBroken) && keyboard.gameObject.activeInHierarchy && (!requireInput || (keyboard.InputEnabled && keyboard.isActiveAndEnabled)))
         {
             for (int index = 0; index < keycaps.Length; index++)
             {
@@ -1045,7 +1048,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
                     onKeycapReached?.Invoke(keycap);
                 }
 
-                if ((_keyboardDestruction != null && _keyboardDestruction.IsBroken) || !keyboard.InputEnabled || !keyboard.isActiveAndEnabled)
+                if ((_keyboardDestruction != null && _keyboardDestruction.IsBroken) || !keyboard.gameObject.activeInHierarchy || (requireInput && (!keyboard.InputEnabled || !keyboard.isActiveAndEnabled)))
                 {
                     break;
                 }
@@ -1056,8 +1059,8 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
                 contributions[index] = offset;
             }
 
-            ring.enabled = _hammerAnimation.ShowWaveRing;
-            if (ring.enabled)
+            if (ring != null) ring.enabled = _hammerAnimation.ShowWaveRing;
+            if (ring != null && ring.enabled)
             {
                 float radius = Mathf.Max(0.02f, elapsed * speed);
                 for (int index = 0; index < points.Length; index++)
@@ -1077,7 +1080,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             elapsed += Mathf.Min(Time.deltaTime, 1f / 30f);
         }
 
-        if (keyboard.InputEnabled && keyboard.isActiveAndEnabled)
+        if (keyboard.gameObject.activeInHierarchy && (!requireInput || (keyboard.InputEnabled && keyboard.isActiveAndEnabled)))
         {
             for (int index = 0; index < keycaps.Length; index++)
             {
@@ -1088,8 +1091,11 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             }
         }
 
-        ring.gameObject.SetActive(false);
-        _availableShockwaves.Push(ring);
+        if (ring != null)
+        {
+            ring.gameObject.SetActive(false);
+            _availableShockwaves.Push(ring);
+        }
         ReleaseShockwaveBuffer(buffer);
     }
 

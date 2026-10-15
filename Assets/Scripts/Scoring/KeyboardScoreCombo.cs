@@ -26,6 +26,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     private float _remainingTime;
     private bool _isTimerPaused;
     private bool _isTracking = true;
+    private float _bonusRemaining;
 
     public long Score => _score;
     public int Combo => _combo;
@@ -34,6 +35,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     public float TimeRatio => _combo == 0 ? 0f : _remainingTime / Duration;
     private float Duration => _combo >= 150 ? 5f : _combo >= 100 ? 6f : _combo >= 50 ? 8f : 10f;
     public bool IsTimerPaused => _isTimerPaused;
+    public float BonusRemaining => _bonusRemaining;
 
     public KeyboardInputController Keyboard
     {
@@ -56,6 +58,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 
     void Update()
     {
+        if (_isTracking) _bonusRemaining = Mathf.Max(0f, _bonusRemaining - Time.deltaTime);
         if (!_isTracking || _combo == 0 || _isTimerPaused)
         {
             return;
@@ -130,6 +133,20 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     public void ResetState()
     {
         _score = 0;
+        _bonusRemaining = 0f;
+        ResetCombo();
+    }
+
+    /// <summary>duration초 동안 점수 2배를 적용하며 효과 중 재발동하면 남은 시간을 갱신한다.</summary>
+    public void ActivateBonus(float duration)
+    {
+        _bonusRemaining = duration;
+    }
+
+    /// <summary>입력값 없이 보너스 효과와 콤보를 초기화하고 누적 점수는 유지한다.</summary>
+    public void ResetBattleEffects()
+    {
+        _bonusRemaining = 0f;
         ResetCombo();
     }
 
@@ -203,7 +220,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     {
         if (!_isTracking || !isActiveAndEnabled)
             return;
-        _score += (int)(BASE_SCORE * Multiplier);
+        _score += (int)(BASE_SCORE * Multiplier) * (_bonusRemaining > 0f ? 2 : 1);
         StateChanged?.Invoke();
     }
 
@@ -216,7 +233,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
         keycap.Broken -= HandleKeycapBroken;
         if (!_isTracking || !isActiveAndEnabled)
             return;
-        _score += (int)(KEYCAP_BREAK_SCORE * Multiplier);
+        _score += (int)(KEYCAP_BREAK_SCORE * Multiplier) * (_bonusRemaining > 0f ? 2 : 1);
         _combo++;
         _remainingTime = Duration;
         StateChanged?.Invoke();

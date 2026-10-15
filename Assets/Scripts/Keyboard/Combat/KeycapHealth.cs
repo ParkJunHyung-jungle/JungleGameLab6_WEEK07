@@ -71,6 +71,19 @@ public sealed class KeycapHealth : MonoBehaviour
     }
 
     /// <summary>
+    /// 아직 손상되지 않은 키캡에 maxHP를 적용하여 최대 체력과 현재 체력을 변경한다.
+    /// 토너먼트 생성 시 사용하며 균열 표시를 갱신하고 기존 파괴 상태의 변경은 거부한다.
+    /// </summary>
+    public void ConfigureTournamentHealth(int maxHP)
+    {
+        if (_broken || _currentHP != _maxHP || maxHP < 1)
+            throw new InvalidOperationException("Tournament health requires an untouched keycap and positive health.");
+        _maxHP = maxHP;
+        _currentHP = maxHP;
+        UpdateDamageDecal();
+    }
+
+    /// <summary>
     /// data의 등급·체력·보상·외피 재질과 설정된 효과음을 새 키캡에 한 번 적용한다.
     /// 최대·현재 체력과 등급 상태를 저장하고 외피 및 균열 표시를 갱신한다.
     /// </summary>

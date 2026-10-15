@@ -19,6 +19,15 @@ namespace KeyboardModeling
         private bool _isAttacking;
         public bool IsAttacking => _isAttacking;
 
+        /// <summary>speed와 damage로 대전의 공격 설정을 변경하고 팔 동작을 타격 간격에 맞춘다.</summary>
+        public void ConfigureTournamentAttack(float speed, int damage)
+        {
+            StopAttacking();
+            _attacksPerSecond = Mathf.Max(0.01f, speed);
+            _damage = Mathf.Max(1, damage);
+            _arm.ConfigureTournamentMotion(0.7f / _attacksPerSecond);
+        }
+
         void OnDisable()
         {
             StopAttacking();

@@ -24,6 +24,13 @@ public class KeyboardSpawner : MonoBehaviour
 
     public event Action<GameObject> KeyboardSpawned;
 
+    /// <summary>생성 중인 연출을 중단하여 종료된 대전의 입력 재개와 완료 알림을 방지한다.</summary>
+    public void CancelSpawn()
+    {
+        if (_spawnRoutine != null) StopCoroutine(_spawnRoutine);
+        _spawnRoutine = null;
+    }
+
     /// <summary>
     /// 지정된 Transform의 위치와 회전을 기반으로 키보드를 생성한다.
     /// spawnPoint 위치와 회전, withAnimation 애니메이션 적용 여부를 입력받아 키보드를 생성하고 인스턴스를 반환한다.

@@ -1365,6 +1365,8 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
   const scoreSnapshots = [];
   const intervalSummaries = [];
   const stageStarts = [];
+  const stageRuns = [];
+  let activeStageRun = null;
   let finalPlayerScore = null;
   let finalEnemyScore = null;
   let stageDuration = 0;
@@ -1407,6 +1409,40 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
       if (elapsed < minElapsed) minElapsed = elapsed;
     }
 
+    if (rowRecordType === "StageStart" && Number.isFinite(elapsed)) {
+      activeStageRun = {
+        id: rowStageRunId || String(stageRuns.length),
+        startElapsed: elapsed,
+        endElapsed: null,
+        downTimestamps: [],
+        scoreSnapshots: [],
+        intervalSummaries: []
+      };
+      const initialScore = Number(rowPlayerScore);
+      if (rowPlayerScore !== "" && Number.isFinite(initialScore)) {
+        activeStageRun.scoreSnapshots.push({ elapsed, score: initialScore });
+      }
+      stageRuns.push(activeStageRun);
+    }
+    const currentRun = rowStageRunId
+      ? stageRuns.find(run => run.id === rowStageRunId)
+      : activeStageRun;
+    if (currentRun) {
+      if (rowRecordType === "KeyInput" && event === "down" && Number.isFinite(elapsed)) {
+        currentRun.downTimestamps.push(elapsed);
+      } else if (rowRecordType === "ScoreSnapshot" && rowPlayerScore !== "" && Number.isFinite(elapsed)) {
+        const score = Number(rowPlayerScore);
+        if (Number.isFinite(score)) currentRun.scoreSnapshots.push({ elapsed, score });
+      } else if (rowRecordType === "StageEnd" && Number.isFinite(elapsed)) {
+        currentRun.endElapsed = elapsed;
+        const score = Number(rowPlayerScore);
+        if (rowPlayerScore !== "" && Number.isFinite(score)) {
+          currentRun.scoreSnapshots.push({ elapsed, score });
+        }
+        if (currentRun === activeStageRun) activeStageRun = null;
+      }
+    }
+
     // 1) 레코드 타입 기반 처리 (신규 29열 CSV)
     if (col.recordType !== -1 && rowRecordType) {
       if (rowRecordType === "KeyInput" && event === "down") {
@@ -1440,7 +1476,7 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
         const delta = rowScoreDelta !== "" ? parseFloat(rowScoreDelta) : 0;
         const dur = rowDuration !== "" ? parseFloat(rowDuration) : (endElapsed - startElapsed);
 
-        intervalSummaries.push({
+        const intervalSummary = {
           startElapsed: !isNaN(startElapsed) ? startElapsed : elapsed,
           endElapsed: !isNaN(endElapsed) ? endElapsed : elapsed,
           scorePerSecond: !isNaN(sps) ? sps : 0,
@@ -1448,7 +1484,9 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
           combo: !isNaN(comboVal) ? comboVal : 0,
           scoreDelta: !isNaN(delta) ? delta : 0,
           duration: !isNaN(dur) ? dur : 0
-        });
+        };
+        intervalSummaries.push(intervalSummary);
+        if (currentRun) currentRun.intervalSummaries.push(intervalSummary);
       } else if (rowRecordType === "StageStart") {
         if (!isNaN(elapsed)) stageStarts.push(elapsed);
         if (rowPlayerScore !== "") finalPlayerScore = parseInt(rowPlayerScore, 10);
@@ -1518,6 +1556,7 @@ function parseSingleCsv(csvContent, fileName = "Unknown") {
     scoreSnapshots,
     intervalSummaries,
     stageStarts,
+    stageRuns,
     finalPlayerScore: finalPlayerScore !== null ? finalPlayerScore : 0,
     finalEnemyScore: finalEnemyScore !== null ? finalEnemyScore : 0,
     hasScoreData: finalPlayerScore !== null,
@@ -1695,6 +1734,7 @@ function renderComparisonTable() {
 
 // 8. 뷰 일괄 갱신 함수
 function updateView() {
+  syncViewerNavigation();
   const elSessionId = document.getElementById("sessionIdText");
   const elBuild = document.getElementById("buildVersionText");
   const elElapsed = document.getElementById("elapsedTimeText");
@@ -1716,14 +1756,6 @@ function updateView() {
   const statWinRate = document.getElementById("statWinRate");
   const statAvgApm = document.getElementById("statAvgApm");
 
-  // 글로벌 세션 네비게이션 카드 요소들
-  const sessionGlobalCard = document.getElementById("sessionGlobalCard");
-  const currentSessionAvatar = document.getElementById("currentSessionAvatar");
-  const currentSessionTag = document.getElementById("currentSessionTag");
-  const currentSessionBadge = document.getElementById("currentSessionBadge");
-  const currentSessionName = document.getElementById("currentSessionName");
-  const sessionTabs = document.getElementById("sessionTabs");
-
   if (loadedSessions.length === 0) {
     resetViewer();
     return;
@@ -1734,7 +1766,6 @@ function updateView() {
     if (toolbar) toolbar.style.display = "none";
     if (fileCountBadge) fileCountBadge.style.display = "none";
     if (fileListTags) fileListTags.style.display = "none";
-    if (sessionGlobalCard) sessionGlobalCard.style.display = "none";
     if (summaryStatsGrid) summaryStatsGrid.style.display = "none";
 
     const session = loadedSessions[0];
@@ -1795,32 +1826,6 @@ function updateView() {
       tag.className = "file-tag";
       tag.innerHTML = `📄 ${s.fileName} <button type="button" class="tag-remove-btn" title="이 파일 제외" data-index="${idx}">×</button>`;
       fileListTags.appendChild(tag);
-    });
-  }
-
-  // 글로벌 세션 네비게이션 카드 표시 및 탭 렌더링
-  if (sessionGlobalCard && sessionTabs) {
-    sessionGlobalCard.style.display = "flex";
-    sessionTabs.innerHTML = "";
-
-    // 1) 전체 통합 탭
-    const allTabBtn = document.createElement("button");
-    allTabBtn.type = "button";
-    allTabBtn.className = "player-tab-btn" + (selectedSessionIndex === -1 ? " active" : "");
-    allTabBtn.setAttribute("data-index", "-1");
-    allTabBtn.innerText = "📊 전체 통합";
-    sessionTabs.appendChild(allTabBtn);
-
-    // 2) 개별 세션 탭 목록
-    loadedSessions.forEach((s, idx) => {
-      const tabBtn = document.createElement("button");
-      tabBtn.type = "button";
-      tabBtn.className = "player-tab-btn" + (selectedSessionIndex === idx ? " active" : "");
-      tabBtn.setAttribute("data-index", idx.toString());
-      const shortName = s.fileName.length > 14 ? s.fileName.substring(0, 12) + ".." : s.fileName;
-      tabBtn.innerText = `🎮 ${idx + 1}. ${shortName}`;
-      tabBtn.title = s.fileName;
-      sessionTabs.appendChild(tabBtn);
     });
   }
 
@@ -1898,14 +1903,6 @@ function updateView() {
       }
     }
 
-    if (currentSessionAvatar) currentSessionAvatar.innerText = session.result === "WIN" ? "🏆" : "🎮";
-    if (currentSessionTag) currentSessionTag.innerText = `INDIVIDUAL SESSION #${selectedSessionIndex + 1} (${session.stageId})`;
-    if (currentSessionBadge) currentSessionBadge.innerText = `Session ${selectedSessionIndex + 1}`;
-    if (currentSessionName) {
-      const scoreStr = session.hasScoreData ? `, ${session.finalPlayerScore.toLocaleString()}점` : "";
-      currentSessionName.innerText = `${session.fileName} (기록 ${(session.playDuration > 0 ? session.playDuration : session.maxElapsed).toFixed(1)}초, ${session.totalDownCount.toLocaleString()}타${scoreStr})`;
-    }
-
     renderKeyboard(session.keyCounts, false, session.keyCounts, 1);
     renderRanking(session.keyCounts, false);
     renderTimelineChart(session.downTimestamps, false, 1, session.maxElapsed);
@@ -1932,13 +1929,6 @@ function updateView() {
     } else {
       apmText.style.display = "none";
     }
-  }
-
-  if (currentSessionAvatar) currentSessionAvatar.innerText = "📊";
-  if (currentSessionTag) currentSessionTag.innerText = `AGGREGATED SESSIONS (${agg.sessionCount} FILES)`;
-  if (currentSessionBadge) currentSessionBadge.innerText = "ALL SESSIONS";
-  if (currentSessionName) {
-    currentSessionName.innerText = isAvg ? `전체 세션 통합 분석 (세션별 평균)` : `전체 세션 통합 분석 (종합 합계)`;
   }
 
   if (isAvg) {
@@ -2216,8 +2206,12 @@ function redrawCurrentChart() {
 function resetViewer() {
   loadedSessions = [];
   selectedSessionIndex = -1;
+  selectedOverlayRound = "ALL";
+  syncViewerNavigation();
   currentViewMode = "total";
   chartHoverData = null;
+  overlayVisibilityMap.clear();
+  hoveredOverlayTime = null;
 
   const elSessionId = document.getElementById("sessionIdText");
   if (elSessionId) elSessionId.innerText = "Session: 대기 중 (CSV 파일을 로드하세요)";
@@ -2264,11 +2258,7 @@ function resetViewer() {
     fileListTags.innerHTML = "";
   }
 
-  const sessionGlobalCard = document.getElementById("sessionGlobalCard");
-  if (sessionGlobalCard) sessionGlobalCard.style.display = "none";
 
-  const sessionTabs = document.getElementById("sessionTabs");
-  if (sessionTabs) sessionTabs.innerHTML = "";
 
   const fileInput = document.getElementById("csvFileInput");
   if (fileInput) fileInput.value = "";
@@ -2339,6 +2329,8 @@ function loadFiles(fileList) {
 
 // 10. 초기화 및 이벤트 리스너 등록
 document.addEventListener("DOMContentLoaded", () => {
+  setupViewerNavigation();
+
   // 1) 웹 처음 열었을 때는 샘플 데이터를 자동 로드하지 않고 빈 상태로 초기화
   resetViewer();
 
@@ -2400,50 +2392,6 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedSessionIndex = -1;
       } else {
         selectedSessionIndex = parseInt(val, 10);
-      }
-      updateView();
-    });
-  }
-
-  // 7) 세션 글로벌 카드 네비게이션 탭 클릭
-  const sessionTabs = document.getElementById("sessionTabs");
-  if (sessionTabs) {
-    sessionTabs.addEventListener("click", e => {
-      const btn = e.target.closest(".player-tab-btn");
-      if (!btn) return;
-      const index = parseInt(btn.getAttribute("data-index"), 10);
-      selectedSessionIndex = index;
-      updateView();
-    });
-  }
-
-  // 8) 이전(◀), 다음(▶) 세션 이동 버튼
-  const prevSessionBtn = document.getElementById("prevSessionBtn");
-  const nextSessionBtn = document.getElementById("nextSessionBtn");
-
-  if (prevSessionBtn) {
-    prevSessionBtn.addEventListener("click", () => {
-      if (loadedSessions.length <= 1) return;
-      if (selectedSessionIndex === -1) {
-        selectedSessionIndex = loadedSessions.length - 1;
-      } else if (selectedSessionIndex === 0) {
-        selectedSessionIndex = -1; // 전체 통합으로 순환
-      } else {
-        selectedSessionIndex--;
-      }
-      updateView();
-    });
-  }
-
-  if (nextSessionBtn) {
-    nextSessionBtn.addEventListener("click", () => {
-      if (loadedSessions.length <= 1) return;
-      if (selectedSessionIndex === -1) {
-        selectedSessionIndex = 0;
-      } else if (selectedSessionIndex === loadedSessions.length - 1) {
-        selectedSessionIndex = -1; // 전체 통합으로 순환
-      } else {
-        selectedSessionIndex++;
       }
       updateView();
     });
@@ -2753,144 +2701,88 @@ const OVERLAY_PALETTE = [
   { color: "#f87171", dash: [3, 3], name: "Red Dot" }        // 8순위: 레드 점선
 ];
 
+let selectedOverlayRound = "ALL";
 let activeOverlaySeries = [];
 let overlayVisibilityMap = new Map(); // series id -> boolean
 let hoveredOverlayTime = null;
 let overlayEventsInitialized = false;
 
-// 회차(Round) 및 사용자별 데이터 시리즈 빌드
-// 파일 1개 = 1명의 사용자 (User 1, User 2, ...), 100초 기준 다회차 분할 (100초 이하인 경우 1줄 유지)
+/**
+ * 세션의 실제 스테이지 회차와 선택된 집계 기준을 사용하여 비교 곡선을 반환한다.
+ * 각 회차 시작을 0초로 맞추며, 점수 속도와 APM 구간을 생성한다.
+ */
 function buildOverlaySeries() {
-  const roundDurationInput = document.getElementById("overlayRoundDuration");
-  const roundDuration = (roundDurationInput ? parseFloat(roundDurationInput.value) : 100) || 100;
-  const intervalModeSelect = document.getElementById("overlayIntervalMode");
-  const mode = intervalModeSelect ? intervalModeSelect.value : "auto";
-
+  const durationInput = document.getElementById("overlayRoundDuration");
+  const requestedDuration = Number(durationInput ? durationInput.value : 100);
+  const roundDuration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : 100;
+  const modeSelect = document.getElementById("overlayIntervalMode");
+  const mode = modeSelect ? modeSelect.value : "auto";
   const series = [];
-  if (!loadedSessions || loadedSessions.length === 0) {
-    return series;
-  }
 
-  // 로드된 각 세션(파일)을 순회
   loadedSessions.forEach((session, fileIdx) => {
-    const userNumber = fileIdx + 1;
-    const userLabel = `User ${userNumber}`;
+    const runs = session.stageRuns.length > 0 ? session.stageRuns : [{
+      id: "legacy",
+      startElapsed: session.minElapsed,
+      endElapsed: session.maxElapsed,
+      downTimestamps: session.downTimestamps,
+      scoreSnapshots: session.scoreSnapshots,
+      intervalSummaries: session.intervalSummaries
+    }];
 
-    // 기준 시작 시간 산출 (StageStart 기준 우선, 없으면 최초 타임스탬프)
-    let baseStart = 0;
-    if (session.stageStarts && session.stageStarts.length > 0) {
-      baseStart = session.stageStarts[0];
-    } else if (session.minElapsed !== Infinity && session.minElapsed > 0) {
-      baseStart = session.minElapsed;
-    }
-
-    const maxTime = session.maxElapsed || (baseStart + 10);
-    const recordedDuration = session.playDuration > 0 ? session.playDuration : Math.max(0, maxTime - baseStart);
-
-    // 100초를 초과한 긴 파일일 때만 2회차, 3회차로 분할, 그렇지 않으면 무조건 1회차(1줄)
-    const totalRounds = recordedDuration > roundDuration ? Math.ceil(recordedDuration / roundDuration) : 1;
-
-    for (let r = 1; r <= totalRounds; r++) {
-      const rStart = baseStart + (r - 1) * roundDuration;
-      const rEnd = rStart + roundDuration;
+    runs.forEach((run, roundIndex) => {
+      const nextRun = runs[roundIndex + 1];
+      const runEnd = run.endElapsed ?? (nextRun ? nextRun.startElapsed : session.maxElapsed);
+      const duration = Math.min(roundDuration, Math.max(0, runEnd - run.startElapsed));
+      const intervals = run.intervalSummaries
+        .filter(interval => Number.isFinite(interval.startElapsed) && interval.endElapsed > interval.startElapsed)
+        .slice().sort((a, b) => a.startElapsed - b.startElapsed);
       const scoreSegments = [];
       const apmSegments = [];
 
-      // CSV 기록 구간 (IntervalSummary) 사용 조건: 모드가 "combo"이고 해당 인터벌이 2개 이상일 때
-      const hasValidIntervals = session.intervalSummaries && session.intervalSummaries.length >= 2;
-      if (mode === "combo" && hasValidIntervals) {
-        let lastEndRel = 0;
-        session.intervalSummaries.forEach(interval => {
-          const startRaw = interval.startElapsed;
-          const endRaw = interval.endElapsed;
-          if (endRaw < rStart || startRaw > rEnd) return;
-
-          const relStart = Math.max(0, Math.min(roundDuration, startRaw - rStart));
-          const relEnd = Math.max(0, Math.min(roundDuration, endRaw - rStart));
-
-          if (relEnd > relStart) {
-            // 빈 틈이 있으면 0으로 메꿈
-            if (relStart > lastEndRel) {
-              scoreSegments.push({ start: lastEndRel, end: relStart, value: 0 });
-              apmSegments.push({ start: lastEndRel, end: relStart, value: 0 });
-            }
-            scoreSegments.push({ start: relStart, end: relEnd, value: interval.scorePerSecond || 0 });
-            apmSegments.push({ start: relStart, end: relEnd, value: Math.round(interval.apm || 0) });
-            lastEndRel = relEnd;
-          }
+      if ((mode === "auto" || mode === "combo") && intervals.length > 0) {
+        intervals.forEach(interval => {
+          const start = Math.max(0, interval.startElapsed - run.startElapsed);
+          const end = Math.min(duration, interval.endElapsed - run.startElapsed);
+          if (end <= start) return;
+          scoreSegments.push({ start, end, value: interval.scorePerSecond });
+          apmSegments.push({ start, end, value: interval.apm });
         });
-
-        // 라운드 종료(roundDuration)까지 남은 구간을 0으로 채움
-        if (lastEndRel < roundDuration) {
-          scoreSegments.push({ start: lastEndRel, end: roundDuration, value: 0 });
-          apmSegments.push({ start: lastEndRel, end: roundDuration, value: 0 });
-        }
-      } else {
-        // 균등 윈도우 집계 (기본 "auto" 및 "window_10"은 10초, "window_5"는 5초)
+      } else if (mode !== "combo") {
         const windowSize = mode === "window_5" ? 5 : 10;
-        const snapshots = session.scoreSnapshots || [];
-        const timestamps = session.downTimestamps || [];
-
-        for (let sec = 0; sec < roundDuration; sec += windowSize) {
-          const segStart = sec;
-          const segEnd = Math.min(roundDuration, sec + windowSize);
-          const dur = segEnd - segStart;
-          if (dur <= 0) break;
-
-          const absStart = rStart + segStart;
-          const absEnd = rStart + segEnd;
-
-          // 키 다운 APM 집계
-          const downCount = timestamps.filter(t => t >= absStart && t < absEnd).length;
-          const apm = Math.round((downCount / dur) * 60);
-
-          // 점수 획득 속도 (점/초) 집계
-          const inWinSnaps = snapshots.filter(s => s.elapsed >= absStart && s.elapsed <= absEnd);
-          let sps = 0;
-          if (inWinSnaps.length >= 2) {
-            const delta = inWinSnaps[inWinSnaps.length - 1].score - inWinSnaps[0].score;
-            sps = Math.max(0, delta / dur);
-          } else if (downCount > 0) {
-            // 1타당 10점 기반 환산
-            sps = Math.max(0, (downCount * 10) / dur);
-          }
-
-          // CSV의 IntervalSummary에 점수/초가 있으면 보정 참조
-          const matchedInterval = (session.intervalSummaries || []).find(it => absStart >= it.startElapsed && absStart < it.endElapsed);
-          if (matchedInterval && matchedInterval.scorePerSecond > 0 && sps === 0) {
-            sps = matchedInterval.scorePerSecond;
-          }
-
-          scoreSegments.push({ start: segStart, end: segEnd, value: Math.round(sps * 10) / 10 });
-          apmSegments.push({ start: segStart, end: segEnd, value: apm });
+        const snapshots = run.scoreSnapshots.slice().sort((a, b) => a.elapsed - b.elapsed);
+        for (let start = 0; start < duration; start += windowSize) {
+          const end = Math.min(duration, start + windowSize);
+          const absStart = run.startElapsed + start;
+          const absEnd = run.startElapsed + end;
+          const isLast = end === duration;
+          const downCount = run.downTimestamps.filter(time => time >= absStart &&
+            (time < absEnd || (isLast && time === absEnd))).length;
+          const delta = snapshots.reduce((sum, snapshot, index) => {
+            if (index === 0 || snapshot.elapsed <= absStart || snapshot.elapsed > absEnd) return sum;
+            return sum + Math.max(0, snapshot.score - snapshots[index - 1].score);
+          }, 0);
+          if (snapshots.length > 0) scoreSegments.push({ start, end, value: delta / (end - start) });
+          apmSegments.push({ start, end, value: downCount * 60 / (end - start) });
         }
       }
 
-      // 시리즈 등록
-      const seriesId = `session-${fileIdx}-round-${r}`;
-      const colorIdx = series.length % OVERLAY_PALETTE.length;
-      const palette = OVERLAY_PALETTE[colorIdx];
-
-      const shortFileName = session.fileName.replace(/\.csv$/i, "").replace(/^Playtest_/, "");
-      const cleanFileTag = shortFileName.length > 20 ? shortFileName.substring(0, 18) + "…" : shortFileName;
-      const label = totalRounds > 1
-        ? `${userLabel} (${cleanFileTag}) - ${r}회차`
-        : `${userLabel} (${cleanFileTag})`;
-
+      const id = JSON.stringify([session.sessionId, session.fileName, run.id]);
+      const palette = OVERLAY_PALETTE[series.length % OVERLAY_PALETTE.length];
+      const user = "User " + (fileIdx + 1);
+      const fileTag = session.fileName.replace(/\.csv$/i, "");
       series.push({
-        id: seriesId,
-        label: label,
-        user: userLabel,
-        round: r,
+        id,
+        label: user + " (" + fileTag + ") - " + (roundIndex + 1) + "회차",
+        user,
+        round: roundIndex + 1,
         color: palette.color,
         dash: palette.dash,
-        visible: overlayVisibilityMap.has(seriesId) ? overlayVisibilityMap.get(seriesId) : true,
+        visible: overlayVisibilityMap.has(id) ? overlayVisibilityMap.get(id) : true,
         scoreSegments,
         apmSegments
       });
-    }
+    });
   });
-
   return series;
 }
 
@@ -2904,7 +2796,7 @@ function renderOverlayChips() {
 
   if (activeOverlaySeries.length === 0) {
     if (badge) badge.innerText = "0개 파일 로드됨 (0줄 표시)";
-    container.innerHTML = `<span style="color:#64748b;font-size:12px;padding:4px 0;">비교할 CSV 파일을 상단에서 추가해주세요. (파일 1개 = 1줄, 100초 기준)</span>`;
+    container.innerHTML = `<span style="color:#64748b;font-size:12px;padding:4px 0;">비교할 CSV 파일을 상단에서 추가해주세요. (플레이어의 회차마다 곡선 추가)</span>`;
     return;
   }
 
@@ -3056,7 +2948,7 @@ function drawOverlayStepChart(canvasId, type) {
     ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("비교할 CSV 파일을 업로드하면 0~100초 구간 중첩 그래프가 표시됩니다.", margin.left + plotW / 2, margin.top + plotH / 2);
+    ctx.fillText("비교할 CSV 파일을 업로드하면 회차별 중첩 그래프가 표시됩니다.", margin.left + plotW / 2, margin.top + plotH / 2);
     return;
   }
 
@@ -3126,7 +3018,17 @@ function redrawOverlayCharts() {
 }
 
 function renderOverlayComparison() {
-  activeOverlaySeries = buildOverlaySeries();
+  const allSeries = buildOverlaySeries();
+  const availableSeries = selectedSessionIndex < 0 ? allSeries
+    : allSeries.filter(series => series.user === "User " + (selectedSessionIndex + 1));
+  if (!availableSeries.some(series => series.id === selectedOverlayRound)) selectedOverlayRound = "ALL";
+  const roundSelect = document.getElementById("navRoundSelect");
+  roundSelect.replaceChildren(new Option("모든 회차", "ALL"));
+  availableSeries.forEach(series => roundSelect.add(new Option(series.label, series.id)));
+  roundSelect.value = selectedOverlayRound;
+  roundSelect.disabled = availableSeries.length === 0;
+  activeOverlaySeries = selectedOverlayRound === "ALL" ? availableSeries
+    : availableSeries.filter(series => series.id === selectedOverlayRound);
   renderOverlayChips();
   redrawOverlayCharts();
 
@@ -3165,7 +3067,7 @@ function setupOverlayChartEvents() {
 
         activeOverlaySeries.filter(s => s.visible).forEach(s => {
           const segs = type === "score" ? s.scoreSegments : s.apmSegments;
-          const match = segs.find(seg => hoveredOverlayTime >= seg.start && hoveredOverlayTime <= seg.end);
+          const match = segs.find(seg => hoveredOverlayTime >= seg.start && (hoveredOverlayTime < seg.end || (hoveredOverlayTime === maxTime && seg.end === maxTime)));
           if (match) {
             hasData = true;
             const valStr = type === "score" ? `${match.value.toFixed(1)} 점/초` : `${Math.round(match.value)} APM`;
@@ -3221,21 +3123,61 @@ function setupOverlayChartEvents() {
     });
   }
 
-  // View 5 PDF 인쇄 버튼
-  const printView5Btn = document.getElementById("printView5Btn");
-  if (printView5Btn) {
-    printView5Btn.addEventListener("click", () => {
-      window.print();
-    });
-  }
+}
 
-  // View 5 PNG 이미지 저장 버튼
-  const imgView5Btn = document.getElementById("imgView5Btn");
-  if (imgView5Btn) {
-    imgView5Btn.addEventListener("click", () => {
-      if (typeof captureCardToImage === "function") {
-        captureCardToImage("view5Section", "View5_MultiUser_Overlay");
-      }
+/**
+ * 로드된 세션과 현재 선택값을 사용하여 고정 탐색 메뉴의 선택 상태를 갱신한다.
+ * 플레이어 목록과 이동 버튼의 사용 가능 상태를 변경한다.
+ */
+function syncViewerNavigation() {
+  const select = document.getElementById("navSessionSelect");
+  select.replaceChildren(new Option(loadedSessions.length ? "전체 플레이어" : "CSV를 불러오세요", "-1"));
+  loadedSessions.forEach((session, index) => select.add(new Option((index + 1) + ". " + session.fileName, String(index))));
+  select.value = String(selectedSessionIndex);
+  select.disabled = loadedSessions.length === 0;
+  document.getElementById("navPrevSession").disabled = loadedSessions.length < 2;
+  document.getElementById("navNextSession").disabled = loadedSessions.length < 2;
+  document.querySelector('[data-view="comparisonCard"]').hidden = loadedSessions.length < 2;
+  document.getElementById("navStatus").textContent = selectedSessionIndex < 0
+    ? "전체 플레이어 선택" : loadedSessions[selectedSessionIndex]?.fileName || "";
+}
+
+/**
+ * 고정 탐색 메뉴의 입력과 화면 구역을 연결한다.
+ * 플레이어 및 회차 선택으로 데이터를 갱신하고 현재 보고 있는 구역을 표시한다.
+ */
+function setupViewerNavigation() {
+  const selectSession = index => {
+    selectedSessionIndex = index;
+    selectedOverlayRound = "ALL";
+    updateView();
+  };
+  document.getElementById("navSessionSelect").addEventListener("change", event => selectSession(Number(event.target.value)));
+  document.getElementById("navPrevSession").addEventListener("click", () => {
+    selectSession(selectedSessionIndex === -1 ? loadedSessions.length - 1 : selectedSessionIndex - 1);
+  });
+  document.getElementById("navNextSession").addEventListener("click", () => {
+    selectSession(selectedSessionIndex === loadedSessions.length - 1 ? -1 : selectedSessionIndex + 1);
+  });
+  document.getElementById("navRoundSelect").addEventListener("change", event => {
+    selectedOverlayRound = event.target.value;
+    renderOverlayComparison();
+  });
+  document.getElementById("navUploadBtn").addEventListener("click", () => document.getElementById("csvFileInput").click());
+  const nav = document.querySelector(".viewer-nav");
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--viewer-nav-offset", (nav.getBoundingClientRect().height + 24) + "px");
+  }).observe(nav);
+  const links = Array.from(document.querySelectorAll(".viewer-nav-links a"));
+  const observer = new IntersectionObserver(entries => {
+    const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    if (!visible.length) return;
+    links.forEach(link => {
+      const active = link.dataset.view === visible[0].target.id;
+      link.classList.toggle("active", active);
+      if (active) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
     });
-  }
+  }, { rootMargin: "-15% 0px -55% 0px", threshold: 0 });
+  links.forEach(link => observer.observe(document.getElementById(link.dataset.view)));
 }

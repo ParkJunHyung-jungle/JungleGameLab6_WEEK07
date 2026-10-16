@@ -245,7 +245,10 @@ namespace Game.Player
                 Label(button.transform, _patternNames[index], 10f, 0f, 340f, 32f, 12, Color.white);
                 button.Clicked += selected =>
                 {
+                    string previous = _customization.CurrentLEDPattern.ToString();
                     _customization.SetLEDPattern(pattern);
+                    Game.Logging.CustomizationTelemetry.Emit(_customization, "ElementSelected", "LED", pattern.ToString(),
+                        previous, changed: previous != pattern.ToString());
                     RefreshPattern();
                     _patternMenu.SetActive(false);
                 };
@@ -261,6 +264,8 @@ namespace Game.Player
         private void HandlePowerClicked(KeyboardEditButton button)
         {
             _customization.SetLEDEnabled(!_customization.LEDEnabled);
+            Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Power",
+                changed: true, details: _customization.LEDEnabled ? "true" : "false");
             RefreshPower();
         }
 
@@ -312,7 +317,9 @@ namespace Game.Player
         /// </summary>
         private void HandleIntensityChanged(float value)
         {
+            float previous = _customization.LEDIntensity;
             _customization.SetLEDIntensity(value);
+            ObserveAdjustment("Intensity", previous, _customization.LEDIntensity);
             RefreshValues();
         }
 
@@ -322,7 +329,9 @@ namespace Game.Player
         /// </summary>
         private void HandleSpeedChanged(float value)
         {
+            float previous = _customization.LEDSpeed;
             _customization.SetLEDSpeed(value);
+            ObserveAdjustment("Speed", previous, _customization.LEDSpeed);
             RefreshValues();
         }
 
@@ -332,9 +341,24 @@ namespace Game.Player
         /// </summary>
         private void ApplyColor(Color color, bool syncPicker)
         {
+            string previous = ColorUtility.ToHtmlStringRGBA(_customization.LEDColor);
             _customization.SetLEDColor(color);
+            string applied = ColorUtility.ToHtmlStringRGBA(_customization.LEDColor);
+            Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Color",
+                previous, changed: previous != applied, details: applied);
             _patternMenu.SetActive(false);
             RefreshColor(syncPicker);
+        }
+
+        /// <summary>
+        /// LED의 element 조작 전 previous와 적용 후 value를 관찰자에게 전달한다.
+        /// 연속 슬라이더 조작은 요소 버튼 선택과 별도 이벤트로 기록한다.
+        /// </summary>
+        private void ObserveAdjustment(string element, float previous, float value)
+        {
+            Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", element,
+                previous.ToString(CultureInfo.InvariantCulture), changed: !Mathf.Approximately(previous, value),
+                details: value.ToString(CultureInfo.InvariantCulture));
         }
 
         /// <summary>

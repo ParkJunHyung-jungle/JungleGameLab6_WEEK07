@@ -433,6 +433,8 @@ namespace Game.Player
             _keyboardEditOverlayUI?.SetLEDCustomization(customization);
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(true);
+            Game.Logging.CustomizationTelemetry.Emit(customization, "CustomizationStart");
+            _keyboardEditOverlayUI?.ObserveAvailableOptions();
             if (_centerReticle != null)
                 _centerReticle.SetActive(false);
 
@@ -493,6 +495,9 @@ namespace Game.Player
         /// </summary>
         private void ExitKeyboardEditMode()
         {
+            if (_editingKeyboard != null)
+                Game.Logging.CustomizationTelemetry.Emit(_editingKeyboard.GetComponent<KeyboardCustomization>(),
+                    "CustomizationEnd", details: "RightClickExit");
             _isKeyboardEditMode = false;
             StopEditingKeyboardRotation();
             if (_keyboardEditOverlay != null)
@@ -582,6 +587,9 @@ namespace Game.Player
         /// </summary>
         private void ResetKeyboardEditMode()
         {
+            if (_editingKeyboard != null)
+                Game.Logging.CustomizationTelemetry.Emit(_editingKeyboard.GetComponent<KeyboardCustomization>(),
+                    "CustomizationEnd", success: false, details: "EditInterrupted");
             StopEditingKeyboardRotation();
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(false);
@@ -774,7 +782,12 @@ namespace Game.Player
 
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
             if (customization != null)
+            {
+                string previous = customization.KeycapMaterial != null ? customization.KeycapMaterial.name : "";
                 customization.SetKeycapMaterial(material);
+                Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Keycap", material.name,
+                    previous, changed: previous != material.name);
+            }
         }
 
         /// <summary>
@@ -787,6 +800,7 @@ namespace Game.Player
                 return;
 
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
+            string previous = _editingKeyboard.CurrentSwitchSound.ToString();
             bool applied = customization != null
                 ? customization.SetSwitchType(type)
                 : _editingKeyboard.SetSwitchSound(type);
@@ -794,6 +808,8 @@ namespace Game.Player
             {
                 _keyboardEditOverlayUI.SetSelectedSwitchSound(_editingKeyboard.CurrentSwitchSound);
             }
+            Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Switch", type.ToString(),
+                previous, applied, applied && previous != type.ToString());
         }
 
         /// <summary>
@@ -808,8 +824,12 @@ namespace Game.Player
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
             if (customization != null)
             {
+                int previous = customization.CaseMaterialIndex;
                 customization.SetCaseMaterialIndex(index);
                 _keyboardEditOverlayUI.RefreshCaseMaterialSelection();
+                Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Case",
+                    customization.CaseMaterials[index].name, customization.CaseMaterials[previous].name,
+                    changed: previous != customization.CaseMaterialIndex);
             }
         }
 
@@ -823,7 +843,12 @@ namespace Game.Player
                 return;
 
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
-            if (customization != null && customization.SetPlateType(type))
+            if (customization == null) return;
+            string previous = customization.CurrentPlateType.ToString();
+            bool applied = customization.SetPlateType(type);
+            Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Plate", type.ToString(),
+                previous, applied, applied && previous != customization.CurrentPlateType.ToString());
+            if (applied)
             {
                 _keyboardEditOverlayUI.RefreshPlateSelection();
             }

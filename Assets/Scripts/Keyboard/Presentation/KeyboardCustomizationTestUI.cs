@@ -102,8 +102,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _index.text = "0";
         _index.contentType = InputField.ContentType.IntegerNumber;
         Button(panel, "Apply to KEY index", 92, 458, 230, ApplySelectedKey);
-        Button(panel, "Clear keycaps", 18, 504, 147, () => { _storage.Customization.ClearKeycapImage(); _message.text = "Keycap photos cleared."; });
-        Button(panel, "Clear case", 175, 504, 147, () => { _storage.Customization.ClearCaseImage(); _message.text = "Case photo cleared."; });
+        Button(panel, "Clear keycaps", 18, 504, 147, () => { _storage.Customization.ClearKeycapImage(); ObserveImage("Remove", "AllKeycapsCanvas", -1, true); _message.text = "Keycap photos cleared."; });
+        Button(panel, "Clear case", 175, 504, 147, () => { _storage.Customization.ClearCaseImage(); ObserveImage("Remove", "CaseWhole", -1, true); _message.text = "Case photo cleared."; });
         Button(panel, "Save", 18, 550, 147, SaveCustomization);
         Button(panel, "Load", 175, 550, 147, LoadCustomization);
         Button(panel, "Finish customization", 18, 596, 304, EndCustomization);
@@ -179,6 +179,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void SaveCustomization()
     {
         bool saved = _storage.SaveCustomization();
+        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "Save", "CustomImage", success: saved);
         _message.text = _storage.LastMessage;
         if (saved && _embedded) RefreshSavedPreview();
     }
@@ -190,6 +191,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void LoadCustomization()
     {
         bool loaded = _storage.LoadCustomization();
+        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "Load", "CustomImage", success: loaded);
         _message.text = _storage.LastMessage;
         if (!loaded) return;
         if (_embedded)
@@ -249,8 +251,16 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void ChooseImage()
     {
 #if UNITY_EDITOR
-        string path = UnityEditor.EditorUtility.OpenFilePanel("Choose keyboard photo", "", "png,jpg,jpeg");
-        if (string.IsNullOrEmpty(path)) return;
+        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", "ChooseStarted");
+        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ExternalDialogStart");
+        string path;
+        try { path = UnityEditor.EditorUtility.OpenFilePanel("Choose keyboard photo", "", "png,jpg,jpeg"); }
+        finally { Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ExternalDialogEnd"); }
+        if (string.IsNullOrEmpty(path))
+        {
+            Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", "ChooseCancelled");
+            return;
+        }
         _path.text = path;
         ShowPreview();
 #else
@@ -269,7 +279,16 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void ApplyImage(bool caseImage, int index)
     {
         var customization = _storage.Customization;
+        bool replacing = false;
+        foreach (string[] value in customization.GetCustomizationLogValues())
+        {
+            bool matches = caseImage ? value[0] == "Image:CaseWhole"
+                : index < 0 ? value[0].StartsWith("Image:Keycap:", StringComparison.Ordinal)
+                : value[0] == "Image:Keycap:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (matches && value[1] != "None") replacing = true;
+        }
         bool applied = caseImage ? customization.LoadCaseImage(_path.text) : customization.LoadKeycapImage(_path.text, index);
+        ObserveImage(replacing ? "Replace" : "Apply", caseImage ? "CaseWhole" : index < 0 ? "AllKeycapsCanvas" : "SingleKeycap", index, applied);
         _message.text = applied ? "Photo applied. Save to keep the layout." : customization.ImageError;
         if (applied) ShowPreview();
     }
@@ -280,11 +299,12 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         try
         {
             var file = new System.IO.FileInfo(_path.text);
-            if (!file.Exists || file.Length > 32 * 1024 * 1024) { _message.text = "Choose an image under 32 MB."; return; }
+            if (!file.Exists || file.Length > 32 * 1024 * 1024) { ObserveImage("LoadFailed", "", -1, false); _message.text = "Choose an image under 32 MB."; return; }
             var texture = new Texture2D(2, 2);
-            if (!texture.LoadImage(System.IO.File.ReadAllBytes(file.FullName))) { Destroy(texture); _message.text = "Unsupported image."; return; }
+            if (!texture.LoadImage(System.IO.File.ReadAllBytes(file.FullName))) { ObserveImage("LoadFailed", "", -1, false); Destroy(texture); _message.text = "Unsupported image."; return; }
             if (_texture != null) Destroy(_texture);
             _texture = texture;
+            ObserveImage("LoadSucceeded", "", -1, true);
             _preview.texture = texture;
             _preview.color = Color.white;
             float aspect = (float)texture.width / texture.height;
@@ -292,8 +312,19 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         }
         catch (Exception exception) when (exception is System.IO.IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
         {
+            ObserveImage("LoadFailed", "", -1, false);
             _message.text = exception.Message;
         }
+    }
+
+    /// <summary>
+    /// action의 이미지 동작과 scope, index 및 success 결과를 관찰자에게 전달한다.
+    /// 원본 경로나 이미지 바이트는 전송하지 않으며 개별 대상은 키캡 인덱스로 구분한다.
+    /// </summary>
+    private void ObserveImage(string action, string scope, int index, bool success)
+    {
+        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", action,
+            success: success, scope: scope, key: index >= 0 ? index.ToString(System.Globalization.CultureInfo.InvariantCulture) : "");
     }
 
     /// <summary>parent 아래 지정한 이름, 위치, 크기의 왼쪽 위 기준 UI 영역을 생성해 반환한다.</summary>

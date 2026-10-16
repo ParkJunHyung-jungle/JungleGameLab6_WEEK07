@@ -33,6 +33,18 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     public string LastError => _lastError;
 
     /// <summary>
+    /// 현재 케이스와 키캡의 이미지 적용 상태를 로그용 목록으로 반환한다.
+    /// 텍스처 실행 식별자와 적용 방식을 읽으며 이미지 내용과 파일 경로는 포함하지 않는다.
+    /// </summary>
+    public IEnumerable<string[]> GetLogValues()
+    {
+        yield return new[] { "Image:CaseWhole", _caseImage != null ? _caseImage.GetInstanceID().ToString(System.Globalization.CultureInfo.InvariantCulture) : "None" };
+        for (int index = 0; index < _keycapImages.Length; index++)
+            yield return new[] { "Image:Keycap:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                _keycapImages[index] != null ? (_individualImages[index] ? "Individual:" : "Canvas:") + _keycapImages[index].GetInstanceID().ToString(System.Globalization.CultureInfo.InvariantCulture) : "None" };
+    }
+
+    /// <summary>
     /// renderer의 사진 적용 여부를 확인한다.
     /// 사진용 재질을 사용하는 동안 true를 반환한다.
     /// </summary>

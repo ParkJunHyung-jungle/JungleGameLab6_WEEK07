@@ -9,7 +9,6 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
 {
     private const int MAX_IMAGE_BYTES = 32 * 1024 * 1024;
     private const int MAX_IMAGE_DIMENSION = 8192;
-    private const string PHOTO_MATERIAL_PATH = "KeyboardPhotoMaterial";
     private static readonly int _baseMapProperty = Shader.PropertyToID("_BaseMap");
     private static readonly int _baseMapTransformProperty = Shader.PropertyToID("_BaseMap_ST");
     private static readonly int _baseColorProperty = Shader.PropertyToID("_BaseColor");
@@ -27,6 +26,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     private readonly Dictionary<MeshRenderer, MaterialPropertyBlock> _originalProperties = new Dictionary<MeshRenderer, MaterialPropertyBlock>();
     private readonly Dictionary<MeshRenderer, Material[]> _originalMaterials = new Dictionary<MeshRenderer, Material[]>();
     private Material _photoMaterial;
+    private Material _photoMaterialTemplate;
     private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
     private string _lastError;
 
@@ -51,11 +51,12 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// cases와 keycaps에서 외피 렌더러를 수집하고 로컬 좌표 기준 사진 캔버스를 구성한다.
+    /// cases와 keycaps에서 외피 렌더러를 수집하고 photoMaterialTemplate을 사진용 기본 재질로 보관한다.
     /// 최초 호출에서만 참조와 사진 상태를 초기화해 이후 개별 꾸미기 상태를 유지한다.
     /// </summary>
-    public void Initialize(MeshRenderer[] cases, MeshRenderer[] keycaps)
+    public void Initialize(MeshRenderer[] cases, MeshRenderer[] keycaps, Material photoMaterialTemplate)
     {
+        _photoMaterialTemplate = photoMaterialTemplate;
         if (_shells != null) return;
         _cases = cases;
         var shells = new List<MeshRenderer>();
@@ -361,9 +362,12 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         MeshFilter filter = renderer.GetComponent<MeshFilter>();
         if (_photoMaterial == null)
         {
-            Material template = Resources.Load<Material>(PHOTO_MATERIAL_PATH);
-            if (template == null) { _lastError = "Photo material is missing."; return false; }
-            _photoMaterial = new Material(template) { name = "Keyboard Photo (Instance)", hideFlags = HideFlags.DontSave };
+            if (_photoMaterialTemplate == null || !_photoMaterialTemplate.HasProperty(_baseMapProperty))
+            {
+                _lastError = "Assign a photo material with a Base Map in KeyboardCustomization.";
+                return false;
+            }
+            _photoMaterial = new Material(_photoMaterialTemplate) { name = "Keyboard Photo (Instance)", hideFlags = HideFlags.DontSave };
         }
         if (filter != null && filter.sharedMesh != null && filter.sharedMesh.isReadable) return true;
         _lastError = "Photo customization needs a readable mesh.";

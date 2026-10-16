@@ -384,6 +384,7 @@ namespace Game.Player
             _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
             _keyboardEditOverlayUI?.SetCaseCustomization(customization);
             _keyboardEditOverlayUI?.SetPhotoCustomization(customization);
+            _keyboardEditOverlayUI?.SetLEDCustomization(customization);
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(true);
             if (_centerReticle != null)

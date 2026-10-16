@@ -92,6 +92,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [Header("Plate")]
     [SerializeField] private KeyboardPlate _plate;
     [SerializeField] private PlateType _plateType = PlateType.Nomal;
+    private AudioManager _plateAudioManager;
+    private int _plateAudioSelection;
+
+    public KeyboardPlate Plate => _plate;
 
     public IReadOnlyList<PlateData> AvailablePlates => _plate != null ? _plate.AvailablePlates : Array.Empty<PlateData>();
     public MeshRenderer PlateRenderer => _plate != null ? _plate.PlateRenderer : null;
@@ -108,6 +112,12 @@ public sealed class KeyboardCustomization : MonoBehaviour
         {
             ApplyLED();
         }
+        if (Application.IsPlaying(gameObject))
+        {
+            AudioManager.Ready -= HandleAudioManagerReady;
+            AudioManager.Ready += HandleAudioManagerReady;
+            if (AudioManager.instance != null) HandleAudioManagerReady(AudioManager.instance);
+        }
     }
 
     void OnValidate()
@@ -120,6 +130,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     void OnDisable()
     {
+        AudioManager.Ready -= HandleAudioManagerReady;
+        if (_plateAudioManager != null) _plateAudioManager.SuspendKeyboardEffects(this);
 #if UNITY_EDITOR
         EditorApplication.delayCall -= ApplyCaseEditorPreview;
 #endif
@@ -450,6 +462,27 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #endregion
 
     #region 플레이트
+
+    /// <summary>
+    /// manager가 부여한 selectionVersion을 저장하여 재활성화 시 선택 권한을 확인한다.
+    /// 현재 키보드의 플레이트 오디오 관리자와 선택 번호만 변경한다.
+    /// </summary>
+    public void RememberPlateAudioSelection(AudioManager manager, int selectionVersion)
+    {
+        _plateAudioManager = manager;
+        _plateAudioSelection = selectionVersion;
+    }
+
+    /// <summary>
+    /// 런타임 manager가 준비되면 현재 키보드의 선택 번호로 구독과 초기 효과 복원을 요청한다.
+    /// 편집 모드 미리보기와 다른 관리자의 이전 선택은 효과를 변경하지 않는다.
+    /// </summary>
+    private void HandleAudioManagerReady(AudioManager manager)
+    {
+        if (!Application.IsPlaying(gameObject) || !isActiveAndEnabled) return;
+        if (_plateAudioManager == null || _plateAudioManager == manager)
+            manager.ResumeKeyboardEffects(this, _plateAudioSelection);
+    }
 
     /// <summary>
     /// type 입력을 Plate 컴포넌트에 전달해 재질을 변경한다.

@@ -45,6 +45,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e354989f9e4aaf43afea243816c81d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioManager
+  _reverbOffOn: {x: 0, y: 1}
+  _delayOffOn: {x: 0, y: 1}
+  _pitchOffOn: {x: 0, y: 1}
 --- !u!114 &5644101937113968702
 MonoBehaviour:
   m_ObjectHideFlags: 0

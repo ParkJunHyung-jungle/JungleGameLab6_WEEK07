@@ -302,6 +302,8 @@ public class GameManager : MonoBehaviour
 
         if (_activeKeyboard != null)
         {
+            if (AudioManager.instance != null)
+                AudioManager.instance.SelectKeyboardEffects(_activeKeyboard.GetComponent<KeyboardCustomization>());
             _activeDestruction = _activeKeyboard.GetComponent<KeyboardDestruction>();
             if (_activeDestruction != null)
             {

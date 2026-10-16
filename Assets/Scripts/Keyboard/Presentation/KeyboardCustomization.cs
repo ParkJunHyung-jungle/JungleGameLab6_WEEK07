@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -38,6 +40,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
     [SerializeField] private Material _keycapMaterial;
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
+    private Transform[] _keycaps;
 
     [Header("Switches")]
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
@@ -49,6 +52,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     void OnEnable()
     {
+        CacheKeycaps();
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
         if (_switches.Length > 0) SetSwitchType(_switchType);
@@ -142,6 +146,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 #endif
 
+    #region 플레이트
+
     /// <summary>
     /// type 입력을 Plate 컴포넌트에 전달해 재질을 변경한다.
     /// 성공 여부를 반환하며 성공할 때만 현재 선택 타입을 저장한다.
@@ -152,6 +158,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _plateType = type;
         return true;
     }
+
+    #endregion
+
+    #region 축
 
     /// <summary>
     /// type 입력을 모든 축 컴포넌트에 전달해 외형과 사운드 선택을 일괄 변경한다.
@@ -176,6 +186,56 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         _switchType = type;
         return true;
+    }
+
+    #endregion
+
+    #region 키캡
+
+    /// <summary>
+    /// keycapIndex의 키캡에만 material을 적용하며 각인과 다른 키캡은 유지한다.
+    /// 키캡 순서는 렌더러 배열의 외피 순서이며 잘못된 입력 또는 파괴된 키캡은 false를 반환한다.
+    /// </summary>
+    public bool SetKeycapMaterial(int keycapIndex, Material material)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (material == null || keycapIndex < 0 || keycapIndex >= _keycaps.Length)
+        {
+            return false;
+        }
+
+        Transform keycap = _keycaps[keycapIndex];
+        if (keycap == null) return false;
+
+        bool applied = false;
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null && renderer.transform.IsChildOf(keycap))
+            {
+                renderer.sharedMaterial = material;
+                applied = true;
+            }
+        }
+
+        return applied;
+    }
+
+    /// <summary>
+    /// 등록된 렌더러 배열의 PBT_SculptedShell을 사용해 키캡별 루트를 순서대로 저장한다.
+    /// 입력과 반환값 없이 키캡 인덱스를 고정해 파괴 이후에도 다른 키의 인덱스를 유지한다.
+    /// </summary>
+    private void CacheKeycaps()
+    {
+        var keycaps = new List<Transform>();
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null && renderer.name == "PBT_SculptedShell")
+            {
+                keycaps.Add(renderer.transform.parent);
+            }
+        }
+
+        _keycaps = keycaps.ToArray();
     }
 
     /// <summary>
@@ -243,6 +303,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region 케이스
+
     /// <summary>
     /// material 입력을 하우징 재질로 저장하고 연결된 케이스 파츠에 적용한다.
     /// 반환값 없이 하우징의 렌더러 재질을 변경하며 null 입력은 무시한다.
@@ -309,6 +373,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region LED
+
     /// <summary>
     /// enabled 입력으로 LED 전원을 저장하고 레이어의 투명도를 갱신한다.
     /// 반환값 없이 OFF 상태의 알파를 0으로 변경한다.
@@ -343,6 +411,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _propertyBlock.SetFloat(_intensityProperty, Mathf.Max(0f, _ledIntensity));
         _ledRenderer.SetPropertyBlock(_propertyBlock);
     }
+
+    #endregion
 }
 
 

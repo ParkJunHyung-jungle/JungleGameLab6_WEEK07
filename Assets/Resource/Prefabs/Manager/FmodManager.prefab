@@ -71,20 +71,34 @@ MonoBehaviour:
       Data3: 2019034516
       Data4: -896893305
     Path: event:/SFX/KeyBoard/Switch/BrownSwitch
-  <SansSwitch>k__BackingField:
-    Guid:
-      Data1: -32070428
-      Data2: 1291412373
-      Data3: 450794891
-      Data4: 1324151617
-    Path: event:/SFX/KeyBoard/Switch/Sans
   <RedSwitch>k__BackingField:
     Guid:
       Data1: 191871004
       Data2: 1185196984
       Data3: 302908047
       Data4: -2044697214
-    Path: event:/SFX/KeyBoard/Switch/Red
+    Path: event:/SFX/KeyBoard/Switch/RedSwitch
+  <SansSwitch>k__BackingField:
+    Guid:
+      Data1: -32070428
+      Data2: 1291412373
+      Data3: 450794891
+      Data4: 1324151617
+    Path: event:/SFX/KeyBoard/Switch/SansSwitch
+  <PopSwitch>k__BackingField:
+    Guid:
+      Data1: -918527380
+      Data2: 1221018364
+      Data3: 1816992663
+      Data4: -177418115
+    Path: event:/SFX/KeyBoard/Switch/PopSwitch
+  <TypewriterSwitch>k__BackingField:
+    Guid:
+      Data1: 521934002
+      Data2: 1203661355
+      Data3: 1665637543
+      Data4: -1561119682
+    Path: event:/SFX/KeyBoard/Switch/TypewriterSwitch
   <BreakKeyCap>k__BackingField:
     Guid:
       Data1: -715810010

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -5,21 +8,22 @@ using UnityEngine.Serialization;
 using UnityEditor;
 #endif
 
+using KeyboardModeling;
+
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public sealed class KeyboardCustomization : MonoBehaviour
 {
-    private static readonly int _ledColorProperty = Shader.PropertyToID("_LEDColor");
-    private static readonly int _intensityProperty = Shader.PropertyToID("_Intensity");
-
     [Header("LED Layer")]
-    [SerializeField] private MeshRenderer _ledRenderer;
+    [SerializeField, HideInInspector] private MeshRenderer _ledRenderer;
+    [SerializeField] private KeyboardLED _ledLayer;
 
     [Header("LED Settings")]
     [SerializeField] private bool _ledEnabled = true;
     [SerializeField, ColorUsage(false, true)] private Color _ledColor = new Color(0f, 0.8f, 1f, 1f);
     [SerializeField, Min(0f)] private float _ledIntensity = 3f;
-    private MaterialPropertyBlock _propertyBlock;
+    [SerializeField] private LEDPattern _ledPattern = LEDPattern.Static;
+    [SerializeField, Min(0f)] private float _ledSpeed = 1f;
 
     [Header("Shared Materials")]
     [FormerlySerializedAs("_caseMaterials")]
@@ -38,6 +42,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
     [SerializeField] private Material _keycapMaterial;
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
+    private Transform[] _keycaps;
 
     [Header("Switches")]
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
@@ -49,6 +54,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     void OnEnable()
     {
+        CacheKeycaps();
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
         if (_switches.Length > 0) SetSwitchType(_switchType);
@@ -65,11 +71,6 @@ public sealed class KeyboardCustomization : MonoBehaviour
         EditorApplication.delayCall -= ApplyCaseEditorPreview;
         EditorApplication.delayCall += ApplyCaseEditorPreview;
 #endif
-        // 컴포넌트를 처음 추가할 때는 레이어 참조가 아직 연결되지 않는다.
-        if (_ledRenderer != null)
-        {
-            ApplyLED();
-        }
     }
 
     void OnDisable()
@@ -90,6 +91,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         {
             return;
         }
+
+        ApplyLED();
 
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
@@ -142,6 +145,172 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 #endif
 
+    #region 저장 및 불러오기
+
+    /// <summary>
+    /// catalog와 materialIds로 현재 렌더러 재질을 식별하고 LED 및 파츠 선택 상태를 수집한다.
+    /// 개별 키캡 변경을 포함하는 저장 데이터를 반환하며 등록되지 않은 재질은 예외로 알린다.
+    /// </summary>
+    public KeyboardCustomizationState CaptureState(Material[] catalog, string[] materialIds)
+    {
+        if (catalog.Length != materialIds.Length) throw new InvalidOperationException("Material registry is invalid.");
+        MeshRenderer[] renderers = GetCustomizationRenderers();
+        var paths = new string[renderers.Length];
+        var counts = new int[renderers.Length];
+        var indices = new List<int>();
+        for (int index = 0; index < renderers.Length; index++)
+        {
+            MeshRenderer renderer = renderers[index];
+            if (renderer == null) throw new InvalidOperationException("A customization renderer is missing.");
+            paths[index] = GetRendererPath(renderer.transform);
+            Material[] materials = renderer.sharedMaterials;
+            counts[index] = materials.Length;
+            foreach (Material material in materials) indices.Add(GetMaterialIndex(material, catalog));
+        }
+
+        var switchTypes = new SwitchType[_switches.Length];
+        for (int index = 0; index < _switches.Length; index++)
+        {
+            switchTypes[index] = _switches[index].CurrentData != null ? _switches[index].CurrentData.Type : _switchType;
+        }
+
+        return new KeyboardCustomizationState(_ledEnabled, _ledColor, _ledIntensity,
+            new[] { GetMaterialIndex(_caseMaterial, catalog), GetMaterialIndex(_keycapMaterial, catalog), _caseMaterialIndex, _keycapMaterialIndex },
+            (string[])materialIds.Clone(), paths, counts, indices.ToArray(), switchTypes,
+            _plate != null && _plate.CurrentData != null ? _plate.CurrentData.Type : _plateType, _ledPattern, _ledSpeed);
+    }
+
+    /// <summary>
+    /// state와 현재 Material 카탈로그를 검증한 뒤 LED, 실제 재질, 축 및 Plate 선택을 복원한다.
+    /// 반환값 없이 현재 인스턴스만 변경하며 호환되지 않는 데이터는 적용 전에 예외로 알린다.
+    /// </summary>
+    public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds)
+    {
+        if (state == null || (state.Version != 1 && state.Version != 2) || state.Selection == null || state.Selection.Length != 4 ||
+            state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
+            state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
+            throw new InvalidOperationException("Save data is invalid or unsupported.");
+
+        var remap = new int[state.CatalogIds.Length];
+        for (int index = 0; index < remap.Length; index++)
+        {
+            remap[index] = Array.IndexOf(materialIds, state.CatalogIds[index]);
+            if (remap[index] < 0 || catalog[remap[index]] == null) throw new InvalidOperationException("A saved material is unavailable.");
+        }
+
+        MeshRenderer[] renderers = GetCustomizationRenderers();
+        if (state.RendererPaths.Length != renderers.Length || state.SlotCounts.Length != renderers.Length ||
+            state.SwitchTypes.Length != _switches.Length || state.LedIntensity < 0f ||
+            float.IsNaN(state.LedIntensity) || float.IsInfinity(state.LedIntensity) ||
+            !Enum.IsDefined(typeof(LEDPattern), state.LedPattern) || state.LedSpeed < 0f ||
+            float.IsNaN(state.LedSpeed) || float.IsInfinity(state.LedSpeed))
+            throw new InvalidOperationException("The saved keyboard layout or settings are incompatible.");
+
+        int totalSlots = 0;
+        for (int index = 0; index < renderers.Length; index++)
+        {
+            if (renderers[index] == null || state.RendererPaths[index] != GetRendererPath(renderers[index].transform) ||
+                state.SlotCounts[index] != renderers[index].sharedMaterials.Length)
+                throw new InvalidOperationException("The saved renderer layout is incompatible.");
+            totalSlots += state.SlotCounts[index];
+        }
+
+        if (totalSlots != state.MaterialIndices.Length) throw new InvalidOperationException("Material slot data is incomplete.");
+        foreach (int index in state.MaterialIndices) ValidateSavedMaterialIndex(index, remap.Length);
+        ValidateSavedMaterialIndex(state.Selection[0], remap.Length);
+        ValidateSavedMaterialIndex(state.Selection[1], remap.Length);
+        for (int index = 0; index < _switches.Length; index++)
+        {
+            if (!_switches[index].HasSwitchType(state.SwitchTypes[index])) throw new InvalidOperationException("A saved switch type is unavailable.");
+        }
+
+        if (_plate != null && !_plate.HasPlateType(state.PlateType)) throw new InvalidOperationException("The saved Plate type is unavailable.");
+
+        for (int index = 0; index < _switches.Length; index++) _switches[index].ChangeSwitch(state.SwitchTypes[index]);
+        if (_switches.Length > 0)
+        {
+            _switchType = state.SwitchTypes[0];
+            GetComponent<KeyboardInputController>().SetSwitchSound(_switchType);
+        }
+        if (_plate != null) SetPlateType(state.PlateType);
+        _caseMaterial = state.Selection[0] < 0 ? null : catalog[remap[state.Selection[0]]];
+        _keycapMaterial = state.Selection[1] < 0 ? null : catalog[remap[state.Selection[1]]];
+        _caseMaterialIndex = Mathf.Max(0, Array.IndexOf(_materials, _caseMaterial));
+        _keycapMaterialIndex = Mathf.Max(0, Array.IndexOf(_materials, _keycapMaterial));
+        int slot = 0;
+        for (int index = 0; index < renderers.Length; index++)
+        {
+            var materials = new Material[state.SlotCounts[index]];
+            for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+            {
+                int savedIndex = state.MaterialIndices[slot++];
+                materials[materialIndex] = savedIndex < 0 ? null : catalog[remap[savedIndex]];
+            }
+
+            renderers[index].sharedMaterials = materials;
+        }
+
+        _ledEnabled = state.LedEnabled;
+        _ledColor = state.LedColor;
+        _ledIntensity = state.LedIntensity;
+        _ledPattern = state.LedPattern;
+        _ledSpeed = state.LedSpeed;
+        if (_ledRenderer != null) ApplyLED();
+    }
+
+    /// <summary>
+    /// material을 catalog 참조 배열에서 찾아 저장용 인덱스를 반환한다.
+    /// null은 -1로 표시하며 등록되지 않은 재질은 예외로 알린다.
+    /// </summary>
+    private int GetMaterialIndex(Material material, Material[] catalog)
+    {
+        if (material == null) return -1;
+        int index = Array.IndexOf(catalog, material);
+        if (index < 0) throw new InvalidOperationException($"Material is not registered: {material.name}");
+        return index;
+    }
+
+    /// <summary>
+    /// 저장된 index와 카탈로그 count로 Material 참조 범위를 검사한다.
+    /// 반환값 없이 잘못된 인덱스에 대해 예외를 발생시킨다.
+    /// </summary>
+    private void ValidateSavedMaterialIndex(int index, int count)
+    {
+        if (index < -1 || index >= count) throw new InvalidOperationException("A saved material index is invalid.");
+    }
+
+    /// <summary>
+    /// Case 및 키캡 렌더러 참조를 현재 배열 순서로 합쳐 반환한다.
+    /// 입력 없이 저장 대상 렌더러 목록을 구성한다.
+    /// </summary>
+    private MeshRenderer[] GetCustomizationRenderers()
+    {
+        var renderers = new List<MeshRenderer>(_caseRenderers);
+        renderers.AddRange(_keycapRenderers);
+        return renderers.ToArray();
+    }
+
+    /// <summary>
+    /// target의 부모 이름과 형제 인덱스로 키보드 루트 기준 식별 경로를 만든다.
+    /// 중복 이름의 Mesh도 구별할 수 있는 문자열을 반환한다.
+    /// </summary>
+    private string GetRendererPath(Transform target)
+    {
+        string path = "";
+        while (target != transform)
+        {
+            if (target == null) throw new InvalidOperationException("A renderer belongs to another keyboard.");
+            path = target.GetSiblingIndex() + ":" + target.name + "/" + path;
+            target = target.parent;
+        }
+
+        return path;
+    }
+
+    #endregion
+
+    #region 플레이트
+
     /// <summary>
     /// type 입력을 Plate 컴포넌트에 전달해 재질을 변경한다.
     /// 성공 여부를 반환하며 성공할 때만 현재 선택 타입을 저장한다.
@@ -152,6 +321,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _plateType = type;
         return true;
     }
+
+    #endregion
+
+    #region 축
 
     /// <summary>
     /// type 입력을 모든 축 컴포넌트에 전달해 외형과 사운드 선택을 일괄 변경한다.
@@ -175,7 +348,58 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _switchType = type;
+        GetComponent<KeyboardInputController>().SetSwitchSound(type);
         return true;
+    }
+
+    #endregion
+
+    #region 키캡
+
+    /// <summary>
+    /// keycapIndex의 키캡에만 material을 적용하며 각인과 다른 키캡은 유지한다.
+    /// 키캡 순서는 렌더러 배열의 외피 순서이며 잘못된 입력 또는 파괴된 키캡은 false를 반환한다.
+    /// </summary>
+    public bool SetKeycapMaterial(int keycapIndex, Material material)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (material == null || keycapIndex < 0 || keycapIndex >= _keycaps.Length)
+        {
+            return false;
+        }
+
+        Transform keycap = _keycaps[keycapIndex];
+        if (keycap == null) return false;
+
+        bool applied = false;
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null && renderer.transform.IsChildOf(keycap))
+            {
+                renderer.sharedMaterial = material;
+                applied = true;
+            }
+        }
+
+        return applied;
+    }
+
+    /// <summary>
+    /// 등록된 렌더러 배열의 PBT_SculptedShell을 사용해 키캡별 루트를 순서대로 저장한다.
+    /// 입력과 반환값 없이 키캡 인덱스를 고정해 파괴 이후에도 다른 키의 인덱스를 유지한다.
+    /// </summary>
+    private void CacheKeycaps()
+    {
+        var keycaps = new List<Transform>();
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null && renderer.name == "PBT_SculptedShell")
+            {
+                keycaps.Add(renderer.transform.parent);
+            }
+        }
+
+        _keycaps = keycaps.ToArray();
     }
 
     /// <summary>
@@ -243,6 +467,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region 케이스
+
     /// <summary>
     /// material 입력을 하우징 재질로 저장하고 연결된 케이스 파츠에 적용한다.
     /// 반환값 없이 하우징의 렌더러 재질을 변경하며 null 입력은 무시한다.
@@ -309,6 +537,43 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region LED
+
+    /// <summary>
+    /// pattern 입력을 LED 패턴으로 선택하고 전용 레이어에 전달한다.
+    /// 반환값 없이 Static, Rainbow 또는 Breathing 표시를 변경하며 잘못된 타입은 무시한다.
+    /// </summary>
+    public void SetLEDPattern(LEDPattern pattern)
+    {
+        if (!Enum.IsDefined(typeof(LEDPattern), pattern)) return;
+        _ledPattern = pattern;
+        ApplyLED();
+    }
+
+    /// <summary>
+    /// speed 입력을 LED 애니메이션 속도로 저장하고 레이어에 전달한다.
+    /// 반환값 없이 속도를 갱신하며 음수는 0으로 제한하고 유효하지 않은 실수는 무시한다.
+    /// </summary>
+    public void SetLEDSpeed(float speed)
+    {
+        if (float.IsNaN(speed) || float.IsInfinity(speed)) return;
+        _ledSpeed = Mathf.Max(0f, speed);
+        ApplyLED();
+    }
+
+    /// <summary>
+    /// intensity 입력을 LED 밝기로 저장하고 전용 레이어에 전달한다.
+    /// 반환값 없이 밝기를 갱신하며 음수는 0으로 제한하고 유효하지 않은 실수는 무시한다.
+    /// </summary>
+    public void SetLEDIntensity(float intensity)
+    {
+        if (float.IsNaN(intensity) || float.IsInfinity(intensity)) return;
+        _ledIntensity = Mathf.Max(0f, intensity);
+        ApplyLED();
+    }
+
     /// <summary>
     /// enabled 입력으로 LED 전원을 저장하고 레이어의 투명도를 갱신한다.
     /// 반환값 없이 OFF 상태의 알파를 0으로 변경한다.
@@ -330,19 +595,17 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// Inspector의 전원, 색상, 밝기를 사용해 LED 렌더러 속성을 갱신한다.
-    /// 반환값 없이 인스턴스별 속성을 변경하며 공유 머티리얼은 유지한다.
+    /// Inspector의 전원, 패턴, 색상, 밝기, 속도를 LED 컴포넌트에 전달한다.
+    /// 반환값 없이 표시 설정을 변경하며 애니메이션 계산은 레이어에 위임한다.
     /// </summary>
     private void ApplyLED()
     {
-        _propertyBlock ??= new MaterialPropertyBlock();
-        Color color = _ledColor;
-        color.a = _ledEnabled ? 1f : 0f;
-        _ledRenderer.GetPropertyBlock(_propertyBlock);
-        _propertyBlock.SetColor(_ledColorProperty, color);
-        _propertyBlock.SetFloat(_intensityProperty, Mathf.Max(0f, _ledIntensity));
-        _ledRenderer.SetPropertyBlock(_propertyBlock);
+        if (_ledLayer == null && _ledRenderer != null) _ledLayer = _ledRenderer.GetComponent<KeyboardLED>();
+        // 기존 프리팹을 새 컴포넌트로 연결하는 동안에는 레이어가 아직 없을 수 있다.
+        if (_ledLayer != null) _ledLayer.ApplySettings(_ledEnabled, _ledPattern, _ledColor, _ledIntensity, _ledSpeed);
     }
+
+    #endregion
 }
 
 

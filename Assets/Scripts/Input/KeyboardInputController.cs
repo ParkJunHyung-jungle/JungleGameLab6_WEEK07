@@ -89,7 +89,9 @@ namespace KeyboardModeling
             Blue,
             Brown,
             Sans,
-            Red
+            Red,
+            Pop,
+            Typewriter
         }
 
         public bool InputEnabled
@@ -293,6 +295,8 @@ namespace KeyboardModeling
                     FmodSwitchSound.Brown => FMODEvents.instance.BrownSwitch,
                     FmodSwitchSound.Sans => FMODEvents.instance.SansSwitch,
                     FmodSwitchSound.Red => FMODEvents.instance.RedSwitch,
+                    FmodSwitchSound.Pop =>FMODEvents.instance.PopSwitch,
+                    FmodSwitchSound.Typewriter =>FMODEvents.instance.TypewriterSwitch,
                     _ => FMODEvents.instance.BlueSwitch
                 };
                 AudioManager.instance.PlayOneShot(sound, transform.position);
@@ -300,6 +304,28 @@ namespace KeyboardModeling
             }
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
             _audioSource.PlayOneShot(_pressSound, volume);
+        }
+
+        /// <summary>
+        /// type 입력을 대응하는 FMOD 사운드 종류로 변환해 이후 눌림음에 사용한다.
+        /// 변경 성공 여부를 반환하며 알 수 없는 타입은 기존 사운드를 유지한다.
+        /// </summary>
+        public bool SetSwitchSound(SwitchType type)
+        {
+            FmodSwitchSound sound;
+            switch (type)
+            {
+                case SwitchType.Blue: sound = FmodSwitchSound.Blue; break;
+                case SwitchType.Red: sound = FmodSwitchSound.Red; break;
+                case SwitchType.Brown: sound = FmodSwitchSound.Brown; break;
+                case SwitchType.Sans: sound = FmodSwitchSound.Sans; break;
+                case SwitchType.Pop: sound = FmodSwitchSound.Pop; break;
+                case SwitchType.Typewriter: sound = FmodSwitchSound.Typewriter; break;
+                default: return false;
+            }
+
+            _fmodSwitchSound = sound;
+            return true;
         }
 
         /// <summary>

@@ -19,6 +19,15 @@ public sealed class KeyboardPlate : MonoBehaviour
     public event Action<PlateData> PlateChanged;
 
     /// <summary>
+    /// type에 해당하는 Plate SO와 Material이 등록되어 있는지 확인한다.
+    /// 외형과 현재 선택은 변경하지 않고 적용 가능 여부를 반환한다.
+    /// </summary>
+    public bool HasPlateType(PlateType type)
+    {
+        return BuildDataMap() && _plateDataMap.TryGetValue(type, out PlateData data) && data.Material != null;
+    }
+
+    /// <summary>
     /// type 키로 SO 배열의 데이터를 조회해 Plate의 Material을 변경한다.
     /// 성공 여부를 반환하고 선택 데이터가 바뀌면 PlateChanged로 알린다.
     /// </summary>

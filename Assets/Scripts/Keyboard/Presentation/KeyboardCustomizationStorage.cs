@@ -17,6 +17,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
 
     public string SavePath => Path.Combine(Application.persistentDataPath, SAVE_FILE_NAME);
     public string LastMessage => _lastMessage;
+    public KeyboardCustomization Customization => _customization;
 
     /// <summary>
     /// 연결된 커스터마이저의 현재 상태를 JSON 파일 하나로 저장한다.
@@ -34,7 +35,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
             _lastMessage = "Saved: " + SavePath;
             return true;
         }
-        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException || exception is InvalidOperationException)
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
         {
             _lastMessage = "Save failed: " + exception.Message;
             return false;
@@ -60,7 +61,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
             _lastMessage = "Loaded";
             return true;
         }
-        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException || exception is InvalidOperationException)
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
         {
             _lastMessage = "Load failed: " + exception.Message;
             return false;

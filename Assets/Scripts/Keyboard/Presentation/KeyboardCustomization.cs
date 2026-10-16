@@ -91,7 +91,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     [Header("Plate")]
     [SerializeField] private KeyboardPlate _plate;
-    [SerializeField] private PlateType _plateType = PlateType.Brass;
+    [SerializeField] private PlateType _plateType = PlateType.Nomal;
 
     public IReadOnlyList<PlateData> AvailablePlates => _plate != null ? _plate.AvailablePlates : Array.Empty<PlateData>();
     public MeshRenderer PlateRenderer => _plate != null ? _plate.PlateRenderer : null;

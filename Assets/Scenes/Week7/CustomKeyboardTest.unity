@@ -390,6 +390,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 534380275776001789, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: b6cacee2f02e3874d97f82f41749ddc0, type: 2}
     - target: {fileID: 1264139386206111033, guid: f5b5770352c706c46827af4de924c16d, type: 3}
       propertyPath: _fmodSwitchSound
       value: 4

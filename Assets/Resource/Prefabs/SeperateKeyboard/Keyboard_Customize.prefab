@@ -59854,7 +59854,7 @@ PrefabInstance:
     - target: {fileID: 1047305911693307686, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 9947c8e32db262144832a15355c38bf8, type: 2}
+      objectReference: {fileID: 2100000, guid: b6cacee2f02e3874d97f82f41749ddc0, type: 2}
     - target: {fileID: 3276249815416262668, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
       propertyPath: m_LocalScale.x
       value: 1
@@ -59977,9 +59977,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardPlate
   _plateData:
-  - {fileID: 11400000, guid: 7858a837447520d4390316b9da011f7e, type: 2}
-  - {fileID: 11400000, guid: 440d48bfdc424db4ca52a47c0b52fe2e, type: 2}
+  - {fileID: 11400000, guid: 69e1e2a7db7be374d90eb2cfe4d82c16, type: 2}
+  - {fileID: 11400000, guid: 6c380f1e883926043b3dbecc9c980996, type: 2}
   - {fileID: 11400000, guid: 8f826efd0c3ec5941941d1e269490a42, type: 2}
+  - {fileID: 11400000, guid: bd31123c656224b4eb33cd51b321d11a, type: 2}
   _plateRenderer: {fileID: 534380275776001789}
 --- !u!23 &5999264866688161344 stripped
 MeshRenderer:

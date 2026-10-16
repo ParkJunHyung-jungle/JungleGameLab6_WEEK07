@@ -49,6 +49,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     [SerializeField, Range(0.02f, 0.5f)] private float _whiteFlashDuration = 0.12f;
     private MeshRenderer[] _flashRenderers;
     private Material[] _flashOriginalMaterials;
+    private MaterialPropertyBlock[] _flashOriginalProperties;
     private float[] _flashEndTimes;
     private KeycapHealth[] _flashHealths;
     private readonly Dictionary<Transform, int> _flashIndices = new Dictionary<Transform, int>();
@@ -548,7 +549,8 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         Vector3 origin = _keyboard.transform.InverseTransformPoint(keycap.TransformPoint(new Vector3(0f, 0.58f, 0f)));
         Transform shell = keycap.Find("PBT_SculptedShell");
         Material material = shell != null ? shell.GetComponent<MeshRenderer>().sharedMaterial : _debrisPrefab.GetComponent<MeshRenderer>().sharedMaterial;
-        if (_flashIndices.TryGetValue(keycap, out int flashIndex) && _flashOriginalMaterials[flashIndex] != null)
+        if (_flashIndices.TryGetValue(keycap, out int flashIndex) && _activeFlashIndices.Contains(flashIndex) &&
+            _flashRenderers[flashIndex].sharedMaterial == _whiteFlashMaterial && _flashOriginalMaterials[flashIndex] != null)
         {
             material = _flashOriginalMaterials[flashIndex];
         }
@@ -682,6 +684,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         KeycapButton[] buttons = _keyboard.GetComponentsInChildren<KeycapButton>(true);
         _flashRenderers = new MeshRenderer[buttons.Length];
         _flashOriginalMaterials = new Material[buttons.Length];
+        _flashOriginalProperties = new MaterialPropertyBlock[buttons.Length];
         _flashEndTimes = new float[buttons.Length];
         _flashHealths = new KeycapHealth[buttons.Length];
 
@@ -696,6 +699,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             MeshRenderer renderer = shell.GetComponent<MeshRenderer>();
             _flashRenderers[index] = renderer;
             _flashOriginalMaterials[index] = renderer.sharedMaterial;
+            _flashOriginalProperties[index] = new MaterialPropertyBlock();
             _flashIndices.Add(buttons[index].transform, index);
             KeycapHealth health = buttons[index].GetComponent<KeycapHealth>();
             _flashHealths[index] = health;
@@ -720,7 +724,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     /// <summary>
     /// keycap의 외부 표면을 잠시 흰색 공유 재질로 표시한다.
-    /// 대상 인덱스와 지속 시간을 사용하며 연타 시 복원 시간을 갱신하고 원본 재질 에셋은 변경하지 않는다.
+    /// 피격 직전 재질과 사진 속성을 보관하고 사진 속성을 잠시 해제해 흰색 피드백을 표시한다.
     /// </summary>
     private void PlayWhiteFlash(Transform keycap)
     {
@@ -729,6 +733,12 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             return;
         }
 
+        if (!_activeFlashIndices.Contains(index) || _flashRenderers[index].sharedMaterial != _whiteFlashMaterial)
+        {
+            _flashOriginalMaterials[index] = _flashRenderers[index].sharedMaterial;
+            _flashRenderers[index].GetPropertyBlock(_flashOriginalProperties[index]);
+        }
+        _flashRenderers[index].SetPropertyBlock(null);
         _flashRenderers[index].sharedMaterial = _whiteFlashMaterial;
         _flashEndTimes[index] = Time.unscaledTime + _whiteFlashDuration;
         if (!_activeFlashIndices.Contains(index))
@@ -767,9 +777,10 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
                 continue;
             }
 
-            if (_flashRenderers[index] != null)
+            if (_flashRenderers[index] != null && _flashRenderers[index].sharedMaterial == _whiteFlashMaterial)
             {
                 _flashRenderers[index].sharedMaterial = _flashOriginalMaterials[index];
+                _flashRenderers[index].SetPropertyBlock(_flashOriginalProperties[index]);
             }
 
             _flashEndTimes[index] = 0f;
@@ -791,9 +802,10 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         for (int i = 0; i < _activeFlashIndices.Count; i++)
         {
             int index = _activeFlashIndices[i];
-            if (_flashRenderers[index] != null)
+            if (_flashRenderers[index] != null && _flashRenderers[index].sharedMaterial == _whiteFlashMaterial)
             {
                 _flashRenderers[index].sharedMaterial = _flashOriginalMaterials[index];
+                _flashRenderers[index].SetPropertyBlock(_flashOriginalProperties[index]);
             }
 
             _flashEndTimes[index] = 0f;

@@ -9,6 +9,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
 {
     private const int MAX_IMAGE_BYTES = 32 * 1024 * 1024;
     private const int MAX_IMAGE_DIMENSION = 8192;
+    private const string PHOTO_MATERIAL_PATH = "KeyboardPhotoMaterial";
     private static readonly int _baseMapProperty = Shader.PropertyToID("_BaseMap");
     private static readonly int _baseMapTransformProperty = Shader.PropertyToID("_BaseMap_ST");
     private static readonly int _baseColorProperty = Shader.PropertyToID("_BaseColor");
@@ -24,10 +25,30 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     private readonly Dictionary<MeshRenderer, Mesh> _originalMeshes = new Dictionary<MeshRenderer, Mesh>();
     private readonly Dictionary<MeshRenderer, Mesh> _imageMeshes = new Dictionary<MeshRenderer, Mesh>();
     private readonly Dictionary<MeshRenderer, MaterialPropertyBlock> _originalProperties = new Dictionary<MeshRenderer, MaterialPropertyBlock>();
+    private readonly Dictionary<MeshRenderer, Material[]> _originalMaterials = new Dictionary<MeshRenderer, Material[]>();
+    private Material _photoMaterial;
     private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
     private string _lastError;
 
     public string LastError => _lastError;
+
+    /// <summary>
+    /// renderer의 사진 적용 여부를 확인한다.
+    /// 사진용 재질을 사용하는 동안 true를 반환한다.
+    /// </summary>
+    public bool HasImage(MeshRenderer renderer)
+    {
+        return _originalMaterials.ContainsKey(renderer);
+    }
+
+    /// <summary>
+    /// renderer의 사진 적용 전 재질 배열을 조회한다.
+    /// 사진이 없으면 현재 재질을 반환해 임시 사진용 재질 대신 원래 재질을 저장하게 한다.
+    /// </summary>
+    public Material[] GetMaterialsForStorage(MeshRenderer renderer)
+    {
+        return _originalMaterials.TryGetValue(renderer, out Material[] materials) ? materials : renderer.sharedMaterials;
+    }
 
     /// <summary>
     /// cases와 keycaps에서 외피 렌더러를 수집하고 로컬 좌표 기준 사진 캔버스를 구성한다.
@@ -186,6 +207,12 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             throw new InvalidOperationException("Saved image layout is incompatible.");
         foreach (int index in state.KeycapImages) ValidateImageIndex(index, state.Images.Length);
         ValidateImageIndex(state.CaseImage, state.Images.Length);
+        for (int index = 0; index < _shells.Length; index++)
+            if (state.KeycapImages[index] >= 0 && _shells[index] != null && !CanApply(_shells[index]))
+                throw new InvalidOperationException(_lastError);
+        if (state.CaseImage >= 0)
+            foreach (MeshRenderer renderer in _cases)
+                if (renderer != null && !CanApply(renderer)) throw new InvalidOperationException(_lastError);
         var textures = new Texture2D[state.Images.Length];
         try
         {
@@ -239,6 +266,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             var previous = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(previous);
             _originalProperties.Add(renderer, previous);
+            _originalMaterials.Add(renderer, renderer.sharedMaterials);
         }
         if (_imageMeshes.TryGetValue(renderer, out Mesh old)) ReleaseObject(old);
         Mesh mesh = Instantiate(_originalMeshes[renderer]);
@@ -256,6 +284,9 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         mesh.uv = uv;
         filter.sharedMesh = mesh;
         _imageMeshes[renderer] = mesh;
+        var materials = new Material[_originalMaterials[renderer].Length];
+        for (int index = 0; index < materials.Length; index++) materials[index] = _photoMaterial;
+        renderer.sharedMaterials = materials;
         var properties = new MaterialPropertyBlock();
         renderer.GetPropertyBlock(properties);
         properties.SetTexture(_baseMapProperty, image);
@@ -279,6 +310,8 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             _imageMeshes.Remove(renderer);
         }
         renderer.SetPropertyBlock(_originalProperties[renderer]);
+        renderer.sharedMaterials = _originalMaterials[renderer];
+        _originalMaterials.Remove(renderer);
         _originalMeshes.Remove(renderer);
         _originalProperties.Remove(renderer);
     }
@@ -320,14 +353,20 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// renderer의 셰이더와 Mesh가 사진 적용을 지원하는지 검사한다.
-    /// Base Map과 읽기 가능한 Mesh가 없으면 오류를 기록하고 false를 반환한다.
+    /// renderer의 Mesh와 사진용 기본 재질을 검사한다.
+    /// 전용 재질 인스턴스를 준비하고 사진 적용 가능 여부를 반환한다.
     /// </summary>
     private bool CanApply(MeshRenderer renderer)
     {
         MeshFilter filter = renderer.GetComponent<MeshFilter>();
-        if (renderer.sharedMaterial != null && renderer.sharedMaterial.HasProperty(_baseMapProperty) && filter != null && filter.sharedMesh != null && filter.sharedMesh.isReadable) return true;
-        _lastError = "The selected material needs a Base Map and a readable mesh.";
+        if (_photoMaterial == null)
+        {
+            Material template = Resources.Load<Material>(PHOTO_MATERIAL_PATH);
+            if (template == null) { _lastError = "Photo material is missing."; return false; }
+            _photoMaterial = new Material(template) { name = "Keyboard Photo (Instance)", hideFlags = HideFlags.DontSave };
+        }
+        if (filter != null && filter.sharedMesh != null && filter.sharedMesh.isReadable) return true;
+        _lastError = "Photo customization needs a readable mesh.";
         return false;
     }
 
@@ -427,5 +466,6 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         foreach (MeshRenderer renderer in renderers) ClearImage(renderer);
         foreach (Mesh mesh in _imageMeshes.Values) if (mesh != null) ReleaseObject(mesh);
         foreach (Texture2D texture in _ownedTextures) if (texture != null) ReleaseObject(texture);
+        if (_photoMaterial != null) ReleaseObject(_photoMaterial);
     }
 }

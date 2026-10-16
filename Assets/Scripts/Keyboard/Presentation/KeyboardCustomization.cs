@@ -190,7 +190,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             MeshRenderer renderer = renderers[index];
             if (renderer == null) throw new InvalidOperationException("A customization renderer is missing.");
             paths[index] = GetRendererPath(renderer.transform);
-            Material[] materials = renderer.sharedMaterials;
+            Material[] materials = _imageCustomization != null ? _imageCustomization.GetMaterialsForStorage(renderer) : renderer.sharedMaterials;
             counts[index] = materials.Length;
             foreach (Material material in materials) indices.Add(GetMaterialIndex(material, catalog));
         }
@@ -256,6 +256,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         KeyboardImageCustomization images = GetImageCustomization();
         Texture2D[] preparedImages = images.PrepareState(state.ImageState);
+        images.ClearKeycapImage();
+        images.ClearCaseImage();
 
         for (int index = 0; index < _switches.Length; index++) _switches[index].ChangeSwitch(state.SwitchTypes[index]);
         if (_switches.Length > 0)
@@ -589,7 +591,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         foreach (MeshRenderer renderer in _keycapRenderers)
         {
-            if (renderer != null)
+            if (renderer != null && (_imageCustomization == null || !_imageCustomization.HasImage(renderer)))
             {
                 renderer.sharedMaterial = _keycapMaterial;
             }
@@ -599,7 +601,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         {
             if (pair.Key == null) continue;
             foreach (MeshRenderer renderer in _keycapRenderers)
-                if (renderer != null && renderer.transform.IsChildOf(pair.Key)) renderer.sharedMaterial = pair.Value;
+                if (renderer != null && renderer.transform.IsChildOf(pair.Key) &&
+                    (_imageCustomization == null || !_imageCustomization.HasImage(renderer))) renderer.sharedMaterial = pair.Value;
         }
     }
 
@@ -680,7 +683,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         foreach (MeshRenderer renderer in _caseRenderers)
         {
             // Inspector에서 렌더러 배열을 편집하는 중에는 빈 항목이 생길 수 있다.
-            if (renderer != null)
+            if (renderer != null && (_imageCustomization == null || !_imageCustomization.HasImage(renderer)))
             {
                 renderer.sharedMaterial = _caseMaterial;
             }

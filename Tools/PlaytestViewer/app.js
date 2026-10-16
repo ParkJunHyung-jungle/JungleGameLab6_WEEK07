@@ -1,6 +1,6 @@
 "use strict";
 
-const state = { files: [], file: "", tournament: "ALL", battle: "", tab: "overview", scope: "playable", board: "", compareBoard: "", key: "", owner: "Player", interval: 5, pages: {}, compareIncomplete: false };
+const state = { mode: "playtest", files: [], file: "", tournament: "ALL", battle: "", tab: "overview", scope: "playable", board: "", compareBoard: "", key: "", owner: "Player", interval: 5, pages: {}, compareIncomplete: false };
 const titles = { overview: ["실행 개요", "대전과 상점, 키보드 보충을 하나의 흐름으로 읽습니다."], battle: ["대전 분석", "입력량과 점수, 콤보 구간에 기록된 변화를 확인합니다."], keyboard: ["키보드 · 키 상세", "같은 눈금으로 입력 패턴과 실제 기믹 배치를 살펴봅니다."], shop: ["기믹 · 상점", "보유 변화부터 구매 확정과 효과 실행까지 추적합니다."], compare: ["실행 비교", "시간과 완료 조건을 구분하여 여러 실행을 나란히 비교합니다."] };
 const TYPE_COLORS = { None: "#637185", Explosion: "#f3a4a4", Bonus: "#e8d486", Row: "#b9ec82", Column: "#b5a0f2", All: "#eeae7c" };
 
@@ -80,7 +80,7 @@ function ShopDurationChart(shops) {
   const x = index => left + spacing * (index + .5);
   const y = seconds => bottom - seconds / maximum * (bottom - top);
   const groups = [...new Set(shops.map(shop => JSON.stringify([shop.session, shop.tournament])))];
-  let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" style="min-width:' + width + 'px" role="img" aria-label="라운드별 상점 체류 시간과 이전 방문 대비 증감"><text x="12" y="20">상점 체류 시간 (초)</text>';
+  let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" style="--chart-width:' + width + 'px;min-width:' + width + 'px" role="img" aria-label="라운드별 상점 체류 시간과 이전 방문 대비 증감"><text x="12" y="20">상점 체류 시간 (초)</text>';
   for (let tick = 0; tick <= 4; tick++) {
     const value = maximum * tick / 4;
     svg += '<line class="grid" x1="' + left + '" x2="' + right + '" y1="' + y(value) + '" y2="' + y(value) + '"/><text x="54" text-anchor="end" y="' + (y(value) + 4) + '">' + F(value, 1) + '</text>';
@@ -98,7 +98,7 @@ function ShopDurationChart(shops) {
     const group = JSON.stringify([shop.session, shop.tournament]);
     const label = (groups.length > 1 ? 'T' + (groups.indexOf(group) + 1) + ' · ' : '') + F(shop.round) + 'R 이후';
     const delta = comparable ? '이전 대비 ' + (shop.duration - previous.duration > 0 ? '+' : '') + F(shop.duration - previous.duration, 3) + '초' : shop.complete ? '비교 기준 없음' : '미완료 · 증감 비교 제외';
-    svg += '<text x="' + x(index) + '" y="' + (known ? y(shop.duration) - 13 : bottom - 12) + '" text-anchor="middle" style="fill:' + color + ';font-size:14px;font-weight:600">' + (known ? F(shop.duration, 3) + '초' : '시간 미수집') + '</text><text x="' + x(index) + '" y="270" text-anchor="middle">' + label + '</text><text x="' + x(index) + '" y="291" text-anchor="middle">' + (shop.complete ? '완료' : '미완료') + ' · 방문 ' + (index + 1) + '</text><text x="' + x(index) + '" y="313" text-anchor="middle">' + delta + '</text>';
+    svg += '<text x="' + x(index) + '" y="' + (known ? y(shop.duration) - 13 : bottom - 12) + '" text-anchor="middle" style="fill:' + color + ';font-weight:600">' + (known ? F(shop.duration, 3) + '초' : '시간 미수집') + '</text><text x="' + x(index) + '" y="270" text-anchor="middle">' + label + '</text><text x="' + x(index) + '" y="291" text-anchor="middle">' + (shop.complete ? '완료' : '미완료') + ' · 방문 ' + (index + 1) + '</text><text x="' + x(index) + '" y="313" text-anchor="middle">' + delta + '</text>';
   });
   return '<div class="chart">' + svg + '</svg></div><p class="hint">실선: 정상 완료 방문의 추세 · 점선 막대: 미완료 방문. 증감은 같은 실행의 연속된 완료 방문끼리만 비교합니다. 종료 시간이 없으면 막대를 그리지 않습니다.</p>';
 }
@@ -295,6 +295,8 @@ function CompareView() {
 
 /** 현재 탐색 상태에 맞춰 화면을 갱신하며 입력 범위와 선택한 탭을 유지한다. */
 function Render() {
+  RenderModeShell();
+  if (state.mode === "customization") { CustomUI.Render(); return; }
   SyncSelectors();
   const title = titles[state.tab];
   document.getElementById('pageTitle').textContent = title[0];
@@ -320,14 +322,21 @@ async function LoadFiles(files) {
       if (!file.name.toLowerCase().endsWith('.csv')) throw new Error('CSV 파일을 선택하세요.');
       const text = await file.text();
       const id = file.name + ':' + file.size + ':' + file.lastModified;
+      const header = (Playtest.ParseCsv(text)[0] || []).map(field => field.trim().toLowerCase());
+      if (header.includes('customization_run_id')) {
+        CustomUI.Add(Customization.Build(text, file.name, id));
+        state.mode = 'customization';
+        continue;
+      }
       const model = Playtest.Build(text, file.name, id);
+      state.mode = 'playtest';
       const existing = state.files.findIndex(item => item.id === id);
       if (existing >= 0) state.files[existing] = model; else state.files.push(model);
       state.file = id;
     } catch (error) { errors.push(file.name + ': ' + error.message); }
   }
   button.disabled = false; state.tournament = 'ALL'; state.battle = ''; state.board = ''; state.key = ''; state.pages = {};
-  status.textContent = state.files.length + '개 파일 로드됨 · 데이터는 메모리에만 유지됩니다. 새로고침 시 다시 선택하세요.';
+  status.textContent = '플레이테스트 ' + state.files.length + '개 / 커스터마이징 ' + CustomUI.Count() + '개 · 새로고침 시 파일을 다시 선택하세요.';
   document.getElementById('fileErrors').innerHTML = errors.length ? '<div class="warning error">' + errors.map(E).join('<br>') + '</div>' : '';
   document.getElementById('fileInput').value = '';
   Render();
@@ -345,9 +354,16 @@ function Initialize() {
   const moveBattle = direction => { const runs = Runs(), index = runs.findIndex(run => run.key === state.battle); if (runs[index + direction]) { state.battle = runs[index + direction].key; state.board = ''; state.key = ''; state.pages = {}; Render(); } };
   document.getElementById('prevBattle').addEventListener('click', () => moveBattle(-1));
   document.getElementById('nextBattle').addEventListener('click', () => moveBattle(1));
-  document.getElementById('removeFile').addEventListener('click', () => { state.files = state.files.filter(file => file.id !== state.file); state.file = state.files[0]?.id || ''; state.tournament = 'ALL'; state.pages = {}; Render(); document.getElementById('loadStatus').textContent = state.files.length + '개 파일 로드됨'; });
+  document.getElementById('removeFile').addEventListener('click', () => {
+    if (state.mode === 'customization') CustomUI.Remove();
+    else { state.files = state.files.filter(file => file.id !== state.file); state.file = state.files[0]?.id || ''; state.tournament = 'ALL'; }
+    state.pages = {}; Render();
+  });
+  ['customFileSelect', 'testerSelect', 'customSessionSelect', 'customRunSelect'].forEach(id => document.getElementById(id).addEventListener('change', event => { CustomUI.Change(event.target); state.pages = {}; Render(); }));
   document.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button) return;
+    if (button.dataset.mode) { state.mode = button.dataset.mode; state.pages = {}; Render(); window.scrollTo({ top: 0, behavior: 'auto' }); return; }
+    if (state.mode === 'customization' && CustomUI.Click(button)) { state.pages = {}; Render(); return; }
     if (button.dataset.tab) { state.tab = button.dataset.tab; state.pages = {}; Render(); window.scrollTo({ top: 0, behavior: 'auto' }); }
     if (button.dataset.run) { state.battle = button.dataset.run; state.tab = button.dataset.target; state.board = ''; state.key = ''; state.pages = {}; Render(); }
     if (button.dataset.key) { state.key = button.dataset.key; state.board = button.dataset.board; Render(); document.querySelector('.key-details')?.scrollIntoView({ block: 'nearest' }); }
@@ -355,6 +371,7 @@ function Initialize() {
   });
   document.getElementById('content').addEventListener('change', event => {
     const target = event.target;
+    if (state.mode === "customization") { CustomUI.Change(target); state.pages = {}; Render(); return; }
     if (target.id === 'scopeSelect') state.scope = target.value;
     if (target.id === 'ownerSelect') { state.owner = target.value; state.board = ''; state.compareBoard = ''; state.key = ''; }
     if (target.id === 'boardSelect') { state.board = target.value; state.key = ''; }
@@ -370,6 +387,22 @@ function Initialize() {
   window.addEventListener('drop', event => { event.preventDefault(); depth = 0; overlay.hidden = true; LoadFiles([...event.dataTransfer.files]); });
   window.addEventListener('blur', () => { depth = 0; overlay.hidden = true; });
   Render();
+}
+
+/** 현재 데이터 유형에 맞춰 메뉴·필터·초기 사용법을 전환하고 파일 수를 표시한다. */
+function RenderModeShell() {
+  const custom = state.mode === 'customization';
+  document.getElementById('playtestNav').hidden = custom;
+  document.getElementById('customizationNav').hidden = !custom;
+  document.getElementById('domainLabel').textContent = custom ? '커스터마이징 분석' : '플레이테스트 분석';
+  document.querySelectorAll('[data-domain]').forEach(element => { element.hidden = element.dataset.domain !== state.mode; });
+  document.querySelectorAll('[data-mode]').forEach(button => { button.classList.toggle('active', button.dataset.mode === state.mode); button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode)); });
+  document.getElementById('welcomeTitle').textContent = custom ? '편집의 흐름에서, 유지한 선택까지.' : '한 번의 실행부터, 하나의 키까지.';
+  document.getElementById('welcomeDescription').textContent = custom ? '커스터마이징 CSV를 선택하거나 놓으세요. 플레이어별 접근·체류·요소 선택·이미지 적용과 최종 상태를 확인합니다. 행동만으로 재미를 단정하지 않습니다.' : '플레이테스트 CSV를 선택하거나 놓으세요. 여러 파일의 대전, 키보드, 기믹과 상점 기록을 비교합니다.';
+  document.getElementById('welcomeSteps').innerHTML = custom ? '<span><b>01</b> 플레이어·회차 선택</span><span><b>02</b> 항목·요소 탐색</span><span><b>03</b> 종료 직전 유지 상태 비교</span>' : '<span><b>01</b> 실행의 진행 확인</span><span><b>02</b> 대전과 키보드 탐색</span><span><b>03</b> 다른 실행과 비교</span>';
+  document.getElementById('welcomeFine').textContent = custom ? '커스터마이징 전용 schema v1 · 25열 / UTF-8 CSV / 외부 전송 없음' : '플레이테스트 29 · 43 · 59열 / UTF-8 CSV / 원본 파일 변경 없음';
+  document.getElementById('analysisFooter').textContent = custom ? '선택 횟수 ≠ 최종 선호 ≠ 재미·만족. Final은 저장 완료가 아닙니다. 미기록 상태를 추정하지 않습니다.' : '기록된 사실을 집계합니다. 입력 ≠ 타격 성공 ≠ 기믹 발동. 미수집 데이터를 추정하지 않습니다.';
+  document.getElementById('loadStatus').textContent = '플레이테스트 ' + state.files.length + '개 / 커스터마이징 ' + CustomUI.Count() + '개 · 메모리에만 보관';
 }
 
 Initialize();

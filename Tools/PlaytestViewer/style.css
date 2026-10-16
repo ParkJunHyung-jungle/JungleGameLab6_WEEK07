@@ -10,7 +10,26 @@ pre{max-height:320px;overflow:auto;white-space:pre-wrap;font-size:10px}.key-deta
 .comparison-group + .comparison-group { border-top: 1px solid #46505e; margin-top: 10px; padding-top: 24px; }
 .comparison-group:last-child { padding-bottom: 0; }
 .comparison-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.comparison-group-heading h3 { margin: 0; font-size: 15px; color: var(--accent); }
+.comparison-group-heading h3 { margin: 0; font-size: 14px; color: var(--accent); }
 .comparison-group-heading details { font-size: 11px; max-width: 100%; }
 .comparison-group-heading details p { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
 .comparison-group .stack-row { margin-bottom: 0; }
+
+/* 데이터 유형별 탐색과 커스터마이징 차트의 공통 표현이다. */
+.mode-switch { display: grid; gap: 6px; margin-top: 24px; }
+.mode-switch button { text-align: left; font-size: 12px; }
+.mode-switch button.active { background: #b9ec82; color: #15200c; border-color: #b9ec82; font-weight: 700; }
+.custom-chart-scroll { overflow-x: auto; }
+.custom-bar { display: grid; grid-template-columns: 105px minmax(200px, 1fr); gap: 12px; padding: 12px 0; min-width: 340px; }
+.custom-bar > b { border-left: 4px solid; padding-left: 8px; font-size: 12px; }
+.custom-bar small { display: block; color: var(--muted); font-size: 11px; line-height: 1.8; }
+.custom-track { display: flex; height: 16px; background: #10141c; border-radius: 3px; overflow: hidden; margin-bottom: 7px; }
+.custom-part-filter { display: flex; align-items: center; gap: 12px; margin: 12px 0 20px; }
+/* 그래프를 원본 좌표 너비 이상 확대하지 않아 글자 크기를 유지한다. */
+.chart svg { max-width: var(--chart-width, 860px); }
+.result-exploration { display: grid; grid-template-columns: minmax(150px, 1.3fr) 1fr 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.result-exploration b, .comparison-group p { overflow-wrap: anywhere; }
+.comparison-group p { font-size: 12px; line-height: 1.8; }
+@media (max-width:720px) { .result-exploration { grid-template-columns: 1fr; gap: 4px; } }
+@media (max-width:720px) { .mode-switch { grid-template-columns: 1fr 1fr; margin-top: 14px; } .custom-bar { grid-template-columns: 90px minmax(210px,1fr); } }
+@media print { .mode-switch { display: none; } }

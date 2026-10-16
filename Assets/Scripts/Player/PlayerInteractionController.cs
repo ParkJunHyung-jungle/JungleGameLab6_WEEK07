@@ -1,7 +1,7 @@
 using System.Collections;
 
 using UnityEngine;
-
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -26,6 +26,8 @@ namespace Game.Player
 
     public sealed class PlayerInteractionController : MonoBehaviour
     {
+        private const float KEYBOARD_EDIT_ROTATION_SENSITIVITY = 0.2f;
+
         [Header("Interaction")]
         [SerializeField] private Camera _camera;
         [SerializeField] private InputActionReference _clickInput;
@@ -56,6 +58,7 @@ namespace Game.Player
         [SerializeField] private CinemachineInputAxisController _cameraInputAxisController;
         [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
         [SerializeField] private GameObject _keyboardEditOverlay;
+        [SerializeField] private GameObject _centerReticle;
         private KeyboardInputController _editingKeyboard;
         private Coroutine _cameraTransition;
         private Vector3 _savedPlayerPosition;
@@ -63,6 +66,10 @@ namespace Game.Player
         private bool _moveInputWasEnabled;
         private bool _cameraInputWasEnabled;
         private bool _isKeyboardEditMode;
+        private Rigidbody _editingKeyboardBody;
+        private Vector3 _editingKeyboardCenterOffset;
+        private bool _isDraggingEditingKeyboard;
+        private Vector2 _pendingKeyboardRotationDelta;
 
         void Awake()
         {
@@ -84,6 +91,7 @@ namespace Game.Player
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
             _clickInput.action.started += HandleClickStarted;
+            _clickInput.action.canceled += HandleClickCanceled;
             _clickInput.action.Enable();
             _coverInput.action.started += HandleCoverStarted;
             _coverInput.action.Enable();
@@ -92,6 +100,7 @@ namespace Game.Player
         void OnDisable()
         {
             _clickInput.action.started -= HandleClickStarted;
+            _clickInput.action.canceled -= HandleClickCanceled;
             _clickInput.action.Disable();
             _coverInput.action.started -= HandleCoverStarted;
             _coverInput.action.Disable();
@@ -104,11 +113,13 @@ namespace Game.Player
         void FixedUpdate()
         {
             FollowHeldKeyboard();
+            ApplyEditingKeyboardRotation();
         }
 
         void LateUpdate()
         {
             UpdateInteractionPrompt();
+            CaptureEditingKeyboardMouseDelta();
         }
 
         /// <summary>
@@ -117,10 +128,27 @@ namespace Game.Player
         /// </summary>
         private void HandleClickStarted(InputAction.CallbackContext context)
         {
-            if (_isKeyboardEditMode || _cameraTransition != null)
+            if (_isKeyboardEditMode)
+            {
+                if (_cameraTransition == null)
+                    TryBeginEditingKeyboardRotation();
+
+                return;
+            }
+
+            if (_cameraTransition != null)
                 return;
 
             TryInteract();
+        }
+
+        /// <summary>
+        /// 좌클릭이 끝나면 진행 중인 키보드 드래그 회전을 멈춘다.
+        /// context 입력을 사용하며 대기 중인 회전량과 드래그 상태를 초기화한다.
+        /// </summary>
+        private void HandleClickCanceled(InputAction.CallbackContext context)
+        {
+            StopEditingKeyboardRotation();
         }
 
         /// <summary>
@@ -295,8 +323,13 @@ namespace Game.Player
             _isKeyboardEditMode = true;
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(true);
+            if (_centerReticle != null)
+                _centerReticle.SetActive(false);
 
             _editingKeyboard = keyboard;
+            _editingKeyboardBody = holder.KeyboardBody;
+            KeyboardPickupTarget pickupTarget = _editingKeyboardBody.GetComponent<KeyboardPickupTarget>();
+            _editingKeyboardCenterOffset = pickupTarget.GetVisualCenterLocalPosition(_editingKeyboardBody.transform);
             _savedPlayerPosition = transform.position;
             _savedCameraRotation = _camera.transform.rotation;
             _moveInputWasEnabled = _moveInput.action.enabled;
@@ -348,8 +381,11 @@ namespace Game.Player
         private void ExitKeyboardEditMode()
         {
             _isKeyboardEditMode = false;
+            StopEditingKeyboardRotation();
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(false);
+            if (_centerReticle != null)
+                _centerReticle.SetActive(true);
 
             if (_editingKeyboard != null)
                 _editingKeyboard.SetInputEnabled(false);
@@ -405,6 +441,8 @@ namespace Game.Player
                 _editingKeyboard.SetInputEnabled(false);
 
             _editingKeyboard = null;
+            _editingKeyboardBody = null;
+            _editingKeyboardCenterOffset = Vector3.zero;
             if (_moveInputWasEnabled)
                 _moveInput.action.Enable();
             else
@@ -421,8 +459,11 @@ namespace Game.Player
         /// </summary>
         private void ResetKeyboardEditMode()
         {
+            StopEditingKeyboardRotation();
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(false);
+            if (_centerReticle != null)
+                _centerReticle.SetActive(true);
 
             if (!_isKeyboardEditMode && _editingKeyboard == null && _cameraTransition == null)
                 return;
@@ -437,6 +478,113 @@ namespace Game.Player
             transform.position = _savedPlayerPosition;
             _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _savedCameraRotation);
             RestoreKeyboardEditInput();
+        }
+
+        /// <summary>
+        /// 좌클릭 시작 위치가 편집 중인 키보드 위인지 확인하고 드래그 회전을 시작한다.
+        /// 마우스 위치와 키보드 렌더 경계 Raycast를 확인하고 앞을 가리는 충돌체를 검사한다.
+        /// </summary>
+        private void TryBeginEditingKeyboardRotation()
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse == null || _editingKeyboardBody == null)
+                return;
+
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
+
+            Vector2 pointerPosition = mouse.position.ReadValue();
+            Ray pointerRay = _camera.ScreenPointToRay(pointerPosition);
+            float nearestKeyboardHitDistance = float.PositiveInfinity;
+            Renderer[] keyboardRenderers = _editingKeyboardBody.GetComponentsInChildren<Renderer>();
+            for (int i = 0; i < keyboardRenderers.Length; i++)
+            {
+                Renderer renderer = keyboardRenderers[i];
+                if (renderer.enabled
+                    && renderer.bounds.IntersectRay(pointerRay, out float hitDistance)
+                    && hitDistance < nearestKeyboardHitDistance)
+                {
+                    nearestKeyboardHitDistance = hitDistance;
+                }
+            }
+
+            if (nearestKeyboardHitDistance > _interactionDistance
+                || float.IsPositiveInfinity(nearestKeyboardHitDistance))
+            {
+                return;
+            }
+
+            if (Physics.Raycast(
+                    pointerRay,
+                    out RaycastHit obstructionHit,
+                    _interactionDistance,
+                    _interactionLayers,
+                    QueryTriggerInteraction.Ignore)
+                && obstructionHit.distance < nearestKeyboardHitDistance)
+            {
+                return;
+            }
+
+            _isDraggingEditingKeyboard = true;
+            _pendingKeyboardRotationDelta = Vector2.zero;
+        }
+
+        /// <summary>
+        /// 키보드 위에서 누른 좌클릭이 유지되는 동안 마우스 이동량을 누적한다.
+        /// Mouse.delta를 사용하며 물리 갱신에서 적용할 회전 입력을 저장한다.
+        /// </summary>
+        private void CaptureEditingKeyboardMouseDelta()
+        {
+            if (!_isKeyboardEditMode || !_isDraggingEditingKeyboard)
+                return;
+
+            Mouse mouse = Mouse.current;
+            if (mouse == null)
+            {
+                StopEditingKeyboardRotation();
+                return;
+            }
+
+            _pendingKeyboardRotationDelta += mouse.delta.ReadValue();
+        }
+
+        /// <summary>
+        /// 누적된 마우스 이동량을 사용해 키보드를 시각적 중앙 기준으로 회전한다.
+        /// editingKeyboardBody와 editingKeyboardCenterOffset을 사용해 Rigidbody 자세를 갱신한다.
+        /// </summary>
+        private void ApplyEditingKeyboardRotation()
+        {
+            if (!_isKeyboardEditMode || !_isDraggingEditingKeyboard || _editingKeyboardBody == null)
+                return;
+
+            Vector2 mouseDelta = _pendingKeyboardRotationDelta;
+            _pendingKeyboardRotationDelta = Vector2.zero;
+            if (mouseDelta.sqrMagnitude <= 0f)
+                return;
+
+            Quaternion yawRotation = Quaternion.AngleAxis(
+                mouseDelta.x * KEYBOARD_EDIT_ROTATION_SENSITIVITY,
+                Vector3.up);
+            Quaternion pitchRotation = Quaternion.AngleAxis(
+                -mouseDelta.y * KEYBOARD_EDIT_ROTATION_SENSITIVITY,
+                _camera.transform.right);
+            Quaternion targetRotation = pitchRotation * yawRotation * _editingKeyboardBody.rotation;
+
+            Vector3 visualCenter = _editingKeyboardBody.transform.TransformPoint(_editingKeyboardCenterOffset);
+            Vector3 currentCenterOffset = _editingKeyboardBody.transform.TransformVector(_editingKeyboardCenterOffset);
+            Quaternion rotationDelta = targetRotation * Quaternion.Inverse(_editingKeyboardBody.rotation);
+            _editingKeyboardBody.MovePosition(visualCenter - rotationDelta * currentCenterOffset);
+            _editingKeyboardBody.MoveRotation(targetRotation);
+        }
+
+        /// <summary>
+        /// 키보드 드래그 회전 상태와 대기 중인 마우스 이동량을 초기화한다.
+        /// 입력 해제나 편집 모드 종료 시 회전이 더 적용되지 않도록 한다.
+        /// </summary>
+        private void StopEditingKeyboardRotation()
+        {
+            _isDraggingEditingKeyboard = false;
+            _pendingKeyboardRotationDelta = Vector2.zero;
         }
 
         /// <summary>

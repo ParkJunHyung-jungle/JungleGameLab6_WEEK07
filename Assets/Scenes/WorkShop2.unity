@@ -1001,6 +1001,7 @@ MonoBehaviour:
   _cameraInputAxisController: {fileID: 1381470436}
   _cameraTransitionDuration: 0.45
   _keyboardEditOverlay: {fileID: 9911000020}
+  _centerReticle: {fileID: 9911000004}
 --- !u!114 &7500000010
 MonoBehaviour:
   m_ObjectHideFlags: 0

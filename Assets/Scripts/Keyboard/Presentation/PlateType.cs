@@ -1,6 +1,7 @@
 public enum PlateType
 {
-    Brass = 0,
-    Cave = 1,
+    Nomal = 0,
+    Golden = 1,
     UnderWater = 2,
+    RainBow = 3,
 }

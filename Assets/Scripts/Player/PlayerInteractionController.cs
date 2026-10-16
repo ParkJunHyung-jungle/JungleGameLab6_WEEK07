@@ -425,6 +425,8 @@ namespace Game.Player
             _isKeyboardEditMode = true;
             _editingKeyboard = keyboard;
             KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
+            if (AudioManager.instance != null)
+                AudioManager.instance.SelectKeyboardEffects(customization);
             _keyboardEditOverlayUI?.SetSelectedMaterial(customization != null ? customization.KeycapMaterial : null);
             _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
             _keyboardEditOverlayUI?.SetCaseCustomization(customization);
@@ -559,6 +561,8 @@ namespace Game.Player
 
             if (_editingKeyboard != null)
             {
+                if (AudioManager.instance != null)
+                    AudioManager.instance.ReleaseKeyboardEffects(_editingKeyboard.GetComponent<KeyboardCustomization>());
                 _editingKeyboard.SetInputEnabled(false);
                 _editingKeyboard.SetAttackEnabled(_editingKeyboardAttackWasEnabled);
             }

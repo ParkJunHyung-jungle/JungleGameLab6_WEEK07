@@ -32,6 +32,7 @@ namespace KeyboardModeling
         [Header("Input Mapping")]
         [SerializeField] private bool _inputEnabled = true;
         [SerializeField] private KeyBinding[] _bindings = Array.Empty<KeyBinding>();
+        private bool _attackEnabled = true;
         private bool _alphabetKeysRequired;
         private bool _allKeysRequired;
         private bool _hasFocus;
@@ -99,6 +100,8 @@ namespace KeyboardModeling
             get => _inputEnabled;
             set => SetInputEnabled(value);
         }
+
+        public bool AttackEnabled => _attackEnabled;
 
         public Key LastPressedKey => _lastPressedKey;
         public string CurrentPressedKeys => _currentPressedKeys;
@@ -278,7 +281,7 @@ namespace KeyboardModeling
                     return;
                 }
 
-                if (pressedThisFrame && _keycapHealths[index] != null &&
+                if (_attackEnabled && pressedThisFrame && _keycapHealths[index] != null &&
                     (_keycapHealths[index].CurrentHP == 0 || _keycapButtons[index].isActiveAndEnabled))
                 {
                     AttackRequested?.Invoke(_keycapHealths[index]);
@@ -405,6 +408,15 @@ namespace KeyboardModeling
             _inputEnabled = inputEnabled;
             if (!inputEnabled && _restPositions != null)
                 RestoreKeys();
+        }
+
+        /// <summary>
+        /// 키 입력으로 공격 요청을 발생시킬지 설정한다.
+        /// attackEnabled를 저장하며 false일 때 입력 사운드와 키 눌림 처리는 유지한다.
+        /// </summary>
+        public void SetAttackEnabled(bool attackEnabled)
+        {
+            _attackEnabled = attackEnabled;
         }
 
         /// <summary>

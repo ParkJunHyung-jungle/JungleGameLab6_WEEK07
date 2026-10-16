@@ -77,6 +77,7 @@ namespace Game.Player
         private Quaternion _savedCameraRotation;
         private bool _moveInputWasEnabled;
         private bool _cameraInputWasEnabled;
+        private bool _editingKeyboardAttackWasEnabled;
         private bool _isKeyboardEditMode;
         private Rigidbody _editingKeyboardBody;
         private float _savedCameraFieldOfView;
@@ -125,6 +126,7 @@ namespace Game.Player
                 _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected += HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected += HandleCaseMaterialSelected;
+                _keyboardEditOverlayUI.AttackModeSelected += HandleAttackModeSelected;
             }
             _clickInput.action.started += HandleClickStarted;
             _clickInput.action.canceled += HandleClickCanceled;
@@ -142,6 +144,7 @@ namespace Game.Player
                 _keyboardEditOverlayUI.KeycapMaterialSelected -= HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected -= HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected -= HandleCaseMaterialSelected;
+                _keyboardEditOverlayUI.AttackModeSelected -= HandleAttackModeSelected;
             }
             _clickInput.action.started -= HandleClickStarted;
             _clickInput.action.canceled -= HandleClickCanceled;
@@ -443,6 +446,9 @@ namespace Game.Player
             _cameraInputAxisController.enabled = false;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+            _editingKeyboardAttackWasEnabled = keyboard.AttackEnabled;
+            keyboard.SetAttackEnabled(false);
+            _keyboardEditOverlayUI?.SetSelectedAttackMode(false);
             keyboard.SetInputEnabled(true);
 
             Vector3 targetPlayerPosition;
@@ -542,14 +548,17 @@ namespace Game.Player
 
         /// <summary>
         /// 편집 모드 진입 전에 저장한 렌즈 시야각과 키보드·이동 입력 및 커서 상태를 복원한다.
-        /// 저장 상태를 적용하고 편집 중인 키보드 참조를 비운다.
+        /// 키보드 입력과 공격 설정을 저장 상태로 되돌리고 편집 중인 키보드 참조를 비운다.
         /// </summary>
         private void RestoreKeyboardEditInput()
         {
             SetEditingCameraFieldOfView(_savedCameraFieldOfView);
 
             if (_editingKeyboard != null)
+            {
                 _editingKeyboard.SetInputEnabled(false);
+                _editingKeyboard.SetAttackEnabled(_editingKeyboardAttackWasEnabled);
+            }
 
             _editingKeyboard = null;
             _editingKeyboardBody = null;
@@ -799,6 +808,19 @@ namespace Game.Player
                 customization.SetCaseMaterialIndex(index);
                 _keyboardEditOverlayUI.RefreshCaseMaterialSelection();
             }
+        }
+
+        /// <summary>
+        /// 편집 모드 버튼의 공격 상태를 현재 키보드에 적용하고 선택 표시를 갱신한다.
+        /// attackModeSelected를 사용하며 true면 키 입력 공격을 허용하고 false면 차단한다.
+        /// </summary>
+        private void HandleAttackModeSelected(bool attackModeSelected)
+        {
+            if (!_isKeyboardEditMode || _editingKeyboard == null)
+                return;
+
+            _editingKeyboard.SetAttackEnabled(attackModeSelected);
+            _keyboardEditOverlayUI.SetSelectedAttackMode(attackModeSelected);
         }
 
         /// <summary>

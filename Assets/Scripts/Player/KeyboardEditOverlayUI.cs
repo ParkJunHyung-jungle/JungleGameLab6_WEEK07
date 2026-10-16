@@ -14,6 +14,8 @@ namespace Game.Player
         private const int PREVIEW_TEXTURE_SIZE = 128;
         private const float WHEEL_SCROLL_INPUT_SCALE = 20f;
 
+        private static readonly Color _activeModeButtonColor = new Color(0.12f, 0.48f, 0.58f, 1f);
+        private static readonly Color _inactiveModeButtonColor = new Color(0.12f, 0.17f, 0.24f, 0.98f);
         private static readonly SwitchType[] _switchSoundTypes = (SwitchType[])Enum.GetValues(typeof(SwitchType));
 
         [Header("Edit Buttons")]
@@ -22,6 +24,11 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _ledButton;
         [SerializeField] private KeyboardEditButton _caseButton;
         [SerializeField] private KeyboardEditButton _customButton;
+
+        [Header("Mode Buttons")]
+        [SerializeField] private KeyboardEditButton _generalModeButton;
+        [SerializeField] private KeyboardEditButton _attackModeButton;
+        [SerializeField] private Text _modeStatus;
         private PickerMode _pickerMode;
 
         [Header("Keycap Material Picker")]
@@ -66,6 +73,7 @@ namespace Game.Player
         public event Action<Material> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<int> CaseMaterialSelected;
+        public event Action<bool> AttackModeSelected;
 
         private enum PickerMode
         {
@@ -102,6 +110,8 @@ namespace Game.Player
             _ledButton.Clicked += HandleCategoryClicked;
             _caseButton.Clicked += HandleCategoryClicked;
             _customButton.Clicked += HandleCategoryClicked;
+            _generalModeButton.Clicked += HandleGeneralModeClicked;
+            _attackModeButton.Clicked += HandleAttackModeClicked;
             foreach (KeyboardEditButton button in _previewButtons)
             {
                 button.Clicked += HandlePreviewClicked;
@@ -127,6 +137,8 @@ namespace Game.Player
             _ledButton.Clicked -= HandleCategoryClicked;
             _caseButton.Clicked -= HandleCategoryClicked;
             _customButton.Clicked -= HandleCategoryClicked;
+            _generalModeButton.Clicked -= HandleGeneralModeClicked;
+            _attackModeButton.Clicked -= HandleAttackModeClicked;
             foreach (KeyboardEditButton button in _previewButtons)
             {
                 button.Clicked -= HandlePreviewClicked;
@@ -218,6 +230,23 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 공격 모드 또는 일반 모드 버튼의 선택 색상을 갱신한다.
+        /// attackModeSelected를 사용하며 선택된 모드 버튼을 활성 색상으로 표시한다.
+        /// </summary>
+        public void SetSelectedAttackMode(bool attackModeSelected)
+        {
+            _generalModeButton.targetGraphic.color = attackModeSelected
+                ? _inactiveModeButtonColor
+                : _activeModeButtonColor;
+            _attackModeButton.targetGraphic.color = attackModeSelected
+                ? _activeModeButtonColor
+                : _inactiveModeButtonColor;
+            _modeStatus.text = attackModeSelected
+                ? "현재 모드: 공격 모드"
+                : "현재 모드: 일반 모드";
+        }
+
+        /// <summary>
         /// 사진 편집 완료 요청을 받아 오른쪽 패널과 상단 저장 슬롯을 닫는다.
         /// 별도 입력 없이 선택 모드를 해제하고 기존 키보드 입력 상태를 복원한다.
         /// </summary>
@@ -289,6 +318,24 @@ namespace Game.Player
             else if (button == _ledButton)
                 mode = PickerMode.Led;
             SetPickerMode(mode == _pickerMode ? PickerMode.None : mode);
+        }
+
+        /// <summary>
+        /// 일반 모드 선택을 PlayerInteractionController에 전달한다.
+        /// button의 클릭 콜백에서 false를 전달해 공격 요청을 차단하도록 알린다.
+        /// </summary>
+        private void HandleGeneralModeClicked(KeyboardEditButton button)
+        {
+            AttackModeSelected?.Invoke(false);
+        }
+
+        /// <summary>
+        /// 공격 모드 선택을 PlayerInteractionController에 전달한다.
+        /// button의 클릭 콜백에서 true를 전달해 공격 요청을 허용하도록 알린다.
+        /// </summary>
+        private void HandleAttackModeClicked(KeyboardEditButton button)
+        {
+            AttackModeSelected?.Invoke(true);
         }
 
         /// <summary>

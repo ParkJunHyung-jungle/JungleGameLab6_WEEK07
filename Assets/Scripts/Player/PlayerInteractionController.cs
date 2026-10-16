@@ -55,6 +55,7 @@ namespace Game.Player
         [SerializeField] private CinemachinePanTilt _cameraPanTilt;
         [SerializeField] private CinemachineInputAxisController _cameraInputAxisController;
         [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
+        [SerializeField] private GameObject _keyboardEditOverlay;
         private KeyboardInputController _editingKeyboard;
         private Coroutine _cameraTransition;
         private Vector3 _savedPlayerPosition;
@@ -292,6 +293,9 @@ namespace Game.Player
             }
 
             _isKeyboardEditMode = true;
+            if (_keyboardEditOverlay != null)
+                _keyboardEditOverlay.SetActive(true);
+
             _editingKeyboard = keyboard;
             _savedPlayerPosition = transform.position;
             _savedCameraRotation = _camera.transform.rotation;
@@ -344,6 +348,9 @@ namespace Game.Player
         private void ExitKeyboardEditMode()
         {
             _isKeyboardEditMode = false;
+            if (_keyboardEditOverlay != null)
+                _keyboardEditOverlay.SetActive(false);
+
             if (_editingKeyboard != null)
                 _editingKeyboard.SetInputEnabled(false);
 
@@ -414,6 +421,9 @@ namespace Game.Player
         /// </summary>
         private void ResetKeyboardEditMode()
         {
+            if (_keyboardEditOverlay != null)
+                _keyboardEditOverlay.SetActive(false);
+
             if (!_isKeyboardEditMode && _editingKeyboard == null && _cameraTransition == null)
                 return;
 

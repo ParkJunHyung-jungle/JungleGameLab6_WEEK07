@@ -35123,7 +35123,8 @@ MonoBehaviour:
   _materials:
   - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
-  - {fileID: 2100000, guid: c4da2edb164328841934d091e98ee3a2, type: 2}
+  - {fileID: 2100000, guid: 16b8e1e43f86b614eaa4f02c773c3c57, type: 2}
+  - {fileID: 2100000, guid: 459ddb0e8f4742b48a738f361185deb4, type: 2}
   _caseRenderers:
   - {fileID: 7448335059736704784}
   - {fileID: 8780478049414863374}
@@ -59849,6 +59850,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+    - target: {fileID: 1047305911693307686, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 9947c8e32db262144832a15355c38bf8, type: 2}
     - target: {fileID: 3276249815416262668, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
       propertyPath: m_LocalScale.x
       value: 1
@@ -59973,6 +59978,7 @@ MonoBehaviour:
   _plateData:
   - {fileID: 11400000, guid: 7858a837447520d4390316b9da011f7e, type: 2}
   - {fileID: 11400000, guid: 440d48bfdc424db4ca52a47c0b52fe2e, type: 2}
+  - {fileID: 11400000, guid: 8f826efd0c3ec5941941d1e269490a42, type: 2}
   _plateRenderer: {fileID: 534380275776001789}
 --- !u!23 &5999264866688161344 stripped
 MeshRenderer:

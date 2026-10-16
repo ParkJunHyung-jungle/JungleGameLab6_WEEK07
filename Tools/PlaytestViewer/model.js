@@ -240,6 +240,19 @@ const Playtest = (() => {
     return { player, enemy, intervals, apm };
   }
 
+  /** 대전 시작과 플레이어 보충 입장 행을 사용하여 중복 없는 상대 시각 표시점을 반환한다. */
+  function ReplacementMarkers(run) {
+    const start = run.start?.elapsed_seconds;
+    if (!Number.isFinite(start)) return [];
+    const rows = run.rows.filter(row => row.record_type === "KeyboardSpawn" && row.owner === "Player" &&
+      row.spawn_kind === "Replacement" && Number.isFinite(row.elapsed_seconds) && row.elapsed_seconds >= start &&
+      (!Number.isFinite(run.end?.elapsed_seconds) || row.elapsed_seconds <= run.end.elapsed_seconds));
+    return [...Group(rows, row => row.keyboard_id || row.sourceIndex).values()].map(entries => {
+      const row = entries[0];
+      return { x: row.elapsed_seconds - start, label: "키보드 " + (row.keyboard_spawn_index ?? "번호 미수집") + " 보충" };
+    });
+  }
+
   /** 거래 후보와 확정 행을 분리하여 확정 수량·지출·연결 스냅샷 및 완료 상태를 반환한다. */
   function Transaction(entries) {
     const confirmed = entries.filter(row => row.action === "PurchaseConfirmed");
@@ -266,6 +279,6 @@ const Playtest = (() => {
     return { runs, input, duration, shopTime, final, perMinute: duration > 0 && input.total !== null ? input.total * 60 / duration : null };
   }
 
-  return { TYPES, ParseCsv, Decode, Build, Order, IsDown, Group, Includes, Inputs, InputType, Effects, Spend, Buckets, Scores, Transaction, Comparison };
+  return { TYPES, ParseCsv, Decode, Build, Order, IsDown, Group, Includes, Inputs, InputType, Effects, Spend, Buckets, Scores, ReplacementMarkers, Transaction, Comparison };
 })();
 

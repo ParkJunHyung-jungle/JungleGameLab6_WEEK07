@@ -65,6 +65,39 @@ function Plot(series, unit, step = false) {
   });
   return '<div class="chart">' + svg + '<text x="445" y="280" text-anchor="middle">대전 시작 후 시간 (초)</text></svg></div><div class="legend">' + valid.map(item => '<span><i class="dot" style="background:' + item.color + '"></i>' + E(item.label) + '</span>').join('') + '</div>';
 }
+
+/** 상점 방문의 기록 시간을 라운드별 막대와 추세선으로 표시하고 정상 방문 사이의 증감을 반환한다. */
+function ShopDurationChart(shops) {
+  if (!shops.length) return Empty('이 범위의 상점 방문 기록 없음');
+  const width = Math.max(700, shops.length * 170 + 90), height = 345;
+  const left = 65, right = width - 25, top = 65, bottom = 245;
+  const maximum = Math.max(1, ...shops.map(shop => Number.isFinite(shop.duration) ? shop.duration : 0)) * 1.2;
+  const spacing = (right - left) / shops.length;
+  const x = index => left + spacing * (index + .5);
+  const y = seconds => bottom - seconds / maximum * (bottom - top);
+  const groups = [...new Set(shops.map(shop => JSON.stringify([shop.session, shop.tournament])))];
+  let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" style="min-width:' + width + 'px" role="img" aria-label="라운드별 상점 체류 시간과 이전 방문 대비 증감"><text x="12" y="20">상점 체류 시간 (초)</text>';
+  for (let tick = 0; tick <= 4; tick++) {
+    const value = maximum * tick / 4;
+    svg += '<line class="grid" x1="' + left + '" x2="' + right + '" y1="' + y(value) + '" y2="' + y(value) + '"/><text x="54" text-anchor="end" y="' + (y(value) + 4) + '">' + F(value, 1) + '</text>';
+  }
+  shops.forEach((shop, index) => {
+    const known = Number.isFinite(shop.duration), previous = shops[index - 1];
+    const sameRun = previous && previous.session === shop.session && previous.tournament === shop.tournament;
+    const comparable = known && shop.complete && sameRun && previous.complete && Number.isFinite(previous.duration);
+    const color = shop.complete ? '#b9ec82' : '#f4c88a';
+    if (comparable) svg += '<line x1="' + x(index - 1) + '" x2="' + x(index) + '" y1="' + y(previous.duration) + '" y2="' + y(shop.duration) + '" stroke="#b9ec82" stroke-width="2"/>';
+    if (known) {
+      const barWidth = Math.min(62, spacing * .42);
+      svg += '<rect x="' + (x(index) - barWidth / 2) + '" y="' + y(shop.duration) + '" width="' + barWidth + '" height="' + (bottom - y(shop.duration)) + '" fill="' + color + '" fill-opacity=".2" stroke="' + color + '"' + (shop.complete ? '' : ' stroke-dasharray="4 3"') + '/><circle cx="' + x(index) + '" cy="' + y(shop.duration) + '" r="4" fill="' + color + '"/>';
+    }
+    const group = JSON.stringify([shop.session, shop.tournament]);
+    const label = (groups.length > 1 ? 'T' + (groups.indexOf(group) + 1) + ' · ' : '') + F(shop.round) + 'R 이후';
+    const delta = comparable ? '이전 대비 ' + (shop.duration - previous.duration > 0 ? '+' : '') + F(shop.duration - previous.duration, 3) + '초' : shop.complete ? '비교 기준 없음' : '미완료 · 증감 비교 제외';
+    svg += '<text x="' + x(index) + '" y="' + (known ? y(shop.duration) - 13 : bottom - 12) + '" text-anchor="middle" style="fill:' + color + ';font-size:14px;font-weight:600">' + (known ? F(shop.duration, 3) + '초' : '시간 미수집') + '</text><text x="' + x(index) + '" y="270" text-anchor="middle">' + label + '</text><text x="' + x(index) + '" y="291" text-anchor="middle">' + (shop.complete ? '완료' : '미완료') + ' · 방문 ' + (index + 1) + '</text><text x="' + x(index) + '" y="313" text-anchor="middle">' + delta + '</text>';
+  });
+  return '<div class="chart">' + svg + '</svg></div><p class="hint">실선: 정상 완료 방문의 추세 · 점선 막대: 미완료 방문. 증감은 같은 실행의 연속된 완료 방문끼리만 비교합니다. 종료 시간이 없으면 막대를 그리지 않습니다.</p>';
+}
 /** 상단 파일·토너먼트·대전 선택지를 갱신하고 현재 선택 범위를 유지한다. */
 function SyncSelectors() {
   const file = Dataset();
@@ -94,10 +127,10 @@ function Overview() {
   let html = '<div class="metrics">' + Metric('관측된 진행', E(disposition), '최종 순위와 토너먼트 완주를 추정하지 않음') + Metric('대전 완료 / 전체', runs.filter(run => run.complete).length + ' / ' + runs.length, 'StageEnd.is_complete 기준') + Metric('플레이 가능 Down', F(Playtest.Inputs(rows, file).total), 'Alive + Broken · Up 제외') + Metric('플레이어 최초 / 보충', file.header.includes('keyboard_id') ? boards.filter(board => board.spawn.spawn_kind === 'Initial').length + ' / ' + boards.filter(board => board.spawn.spawn_kind === 'Replacement').length : '미수집', '입장 완료 이벤트 기준') + '</div>';
   html += Panel('대전별 결과', Table(['대전', '상태', '플레이어 / 로봇', '기록 길이', '플레이 가능 / 원본 Down', '종료 사유', '탐색'], runs.map(run => [E(RunLabel(run)), Badge(run), Field(run.end, 'player_score', 0) + ' / ' + Field(run.end, 'enemy_score', 0) + ' 점', Field(run.end, 'duration_seconds') + ' 초', F(run.inputs.total) + ' / ' + F(Playtest.Inputs(run.rows, file, 'all').total), Field(run.end, 'end_reason'), '<button data-run="' + E(run.key) + '" data-target="battle">대전 보기</button>']), 'rounds'));
   const max = Math.max(1, ...runs.map(run => Playtest.Inputs(run.rows, file, 'all').raw));
-  html += Panel('대전별 입력 구성', runs.map(run => InputStack(RunLabel(run), Playtest.Inputs(run.rows, file, state.scope), max)).join('') || Empty('대전 구분 미수집'), '청록: 일반키 / 보라: 기믹키 / 회색: 분류 불가. 같은 입력 횟수 눈금으로 비교합니다.');
+  html += Panel('대전별 입력 구성', runs.map(run => InputStack(RunLabel(run), Playtest.Inputs(run.rows, file, state.scope), max)).join('') || Empty('대전 구분 미수집'), '파랑: 일반키 / 주황: 기믹키 / 회색: 분류 불가. 같은 입력 횟수 눈금으로 비교합니다.');
   const flow = rows.filter(row => ['SessionStart', 'SessionEnd', 'StageStart', 'StageEnd', 'ShopStart', 'ShopEnd', 'KeyboardSpawn'].includes(row.record_type));
   html += Panel('전체 진행 타임라인', Table(['앱 시각(초)', '기록', '대전', '소유자', '입장 / 종료 상태'], flow.map(row => [Field(row, 'elapsed_seconds'), E(row.record_type), F(row.round_index) + 'R · ' + F(row.battle_kind), F(row.owner), row.record_type === 'KeyboardSpawn' ? '키보드 ' + F(row.keyboard_spawn_index) + ' · ' + F(row.spawn_kind) : F(row.end_reason) + (row.record_type.endsWith('End') ? ' · ' + (row.is_complete === true ? '완료' : '미완료') : '')]), 'flow'), '시각은 앱 실행 실시간입니다. 같은 시각의 이벤트는 숫자 sequence 순으로 정렬합니다.');
-  html += Panel('상점 방문', Table(['대전 이후', '상태', '체류', '종료 사유'], shops.map(shop => [F(shop.round) + 'R', shop.complete ? '완료' : '미완료', Field(shop.end, 'duration_seconds', 6) + ' 초', Field(shop.end, 'end_reason')]), 'shopsOverview'), '폐기 화면·교체 준비까지 포함한 기록 시간입니다. 종료 행이 없으면 시간을 추정하지 않습니다.');
+  html += Panel('라운드별 상점 체류 시간', file.header.includes('shop_visit_id') ? ShopDurationChart(shops) : Empty('상점 방문 미수집'), '폐기 화면·교체 준비까지 포함한 기록 시간입니다. 대전이 끝난 뒤 방문한 상점을 표시합니다.');
   html += Panel('키별 원본 입력 · 배치 범위 밖도 포함', Table(['원본 키 식별자', '전체 Down', '일반 / 기믹 / 분류 불가'], [...Playtest.Group(rows.filter(Playtest.IsDown), row => row.key)].map(([key, entries]) => {
     const count = Playtest.Inputs(entries, file, 'all');
     return [F(key), entries.length, F(count.normal) + ' / ' + F(count.special) + ' / ' + F(count.unknown)];
@@ -209,6 +242,7 @@ function ShopView() {
   const rerolls = actions.filter(row => row.action === 'Reroll');
   const collected = shops.map(shop => shop.duration).filter(Number.isFinite);
   html += '<div class="metrics">' + Metric('종료 기록 상점 시간', !shops.length ? '0초' : collected.length ? F(collected.reduce((sum, value) => sum + value, 0), 6) + '초' : '미수집', '방문 ' + shops.length + '회 · 미완료 ' + shops.filter(shop => !shop.complete).length + '회') + Metric('실제 구매', file.header.includes('action') ? purchases.length + '회' : '미수집', 'PurchaseConfirmed만 집계') + Metric('구매 지출 / 리롤 지출', file.header.includes('currency_before') ? F(Playtest.Spend(purchases)) + ' / ' + F(Playtest.Spend(rerolls)) : '미수집', '재화 전후 차이 · 묶음 가격') + '</div>';
+  html += Panel('라운드별 상점 체류 시간 · 증감 추세', ShopDurationChart(shops), '각 막대는 한 번의 상점 방문입니다. 위 숫자는 체류 시간, 아래 숫자는 이전 방문 대비 증감입니다.');
   if (!shops.length) html += Empty('이 범위의 상점 방문 기록 없음');
   shops.forEach((shop, shopIndex) => {
     const transactionRows = [...shop.transactions].map(([id, entries]) => {
@@ -233,20 +267,25 @@ function ShopView() {
   return html;
 }
 
+/** 비교 항목의 짧은 제목과 원본 식별 정보를 표시하고 플레이어별 내용 묶음을 반환한다. */
+function ComparisonGroup(item, body) {
+  const title = '플레이어 ' + (state.files.indexOf(item.file) + 1) + ' · 실행 ' + (item.index + 1);
+  return '<div class="comparison-group"><div class="comparison-group-heading"><h3>' + E(title) + '</h3><details><summary>원본 파일 · ID</summary><p>' + E(item.file.name) + '<br>세션: ' + E(item.tournament.session || '미수집') + '<br>토너먼트: ' + E(item.tournament.id || '미수집') + '</p></details></div>' + body + '</div>';
+}
+
 /** 파일별 토너먼트의 완료 조건과 실제 시간으로 비교 화면의 집계와 공통 막대를 반환한다. */
 function CompareView() {
   const entries = state.files.flatMap(file => file.tournaments.filter(tournament => tournament.runs.length).map((tournament, index) => ({ file, tournament, index })));
   if (!entries.length) return Empty('비교할 실행이 없습니다. CSV를 불러오세요.');
-  let html = '<p class="hint">불러온 모든 파일의 토너먼트를 비교합니다. 상단의 단일 파일 선택과 별개입니다. 완료 대전만 기본 집계하며, 플레이 시간은 기록된 duration_seconds 합계입니다.</p><label class="hint"><input id="includeIncomplete" type="checkbox" ' + (state.compareIncomplete ? 'checked' : '') + '> 미완료 대전도 별도 상태를 표시하며 포함</label>';
+  let html = '<p class="hint">불러온 모든 파일의 토너먼트를 비교합니다. 플레이어 번호는 불러온 파일을 구분하는 임시 이름입니다. 완료 대전만 기본 집계하며, 플레이 시간은 기록된 duration_seconds 합계입니다.</p><label class="hint"><input id="includeIncomplete" type="checkbox" ' + (state.compareIncomplete ? 'checked' : '') + '> 미완료 대전도 별도 상태를 표시하며 포함</label>';
   const comparisons = entries.map(({ file, tournament, index }) => {
     return { file, tournament, index, ...Playtest.Comparison(file, tournament, state.scope, state.compareIncomplete) };
   });
   const max = Math.max(1, ...comparisons.map(item => item.input.raw));
-  html += Panel('입력량 공통 눈금 비교', comparisons.map(item => InputStack(item.file.name + ' · T' + (item.index + 1), item.input, max)).join(''));
-  html += Panel('실행별 비교', Table(['파일 / 토너먼트', '포함 대전 / 미완료', '선택 Down', '기록 시간', '분당 Down', '재입력률', '상점 시간', '마지막 기록 보유'], comparisons.map(item => [E(item.file.name) + '<br>T' + (item.index + 1) + ' / ' + E(item.tournament.id || '미수집'), item.runs.length + ' / ' + item.tournament.runs.filter(run => !run.complete).length,
-    F(item.input.total), F(item.duration, 3) + ' 초', F(item.perMinute, 2), item.input.total > 0 && item.input.broken !== null ? F(item.input.broken / item.input.total * 100, 1) + '%' : item.input.total === 0 ? '해당 없음' : '미수집', F(item.shopTime, 6) + ' 초', item.final ? Playtest.TYPES.map(type => type + ' ' + F(item.final.quantities[type])).join(' · ') : '미수집']), 'comparisons'), '분당 Down = 선택 범위 Down × 60 / 기록된 대전 시간. CSV의 구간 APM과 별개의 지표입니다. 상점 종료 시간이 누락되면 총시간을 추정하지 않습니다.');
-  const rounds = comparisons.flatMap(item => item.runs.map(run => [E(item.file.name) + ' · T' + (item.index + 1), E(RunLabel(run)), Badge(run), Field(run.end, 'player_score', 0) + ' / ' + Field(run.end, 'enemy_score', 0), Field(run.end, 'duration_seconds'), F(Playtest.Inputs(run.rows, item.file, state.scope).total)]));
-  html += Panel('대전별 성과', Table(['파일 / 토너먼트', '대전', '완료·승패', '플레이어 / 로봇 점수', '기록 길이(초)', '선택 Down'], rounds, 'compareRounds'), '같은 R이라도 정규전과 연장전은 별도 대전입니다. 미완료의 점수는 중단 시점 기록이며 정상 완료 점수와 동등한 성과로 해석하지 않습니다.');
+  html += Panel('입력량 공통 눈금 비교', comparisons.map(item => ComparisonGroup(item, InputStack('선택 범위 입력', item.input, max))).join(''));
+  html += Panel('실행별 비교', comparisons.map(item => ComparisonGroup(item, Table(['포함 대전 / 미완료', '선택 Down', '기록 시간', '분당 Down', '재입력률', '상점 시간', '마지막 기록 보유'], [[item.runs.length + ' / ' + item.tournament.runs.filter(run => !run.complete).length,
+    F(item.input.total), F(item.duration, 3) + ' 초', F(item.perMinute, 2), item.input.total > 0 && item.input.broken !== null ? F(item.input.broken / item.input.total * 100, 1) + '%' : item.input.total === 0 ? '해당 없음' : '미수집', F(item.shopTime, 6) + ' 초', item.final ? Playtest.TYPES.map(type => type + ' ' + F(item.final.quantities[type])).join(' · ') : '미수집']], 'comparisons-' + item.file.id + '-' + item.index))).join(''), '분당 Down = 선택 범위 Down × 60 / 기록된 대전 시간. CSV의 구간 APM과 별개의 지표입니다. 상점 종료 시간이 누락되면 총시간을 추정하지 않습니다.');
+  html += Panel('대전별 성과', comparisons.map(item => ComparisonGroup(item, Table(['대전', '완료·승패', '플레이어 / 로봇 점수', '기록 길이(초)', '선택 Down'], item.runs.map(run => [E(RunLabel(run)), Badge(run), Field(run.end, 'player_score', 0) + ' / ' + Field(run.end, 'enemy_score', 0), Field(run.end, 'duration_seconds'), F(Playtest.Inputs(run.rows, item.file, state.scope).total)]), 'compareRounds-' + item.file.id + '-' + item.index))).join(''), '같은 R이라도 정규전과 연장전은 별도 대전입니다. 미완료의 점수는 중단 시점 기록이며 정상 완료 점수와 동등한 성과로 해석하지 않습니다.');
   return html;
 }
 

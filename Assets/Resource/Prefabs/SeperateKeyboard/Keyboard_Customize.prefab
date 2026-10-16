@@ -15319,6 +15319,7 @@ GameObject:
   - component: {fileID: 2266294713193943937}
   - component: {fileID: 218864959123910279}
   - component: {fileID: 5355856907786012907}
+  - component: {fileID: 4444435156750282531}
   m_Layer: 0
   m_Name: LED_Layer
   m_TagString: Untagged
@@ -15398,6 +15399,18 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4444435156750282531
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2679031897952931461}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 971d2f55cffc34b4693c7432701f0af3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardLED
 --- !u!1 &2689046694914117546
 GameObject:
   m_ObjectHideFlags: 0
@@ -35003,9 +35016,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomization
   _ledRenderer: {fileID: 5355856907786012907}
+  _ledLayer: {fileID: 4444435156750282531}
   _ledEnabled: 1
   _ledColor: {r: 0, g: 0.8, b: 1, a: 1}
   _ledIntensity: 3
+  _ledPattern: 0
+  _ledSpeed: 1
   _materials:
   - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}

@@ -5,10 +5,12 @@ using UnityEngine;
 [Serializable]
 public sealed class KeyboardCustomizationState
 {
-    [SerializeField] private int _version = 1;
+    [SerializeField] private int _version = 2;
     [SerializeField] private bool _ledEnabled;
     [SerializeField] private Color _ledColor;
     [SerializeField] private float _ledIntensity;
+    [SerializeField] private LEDPattern _ledPattern;
+    [SerializeField] private float _ledSpeed = 1f;
     [SerializeField] private int[] _selection;
     [SerializeField] private string[] _catalogIds;
     [SerializeField] private string[] _rendererPaths;
@@ -21,6 +23,8 @@ public sealed class KeyboardCustomizationState
     public bool LedEnabled => _ledEnabled;
     public Color LedColor => _ledColor;
     public float LedIntensity => _ledIntensity;
+    public LEDPattern LedPattern => _version < 2 ? LEDPattern.Static : _ledPattern;
+    public float LedSpeed => _version < 2 ? 1f : _ledSpeed;
     public int[] Selection => _selection;
     public string[] CatalogIds => _catalogIds;
     public string[] RendererPaths => _rendererPaths;
@@ -35,11 +39,13 @@ public sealed class KeyboardCustomizationState
     /// </summary>
     public KeyboardCustomizationState(bool ledEnabled, Color ledColor, float ledIntensity, int[] selection,
         string[] catalogIds, string[] rendererPaths, int[] slotCounts, int[] materialIndices,
-        SwitchType[] switchTypes, PlateType plateType)
+        SwitchType[] switchTypes, PlateType plateType, LEDPattern ledPattern = LEDPattern.Static, float ledSpeed = 1f)
     {
         _ledEnabled = ledEnabled;
         _ledColor = ledColor;
         _ledIntensity = ledIntensity;
+        _ledPattern = ledPattern;
+        _ledSpeed = ledSpeed;
         _selection = selection;
         _catalogIds = catalogIds;
         _rendererPaths = rendererPaths;

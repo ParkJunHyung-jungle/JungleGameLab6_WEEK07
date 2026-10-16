@@ -11,7 +11,7 @@ namespace KeyboardCustomizationTools.Editor
     [InitializeOnLoad]
     public static class KeyboardCustomizerAssigner
     {
-        private const string PREFAB_PATH = "Assets/Resource/Prefabs/SeperateKeyboard/Keyboard_Customize_Test.prefab";
+        private const string PREFAB_PATH = "Assets/Resource/Prefabs/SeperateKeyboard/Keyboard_Customize.prefab";
         private const string MESH_PATH = "Assets/Resource/Meshes/KeyboardCustomizeLED.asset";
         private const string MATERIAL_PATH = "Assets/Resource/Materials/KeyboardCustomizeLED.mat";
 
@@ -183,6 +183,8 @@ namespace KeyboardCustomizationTools.Editor
                 layer.GetComponent<MeshFilter>().sharedMesh = mesh;
                 MeshRenderer renderer = layer.GetComponent<MeshRenderer>();
                 renderer.sharedMaterial = material;
+                KeyboardLED led = layer.GetComponent<KeyboardLED>();
+                if (led == null) led = layer.gameObject.AddComponent<KeyboardLED>();
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
                 KeyboardCustomization customizer = root.GetComponent<KeyboardCustomization>();
@@ -193,6 +195,7 @@ namespace KeyboardCustomizationTools.Editor
 
                 var serialized = new SerializedObject(customizer);
                 serialized.FindProperty("_ledRenderer").objectReferenceValue = renderer;
+                serialized.FindProperty("_ledLayer").objectReferenceValue = led;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 customizer.SetLEDEnabled(serialized.FindProperty("_ledEnabled").boolValue);
                 EditorUtility.SetDirty(customizer);

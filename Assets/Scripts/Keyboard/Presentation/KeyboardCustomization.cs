@@ -12,17 +12,16 @@ using UnityEditor;
 [DisallowMultipleComponent]
 public sealed class KeyboardCustomization : MonoBehaviour
 {
-    private static readonly int _ledColorProperty = Shader.PropertyToID("_LEDColor");
-    private static readonly int _intensityProperty = Shader.PropertyToID("_Intensity");
-
     [Header("LED Layer")]
-    [SerializeField] private MeshRenderer _ledRenderer;
+    [SerializeField, HideInInspector] private MeshRenderer _ledRenderer;
+    [SerializeField] private KeyboardLED _ledLayer;
 
     [Header("LED Settings")]
     [SerializeField] private bool _ledEnabled = true;
     [SerializeField, ColorUsage(false, true)] private Color _ledColor = new Color(0f, 0.8f, 1f, 1f);
     [SerializeField, Min(0f)] private float _ledIntensity = 3f;
-    private MaterialPropertyBlock _propertyBlock;
+    [SerializeField] private LEDPattern _ledPattern = LEDPattern.Static;
+    [SerializeField, Min(0f)] private float _ledSpeed = 1f;
 
     [Header("Shared Materials")]
     [FormerlySerializedAs("_caseMaterials")]
@@ -70,11 +69,6 @@ public sealed class KeyboardCustomization : MonoBehaviour
         EditorApplication.delayCall -= ApplyCaseEditorPreview;
         EditorApplication.delayCall += ApplyCaseEditorPreview;
 #endif
-        // 컴포넌트를 처음 추가할 때는 레이어 참조가 아직 연결되지 않는다.
-        if (_ledRenderer != null)
-        {
-            ApplyLED();
-        }
     }
 
     void OnDisable()
@@ -95,6 +89,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         {
             return;
         }
+
+        ApplyLED();
 
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
@@ -179,7 +175,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         return new KeyboardCustomizationState(_ledEnabled, _ledColor, _ledIntensity,
             new[] { GetMaterialIndex(_caseMaterial, catalog), GetMaterialIndex(_keycapMaterial, catalog), _caseMaterialIndex, _keycapMaterialIndex },
             (string[])materialIds.Clone(), paths, counts, indices.ToArray(), switchTypes,
-            _plate != null && _plate.CurrentData != null ? _plate.CurrentData.Type : _plateType);
+            _plate != null && _plate.CurrentData != null ? _plate.CurrentData.Type : _plateType, _ledPattern, _ledSpeed);
     }
 
     /// <summary>
@@ -188,7 +184,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds)
     {
-        if (state == null || state.Version != 1 || state.Selection == null || state.Selection.Length != 4 ||
+        if (state == null || (state.Version != 1 && state.Version != 2) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
             throw new InvalidOperationException("Save data is invalid or unsupported.");
@@ -203,7 +199,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
         MeshRenderer[] renderers = GetCustomizationRenderers();
         if (state.RendererPaths.Length != renderers.Length || state.SlotCounts.Length != renderers.Length ||
             state.SwitchTypes.Length != _switches.Length || state.LedIntensity < 0f ||
-            float.IsNaN(state.LedIntensity) || float.IsInfinity(state.LedIntensity))
+            float.IsNaN(state.LedIntensity) || float.IsInfinity(state.LedIntensity) ||
+            !Enum.IsDefined(typeof(LEDPattern), state.LedPattern) || state.LedSpeed < 0f ||
+            float.IsNaN(state.LedSpeed) || float.IsInfinity(state.LedSpeed))
             throw new InvalidOperationException("The saved keyboard layout or settings are incompatible.");
 
         int totalSlots = 0;
@@ -249,6 +247,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _ledEnabled = state.LedEnabled;
         _ledColor = state.LedColor;
         _ledIntensity = state.LedIntensity;
+        _ledPattern = state.LedPattern;
+        _ledSpeed = state.LedSpeed;
         if (_ledRenderer != null) ApplyLED();
     }
 
@@ -535,6 +535,39 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #region LED
 
     /// <summary>
+    /// pattern 입력을 LED 패턴으로 선택하고 전용 레이어에 전달한다.
+    /// 반환값 없이 Static, Rainbow 또는 Breathing 표시를 변경하며 잘못된 타입은 무시한다.
+    /// </summary>
+    public void SetLEDPattern(LEDPattern pattern)
+    {
+        if (!Enum.IsDefined(typeof(LEDPattern), pattern)) return;
+        _ledPattern = pattern;
+        ApplyLED();
+    }
+
+    /// <summary>
+    /// speed 입력을 LED 애니메이션 속도로 저장하고 레이어에 전달한다.
+    /// 반환값 없이 속도를 갱신하며 음수는 0으로 제한하고 유효하지 않은 실수는 무시한다.
+    /// </summary>
+    public void SetLEDSpeed(float speed)
+    {
+        if (float.IsNaN(speed) || float.IsInfinity(speed)) return;
+        _ledSpeed = Mathf.Max(0f, speed);
+        ApplyLED();
+    }
+
+    /// <summary>
+    /// intensity 입력을 LED 밝기로 저장하고 전용 레이어에 전달한다.
+    /// 반환값 없이 밝기를 갱신하며 음수는 0으로 제한하고 유효하지 않은 실수는 무시한다.
+    /// </summary>
+    public void SetLEDIntensity(float intensity)
+    {
+        if (float.IsNaN(intensity) || float.IsInfinity(intensity)) return;
+        _ledIntensity = Mathf.Max(0f, intensity);
+        ApplyLED();
+    }
+
+    /// <summary>
     /// enabled 입력으로 LED 전원을 저장하고 레이어의 투명도를 갱신한다.
     /// 반환값 없이 OFF 상태의 알파를 0으로 변경한다.
     /// </summary>
@@ -555,18 +588,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// Inspector의 전원, 색상, 밝기를 사용해 LED 렌더러 속성을 갱신한다.
-    /// 반환값 없이 인스턴스별 속성을 변경하며 공유 머티리얼은 유지한다.
+    /// Inspector의 전원, 패턴, 색상, 밝기, 속도를 LED 컴포넌트에 전달한다.
+    /// 반환값 없이 표시 설정을 변경하며 애니메이션 계산은 레이어에 위임한다.
     /// </summary>
     private void ApplyLED()
     {
-        _propertyBlock ??= new MaterialPropertyBlock();
-        Color color = _ledColor;
-        color.a = _ledEnabled ? 1f : 0f;
-        _ledRenderer.GetPropertyBlock(_propertyBlock);
-        _propertyBlock.SetColor(_ledColorProperty, color);
-        _propertyBlock.SetFloat(_intensityProperty, Mathf.Max(0f, _ledIntensity));
-        _ledRenderer.SetPropertyBlock(_propertyBlock);
+        if (_ledLayer == null && _ledRenderer != null) _ledLayer = _ledRenderer.GetComponent<KeyboardLED>();
+        // 기존 프리팹을 새 컴포넌트로 연결하는 동안에는 레이어가 아직 없을 수 있다.
+        if (_ledLayer != null) _ledLayer.ApplySettings(_ledEnabled, _ledPattern, _ledColor, _ledIntensity, _ledSpeed);
     }
 
     #endregion

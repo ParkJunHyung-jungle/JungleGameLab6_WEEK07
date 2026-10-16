@@ -298,8 +298,6 @@ public class GameManager : MonoBehaviour
 
         // 등록된 스폰 포인트를 기준으로 키보드 생성을 요청한다.
         _activeKeyboard = _keyboardSpawner.SpawnKeyboard(_keyboardSpawnPoint, withAnimation);
-        if (AudioManager.instance != null)
-            AudioManager.instance.SelectKeyboardEffects(_activeKeyboard.GetComponent<KeyboardCustomization>());
         if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(_activeKeyboard, false);
 
         if (_activeKeyboard != null)

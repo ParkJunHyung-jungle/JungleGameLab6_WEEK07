@@ -130,7 +130,6 @@ GameObject:
   - component: {fileID: 203759074}
   - component: {fileID: 203759073}
   - component: {fileID: 203759075}
-  - component: {fileID: 203759076}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -248,20 +247,6 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!114 &203759076
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 203759071}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86c6556701af9e04380698b89f691b6e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: FMODUnity::FMODUnity.StudioListener
-  nonRigidbodyVelocity: 0
-  attenuationObject: {fileID: 0}
 --- !u!1 &641193455
 GameObject:
   m_ObjectHideFlags: 0
@@ -377,10 +362,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6017198698176353905, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
-      propertyPath: _initialKeyboard
-      value: 
-      objectReference: {fileID: 831032413}
     - target: {fileID: 6233164409691592997, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
       propertyPath: m_Name
       value: FmodManager

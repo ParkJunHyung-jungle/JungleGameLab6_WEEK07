@@ -151,6 +151,7 @@ namespace Game.Player
 
         void OnDisable()
         {
+            Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "CustomizationEnd", success: false, details: "OverlayDisabled");
             _keycapButton.Clicked -= HandleCategoryClicked;
             _switchAxisButton.Clicked -= HandleCategoryClicked;
             _ledButton.Clicked -= HandleCategoryClicked;
@@ -372,6 +373,8 @@ namespace Game.Player
                 mode = PickerMode.Photo;
             else if (button == _ledButton)
                 mode = PickerMode.Led;
+            Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartAccess", GetLogPart(mode),
+                mode == _pickerMode ? "Close" : "Open");
             SetPickerMode(mode == _pickerMode ? PickerMode.None : mode);
         }
 
@@ -1107,6 +1110,7 @@ namespace Game.Player
         /// </summary>
         private void SetPickerMode(PickerMode mode)
         {
+            PickerMode previous = _pickerMode;
             _pickerMode = mode == PickerMode.Keycap && _viewport == null ? PickerMode.None : mode;
             if (_viewport != null)
             {
@@ -1130,6 +1134,46 @@ namespace Game.Player
                 _photoUI.BeginCustomization();
             if (_pickerMode == PickerMode.Led)
                 _ledUI.Open(_ledCustomization);
+            if (previous != _pickerMode)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode));
+        }
+
+        /// <summary>
+        /// mode를 여섯 편집 항목의 고정 로그 식별자로 변환하여 반환한다.
+        /// 목록이 닫힌 상태는 빈 값으로 반환한다.
+        /// </summary>
+        private static string GetLogPart(PickerMode mode)
+        {
+            switch (mode)
+            {
+                case PickerMode.Keycap: return "Keycap";
+                case PickerMode.SwitchSound: return "Switch";
+                case PickerMode.Led: return "LED";
+                case PickerMode.CaseMaterial: return "Case";
+                case PickerMode.Plate: return "Plate";
+                case PickerMode.Photo: return "CustomImage";
+                default: return "";
+            }
+        }
+
+        /// <summary>
+        /// 현재 UI에 실제 제공된 파츠 요소를 관찰자에게 전달한다.
+        /// 만들어진 미리보기 목록을 읽으며 초기화나 자동 복원을 선택으로 세지 않는다.
+        /// </summary>
+        public void ObserveAvailableOptions()
+        {
+            foreach (Material material in _previewMaterials)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Keycap", material.name);
+            foreach (SwitchType type in _switchSoundTypes)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Switch", type.ToString());
+            foreach (int index in _caseMaterialIndices)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Case", _caseCustomization.CaseMaterials[index].name);
+            foreach (PlateType type in _platePreviewTypes)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Plate", type.ToString());
+            foreach (LEDPattern pattern in Enum.GetValues(typeof(LEDPattern)))
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "LED", pattern.ToString());
+            foreach (string scope in new[] { "CaseWhole", "SingleKeycap", "AllKeycapsCanvas" })
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "CustomImage", scope);
         }
 
         /// <summary>

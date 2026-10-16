@@ -101,6 +101,23 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public MeshRenderer PlateRenderer => _plate != null ? _plate.PlateRenderer : null;
     public PlateType CurrentPlateType => _plateType;
 
+    /// <summary>
+    /// 실제 적용된 파츠 설정을 로그용 식별자 목록으로 반환한다.
+    /// 현재 재질과 축, 보강판 및 LED 값을 읽으며 이미지 바이트나 경로는 포함하지 않는다.
+    /// </summary>
+    public IEnumerable<string[]> GetCustomizationLogValues()
+    {
+        yield return new[] { "Keycap", _keycapMaterial != null ? _keycapMaterial.name : "" };
+        yield return new[] { "Case", _caseMaterial != null ? _caseMaterial.name : "" };
+        yield return new[] { "Switch", _switchType.ToString() };
+        yield return new[] { "Plate", _plateType.ToString() };
+        yield return new[] { "LED", _ledPattern.ToString() };
+        yield return new[] { "LEDColor", ColorUtility.ToHtmlStringRGBA(_ledColor) };
+        yield return new[] { "LEDEnabled", _ledEnabled ? "true" : "false" };
+        if (_imageCustomization != null)
+            foreach (string[] value in _imageCustomization.GetLogValues()) yield return value;
+    }
+
     void OnEnable()
     {
         CacheKeycaps();

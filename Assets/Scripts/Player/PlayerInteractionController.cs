@@ -734,12 +734,19 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 선택한 축 타입을 현재 편집 대상의 타건음에 적용한다.
-        /// type과 편집 대상 키보드를 사용하며 적용에 성공하면 UI의 선택 표시를 갱신한다.
+        /// 선택한 type을 편집 대상 커스터마이저에 전달해 축 외형과 타건음을 함께 변경한다.
+        /// 커스터마이저가 없는 대상은 타건음만 변경하며 성공한 경우 UI 선택 표시를 갱신한다.
         /// </summary>
         private void HandleSwitchSoundSelected(SwitchType type)
         {
-            if (_editingKeyboard != null && _editingKeyboard.SetSwitchSound(type))
+            if (_editingKeyboard == null)
+                return;
+
+            KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
+            bool applied = customization != null
+                ? customization.SetSwitchType(type)
+                : _editingKeyboard.SetSwitchSound(type);
+            if (applied)
             {
                 _keyboardEditOverlayUI.SetSelectedSwitchSound(_editingKeyboard.CurrentSwitchSound);
             }

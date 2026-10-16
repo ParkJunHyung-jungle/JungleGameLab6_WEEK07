@@ -14,6 +14,8 @@ namespace KeyboardCustomizationTools.Editor
         private const string PREFAB_PATH = "Assets/Resource/Prefabs/SeperateKeyboard/Keyboard_Customize.prefab";
         private const string MESH_PATH = "Assets/Resource/Meshes/KeyboardCustomizeLED.asset";
         private const string MATERIAL_PATH = "Assets/Resource/Materials/KeyboardCustomizeLED.mat";
+        private const float WIDE_KEY_THRESHOLD = 1.35f;
+        private const float WIDE_KEY_LED_WIDTH = 1.8f;
 
         /// <summary>
         /// 입력 없이 스크립트 로드 후 초기 구성 확인을 예약한다.
@@ -206,8 +208,33 @@ namespace KeyboardCustomizationTools.Editor
         }
 
         /// <summary>
-        /// root 아래 키캡과 스위치 경계로 스위치 영역이 비어 있는 발광 면을 만든다.
-        /// 키별 UV와 정점을 구성한 새 Mesh를 반환한다.
+        /// 현재 커스터마이즈 프리팹의 축 배치로 LED Mesh 애셋만 다시 생성한다.
+        /// 입력과 반환값 없이 Mesh 내용을 저장하며 프리팹과 다른 커스터마이즈 설정은 유지한다.
+        /// </summary>
+        [MenuItem("Tools/Keyboard/Rebuild Customize LED Mesh")]
+        public static void RebuildLEDMesh()
+        {
+            var stage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+            GameObject root = stage != null && stage.assetPath == PREFAB_PATH
+                ? stage.prefabContentsRoot
+                : AssetDatabase.LoadAssetAtPath<GameObject>(PREFAB_PATH);
+            Mesh generated = CreateLEDMesh(root.transform);
+            Mesh existing = AssetDatabase.LoadAssetAtPath<Mesh>(MESH_PATH);
+            existing.Clear();
+            existing.vertices = generated.vertices;
+            existing.uv = generated.uv;
+            existing.triangles = generated.triangles;
+            existing.RecalculateNormals();
+            existing.RecalculateBounds();
+            Object.DestroyImmediate(generated);
+            EditorUtility.SetDirty(existing);
+            AssetDatabase.SaveAssetIfDirty(existing);
+            SceneView.RepaintAll();
+        }
+
+        /// <summary>
+        /// root 아래 각 스위치 하우징 경계로 축 주변에만 발광 면을 만든다.
+        /// 키캡 길이와 무관한 축별 UV와 정점을 구성한 새 Mesh를 반환한다.
         /// </summary>
         private static Mesh CreateLEDMesh(Transform root)
         {
@@ -215,50 +242,25 @@ namespace KeyboardCustomizationTools.Editor
             var triangles = new List<int>();
             var uvs = new List<Vector2>();
             Transform keys = root.Find("Keys_87_SharedPrefabs");
-            foreach (Transform key in keys)
+            foreach (Transform mechanism in keys)
             {
-                if (!key.name.StartsWith("Key_"))
+                if (!mechanism.name.StartsWith("Switch_"))
                 {
                     continue;
                 }
 
-                MeshFilter filter = key.Find("PBT_SculptedShell").GetComponent<MeshFilter>();
-                Bounds bounds = filter.sharedMesh.bounds;
-                Matrix4x4 matrix = root.worldToLocalMatrix * filter.transform.localToWorldMatrix;
-                var localBounds = new Bounds(matrix.MultiplyPoint3x4(bounds.center), Vector3.zero);
-                for (int corner = 0; corner < 8; corner++)
+                Bounds switchBounds = GetSwitchBounds(root, mechanism.Find("Switch_BottomHousing"));
+                Bounds topBounds = GetSwitchBounds(root, mechanism.Find("Switch_TopHousing"));
+                float y = topBounds.max.y + 0.01f;
+                float left = switchBounds.min.x - 0.18f;
+                float right = switchBounds.max.x + 0.18f;
+                if (IsWideKeySwitch(root, keys, mechanism))
                 {
-                    Vector3 offset = new Vector3(
-                        (corner & 1) == 0 ? -bounds.extents.x : bounds.extents.x,
-                        (corner & 2) == 0 ? -bounds.extents.y : bounds.extents.y,
-                        (corner & 4) == 0 ? -bounds.extents.z : bounds.extents.z);
-                    localBounds.Encapsulate(matrix.MultiplyPoint3x4(bounds.center + offset));
+                    left = switchBounds.center.x - WIDE_KEY_LED_WIDTH * 0.5f;
+                    right = switchBounds.center.x + WIDE_KEY_LED_WIDTH * 0.5f;
                 }
-
-                float y = localBounds.min.y + 0.025f;
-                float left = localBounds.min.x - 0.12f;
-                float right = localBounds.max.x + 0.12f;
-                float back = localBounds.min.z - 0.12f;
-                float front = localBounds.max.z + 0.12f;
-                Transform nearestSwitch = null;
-                float nearestDistance = float.PositiveInfinity;
-                foreach (Transform candidate in keys)
-                {
-                    if (!candidate.name.StartsWith("Switch_"))
-                    {
-                        continue;
-                    }
-
-                    Vector3 delta = candidate.localPosition - key.localPosition;
-                    float distance = delta.x * delta.x + delta.z * delta.z;
-                    if (distance < nearestDistance)
-                    {
-                        nearestDistance = distance;
-                        nearestSwitch = candidate;
-                    }
-                }
-
-                Bounds switchBounds = GetSwitchBounds(root, nearestSwitch);
+                float back = switchBounds.min.z - 0.18f;
+                float front = switchBounds.max.z + 0.18f;
                 float holeLeft = Mathf.Clamp(switchBounds.min.x - 0.02f, left, right);
                 float holeRight = Mathf.Clamp(switchBounds.max.x + 0.02f, left, right);
                 float holeBack = Mathf.Clamp(switchBounds.min.z - 0.02f, back, front);
@@ -279,6 +281,24 @@ namespace KeyboardCustomizationTools.Editor
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        /// <summary>
+        /// root 좌표계와 keys의 키캡 배치를 사용해 mechanism에 가로로 긴 키캡이 대응하는지 확인한다.
+        /// 키캡 가로 폭이 기준을 넘는 경우 true를 반환하며 실제 발광 폭은 고정값을 사용한다.
+        /// </summary>
+        private static bool IsWideKeySwitch(Transform root, Transform keys, Transform mechanism)
+        {
+            foreach (Transform key in keys)
+            {
+                if (!key.name.StartsWith("Key_")) continue;
+                Vector3 offset = key.localPosition - mechanism.localPosition;
+                if (Mathf.Abs(offset.x) > 0.001f || Mathf.Abs(offset.z) > 0.001f) continue;
+                Bounds bounds = GetSwitchBounds(root, key.Find("PBT_SculptedShell"));
+                return bounds.size.x > WIDE_KEY_THRESHOLD;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -331,4 +351,5 @@ namespace KeyboardCustomizationTools.Editor
     }
 }
 #endif
+
 

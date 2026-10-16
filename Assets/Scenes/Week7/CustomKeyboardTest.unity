@@ -392,7 +392,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1264139386206111033, guid: f5b5770352c706c46827af4de924c16d, type: 3}
       propertyPath: _fmodSwitchSound
-      value: 3
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
       propertyPath: m_Name

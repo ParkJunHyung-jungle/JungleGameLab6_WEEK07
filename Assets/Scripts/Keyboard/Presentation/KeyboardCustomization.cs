@@ -43,6 +43,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private Material _keycapMaterial;
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
     private Transform[] _keycaps;
+    private KeyboardImageCustomization _imageCustomization;
+    private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
+
+    public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
 
     [Header("Switches")]
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
@@ -177,7 +181,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         return new KeyboardCustomizationState(_ledEnabled, _ledColor, _ledIntensity,
             new[] { GetMaterialIndex(_caseMaterial, catalog), GetMaterialIndex(_keycapMaterial, catalog), _caseMaterialIndex, _keycapMaterialIndex },
             (string[])materialIds.Clone(), paths, counts, indices.ToArray(), switchTypes,
-            _plate != null && _plate.CurrentData != null ? _plate.CurrentData.Type : _plateType, _ledPattern, _ledSpeed);
+            _plate != null && _plate.CurrentData != null ? _plate.CurrentData.Type : _plateType, _ledPattern, _ledSpeed,
+            _imageCustomization != null ? _imageCustomization.CaptureState() : null);
     }
 
     /// <summary>
@@ -186,7 +191,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds)
     {
-        if (state == null || (state.Version != 1 && state.Version != 2) || state.Selection == null || state.Selection.Length != 4 ||
+        if (state == null || (state.Version < 1 || state.Version > 3) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
             throw new InvalidOperationException("Save data is invalid or unsupported.");
@@ -226,6 +231,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         if (_plate != null && !_plate.HasPlateType(state.PlateType)) throw new InvalidOperationException("The saved Plate type is unavailable.");
 
+        KeyboardImageCustomization images = GetImageCustomization();
+        Texture2D[] preparedImages = images.PrepareState(state.ImageState);
+
         for (int index = 0; index < _switches.Length; index++) _switches[index].ChangeSwitch(state.SwitchTypes[index]);
         if (_switches.Length > 0)
         {
@@ -249,6 +257,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
             renderers[index].sharedMaterials = materials;
         }
+
+        RememberKeycapMaterialOverrides();
+        images.RestoreState(state.ImageState, preparedImages);
 
         _ledEnabled = state.LedEnabled;
         _ledColor = state.LedColor;
@@ -305,6 +316,92 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         return path;
+    }
+
+    #endregion
+
+    #region 사진
+
+    /// <summary>
+    /// image를 키캡 전체가 하나로 이어지는 사진 캔버스로 적용한다.
+    /// 기존 개별 사진을 덮어쓰고 성공 여부를 반환한다.
+    /// </summary>
+    public bool SetKeycapImage(Texture2D image)
+    {
+        return GetImageCustomization().SetKeycapImage(image);
+    }
+
+    /// <summary>
+    /// keycapIndex에 해당하는 키캡에 image 한 장을 개별 적용한다.
+    /// 전체 사진보다 우선하는 개별 배치를 저장하고 성공 여부를 반환한다.
+    /// </summary>
+    public bool SetKeycapImage(int keycapIndex, Texture2D image)
+    {
+        return GetImageCustomization().SetKeycapImage(image, keycapIndex);
+    }
+
+    /// <summary>
+    /// image를 Case 전체에 이어지는 Base Map 사진으로 적용한다.
+    /// 다른 키보드의 Material 애셋은 유지하고 성공 여부를 반환한다.
+    /// </summary>
+    public bool SetCaseImage(Texture2D image)
+    {
+        return GetImageCustomization().SetCaseImage(image);
+    }
+
+    /// <summary>
+    /// path의 PNG 또는 JPEG 파일을 전체 키캡이나 keycapIndex 한 곳에 적용한다.
+    /// 성공 여부를 반환하고 음수 인덱스는 전체 캔버스를 의미한다.
+    /// </summary>
+    public bool LoadKeycapImage(string path, int keycapIndex = -1)
+    {
+        return GetImageCustomization().LoadImage(path, false, keycapIndex);
+    }
+
+    /// <summary>
+    /// path의 PNG 또는 JPEG 파일을 읽어 Case 사진으로 적용한다.
+    /// 성공 여부를 반환하며 잘못된 파일은 기존 외관을 유지한다.
+    /// </summary>
+    public bool LoadCaseImage(string path)
+    {
+        return GetImageCustomization().LoadImage(path, true);
+    }
+
+    /// <summary>
+    /// keycapIndex의 개별 사진 또는 음수 입력 시 모든 키캡 사진을 해제한다.
+    /// 반환값 없이 사진 아래의 선택 Material과 원본 UV를 다시 표시한다.
+    /// </summary>
+    public void ClearKeycapImage(int keycapIndex = -1)
+    {
+        if (_imageCustomization != null) _imageCustomization.ClearKeycapImage(keycapIndex);
+    }
+
+    /// <summary>
+    /// 입력 없이 Case의 사진 효과를 해제한다.
+    /// 반환값 없이 현재 선택한 Case Material과 원본 UV를 표시한다.
+    /// </summary>
+    public void ClearCaseImage()
+    {
+        if (_imageCustomization != null) _imageCustomization.ClearCaseImage();
+    }
+
+    /// <summary>
+    /// 현재 씬 인스턴스의 사진 컴포넌트를 준비하고 Case와 키캡 참조를 연결한다.
+    /// 컴포넌트를 반환하며 공통 프리팹이나 Prefab Mode에는 사진을 기록하지 않는다.
+    /// </summary>
+    private KeyboardImageCustomization GetImageCustomization()
+    {
+#if UNITY_EDITOR
+        if (EditorUtility.IsPersistent(this) || UnityEditor.SceneManagement.PrefabStageUtility.GetPrefabStage(gameObject) != null)
+            throw new InvalidOperationException("Apply photos to a scene keyboard instance, outside Prefab Mode.");
+#endif
+        if (_imageCustomization == null)
+        {
+            _imageCustomization = GetComponent<KeyboardImageCustomization>();
+            if (_imageCustomization == null) _imageCustomization = gameObject.AddComponent<KeyboardImageCustomization>();
+        }
+        _imageCustomization.Initialize(_caseRenderers, _keycapRenderers);
+        return _imageCustomization;
     }
 
     #endregion
@@ -371,6 +468,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
         Transform keycap = _keycaps[keycapIndex];
         if (keycap == null) return false;
 
+        ClearKeycapImage(keycapIndex);
+        _keycapMaterialOverrides[keycap] = material;
+
         bool applied = false;
         foreach (MeshRenderer renderer in _keycapRenderers)
         {
@@ -414,6 +514,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _keycapMaterial = material;
+        _keycapMaterialOverrides.Clear();
+        ClearKeycapImage();
         ApplyKeycapMaterial();
     }
 
@@ -429,6 +531,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _keycapMaterialIndex = index;
+        _keycapMaterialOverrides.Clear();
+        ClearKeycapImage();
         ApplySelectedKeycapMaterial();
     }
 
@@ -465,6 +569,25 @@ public sealed class KeyboardCustomization : MonoBehaviour
                 renderer.sharedMaterial = _keycapMaterial;
             }
         }
+
+        foreach (var pair in _keycapMaterialOverrides)
+        {
+            if (pair.Key == null) continue;
+            foreach (MeshRenderer renderer in _keycapRenderers)
+                if (renderer != null && renderer.transform.IsChildOf(pair.Key)) renderer.sharedMaterial = pair.Value;
+        }
+    }
+
+    /// <summary>
+    /// 복원된 각 키캡 외피 Material을 전체 기본 재질과 비교한다.
+    /// 입력과 반환값 없이 개별 재질 차이를 보관해 이후 Inspector 갱신에서도 유지한다.
+    /// </summary>
+    private void RememberKeycapMaterialOverrides()
+    {
+        _keycapMaterialOverrides.Clear();
+        foreach (MeshRenderer renderer in _keycapRenderers)
+            if (renderer != null && renderer.name == "PBT_SculptedShell" && renderer.sharedMaterial != _keycapMaterial)
+                _keycapMaterialOverrides[renderer.transform.parent] = renderer.sharedMaterial;
     }
 
     #endregion
@@ -483,6 +606,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _caseMaterial = material;
+        ClearCaseImage();
         ApplyCaseMaterial();
     }
 
@@ -498,6 +622,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _caseMaterialIndex = index;
+        ClearCaseImage();
         ApplySelectedCaseMaterial();
     }
 

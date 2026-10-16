@@ -51,6 +51,13 @@ namespace Game.Tournament
         /// <summary>rank에 해당하는 작업실 골드를 반환하며 4위 이하에는 기타 보상을 사용한다.</summary>
         public int GetGold(int rank) => _goldRewards[Mathf.Clamp(rank - 1, 0, 3)];
 
+        /// <summary>round의 파괴 필요 수량을 반환하며 1·2대전은 25개, 이후는 직전 수량의 1.2배를 반올림한다.</summary>
+        public int GetRequiredBrokenCount(int round)
+        {
+            int count = 25;
+            for (int index = 3; index <= round; index++) count = Mathf.Min(87, Mathf.RoundToInt(count * 1.2f));
+            return count;
+        }
         /// <summary>1부터 시작하는 round의 로봇 설정을 반환하며 원본 데이터를 유지한다.</summary>
         public RobotRound GetRound(int round) => _rounds[round - 1];
     }

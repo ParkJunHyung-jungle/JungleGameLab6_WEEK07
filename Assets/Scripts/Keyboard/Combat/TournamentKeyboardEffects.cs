@@ -46,7 +46,7 @@ namespace Game.Tournament
             _keyboard = GetComponent<KeyboardInputController>();
             _keyboard.UseAllDestructionKeys();
             _destruction = GetComponent<KeyboardDestruction>();
-            _destruction.ConfigureRequiredBrokenCount(25);
+            _destruction.ConfigureRequiredBrokenCount(tournament.Settings.GetRequiredBrokenCount(tournament.Round));
             _feedback = GetComponent<KeyboardFeedbackManager>();
             IReadOnlyDictionary<Key, KeycapHealth> bindings = _keyboard.GetKeycapLayout();
             Dictionary<Key, Vector2Int> coordinates = layout.CreateCoordinates();
@@ -133,19 +133,12 @@ namespace Game.Tournament
                     StartCoroutine(ExplodeAfterDelay(center));
                     continue;
                 }
-                ObserveEffect(center, "Activated", "");
-                for (int index = 0; index < _keycaps.Length; index++)
-                {
-                    bool sameLine = type == SpecialKeycapType.Row
-                        ? _coordinates[index].x == _coordinates[center].x
-                        : _coordinates[index].y == _coordinates[center].y;
-                    if (sameLine) ApplyDamage(index, 3);
-                }
+                PlayAreaWave(center, type);
             }
         }
 
         /// <summary>
-        /// center 키캡의 파괴 효과를 0.25초 지연한 뒤 주변 12칸에 피해 5를 적용한다.
+        /// center 키캡의 파괴 효과를 0.25초 지연한 뒤 주변 12칸에 피해 4를 적용한다.
         /// 대전 종료나 완파 시 취소를 기록하고 지연 중인 폭발 목록에서 제거한다.
         /// </summary>
         private IEnumerator ExplodeAfterDelay(int center)
@@ -162,11 +155,47 @@ namespace Game.Tournament
                 ObserveEffect(center, "Cancelled", !_tournament.IsBattleActive ? "BattleInactive" : "KeyboardBroken");
                 yield break;
             }
-            ObserveEffect(center, "Activated", "");
-            int count = Mathf.Min(12, _neighbors.GetNeighborCount(center));
-            for (int index = 0; index < count; index++) ApplyDamage(_neighbors.GetNeighbor(center, index), 5);
+            PlayAreaWave(center, SpecialKeycapType.Explosion);
         }
 
+        /// <summary>
+        /// center와 type으로 주변 12칸 또는 같은 행열을 선정하여 해당 범위에만 물결과 도달 피해를 적용한다.
+        /// 폭발은 0.35초에 피해 4, 행열은 0.45초에 피해 3을 전달하고 실제 시작 여부를 로그에 기록한다.
+        /// </summary>
+        private void PlayAreaWave(int center, SpecialKeycapType type)
+        {
+            List<KeycapHealth> targets = new List<KeycapHealth> { _keycaps[center] };
+            List<Vector2> positions = new List<Vector2> { _positions[center] };
+            if (type == SpecialKeycapType.Explosion)
+            {
+                int count = Mathf.Min(12, _neighbors.GetNeighborCount(center));
+                for (int index = 0; index < count; index++)
+                {
+                    int neighbor = _neighbors.GetNeighbor(center, index);
+                    targets.Add(_keycaps[neighbor]);
+                    positions.Add(_positions[neighbor]);
+                }
+            }
+            else
+            {
+                for (int index = 0; index < _keycaps.Length; index++)
+                {
+                    bool sameLine = type == SpecialKeycapType.Row
+                        ? _coordinates[index].x == _coordinates[center].x
+                        : _coordinates[index].y == _coordinates[center].y;
+                    if (index == center || !sameLine) continue;
+                    targets.Add(_keycaps[index]);
+                    positions.Add(_positions[index]);
+                }
+            }
+            int damage = type == SpecialKeycapType.Explosion ? 4 : 3;
+            bool started = false;
+            _feedback.PlayHammerShockwave(_keyboard, targets.ToArray(), positions.ToArray(), 0,
+                keycap => ApplyDamage(_indices[keycap], damage), false, false,
+                () => { started = true; ObserveEffect(center, "Activated", ""); },
+                travelDuration: type == SpecialKeycapType.Explosion ? 0.35f : 0.45f);
+            if (!started) ObserveEffect(center, "Skipped", "WaveUnavailable");
+        }
         /// <summary>index의 살아 있는 키에 damage를 적용하며 종료된 대전과 완파 상태의 지연 피해는 무시한다.</summary>
         private void ApplyDamage(int index, int damage)
         {

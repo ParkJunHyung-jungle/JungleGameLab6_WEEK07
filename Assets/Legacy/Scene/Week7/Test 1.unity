@@ -427,10 +427,7 @@ MonoBehaviour:
   _feedbackManager: {fileID: 0}
   _gameSession: {fileID: 0}
   _feverController: {fileID: 0}
-  _scoreCombo: {fileID: 0}
   _baseDamage: 1
-  _comboFistDamage: 1
-  _comboHammerDamage: 1
 --- !u!114 &910070004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -557,20 +554,34 @@ MonoBehaviour:
       Data3: 2019034516
       Data4: -896893305
     Path: event:/SFX/KeyBoard/Switch/BrownSwitch
-  <SansSwitch>k__BackingField:
-    Guid:
-      Data1: -32070428
-      Data2: 1291412373
-      Data3: 450794891
-      Data4: 1324151617
-    Path: event:/SFX/KeyBoard/Switch/Sans
   <RedSwitch>k__BackingField:
     Guid:
       Data1: 191871004
       Data2: 1185196984
       Data3: 302908047
       Data4: -2044697214
-    Path: event:/SFX/KeyBoard/Switch/Red
+    Path: event:/SFX/KeyBoard/Switch/RedSwitch
+  <SansSwitch>k__BackingField:
+    Guid:
+      Data1: -32070428
+      Data2: 1291412373
+      Data3: 450794891
+      Data4: 1324151617
+    Path: event:/SFX/KeyBoard/Switch/SansSwitch
+  <PopSwitch>k__BackingField:
+    Guid:
+      Data1: 0
+      Data2: 0
+      Data3: 0
+      Data4: 0
+    Path: 
+  <TypewriterSwitch>k__BackingField:
+    Guid:
+      Data1: 0
+      Data2: 0
+      Data3: 0
+      Data4: 0
+    Path: 
   <BreakKeyCap>k__BackingField:
     Guid:
       Data1: -715810010

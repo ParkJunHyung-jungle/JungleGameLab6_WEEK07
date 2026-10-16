@@ -8,6 +8,8 @@ using UnityEngine.Serialization;
 using UnityEditor;
 #endif
 
+using KeyboardModeling;
+
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public sealed class KeyboardCustomization : MonoBehaviour
@@ -225,7 +227,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
         if (_plate != null && !_plate.HasPlateType(state.PlateType)) throw new InvalidOperationException("The saved Plate type is unavailable.");
 
         for (int index = 0; index < _switches.Length; index++) _switches[index].ChangeSwitch(state.SwitchTypes[index]);
-        if (_switches.Length > 0) _switchType = state.SwitchTypes[0];
+        if (_switches.Length > 0)
+        {
+            _switchType = state.SwitchTypes[0];
+            GetComponent<KeyboardInputController>().SetSwitchSound(_switchType);
+        }
         if (_plate != null) SetPlateType(state.PlateType);
         _caseMaterial = state.Selection[0] < 0 ? null : catalog[remap[state.Selection[0]]];
         _keycapMaterial = state.Selection[1] < 0 ? null : catalog[remap[state.Selection[1]]];
@@ -342,6 +348,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _switchType = type;
+        GetComponent<KeyboardInputController>().SetSwitchSound(type);
         return true;
     }
 

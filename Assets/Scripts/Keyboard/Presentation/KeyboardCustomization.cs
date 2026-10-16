@@ -47,6 +47,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
 
     public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
+    /// <summary>
+    /// 현재 전체 키캡에 지정된 Material을 반환한다.
+    /// 사용자 지정 상태를 읽으며 반환값은 _keycapMaterial이다.
+    /// </summary>
+    public Material KeycapMaterial => _keycapMaterial;
 
     [Header("Switches")]
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
@@ -514,6 +519,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         _keycapMaterial = material;
+        _keycapMaterialIndex = Array.IndexOf(_materials, material);
         _keycapMaterialOverrides.Clear();
         ClearKeycapImage();
         ApplyKeycapMaterial();
@@ -542,9 +548,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     private void ApplySelectedKeycapMaterial()
     {
-        if (_materials.Length > 0)
+        if (_materials.Length > 0
+            && _keycapMaterialIndex >= 0
+            && _keycapMaterialIndex < _materials.Length)
         {
-            _keycapMaterialIndex = Mathf.Clamp(_keycapMaterialIndex, 0, _materials.Length - 1);
             _keycapMaterial = _materials[_keycapMaterialIndex];
         }
 

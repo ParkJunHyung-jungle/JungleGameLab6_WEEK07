@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -59,6 +60,7 @@ namespace Game.Player
         [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
         [SerializeField] private GameObject _keyboardEditOverlay;
         [SerializeField] private GameObject _centerReticle;
+        private KeyboardEditOverlayUI _keyboardEditOverlayUI;
         private KeyboardInputController _editingKeyboard;
         private Coroutine _cameraTransition;
         private Vector3 _savedPlayerPosition;
@@ -70,6 +72,7 @@ namespace Game.Player
         private Vector3 _editingKeyboardCenterOffset;
         private bool _isDraggingEditingKeyboard;
         private Vector2 _pendingKeyboardRotationDelta;
+        private readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
 
         void Awake()
         {
@@ -84,12 +87,20 @@ namespace Game.Player
 
             if (_moveInput == null)
                 _moveInput = FindMoveInputReference();
+
+            if (_keyboardEditOverlay != null)
+                _keyboardEditOverlayUI = _keyboardEditOverlay.GetComponent<KeyboardEditOverlayUI>();
         }
 
         void OnEnable()
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+            if (_keyboardEditOverlayUI != null)
+            {
+                _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
+                _keyboardEditOverlayUI.SwitchSoundSelected += HandleSwitchSoundSelected;
+            }
             _clickInput.action.started += HandleClickStarted;
             _clickInput.action.canceled += HandleClickCanceled;
             _clickInput.action.Enable();
@@ -99,6 +110,11 @@ namespace Game.Player
 
         void OnDisable()
         {
+            if (_keyboardEditOverlayUI != null)
+            {
+                _keyboardEditOverlayUI.KeycapMaterialSelected -= HandleKeycapMaterialSelected;
+                _keyboardEditOverlayUI.SwitchSoundSelected -= HandleSwitchSoundSelected;
+            }
             _clickInput.action.started -= HandleClickStarted;
             _clickInput.action.canceled -= HandleClickCanceled;
             _clickInput.action.Disable();
@@ -131,7 +147,9 @@ namespace Game.Player
             if (_isKeyboardEditMode)
             {
                 if (_cameraTransition == null)
+                {
                     TryBeginEditingKeyboardRotation();
+                }
 
                 return;
             }
@@ -321,12 +339,15 @@ namespace Game.Player
             }
 
             _isKeyboardEditMode = true;
+            _editingKeyboard = keyboard;
+            KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
+            _keyboardEditOverlayUI?.SetSelectedMaterial(customization != null ? customization.KeycapMaterial : null);
+            _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(true);
             if (_centerReticle != null)
                 _centerReticle.SetActive(false);
 
-            _editingKeyboard = keyboard;
             _editingKeyboardBody = holder.KeyboardBody;
             KeyboardPickupTarget pickupTarget = _editingKeyboardBody.GetComponent<KeyboardPickupTarget>();
             _editingKeyboardCenterOffset = pickupTarget.GetVisualCenterLocalPosition(_editingKeyboardBody.transform);
@@ -490,10 +511,22 @@ namespace Game.Player
             if (mouse == null || _editingKeyboardBody == null)
                 return;
 
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            Vector2 pointerPosition = mouse.position.ReadValue();
+            if (_keyboardEditOverlayUI != null && _keyboardEditOverlayUI.IsPointerOverUI(pointerPosition))
                 return;
 
-            Vector2 pointerPosition = mouse.position.ReadValue();
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem != null)
+            {
+                PointerEventData pointerEvent = new PointerEventData(eventSystem) { position = pointerPosition };
+                eventSystem.RaycastAll(pointerEvent, _uiRaycastResults);
+                for (int i = 0; i < _uiRaycastResults.Count; i++)
+                {
+                    if (_uiRaycastResults[i].gameObject != _keyboardEditOverlay)
+                        return;
+                }
+            }
+
             Ray pointerRay = _camera.ScreenPointToRay(pointerPosition);
             float nearestKeyboardHitDistance = float.PositiveInfinity;
             Renderer[] keyboardRenderers = _editingKeyboardBody.GetComponentsInChildren<Renderer>();
@@ -585,6 +618,32 @@ namespace Game.Player
         {
             _isDraggingEditingKeyboard = false;
             _pendingKeyboardRotationDelta = Vector2.zero;
+        }
+
+        /// <summary>
+        /// 선택된 material을 현재 편집 중인 키보드의 사용자 지정 컴포넌트에 전달한다.
+        /// material과 _editingKeyboard를 사용하며 전체 키캡 재질을 변경한다.
+        /// </summary>
+        private void HandleKeycapMaterialSelected(Material material)
+        {
+            if (_editingKeyboard == null || material == null)
+                return;
+
+            KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
+            if (customization != null)
+                customization.SetKeycapMaterial(material);
+        }
+
+        /// <summary>
+        /// 선택한 축 타입을 현재 편집 대상의 타건음에 적용한다.
+        /// type과 편집 대상 키보드를 사용하며 적용에 성공하면 UI의 선택 표시를 갱신한다.
+        /// </summary>
+        private void HandleSwitchSoundSelected(SwitchType type)
+        {
+            if (_editingKeyboard != null && _editingKeyboard.SetSwitchSound(type))
+            {
+                _keyboardEditOverlayUI.SetSelectedSwitchSound(_editingKeyboard.CurrentSwitchSound);
+            }
         }
 
         /// <summary>

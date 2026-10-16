@@ -105,6 +105,21 @@ namespace KeyboardModeling
         public KeyboardSpawnProfile SpawnProfile => _spawnProfile;
 
         /// <summary>
+        /// 현재 FMOD 타건음에 대응하는 축 타입을 반환한다.
+        /// 저장된 사운드 설정을 사용하며 FMOD 타건음이 꺼져 있으면 null을 반환한다.
+        /// </summary>
+        public SwitchType? CurrentSwitchSound => _fmodSwitchSound switch
+        {
+            FmodSwitchSound.Blue => SwitchType.Blue,
+            FmodSwitchSound.Red => SwitchType.Red,
+            FmodSwitchSound.Brown => SwitchType.Brown,
+            FmodSwitchSound.Sans => SwitchType.Sans,
+            FmodSwitchSound.Pop => SwitchType.Pop,
+            FmodSwitchSound.Typewriter => SwitchType.Typewriter,
+            _ => null
+        };
+
+        /// <summary>
         /// profile의 키 식별자를 layout과 연결하여 키캡의 등급·체력·보상·외피 재질을 초기화한다.
         /// 모든 식별자를 검사한 뒤 적용된 profile을 _spawnProfile에 저장한다.
         /// </summary>

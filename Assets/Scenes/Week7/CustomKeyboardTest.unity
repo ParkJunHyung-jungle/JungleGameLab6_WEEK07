@@ -256,6 +256,84 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &641193455
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 641193458}
+  - component: {fileID: 641193457}
+  - component: {fileID: 641193456}
+  m_Layer: 0
+  m_Name: CustomizationSaveLoadUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &641193456
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 641193455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5de0ca6efe7689847abbba8659e8752b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomizationTestUI
+  _storage: {fileID: 641193457}
+--- !u!114 &641193457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 641193455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89e1d2440af59244ba58f7663b574ad6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomizationStorage
+  _customization: {fileID: 831032413}
+  _materialCatalog:
+  - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+  - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+  - {fileID: 2100000, guid: c4da2edb164328841934d091e98ee3a2, type: 2}
+  _materialIds:
+  - eb9bef93fd5c48d4da2e0d9f41939e65:2100000
+  - 49c3ca8fd4e59c34ea8d550486382ebb:2100000
+  - c4da2edb164328841934d091e98ee3a2:2100000
+--- !u!4 &641193458
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 641193455}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &831032413 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3967785068815222441, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+  m_PrefabInstance: {fileID: 906818989}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f972d9568538a3b4180eadd677f5a94f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomization
 --- !u!1001 &906818989
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -544,3 +622,4 @@ SceneRoots:
   - {fileID: 1820992677}
   - {fileID: 906818989}
   - {fileID: 1383630400}
+  - {fileID: 641193458}

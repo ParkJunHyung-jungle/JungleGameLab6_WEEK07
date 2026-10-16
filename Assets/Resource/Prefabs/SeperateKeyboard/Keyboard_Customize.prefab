@@ -36185,6 +36185,7 @@ MonoBehaviour:
   - {fileID: 1919298764494140532}
   _keycapMaterial: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   _keycapMaterialIndex: 0
+  _photoMaterialTemplate: {fileID: 2100000, guid: 4a96a34eedb48104fa0dffe02c1580f0, type: 2}
   _switches:
   - {fileID: 1927684077526527268}
   - {fileID: 3871779480709502322}

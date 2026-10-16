@@ -69,6 +69,8 @@ namespace Game.Player
         private bool _cameraInputWasEnabled;
         private bool _isKeyboardEditMode;
         private Rigidbody _editingKeyboardBody;
+        private InputAction _keyboardResetInput;
+        private Quaternion _initialEditingKeyboardRotation;
         private Vector3 _editingKeyboardCenterOffset;
         private bool _isDraggingEditingKeyboard;
         private Vector2 _pendingKeyboardRotationDelta;
@@ -76,6 +78,8 @@ namespace Game.Player
 
         void Awake()
         {
+            _keyboardResetInput = new InputAction("ResetEditingKeyboard", InputActionType.Button, "<Mouse>/middleButton");
+
             if (_camera == null)
                 _camera = Camera.main;
 
@@ -100,12 +104,15 @@ namespace Game.Player
             {
                 _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected += HandleSwitchSoundSelected;
+                _keyboardEditOverlayUI.CaseMaterialSelected += HandleCaseMaterialSelected;
             }
             _clickInput.action.started += HandleClickStarted;
             _clickInput.action.canceled += HandleClickCanceled;
             _clickInput.action.Enable();
             _coverInput.action.started += HandleCoverStarted;
             _coverInput.action.Enable();
+            _keyboardResetInput.started += HandleKeyboardResetStarted;
+            _keyboardResetInput.Enable();
         }
 
         void OnDisable()
@@ -114,12 +121,15 @@ namespace Game.Player
             {
                 _keyboardEditOverlayUI.KeycapMaterialSelected -= HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected -= HandleSwitchSoundSelected;
+                _keyboardEditOverlayUI.CaseMaterialSelected -= HandleCaseMaterialSelected;
             }
             _clickInput.action.started -= HandleClickStarted;
             _clickInput.action.canceled -= HandleClickCanceled;
             _clickInput.action.Disable();
             _coverInput.action.started -= HandleCoverStarted;
             _coverInput.action.Disable();
+            _keyboardResetInput.started -= HandleKeyboardResetStarted;
+            _keyboardResetInput.Disable();
             ResetKeyboardEditMode();
             DropHeldKeyboard();
             Cursor.lockState = CursorLockMode.None;
@@ -130,6 +140,11 @@ namespace Game.Player
         {
             FollowHeldKeyboard();
             ApplyEditingKeyboardRotation();
+        }
+
+        void OnDestroy()
+        {
+            _keyboardResetInput.Dispose();
         }
 
         void LateUpdate()
@@ -167,6 +182,24 @@ namespace Game.Player
         private void HandleClickCanceled(InputAction.CallbackContext context)
         {
             StopEditingKeyboardRotation();
+        }
+
+        /// <summary>
+        /// 휠클릭 입력을 받으면 편집 대상의 모든 키캡과 작업대 최초 회전을 복원한다.
+        /// context와 저장한 회전을 사용하며 드래그를 멈추고 키보드 중심 위치를 유지한다.
+        /// </summary>
+        private void HandleKeyboardResetStarted(InputAction.CallbackContext context)
+        {
+            if (!_isKeyboardEditMode || _cameraTransition != null || _editingKeyboard == null || _editingKeyboardBody == null)
+                return;
+
+            StopEditingKeyboardRotation();
+            Vector3 visualCenter = _editingKeyboardBody.transform.TransformPoint(_editingKeyboardCenterOffset);
+            Vector3 centerOffset = _editingKeyboardBody.transform.TransformVector(_editingKeyboardCenterOffset);
+            Quaternion rotationDelta = _initialEditingKeyboardRotation * Quaternion.Inverse(_editingKeyboardBody.rotation);
+            _editingKeyboardBody.position = visualCenter - rotationDelta * centerOffset;
+            _editingKeyboardBody.rotation = _initialEditingKeyboardRotation;
+            _editingKeyboard.RestoreKeycaps();
         }
 
         /// <summary>
@@ -343,12 +376,14 @@ namespace Game.Player
             KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
             _keyboardEditOverlayUI?.SetSelectedMaterial(customization != null ? customization.KeycapMaterial : null);
             _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
+            _keyboardEditOverlayUI?.SetCaseCustomization(customization);
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(true);
             if (_centerReticle != null)
                 _centerReticle.SetActive(false);
 
             _editingKeyboardBody = holder.KeyboardBody;
+            _initialEditingKeyboardRotation = holder.InitialKeyboardRotation;
             KeyboardPickupTarget pickupTarget = _editingKeyboardBody.GetComponent<KeyboardPickupTarget>();
             _editingKeyboardCenterOffset = pickupTarget.GetVisualCenterLocalPosition(_editingKeyboardBody.transform);
             _savedPlayerPosition = transform.position;
@@ -643,6 +678,23 @@ namespace Game.Player
             if (_editingKeyboard != null && _editingKeyboard.SetSwitchSound(type))
             {
                 _keyboardEditOverlayUI.SetSelectedSwitchSound(_editingKeyboard.CurrentSwitchSound);
+            }
+        }
+
+        /// <summary>
+        /// 선택한 공유 재질 인덱스를 편집 대상의 케이스 전체에 적용한다.
+        /// index와 현재 키보드를 사용하며 적용 후 목록의 선택 표시를 갱신한다.
+        /// </summary>
+        private void HandleCaseMaterialSelected(int index)
+        {
+            if (_editingKeyboard == null)
+                return;
+
+            KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
+            if (customization != null)
+            {
+                customization.SetCaseMaterialIndex(index);
+                _keyboardEditOverlayUI.RefreshCaseMaterialSelection();
             }
         }
 

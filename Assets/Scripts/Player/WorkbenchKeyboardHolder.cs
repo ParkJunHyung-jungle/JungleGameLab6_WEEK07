@@ -13,12 +13,19 @@ namespace Game.Player
 
         [Header("Keyboard")]
         private Rigidbody _keyboardBody;
+        private Quaternion _initialKeyboardRotation;
 
         /// <summary>
         /// 작업대에 고정된 키보드의 Rigidbody를 반환한다.
         /// _keyboardBody를 외부 상호작용 코드가 조회할 수 있게 제공한다.
         /// </summary>
         public Rigidbody KeyboardBody => _keyboardBody;
+
+        /// <summary>
+        /// 작업대에 키보드를 고정할 때 결정한 최초 목표 회전을 반환한다.
+        /// 편집 중 회전이나 재진입에 영향을 받지 않는 복원 기준을 제공한다.
+        /// </summary>
+        public Quaternion InitialKeyboardRotation => _initialKeyboardRotation;
 
         void OnTriggerEnter(Collider other)
         {
@@ -36,6 +43,7 @@ namespace Game.Player
                 return;
 
             _keyboardBody = body;
+            _initialKeyboardRotation = transform.rotation * Quaternion.Euler(-57f, 0f, 0f);
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             body.isKinematic = true;
@@ -58,7 +66,7 @@ namespace Game.Player
         private IEnumerator RotateKeyboardToHolder(Rigidbody body, Vector3 centerOffset)
         {
             Quaternion startRotation = body.rotation;
-            Quaternion targetRotation = transform.rotation * Quaternion.Euler(-57f, 0f, 0f);
+            Quaternion targetRotation = _initialKeyboardRotation;
             if (Quaternion.Dot(startRotation, targetRotation) < 0f)
             {
                 targetRotation = new Quaternion(

@@ -408,6 +408,24 @@ namespace KeyboardModeling
         }
 
         /// <summary>
+        /// 전체 바인딩의 키캡 체력과 표시를 복원하고 눌림 상태를 초기화한다.
+        /// 캐시된 키캡들을 사용하며 위치와 스위치 축을 되돌리고 완파 추적 수량을 갱신한다.
+        /// </summary>
+        public void RestoreKeycaps()
+        {
+            foreach (KeycapHealth health in _keycapHealths)
+            {
+                if (health != null)
+                    health.RestoreHealth();
+            }
+
+            RestoreKeys();
+            KeyboardDestruction destruction = GetComponent<KeyboardDestruction>();
+            if (destruction != null)
+                destruction.RefreshKeycapTracking();
+        }
+
+        /// <summary>
         /// 모델 입력을 받는 창의 포커스 상태를 확인한다.
         /// 앱 상태와 에디터의 Game 창을 사용하여 입력을 받을 수 있는지 반환한다.
         /// </summary>

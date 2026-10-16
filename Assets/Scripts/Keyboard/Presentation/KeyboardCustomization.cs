@@ -38,6 +38,24 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private Material _caseMaterial;
     [SerializeField, Min(0)] private int _caseMaterialIndex;
 
+    /// <summary>
+    /// 케이스 선택 UI에 사용할 공유 재질 목록을 반환한다.
+    /// 등록된 _materials를 읽기 전용 목록으로 제공한다.
+    /// </summary>
+    public IReadOnlyList<Material> CaseMaterials => _materials;
+
+    /// <summary>
+    /// 케이스 미리보기에 사용할 파츠 렌더러 목록을 반환한다.
+    /// 등록된 _caseRenderers를 읽기 전용 목록으로 제공한다.
+    /// </summary>
+    public IReadOnlyList<MeshRenderer> CaseRenderers => _caseRenderers;
+
+    /// <summary>
+    /// 현재 케이스에 선택된 공유 재질의 인덱스를 반환한다.
+    /// 저장된 _caseMaterialIndex를 UI 선택 표시에 제공한다.
+    /// </summary>
+    public int CaseMaterialIndex => _caseMaterialIndex;
+
     [Header("Keycaps")]
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
     [SerializeField] private Material _keycapMaterial;

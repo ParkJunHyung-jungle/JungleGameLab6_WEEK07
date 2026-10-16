@@ -20,6 +20,7 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _keycapButton;
         [SerializeField] private KeyboardEditButton _switchAxisButton;
         [SerializeField] private KeyboardEditButton _ledButton;
+        [SerializeField] private KeyboardEditButton _caseButton;
         private PickerMode _pickerMode;
 
         [Header("Keycap Material Picker")]
@@ -45,14 +46,24 @@ namespace Game.Player
         private readonly List<KeyboardEditButton> _switchSoundButtons = new List<KeyboardEditButton>();
         private SwitchType? _selectedSwitchSound;
 
+        [Header("Case Material Picker")]
+        private KeyboardCustomization _caseCustomization;
+        private RectTransform _caseMaterialViewport;
+        private readonly List<KeyboardEditButton> _casePreviewButtons = new List<KeyboardEditButton>();
+        private readonly List<int> _caseMaterialIndices = new List<int>();
+        private readonly List<Image> _caseSelectionIndicators = new List<Image>();
+        private readonly List<Texture2D> _casePreviewTextures = new List<Texture2D>();
+
         public event Action<Material> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
+        public event Action<int> CaseMaterialSelected;
 
         private enum PickerMode
         {
             None,
             Keycap,
-            SwitchSound
+            SwitchSound,
+            CaseMaterial
         }
 
         void Awake()
@@ -65,9 +76,11 @@ namespace Game.Player
 
         void OnEnable()
         {
+            CreateCaseMaterialPicker();
             _keycapButton.Clicked += HandleCategoryClicked;
             _switchAxisButton.Clicked += HandleCategoryClicked;
             _ledButton.Clicked += HandleCategoryClicked;
+            _caseButton.Clicked += HandleCategoryClicked;
             foreach (KeyboardEditButton button in _previewButtons)
             {
                 button.Clicked += HandlePreviewClicked;
@@ -78,6 +91,11 @@ namespace Game.Player
                 button.Clicked += HandleSwitchSoundClicked;
             }
 
+            foreach (KeyboardEditButton button in _casePreviewButtons)
+            {
+                button.Clicked += HandleCasePreviewClicked;
+            }
+
             SetPickerMode(PickerMode.None);
         }
 
@@ -86,6 +104,7 @@ namespace Game.Player
             _keycapButton.Clicked -= HandleCategoryClicked;
             _switchAxisButton.Clicked -= HandleCategoryClicked;
             _ledButton.Clicked -= HandleCategoryClicked;
+            _caseButton.Clicked -= HandleCategoryClicked;
             foreach (KeyboardEditButton button in _previewButtons)
             {
                 button.Clicked -= HandlePreviewClicked;
@@ -96,18 +115,18 @@ namespace Game.Player
                 button.Clicked -= HandleSwitchSoundClicked;
             }
 
+            foreach (KeyboardEditButton button in _casePreviewButtons)
+            {
+                button.Clicked -= HandleCasePreviewClicked;
+            }
+
             SetPickerMode(PickerMode.None);
         }
 
         void OnDestroy()
         {
-            foreach (Texture2D previewTexture in _previewTextures)
-            {
-                if (previewTexture != null)
-                {
-                    Destroy(previewTexture);
-                }
-            }
+            DestroyPreviewTextures(_previewTextures);
+            DestroyPreviewTextures(_casePreviewTextures);
         }
 
         /// <summary>
@@ -118,7 +137,8 @@ namespace Game.Player
         {
             if (eventData.button == PointerEventData.InputButton.Left
                 && !ContainsPointer(_viewport, eventData.position)
-                && !ContainsPointer(_switchSoundViewport, eventData.position))
+                && !ContainsPointer(_switchSoundViewport, eventData.position)
+                && !ContainsPointer(_caseMaterialViewport, eventData.position))
             {
                 SetPickerMode(PickerMode.None);
             }
@@ -145,6 +165,27 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 편집할 키보드의 케이스 재질과 미리보기 원본을 지정한다.
+        /// customization을 저장하며 다음 활성화 시 해당 키보드의 목록을 만든다.
+        /// </summary>
+        public void SetCaseCustomization(KeyboardCustomization customization)
+        {
+            _caseCustomization = customization;
+        }
+
+        /// <summary>
+        /// 현재 케이스의 재질 인덱스와 일치하는 미리보기에 선택 표시를 켠다.
+        /// 편집 대상과 재질 인덱스 목록을 사용하며 각 표시의 활성 상태를 갱신한다.
+        /// </summary>
+        public void RefreshCaseMaterialSelection()
+        {
+            for (int index = 0; index < _caseSelectionIndicators.Count; index++)
+            {
+                _caseSelectionIndicators[index].enabled = _caseMaterialIndices[index] == _caseCustomization.CaseMaterialIndex;
+            }
+        }
+
+        /// <summary>
         /// screenPosition이 편집 패널이나 열린 선택 목록 위에 있는지 확인한다.
         /// 입력 위치와 UI 사각형을 사용하며 해당 지점이 UI 영역이면 true를 반환한다.
         /// </summary>
@@ -160,18 +201,24 @@ namespace Game.Player
                 return true;
             }
 
-            return ContainsPointer(_viewport, screenPosition) || ContainsPointer(_switchSoundViewport, screenPosition);
+            return ContainsPointer(_viewport, screenPosition)
+                || ContainsPointer(_switchSoundViewport, screenPosition)
+                || ContainsPointer(_caseMaterialViewport, screenPosition);
         }
 
         /// <summary>
-        /// 클릭한 편집 항목에 따라 키캡 또는 축 사운드 목록을 연다.
+        /// 클릭한 편집 항목에 따라 키캡, 축 사운드 또는 케이스 목록을 연다.
         /// button을 사용하며 같은 항목을 다시 누르거나 LED를 누르면 목록을 닫는다.
         /// </summary>
         private void HandleCategoryClicked(KeyboardEditButton button)
         {
-            PickerMode mode = button == _keycapButton
-                ? PickerMode.Keycap
-                : button == _switchAxisButton ? PickerMode.SwitchSound : PickerMode.None;
+            PickerMode mode = PickerMode.None;
+            if (button == _keycapButton)
+                mode = PickerMode.Keycap;
+            else if (button == _switchAxisButton)
+                mode = PickerMode.SwitchSound;
+            else if (button == _caseButton)
+                mode = PickerMode.CaseMaterial;
             SetPickerMode(mode == _pickerMode ? PickerMode.None : mode);
         }
 
@@ -191,6 +238,15 @@ namespace Game.Player
         private void HandleSwitchSoundClicked(KeyboardEditButton button)
         {
             SwitchSoundSelected?.Invoke(_switchSoundTypes[_switchSoundButtons.IndexOf(button)]);
+        }
+
+        /// <summary>
+        /// 클릭한 케이스 미리보기에 해당하는 공유 재질 인덱스를 전달한다.
+        /// button으로 원본 인덱스를 찾아 C# 이벤트로 적용을 요청하며 목록은 유지한다.
+        /// </summary>
+        private void HandleCasePreviewClicked(KeyboardEditButton button)
+        {
+            CaseMaterialSelected?.Invoke(_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]);
         }
 
         /// <summary>
@@ -242,8 +298,21 @@ namespace Game.Player
         /// </summary>
         private Texture2D[] CreateMaterialPreviewTextures(Mesh keycapMesh)
         {
-            Texture2D[] previews = new Texture2D[_keycapMaterials.Length];
-            GameObject previewStage = new GameObject("KeycapMaterialPreviewStage");
+            return CreateMaterialPreviewTextures(keycapMesh, _keycapMaterials, _previewTextures, "Keycap");
+        }
+
+        /// <summary>
+        /// 미리보기 메시와 재질 목록을 오프스크린 렌더링해 텍스처 배열을 만든다.
+        /// previewMesh, materials, previewName을 사용하며 생성한 텍스처를 textures에 기록하고 반환한다.
+        /// </summary>
+        private Texture2D[] CreateMaterialPreviewTextures(
+            Mesh previewMesh,
+            IReadOnlyList<Material> materials,
+            List<Texture2D> textures,
+            string previewName)
+        {
+            Texture2D[] previews = new Texture2D[materials.Count];
+            GameObject previewStage = new GameObject(previewName + "MaterialPreviewStage");
             previewStage.hideFlags = HideFlags.HideAndDontSave;
 
             int previewLayerMask = 1 << PREVIEW_LAYER;
@@ -251,7 +320,7 @@ namespace Game.Player
             modelObject.layer = PREVIEW_LAYER;
             modelObject.transform.SetParent(previewStage.transform, false);
             MeshFilter meshFilter = modelObject.AddComponent<MeshFilter>();
-            meshFilter.sharedMesh = keycapMesh;
+            meshFilter.sharedMesh = previewMesh;
             MeshRenderer meshRenderer = modelObject.AddComponent<MeshRenderer>();
             meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
             meshRenderer.receiveShadows = false;
@@ -284,7 +353,10 @@ namespace Game.Player
 
             Bounds bounds = meshRenderer.bounds;
             Vector3 viewDirection = new Vector3(0.65f, 0.82f, -1f).normalized;
-            previewCamera.transform.position = bounds.center + viewDirection * 3f;
+            float radius = bounds.extents.magnitude;
+            float cameraDistance = Mathf.Max(3f, radius * 3f);
+            previewCamera.farClipPlane = Mathf.Max(10f, cameraDistance + radius * 2f);
+            previewCamera.transform.position = bounds.center + viewDirection * cameraDistance;
             previewCamera.transform.LookAt(bounds.center, Vector3.up);
             previewCamera.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 1.8f;
 
@@ -299,9 +371,9 @@ namespace Game.Player
 
             try
             {
-                for (int index = 0; index < _keycapMaterials.Length; index++)
+                for (int index = 0; index < materials.Count; index++)
                 {
-                    Material material = _keycapMaterials[index];
+                    Material material = materials[index];
                     if (material == null)
                     {
                         continue;
@@ -315,14 +387,14 @@ namespace Game.Player
                         PREVIEW_TEXTURE_SIZE,
                         TextureFormat.RGBA32,
                         false);
-                    previewTexture.name = $"KeycapPreview_{index}";
+                    previewTexture.name = $"{previewName}Preview_{index}";
                     previewTexture.ReadPixels(
                         new Rect(0f, 0f, PREVIEW_TEXTURE_SIZE, PREVIEW_TEXTURE_SIZE),
                         0,
                         0);
                     previewTexture.Apply(false, true);
                     previews[index] = previewTexture;
-                    _previewTextures.Add(previewTexture);
+                    textures.Add(previewTexture);
                 }
             }
             finally
@@ -331,6 +403,7 @@ namespace Game.Player
                 previewCamera.targetTexture = null;
                 renderTexture.Release();
                 Destroy(renderTexture);
+                previewStage.SetActive(false);
                 Destroy(previewStage);
             }
 
@@ -580,8 +653,158 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 현재 키보드의 케이스 파츠와 재질 목록으로 이름 없는 미리보기 목록을 만든다.
+        /// 저장된 편집 대상을 사용하며 이전 목록과 텍스처를 정리하고 버튼 및 선택 표시를 저장한다.
+        /// </summary>
+        private void CreateCaseMaterialPicker()
+        {
+            if (_caseMaterialViewport != null)
+            {
+                Destroy(_caseMaterialViewport.gameObject);
+                _caseMaterialViewport = null;
+            }
+
+            _casePreviewButtons.Clear();
+            _caseMaterialIndices.Clear();
+            _caseSelectionIndicators.Clear();
+            DestroyPreviewTextures(_casePreviewTextures);
+            _caseButton.interactable = _caseCustomization != null
+                && _caseCustomization.CaseMaterials.Count > 0
+                && _caseCustomization.CaseRenderers.Count > 0;
+            if (!_caseButton.interactable)
+                return;
+
+            Mesh caseMesh = CreateCasePreviewMesh();
+            if (caseMesh == null)
+            {
+                _caseButton.interactable = false;
+                return;
+            }
+
+            Texture2D[] previews;
+            try
+            {
+                previews = CreateMaterialPreviewTextures(caseMesh, _caseCustomization.CaseMaterials, _casePreviewTextures, "Case");
+            }
+            finally
+            {
+                Destroy(caseMesh);
+            }
+
+            _caseMaterialViewport = CreateScrollViewport("CaseMaterial", previews.Length, out RectTransform content);
+            CreateCasePreviewItems(content, previews);
+            RefreshCaseMaterialSelection();
+        }
+
+        /// <summary>
+        /// 등록된 케이스 렌더러의 메시를 키보드 로컬 좌표로 합친다.
+        /// 편집 대상의 파츠 변환과 서브메시를 사용하며 합친 메시 또는 파츠가 없으면 null을 반환한다.
+        /// </summary>
+        private Mesh CreateCasePreviewMesh()
+        {
+            List<CombineInstance> parts = new List<CombineInstance>();
+            Matrix4x4 keyboardInverse = _caseCustomization.transform.worldToLocalMatrix;
+            foreach (MeshRenderer renderer in _caseCustomization.CaseRenderers)
+            {
+                MeshFilter filter = renderer != null ? renderer.GetComponent<MeshFilter>() : null;
+                if (filter == null || filter.sharedMesh == null)
+                    continue;
+
+                for (int subMesh = 0; subMesh < filter.sharedMesh.subMeshCount; subMesh++)
+                {
+                    parts.Add(new CombineInstance
+                    {
+                        mesh = filter.sharedMesh,
+                        subMeshIndex = subMesh,
+                        transform = keyboardInverse * renderer.transform.localToWorldMatrix
+                    });
+                }
+            }
+
+            if (parts.Count == 0)
+                return null;
+
+            Mesh mesh = new Mesh { name = "CasePreviewMesh", indexFormat = IndexFormat.UInt32 };
+            mesh.CombineMeshes(parts.ToArray(), true, true);
+            return mesh;
+        }
+
+        /// <summary>
+        /// 케이스 재질 텍스처마다 이름 없는 선택 버튼과 선택 표시를 만든다.
+        /// content와 previews를 사용하며 원본 재질 인덱스와 버튼 참조를 저장한다.
+        /// </summary>
+        private void CreateCasePreviewItems(RectTransform content, Texture2D[] previews)
+        {
+            float stride = _itemWidth + _itemSpacing;
+            for (int index = 0; index < previews.Length; index++)
+            {
+                if (previews[index] == null)
+                    continue;
+
+                GameObject itemObject = new GameObject(
+                    "CaseMaterialPreview", typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton));
+                RectTransform itemRect = itemObject.GetComponent<RectTransform>();
+                itemRect.SetParent(content, false);
+                itemRect.anchorMin = new Vector2(0f, 0.5f);
+                itemRect.anchorMax = new Vector2(0f, 0.5f);
+                itemRect.pivot = new Vector2(0.5f, 0.5f);
+                itemRect.anchoredPosition = new Vector2(index * stride + _itemWidth * 0.5f, 0f);
+                itemRect.sizeDelta = new Vector2(_itemWidth, 116f);
+                Image itemImage = itemObject.GetComponent<Image>();
+                itemImage.color = Color.clear;
+                itemImage.raycastTarget = true;
+
+                GameObject imageObject = new GameObject("CasePreviewImage", typeof(RectTransform), typeof(RawImage));
+                RectTransform imageRect = imageObject.GetComponent<RectTransform>();
+                imageRect.SetParent(itemRect, false);
+                imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+                imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+                imageRect.anchoredPosition = new Vector2(0f, 5f);
+                imageRect.sizeDelta = new Vector2(92f, 92f);
+                RawImage image = imageObject.GetComponent<RawImage>();
+                image.texture = previews[index];
+                image.raycastTarget = false;
+
+                KeyboardEditButton button = itemObject.GetComponent<KeyboardEditButton>();
+                button.targetGraphic = image;
+                button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+                GameObject indicatorObject = new GameObject("SelectedIndicator", typeof(RectTransform), typeof(Image));
+                RectTransform indicatorRect = indicatorObject.GetComponent<RectTransform>();
+                indicatorRect.SetParent(itemRect, false);
+                indicatorRect.anchorMin = new Vector2(0.5f, 0f);
+                indicatorRect.anchorMax = new Vector2(0.5f, 0f);
+                indicatorRect.pivot = new Vector2(0.5f, 0f);
+                indicatorRect.anchoredPosition = new Vector2(0f, 2f);
+                indicatorRect.sizeDelta = new Vector2(48f, 3f);
+                Image indicator = indicatorObject.GetComponent<Image>();
+                indicator.color = new Color(0.36f, 0.82f, 1f, 1f);
+                indicator.raycastTarget = false;
+
+                _casePreviewButtons.Add(button);
+                _caseMaterialIndices.Add(index);
+                _caseSelectionIndicators.Add(indicator);
+            }
+        }
+
+        /// <summary>
+        /// 목록이 소유한 미리보기 텍스처를 해제한다.
+        /// textures의 생성된 텍스처를 파괴하고 목록을 비운다.
+        /// </summary>
+        private void DestroyPreviewTextures(List<Texture2D> textures)
+        {
+            foreach (Texture2D texture in textures)
+            {
+                if (texture != null)
+                    Destroy(texture);
+            }
+
+            textures.Clear();
+        }
+
+        /// <summary>
         /// 선택한 편집 항목에 해당하는 목록만 표시한다.
-        /// mode와 두 viewport를 사용하며 표시할 목록의 종류와 활성 상태를 변경한다.
+        /// mode와 각 viewport를 사용하며 표시할 목록의 종류와 활성 상태를 변경한다.
         /// </summary>
         private void SetPickerMode(PickerMode mode)
         {
@@ -592,6 +815,10 @@ namespace Game.Player
             }
 
             _switchSoundViewport.gameObject.SetActive(_pickerMode == PickerMode.SwitchSound);
+            if (_caseMaterialViewport != null)
+            {
+                _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial);
+            }
         }
 
         /// <summary>

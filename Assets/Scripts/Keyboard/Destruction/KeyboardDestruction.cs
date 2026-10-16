@@ -105,6 +105,27 @@ public sealed class KeyboardDestruction : MonoBehaviour
     public void ConfigureRequiredBrokenCount(int count) { _requiredBrokenCount = Mathf.Max(1, count); }
 
     /// <summary>
+    /// 복구 후 추적 대상 키캡의 현재 체력을 사용해 남은 수량과 파괴 이벤트 구독을 갱신한다.
+    /// 초기화된 대상 목록을 사용하며 완파 연출이 시작된 키보드의 상태는 변경하지 않는다.
+    /// </summary>
+    public void RefreshKeycapTracking()
+    {
+        if (_requiredKeycaps == null || IsBroken)
+            return;
+
+        _remainingKeycaps = 0;
+        foreach (KeycapHealth health in _requiredKeycaps)
+        {
+            health.Broken -= OnKeycapBroken;
+            if (health.CurrentHP <= 0)
+                continue;
+
+            _remainingKeycaps++;
+            health.Broken += OnKeycapBroken;
+        }
+    }
+
+    /// <summary>
     /// 파괴 대상 키캡들과 파편 프리팹, 콜백들을 전달받아 키보드 완파 추적을 시작한다.
     /// requiredKeycaps 키캡 목록, fragmentsPrefab 파편 프리팹, fistSprite 주먹 이미지, onBreaking/onFinished 콜백, configureFistAnimation 설정 델리게이트를 사용한다.
     /// 키캡들의 Broken 이벤트를 구독하고 파편 프레젠터를 초기화한다.

@@ -82,7 +82,7 @@ namespace Game.Tournament
                 {
                     SpecialKeycapType type = _controller.GetOffer(index);
                     string sold = _controller.IsPurchased(index) ? "구매 완료" : $"{_controller.Settings.GetPrice(type)} 재화";
-                    _offerCards[index].Show(type, _controller.Settings.BundleSize);
+                    _offerCards[index].Show(type, _controller.Settings.GetBundleSize(type));
                     _buyButtons[index].SetState(sold, _controller.CanBuy(index));
                 }
             if (phase == TournamentPhase.Discard)

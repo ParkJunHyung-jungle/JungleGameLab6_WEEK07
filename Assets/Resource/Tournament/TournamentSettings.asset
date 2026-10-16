@@ -14,27 +14,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.TournamentSettings
   _battleDuration: 30
   _keycapHealth: 5
-  _capacity: 26
+  _capacity: 80
   _scorePerCurrency: 100
   _bundleSize: 3
   _rerollCost: 5
   _rerollLimit: 3
-  _prices: 0000000050000000640000003c0000003c00000064000000
+  _prices: 0000000028000000640000003c0000003c00000032000000
   _currencyRewardMultiplier: 1.2
   _goldRewards: 32000000280000001e0000000a000000
   _rounds:
-  - _attacksPerSecond: 12
+  - _attacksPerSecond: 13.2
     _damage: 2
     _specialCount: 0
-  - _attacksPerSecond: 14
+  - _attacksPerSecond: 15.4
     _damage: 2
-    _specialCount: 5
-  - _attacksPerSecond: 16
+    _specialCount: 0
+  - _attacksPerSecond: 17.6
     _damage: 2
-    _specialCount: 10
-  - _attacksPerSecond: 18
+    _specialCount: 0
+  - _attacksPerSecond: 19.8
     _damage: 2
-    _specialCount: 15
-  - _attacksPerSecond: 20
+    _specialCount: 0
+  - _attacksPerSecond: 22
     _damage: 2
-    _specialCount: 20
+    _specialCount: 0

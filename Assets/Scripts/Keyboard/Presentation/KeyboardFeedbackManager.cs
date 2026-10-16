@@ -298,9 +298,9 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     /// <summary>
     /// 충격파 링 애니메이션과 주변 키캡들의 시각적 출렁임 애니메이션을 재생한다.
     /// keyboard, keycaps, positions 배열과 targetIndex 타격 인덱스, 키캡 도달 시 호출할 onKeycapReached 콜백을 입력으로 받는다.
-    /// onStarted로 유효한 실행 시작을 알리고 코루틴으로 링과 키캡 물결 변위를 갱신한다.
+    /// onStarted로 실행 시작을 알리고 travelDuration이 양수이면 가장 먼 키까지의 전파 시간을 지정하여 물결 변위를 갱신한다.
     /// </summary>
-    public void PlayHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex, Action<KeycapHealth> onKeycapReached = null, bool showRing = true, bool requireInput = true, Action onStarted = null)
+    public void PlayHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, int targetIndex, Action<KeycapHealth> onKeycapReached = null, bool showRing = true, bool requireInput = true, Action onStarted = null, float travelDuration = 0f)
     {
         if (keyboard == null || keycaps == null || targetIndex < 0 || targetIndex >= keycaps.Length)
         {
@@ -317,7 +317,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
         Bounds bounds = shell.sharedMesh.bounds;
         Vector3 contact = keyboard.transform.InverseTransformPoint(shell.transform.TransformPoint(bounds.center + Vector3.up * bounds.extents.y));
-        StartCoroutine(SpreadHammerShockwave(keyboard, keycaps, positions, positions[targetIndex], contact.y + 0.03f, onKeycapReached, showRing, requireInput, onStarted));
+        StartCoroutine(SpreadHammerShockwave(keyboard, keycaps, positions, positions[targetIndex], contact.y + 0.03f, onKeycapReached, showRing, requireInput, onStarted, travelDuration));
     }
 
     /// <summary>
@@ -993,9 +993,9 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
     /// <summary>
     /// 중심에서 바깥으로 퍼져나가는 충격파 링과 키캡 물결 변위를 계산하여 표시한다.
     /// keyboard와 keycaps 배열, positions 좌표, center 중심과 planeHeight 높이, onKeycapReached 콜백을 사용한다.
-    /// 최초 진행 시 onStarted와 각 키캡 도달 시 onKeycapReached를 호출하고 종료 시 변위를 복원한다.
+    /// travelDuration으로 전파 시간을 조정하고 최초 진행 시 onStarted와 키캡 도달 시 onKeycapReached를 호출하며 종료 시 변위를 복원한다.
     /// </summary>
-    private IEnumerator SpreadHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, Vector2 center, float planeHeight, Action<KeycapHealth> onKeycapReached, bool showRing, bool requireInput, Action onStarted)
+    private IEnumerator SpreadHammerShockwave(KeyboardInputController keyboard, KeycapHealth[] keycaps, Vector2[] positions, Vector2 center, float planeHeight, Action<KeycapHealth> onKeycapReached, bool showRing, bool requireInput, Action onStarted, float travelDuration)
     {
         float speed = Mathf.Max(0.01f, _hammerAnimation.WaveSpeed);
         float height = _hammerAnimation.WaveHeight;
@@ -1013,6 +1013,14 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         {
             arrivalTimes[index] = Vector2.Distance(center, positions[index]) / speed;
             maxArrival = Mathf.Max(maxArrival, arrivalTimes[index]);
+        }
+
+        if (travelDuration > 0f && maxArrival > 0f)
+        {
+            float scale = travelDuration / maxArrival;
+            for (int index = 0; index < keycaps.Length; index++) arrivalTimes[index] *= scale;
+            speed /= scale;
+            maxArrival = travelDuration;
         }
 
         float duration = maxArrival + rippleDuration;
@@ -1083,7 +1091,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             }
 
             yield return null;
-            elapsed += Mathf.Min(Time.deltaTime, 1f / 30f);
+            elapsed += travelDuration > 0f ? Time.deltaTime : Mathf.Min(Time.deltaTime, 1f / 30f);
         }
 
         if (keyboard.gameObject.activeInHierarchy && (!requireInput || (keyboard.InputEnabled && keyboard.isActiveAndEnabled)))

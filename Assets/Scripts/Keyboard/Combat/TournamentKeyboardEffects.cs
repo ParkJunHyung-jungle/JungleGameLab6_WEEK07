@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -16,6 +17,7 @@ namespace Game.Tournament
 
         [Header("Runtime")]
         private readonly Queue<int> _pending = new Queue<int>();
+        private readonly HashSet<int> _delayedExplosions = new HashSet<int>();
         private readonly Dictionary<KeycapHealth, int> _indices = new Dictionary<KeycapHealth, int>();
         private TournamentController _tournament;
         private KeyboardScoreCombo _score;
@@ -35,15 +37,16 @@ namespace Game.Tournament
 
         /// <summary>
         /// tournament와 inventory, score 및 layout으로 새 키보드의 체력, 특수 유형과 행열을 구성한다.
-        /// 보유 수량을 A~Z 무작위 칸에 배치하고 파괴 이벤트를 등록하며 보유 목록은 소모하지 않는다.
+        /// 보유 수량을 시스템 키를 제외한 80개 무작위 칸에 배치하고 파괴 이벤트를 등록하며 보유 목록은 소모하지 않는다.
         /// </summary>
         public void Initialize(TournamentController tournament, TournamentInventory inventory, KeyboardScoreCombo score, TournamentKeyLayout layout, int health, Material[] materials)
         {
             _tournament = tournament;
             _score = score;
             _keyboard = GetComponent<KeyboardInputController>();
-            _keyboard.UseAlphabetDestructionKeys();
+            _keyboard.UseAllDestructionKeys();
             _destruction = GetComponent<KeyboardDestruction>();
+            _destruction.ConfigureRequiredBrokenCount(25);
             _feedback = GetComponent<KeyboardFeedbackManager>();
             IReadOnlyDictionary<Key, KeycapHealth> bindings = _keyboard.GetKeycapLayout();
             Dictionary<Key, Vector2Int> coordinates = layout.CreateCoordinates();
@@ -63,7 +66,7 @@ namespace Game.Tournament
                 Vector3 position = transform.InverseTransformPoint(binding.Value.transform.position);
                 _positions[index] = new Vector2(position.x, position.z);
                 binding.Value.ConfigureTournamentHealth(health);
-                if (binding.Key >= Key.A && binding.Key <= Key.Z) slots.Add(index);
+                if (CanPlaceSpecial(binding.Key)) slots.Add(index);
                 _indices.Add(binding.Value, index++);
             }
             _neighbors = new KeyboardNeighborLayout(_positions);
@@ -76,6 +79,13 @@ namespace Game.Tournament
                 _keycaps[slot].Broken += HandleBroken;
                 _keycaps[slot].GetComponent<SpecialKeycapPresenter>().Initialize(_keycaps[slot], type, materials[(int)type - 1]);
             }
+        }
+
+        /// <summary>key가 좌우 Ctrl, Alt, Windows 또는 메뉴 키인지 확인하여 특수 키캡 배치 가능 여부를 반환한다.</summary>
+        private bool CanPlaceSpecial(Key key)
+        {
+            return key != Key.LeftCtrl && key != Key.RightCtrl && key != Key.LeftAlt && key != Key.RightAlt
+                && key != Key.LeftMeta && key != Key.RightMeta && key != Key.ContextMenu;
         }
 
         /// <summary>keycap의 파괴 효과를 예약하고 보너스는 먼저 활성화하여 해당 파괴 점수부터 적용한다.</summary>
@@ -113,17 +123,17 @@ namespace Game.Tournament
                 {
                     bool started = false;
                     _feedback.PlayHammerShockwave(_keyboard, _keycaps, _positions, center, ApplyWaveDamage, false, false,
-                        () => { started = true; ObserveEffect(center, "Activated", ""); });
+                        () => { started = true; ObserveEffect(center, "Activated", ""); }, travelDuration: 2f);
                     if (!started) ObserveEffect(center, "Skipped", "WaveUnavailable");
                     continue;
                 }
-                ObserveEffect(center, "Activated", "");
                 if (type == SpecialKeycapType.Explosion)
                 {
-                    int count = Mathf.Min(12, _neighbors.GetNeighborCount(center));
-                    for (int index = 0; index < count; index++) ApplyDamage(_neighbors.GetNeighbor(center, index), 5);
+                    _delayedExplosions.Add(center);
+                    StartCoroutine(ExplodeAfterDelay(center));
                     continue;
                 }
+                ObserveEffect(center, "Activated", "");
                 for (int index = 0; index < _keycaps.Length; index++)
                 {
                     bool sameLine = type == SpecialKeycapType.Row
@@ -132,6 +142,29 @@ namespace Game.Tournament
                     if (sameLine) ApplyDamage(index, 3);
                 }
             }
+        }
+
+        /// <summary>
+        /// center 키캡의 파괴 효과를 0.25초 지연한 뒤 주변 12칸에 피해 5를 적용한다.
+        /// 대전 종료나 완파 시 취소를 기록하고 지연 중인 폭발 목록에서 제거한다.
+        /// </summary>
+        private IEnumerator ExplodeAfterDelay(int center)
+        {
+            float elapsed = 0f;
+            while (elapsed < 0.25f && _tournament.IsBattleActive && !_destruction.IsBroken)
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+            _delayedExplosions.Remove(center);
+            if (!_tournament.IsBattleActive || _destruction.IsBroken)
+            {
+                ObserveEffect(center, "Cancelled", !_tournament.IsBattleActive ? "BattleInactive" : "KeyboardBroken");
+                yield break;
+            }
+            ObserveEffect(center, "Activated", "");
+            int count = Mathf.Min(12, _neighbors.GetNeighborCount(center));
+            for (int index = 0; index < count; index++) ApplyDamage(_neighbors.GetNeighbor(center, index), 5);
         }
 
         /// <summary>index의 살아 있는 키에 damage를 적용하며 종료된 대전과 완파 상태의 지연 피해는 무시한다.</summary>
@@ -187,6 +220,8 @@ namespace Game.Tournament
         void OnDestroy()
         {
             CancelPendingEffects("KeyboardDestroyed");
+            foreach (int center in _delayedExplosions) ObserveEffect(center, "Cancelled", "KeyboardDestroyed");
+            _delayedExplosions.Clear();
             foreach (KeycapHealth keycap in _indices.Keys)
                 if (keycap != null) keycap.Broken -= HandleBroken;
         }

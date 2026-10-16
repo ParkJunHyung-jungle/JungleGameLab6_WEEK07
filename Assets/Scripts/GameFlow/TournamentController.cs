@@ -108,11 +108,7 @@ namespace Game.Tournament
             Phase = TournamentPhase.Preparing;
             _message = suddenDeath ? "연장전 · 새 키보드를 먼저 완파하면 승리" : $"{Round} / {_settings.RoundCount} 대전 준비";
             RobotRound robot = _settings.GetRound(Round);
-            if (!suddenDeath)
-            {
-                while (_enemyInventory.Total < Mathf.Min(robot.SpecialCount, _settings.Capacity))
-                    _enemyInventory.TryAdd((SpecialKeycapType)UnityEngine.Random.Range(1, 6), 1);
-            }
+
             _enemy.ConfigureTournamentAttack(robot.AttacksPerSecond, robot.Damage);
             _manager.BeginTournamentBattle(_settings.BattleDuration, suddenDeath);
             Changed?.Invoke();
@@ -212,7 +208,7 @@ namespace Game.Tournament
                 _purchased[index] = false;
             }
             for (int index = 0; index < _offers.Length; index++)
-                ObserveShopAction("OfferPresented", index, _offers[index], _settings.BundleSize,
+                ObserveShopAction("OfferPresented", index, _offers[index], _settings.GetBundleSize(_offers[index]),
                     _settings.GetPrice(_offers[index]), Currency, false);
         }
 
@@ -249,9 +245,9 @@ namespace Game.Tournament
             Array.Clear(_pendingDiscards, 0, _pendingDiscards.Length);
             _shopTransactionId = Guid.NewGuid().ToString("N");
             _pendingOffer = index;
-            _pendingInventory = new TournamentInventory(_inventory, _settings.Capacity + _settings.BundleSize);
-            _pendingInventory.TryAdd(_offers[index], _settings.BundleSize);
-            ObserveShopAction("PurchaseSelected", index, _offers[index], _settings.BundleSize,
+            _pendingInventory = new TournamentInventory(_inventory, _settings.Capacity + _settings.GetBundleSize(_offers[index]));
+            _pendingInventory.TryAdd(_offers[index], _settings.GetBundleSize(_offers[index]));
+            ObserveShopAction("PurchaseSelected", index, _offers[index], _settings.GetBundleSize(_offers[index]),
                 _settings.GetPrice(_offers[index]), Currency, false);
             if (RequiredDiscards > 0)
             {
@@ -275,7 +271,7 @@ namespace Game.Tournament
             Changed?.Invoke();
         }
 
-        /// <summary>정리된 구매 후보를 확정하고 상품 가격을 차감하며 현재 토너먼트 보유 수량에 반영한다.</summary>
+        /// <summary>정리된 구매 후보를 확정하고 상품 가격을 차감하며 플레이어와 로봇의 보유 구성을 동일하게 갱신한다.</summary>
         public void ConfirmPurchase()
         {
             if (_pendingInventory == null || RequiredDiscards != 0) return;
@@ -283,9 +279,10 @@ namespace Game.Tournament
             Currency -= _settings.GetPrice(_offers[_pendingOffer]);
             _purchased[_pendingOffer] = true;
             _inventory = new TournamentInventory(_pendingInventory, _settings.Capacity);
+            _enemyInventory = new TournamentInventory(_inventory, _settings.Capacity);
             _pendingInventory = null;
             Phase = TournamentPhase.Shop;
-            ObserveShopAction("PurchaseConfirmed", _pendingOffer, _offers[_pendingOffer], _settings.BundleSize,
+            ObserveShopAction("PurchaseConfirmed", _pendingOffer, _offers[_pendingOffer], _settings.GetBundleSize(_offers[_pendingOffer]),
                 _settings.GetPrice(_offers[_pendingOffer]), currencyBefore, true);
             for (int type = 1; type < _pendingDiscards.Length; type++)
                 if (_pendingDiscards[type] > 0)
@@ -301,7 +298,7 @@ namespace Game.Tournament
         public void CancelPurchase()
         {
             if (Phase != TournamentPhase.Discard) return;
-            ObserveShopAction("PurchaseCancelled", _pendingOffer, _offers[_pendingOffer], _settings.BundleSize,
+            ObserveShopAction("PurchaseCancelled", _pendingOffer, _offers[_pendingOffer], _settings.GetBundleSize(_offers[_pendingOffer]),
                 _settings.GetPrice(_offers[_pendingOffer]), Currency, false);
             _pendingInventory = null;
             _pendingOffer = -1;

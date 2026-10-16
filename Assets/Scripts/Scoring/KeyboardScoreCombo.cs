@@ -12,6 +12,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 {
     private const int BASE_SCORE = 10;
     private const int KEYCAP_BREAK_SCORE = 10;
+    private const int KEYBOARD_BREAK_SCORE = 100;
 
     [Header("Input")]
     [SerializeField] private KeyboardInputController _keyboard;
@@ -135,6 +136,14 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
         _score = 0;
         _bonusRemaining = 0f;
         ResetCombo();
+    }
+
+    /// <summary>점수 수집 중 키보드 파괴 보상 100점을 배율 없이 추가하고 화면에 변경 상태를 알린다.</summary>
+    public void AddKeyboardBreakScore()
+    {
+        if (!_isTracking || !isActiveAndEnabled) return;
+        _score += KEYBOARD_BREAK_SCORE;
+        StateChanged?.Invoke();
     }
 
     /// <summary>duration초 동안 점수 2배를 적용하며 효과 중 재발동하면 남은 시간을 갱신한다.</summary>

@@ -490,6 +490,7 @@ public class GameManager : MonoBehaviour
         // 키보드 완파 연출 및 교환 완료 전까지 콤보 타이머 감소만 일시정지한다.
         if (_comboHUD != null)
         {
+            _comboHUD.AddKeyboardBreakScore();
             _comboHUD.SetTimerPaused(true);
         }
 
@@ -843,6 +844,7 @@ public class GameManager : MonoBehaviour
         // 로봇 키보드 교환 완료 전까지 콤보 타이머 감소를 일시정지한다.
         if (_enemyScoreCombo != null)
         {
+            _enemyScoreCombo.AddKeyboardBreakScore();
             _enemyScoreCombo.SetTimerPaused(true);
         }
     }

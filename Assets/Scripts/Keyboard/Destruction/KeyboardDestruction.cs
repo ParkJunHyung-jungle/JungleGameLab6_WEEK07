@@ -24,6 +24,8 @@ public sealed class KeyboardDestruction : MonoBehaviour
     private Action _onFinished;
     private Action<KeyboardDestruction> _configureFistAnimation;
     private int _remainingKeycaps;
+    private int _requiredBrokenCount;
+    private int _remainingThreshold;
 
     public bool IsBroken { get; private set; }
 
@@ -99,6 +101,9 @@ public sealed class KeyboardDestruction : MonoBehaviour
             null);
     }
 
+    /// <summary>count개 파괴 시 키보드를 파괴하도록 지정하며 초기화 전 파괴 필요 수량을 저장한다.</summary>
+    public void ConfigureRequiredBrokenCount(int count) { _requiredBrokenCount = Mathf.Max(1, count); }
+
     /// <summary>
     /// 파괴 대상 키캡들과 파편 프리팹, 콜백들을 전달받아 키보드 완파 추적을 시작한다.
     /// requiredKeycaps 키캡 목록, fragmentsPrefab 파편 프리팹, fistSprite 주먹 이미지, onBreaking/onFinished 콜백, configureFistAnimation 설정 델리게이트를 사용한다.
@@ -119,6 +124,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
 
         EnsureFragmentPresenter().Initialize(fragmentsPrefab);
 
+        _remainingThreshold = _requiredBrokenCount > 0 ? Mathf.Max(0, _requiredKeycaps.Count - _requiredBrokenCount) : 0;
         _remainingKeycaps = 0;
         foreach (KeycapHealth health in _requiredKeycaps)
         {
@@ -153,16 +159,16 @@ public sealed class KeyboardDestruction : MonoBehaviour
     }
 
     /// <summary>
-    /// 키캡 파괴 알림을 수신하여 남은 키캡 수를 줄이고, 모두 파괴되면 완파 처리를 시작한다.
+    /// 키캡 파괴 알림을 수신하여 남은 키캡 수를 줄이고 설정된 잔여 수량 이하가 되면 키보드 파괴를 시작한다.
     /// health 파괴된 키캡 컴포넌트를 사용한다.
-    /// _remainingKeycaps가 0에 도달하면 IsBroken을 true로 변경하고 파편 프레젠터를 실행한다.
+    /// _remainingKeycaps가 _remainingThreshold 이하가 되면 IsBroken을 true로 변경하고 파편 프레젠터를 실행한다.
     /// </summary>
     private void OnKeycapBroken(KeycapHealth health)
     {
         health.Broken -= OnKeycapBroken;
         _remainingKeycaps--;
 
-        if (_remainingKeycaps != 0 || IsBroken)
+        if (_remainingKeycaps > _remainingThreshold || IsBroken)
         {
             return;
         }

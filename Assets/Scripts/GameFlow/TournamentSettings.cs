@@ -13,14 +13,14 @@ namespace Game.Tournament
         [Header("Tournament")]
         [SerializeField, Min(1f)] private float _battleDuration = 30f;
         [SerializeField, Min(1)] private int _keycapHealth = 5;
-        [SerializeField, Min(1)] private int _capacity = 26;
+        [SerializeField, Min(1)] private int _capacity = 80;
 
         [Header("Shop")]
         [SerializeField, Min(1)] private int _scorePerCurrency = 100;
         [SerializeField, Min(1)] private int _bundleSize = 3;
         [SerializeField, Min(0)] private int _rerollCost = 5;
         [SerializeField, Min(1)] private int _rerollLimit = 3;
-        [SerializeField] private int[] _prices = { 0, 80, 100, 60, 60, 100 };
+        [SerializeField] private int[] _prices = { 0, 40, 100, 60, 60, 50 };
 
         [Header("Rewards")]
         [SerializeField, Min(0f)] private float _currencyRewardMultiplier = 1.2f;
@@ -29,9 +29,9 @@ namespace Game.Tournament
         [Header("Robot Rounds")]
         [SerializeField] private RobotRound[] _rounds =
         {
-            new RobotRound(12f, 2, 0), new RobotRound(14f, 2, 5),
-            new RobotRound(16f, 2, 10), new RobotRound(18f, 2, 15),
-            new RobotRound(20f, 2, 20)
+            new RobotRound(13.2f, 2, 0), new RobotRound(15.4f, 2, 0),
+            new RobotRound(17.6f, 2, 0), new RobotRound(19.8f, 2, 0),
+            new RobotRound(22f, 2, 0)
         };
 
         public float BattleDuration => _battleDuration;
@@ -39,7 +39,8 @@ namespace Game.Tournament
         public int Capacity => _capacity;
         public int ScorePerCurrency => _scorePerCurrency;
         public float CurrencyRewardMultiplier => _currencyRewardMultiplier;
-        public int BundleSize => _bundleSize;
+        /// <summary>type이 폭발 또는 전체 타격이면 1개, 그 외에는 설정된 판매 수량을 반환한다.</summary>
+        public int GetBundleSize(SpecialKeycapType type) => type == SpecialKeycapType.Explosion || type == SpecialKeycapType.All ? 1 : _bundleSize;
         public int RerollCost => _rerollCost;
         public int RerollLimit => _rerollLimit;
         public int RoundCount => _rounds.Length;

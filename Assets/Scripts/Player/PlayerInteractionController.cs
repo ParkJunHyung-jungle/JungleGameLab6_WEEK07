@@ -28,6 +28,7 @@ namespace Game.Player
     public sealed class PlayerInteractionController : MonoBehaviour
     {
         private const float KEYBOARD_EDIT_ROTATION_SENSITIVITY = 0.2f;
+        private const float INTERACTION_PROMPT_CURSOR_OFFSET = 24f;
 
         [Header("Interaction")]
         [SerializeField] private Camera _camera;
@@ -37,6 +38,11 @@ namespace Game.Player
         [SerializeField] private float _interactionDistance = 3f;
         [SerializeField] private LayerMask _interactionLayers = ~0;
         [SerializeField] private Text _interactionPrompt;
+        private RectTransform _interactionPromptRectTransform;
+        private Vector2 _interactionPromptDefaultAnchorMin;
+        private Vector2 _interactionPromptDefaultAnchorMax;
+        private Vector2 _interactionPromptDefaultPivot;
+        private Vector2 _interactionPromptDefaultAnchoredPosition;
         private readonly RaycastHit[] _interactionHits = new RaycastHit[32];
 
         [Header("Keyboard Cover")]
@@ -60,9 +66,10 @@ namespace Game.Player
         [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
         [SerializeField] private GameObject _keyboardEditOverlay;
         [SerializeField] private GameObject _centerReticle;
-        [SerializeField, Range(0.1f, 1f)] private float _keyboardEditMinZoom = 0.5f;
-        [SerializeField, Min(1f)] private float _keyboardEditMaxZoom = 2f;
-        [SerializeField, Min(0.01f)] private float _keyboardEditZoomStep = 0.1f;
+        [SerializeField, Range(1f, 179f)] private float _keyboardEditMinFieldOfView = 40f;
+        [SerializeField, Range(1f, 179f)] private float _keyboardEditMaxFieldOfView = 100f;
+        [SerializeField, Min(0.01f)] private float _keyboardEditFieldOfViewStep = 0.1f;
+        private CinemachineCamera _editingCinemachineCamera;
         private KeyboardEditOverlayUI _keyboardEditOverlayUI;
         private KeyboardInputController _editingKeyboard;
         private Coroutine _cameraTransition;
@@ -72,11 +79,10 @@ namespace Game.Player
         private bool _cameraInputWasEnabled;
         private bool _isKeyboardEditMode;
         private Rigidbody _editingKeyboardBody;
+        private float _savedCameraFieldOfView;
         private InputAction _keyboardResetInput;
         private Quaternion _initialEditingKeyboardRotation;
         private Vector3 _editingKeyboardCenterOffset;
-        private Vector3 _initialEditingKeyboardScale;
-        private float _editingKeyboardZoom = 1f;
         private bool _isDraggingEditingKeyboard;
         private Vector2 _pendingKeyboardRotationDelta;
         private readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
@@ -88,11 +94,20 @@ namespace Game.Player
             if (_camera == null)
                 _camera = Camera.main;
 
+            _interactionPromptRectTransform = _interactionPrompt.rectTransform;
+            _interactionPromptDefaultAnchorMin = _interactionPromptRectTransform.anchorMin;
+            _interactionPromptDefaultAnchorMax = _interactionPromptRectTransform.anchorMax;
+            _interactionPromptDefaultPivot = _interactionPromptRectTransform.pivot;
+            _interactionPromptDefaultAnchoredPosition = _interactionPromptRectTransform.anchoredPosition;
+
             if (_cameraPanTilt == null)
                 _cameraPanTilt = GetComponentInChildren<CinemachinePanTilt>();
 
             if (_cameraInputAxisController == null)
                 _cameraInputAxisController = GetComponentInChildren<CinemachineInputAxisController>();
+
+            if (_cameraPanTilt != null)
+                _editingCinemachineCamera = _cameraPanTilt.GetComponent<CinemachineCamera>();
 
             if (_moveInput == null)
                 _moveInput = FindMoveInputReference();
@@ -156,7 +171,7 @@ namespace Game.Player
         {
             UpdateInteractionPrompt();
             CaptureEditingKeyboardMouseDelta();
-            UpdateEditingKeyboardZoom();
+            UpdateEditingCameraZoom();
         }
 
         /// <summary>
@@ -325,6 +340,28 @@ namespace Game.Player
 
             _interactionPrompt.text = prompt;
             _interactionPrompt.enabled = prompt.Length > 0;
+            UpdateInteractionPromptPosition();
+        }
+
+        /// <summary>
+        /// 필드에서는 조준점 아래에 안내를 놓고 편집 모드에서는 저장된 하단 배치를 복원한다.
+        /// 편집 상태와 초기 RectTransform 값을 사용해 안내 UI의 기준점과 위치를 갱신한다.
+        /// </summary>
+        private void UpdateInteractionPromptPosition()
+        {
+            if (_isKeyboardEditMode)
+            {
+                _interactionPromptRectTransform.anchorMin = _interactionPromptDefaultAnchorMin;
+                _interactionPromptRectTransform.anchorMax = _interactionPromptDefaultAnchorMax;
+                _interactionPromptRectTransform.pivot = _interactionPromptDefaultPivot;
+                _interactionPromptRectTransform.anchoredPosition = _interactionPromptDefaultAnchoredPosition;
+                return;
+            }
+
+            _interactionPromptRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            _interactionPromptRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            _interactionPromptRectTransform.pivot = new Vector2(0.5f, 1f);
+            _interactionPromptRectTransform.anchoredPosition = new Vector2(0f, -INTERACTION_PROMPT_CURSOR_OFFSET);
         }
 
         /// <summary>
@@ -367,16 +404,19 @@ namespace Game.Player
                 || _moveInput == null
                 || _moveInput.action == null
                 || _cameraPanTilt == null
-                || _cameraInputAxisController == null)
+                || _cameraInputAxisController == null
+                || _editingCinemachineCamera == null)
             {
                 Debug.LogError(
                     $"키보드 편집 모드 참조 누락: Camera={_camera != null}, " +
                     $"MoveInput={_moveInput?.action != null}, PanTilt={_cameraPanTilt != null}, " +
-                    $"CameraInput={_cameraInputAxisController != null}.",
+                    $"CameraInput={_cameraInputAxisController != null}, " +
+                    $"CinemachineCamera={_editingCinemachineCamera != null}.",
                     this);
                 return;
             }
 
+            _savedCameraFieldOfView = _editingCinemachineCamera.Lens.FieldOfView;
             _isKeyboardEditMode = true;
             _editingKeyboard = keyboard;
             KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
@@ -392,8 +432,6 @@ namespace Game.Player
 
             _editingKeyboardBody = holder.KeyboardBody;
             _initialEditingKeyboardRotation = holder.InitialKeyboardRotation;
-            _initialEditingKeyboardScale = _editingKeyboardBody.transform.localScale;
-            _editingKeyboardZoom = 1f;
             KeyboardPickupTarget pickupTarget = _editingKeyboardBody.GetComponent<KeyboardPickupTarget>();
             _editingKeyboardCenterOffset = pickupTarget.GetVisualCenterLocalPosition(_editingKeyboardBody.transform);
             _savedPlayerPosition = transform.position;
@@ -448,7 +486,6 @@ namespace Game.Player
         {
             _isKeyboardEditMode = false;
             StopEditingKeyboardRotation();
-            RestoreEditingKeyboardScale();
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(false);
             if (_centerReticle != null)
@@ -473,13 +510,14 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 시야와 플레이어 위치를 목표 회전 및 위치까지 부드럽게 보간한다.
-        /// targetRotation, targetPlayerPosition, Time.deltaTime을 사용하며 종료 전환 후 조작 상태를 복원한다.
+        /// 현재 시야와 플레이어 위치를 목표 상태까지 보간하고 렌즈 시야각을 원래 값으로 복원한다.
+        /// targetRotation, targetPlayerPosition, Time.deltaTime을 사용해 전환과 편집 줌 복원을 수행한다.
         /// </summary>
         private IEnumerator TransitionCameraRotation(Quaternion targetRotation, Vector3 targetPlayerPosition)
         {
             Vector3 startPlayerPosition = transform.position;
             Quaternion startRotation = _camera.transform.rotation;
+            float startFieldOfView = _editingCinemachineCamera.Lens.FieldOfView;
             float elapsed = 0f;
             while (elapsed < _cameraTransitionDuration)
             {
@@ -488,23 +526,28 @@ namespace Game.Player
                 Quaternion rotation = Quaternion.Slerp(startRotation, targetRotation, progress);
                 transform.position = Vector3.Lerp(startPlayerPosition, targetPlayerPosition, progress);
                 _cameraPanTilt.ForceCameraPosition(_camera.transform.position, rotation);
+                SetEditingCameraFieldOfView(Mathf.Lerp(startFieldOfView, _savedCameraFieldOfView, progress));
                 yield return null;
             }
 
             transform.position = targetPlayerPosition;
             _cameraPanTilt.ForceCameraPosition(_camera.transform.position, targetRotation);
+            yield return null;
+            SetEditingCameraFieldOfView(_savedCameraFieldOfView);
+
             _cameraTransition = null;
             if (!_isKeyboardEditMode)
                 RestoreKeyboardEditInput();
         }
 
         /// <summary>
-        /// 편집 모드 진입 전에 저장한 키보드·이동·카메라 입력과 커서 상태를 복원한다.
-        /// 저장 상태를 사용해 입력을 되돌리고 편집 중인 키보드 참조를 비운다.
+        /// 편집 모드 진입 전에 저장한 렌즈 시야각과 키보드·이동 입력 및 커서 상태를 복원한다.
+        /// 저장 상태를 적용하고 편집 중인 키보드 참조를 비운다.
         /// </summary>
         private void RestoreKeyboardEditInput()
         {
-            RestoreEditingKeyboardScale();
+            SetEditingCameraFieldOfView(_savedCameraFieldOfView);
+
             if (_editingKeyboard != null)
                 _editingKeyboard.SetInputEnabled(false);
 
@@ -575,6 +618,7 @@ namespace Game.Player
             }
 
             Ray pointerRay = _camera.ScreenPointToRay(pointerPosition);
+            float maximumKeyboardHitDistance = _interactionDistance;
             float nearestKeyboardHitDistance = float.PositiveInfinity;
             Renderer[] keyboardRenderers = _editingKeyboardBody.GetComponentsInChildren<Renderer>();
             for (int i = 0; i < keyboardRenderers.Length; i++)
@@ -588,7 +632,7 @@ namespace Game.Player
                 }
             }
 
-            if (nearestKeyboardHitDistance > _interactionDistance
+            if (nearestKeyboardHitDistance > maximumKeyboardHitDistance
                 || float.IsPositiveInfinity(nearestKeyboardHitDistance))
             {
                 return;
@@ -597,7 +641,7 @@ namespace Game.Player
             if (Physics.Raycast(
                     pointerRay,
                     out RaycastHit obstructionHit,
-                    _interactionDistance,
+                    maximumKeyboardHitDistance,
                     _interactionLayers,
                     QueryTriggerInteraction.Ignore)
                 && obstructionHit.distance < nearestKeyboardHitDistance)
@@ -629,10 +673,10 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 편집 중 UI 밖의 휠 입력을 사용해 키보드를 설정된 배율 범위에서 확대하거나 축소한다.
-        /// Mouse.scroll과 감도를 사용하며 카메라 전환 중에는 크기를 변경하지 않는다.
+        /// 편집 중 UI 밖의 휠 입력으로 카메라 렌즈의 시야각을 조절한다.
+        /// Mouse.scroll을 사용하며 시야각을 지정한 최소값과 최대값 사이로 제한한다.
         /// </summary>
-        private void UpdateEditingKeyboardZoom()
+        private void UpdateEditingCameraZoom()
         {
             if (!_isKeyboardEditMode || _cameraTransition != null || _editingKeyboardBody == null)
                 return;
@@ -648,37 +692,24 @@ namespace Game.Player
                 return;
             }
 
-            float zoom = Mathf.Clamp(
-                _editingKeyboardZoom + scrollDelta * _keyboardEditZoomStep,
-                _keyboardEditMinZoom,
-                _keyboardEditMaxZoom);
-            if (!Mathf.Approximately(zoom, _editingKeyboardZoom))
-                SetEditingKeyboardZoom(zoom);
+            float currentFieldOfView = _editingCinemachineCamera.Lens.FieldOfView;
+            float fieldOfView = Mathf.Clamp(
+                currentFieldOfView - scrollDelta * _keyboardEditFieldOfViewStep,
+                _keyboardEditMinFieldOfView,
+                _keyboardEditMaxFieldOfView);
+            if (!Mathf.Approximately(fieldOfView, currentFieldOfView))
+                SetEditingCameraFieldOfView(fieldOfView);
         }
 
         /// <summary>
-        /// 진입 시 저장한 크기에 zoom 배율을 곱하고 키보드의 시각적 중심 위치를 유지한다.
-        /// zoom과 중앙 오프셋을 사용해 localScale, Rigidbody 위치와 현재 배율을 갱신한다.
+        /// Cinemachine 카메라 렌즈에 요청된 시야각을 적용한다.
+        /// fieldOfView를 사용하며 카메라 위치를 바꾸지 않고 렌즈 설정을 갱신한다.
         /// </summary>
-        private void SetEditingKeyboardZoom(float zoom)
+        private void SetEditingCameraFieldOfView(float fieldOfView)
         {
-            Transform keyboardTransform = _editingKeyboardBody.transform;
-            Vector3 visualCenter = keyboardTransform.TransformPoint(_editingKeyboardCenterOffset);
-            keyboardTransform.localScale = _initialEditingKeyboardScale * zoom;
-            _editingKeyboardBody.position = visualCenter - keyboardTransform.TransformVector(_editingKeyboardCenterOffset);
-            _editingKeyboardZoom = zoom;
-        }
-
-        /// <summary>
-        /// 편집 대상과 현재 배율을 확인해 키보드 크기를 편집 진입 전 상태로 복원한다.
-        /// 저장한 원래 크기를 사용하며 종료와 비활성화 시 확대 상태가 남지 않도록 한다.
-        /// </summary>
-        private void RestoreEditingKeyboardScale()
-        {
-            if (_editingKeyboardBody == null || _editingKeyboardZoom == 1f)
-                return;
-
-            SetEditingKeyboardZoom(1f);
+            LensSettings lens = _editingCinemachineCamera.Lens;
+            lens.FieldOfView = fieldOfView;
+            _editingCinemachineCamera.Lens = lens;
         }
 
         /// <summary>

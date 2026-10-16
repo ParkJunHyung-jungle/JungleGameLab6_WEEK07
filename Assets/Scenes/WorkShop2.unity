@@ -385,112 +385,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &92401596
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 92401599}
-  - component: {fileID: 92401598}
-  - component: {fileID: 92401597}
-  m_Layer: 0
-  m_Name: AudioManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &92401597
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 92401596}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d8108d07f7d92284386603c2b5c86b01, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FMODEvents
-  <BlueSwitch>k__BackingField:
-    Guid:
-      Data1: 714337182
-      Data2: 1247155301
-      Data3: 1394622130
-      Data4: -1158505385
-    Path: event:/SFX/KeyBoard/Switch/BlueSwitch
-  <BrownSwitch>k__BackingField:
-    Guid:
-      Data1: -416014041
-      Data2: 1080270025
-      Data3: 2019034516
-      Data4: -896893305
-    Path: event:/SFX/KeyBoard/Switch/BrownSwitch
-  <RedSwitch>k__BackingField:
-    Guid:
-      Data1: 191871004
-      Data2: 1185196984
-      Data3: 302908047
-      Data4: -2044697214
-    Path: event:/SFX/KeyBoard/Switch/Red
-  <SansSwitch>k__BackingField:
-    Guid:
-      Data1: -32070428
-      Data2: 1291412373
-      Data3: 450794891
-      Data4: 1324151617
-    Path: event:/SFX/KeyBoard/Switch/Sans
-  <PopSwitch>k__BackingField:
-    Guid:
-      Data1: 0
-      Data2: 0
-      Data3: 0
-      Data4: 0
-    Path: 
-  <TypewriterSwitch>k__BackingField:
-    Guid:
-      Data1: 0
-      Data2: 0
-      Data3: 0
-      Data4: 0
-    Path: 
-  <BreakKeyCap>k__BackingField:
-    Guid:
-      Data1: -715810010
-      Data2: 1209485294
-      Data3: -1633832268
-      Data4: -29979577
-    Path: event:/SFX/KeyBoard/KeyCaps/BreakKeyCap
---- !u!114 &92401598
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 92401596}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e354989f9e4aaf43afea243816c81d8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AudioManager
---- !u!4 &92401599
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 92401596}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.72933, y: -2.5, z: 1.7231}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &224987655
 GameObject:
   m_ObjectHideFlags: 0
@@ -591,6 +485,63 @@ MonoBehaviour:
   m_EditorClassIdentifier: FMODUnity::FMODUnity.StudioListener
   nonRigidbodyVelocity: 0
   attenuationObject: {fileID: 0}
+--- !u!1001 &439298123
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 270.61206
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 384.09744
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.10663
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6233164409691592997, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_Name
+      value: FmodManager
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
 --- !u!1 &1328842446
 GameObject:
   m_ObjectHideFlags: 0
@@ -1031,6 +982,9 @@ MonoBehaviour:
   _cameraTransitionDuration: 0.45
   _keyboardEditOverlay: {fileID: 9911000020}
   _centerReticle: {fileID: 9911000004}
+  _keyboardEditMinFieldOfView: 40
+  _keyboardEditMaxFieldOfView: 100
+  _keyboardEditFieldOfViewStep: 2
 --- !u!114 &7500000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3518,7 +3472,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
   m_ReferenceResolution: {x: 1920, y: 1080}
@@ -3529,6 +3483,23 @@ MonoBehaviour:
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
   m_PresetInfoIsWorld: 0
+--- !u!114 &9911000009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9911000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &9911000010
 GameObject:
   m_ObjectHideFlags: 0
@@ -3650,43 +3621,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &9911000090
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9911000020}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6e02df7475f546d197008fbd0d8de997, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardEditOverlayUI
-  _keycapButton: {fileID: 9911000091}
-  _switchAxisButton: {fileID: 9911000092}
-  _ledButton: {fileID: 9911000093}
-  _caseButton: {fileID: 9911000128}
-  _customButton: {fileID: 9911000138}
-  _photoStorage: {fileID: 9911000150}
-  _previewKeycapPrefab: {fileID: 2324825244143828177, guid: 1889f29d74f2d354eb36117e3485caa8, type: 3}
-  _keycapMaterials:
-  - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
-  - {fileID: 2100000, guid: 0a1a2ec0d6ed18c459f87b5d181564bf, type: 2}
-  - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
-  - {fileID: 2100000, guid: 994431c627356934b98175a03bb95d66, type: 2}
-  - {fileID: 2100000, guid: ef29bfa57b8eeaa4684755d94aec900c, type: 2}
-  - {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
-  - {fileID: 2100000, guid: 1c359114b88294f4faf80ab69cd546a9, type: 2}
-  - {fileID: 2100000, guid: dc81f37b2d349b54faeb49ad09dc0abf, type: 2}
-  - {fileID: 2100000, guid: b390153fd5970104f9ca9f3f820ea816, type: 2}
-  - {fileID: 2100000, guid: 5629585690d5fc044b4375325e8357fe, type: 2}
-  - {fileID: 2100000, guid: 1930ccd51f7ac86448e47ae31c67e6bc, type: 2}
-  - {fileID: 2100000, guid: 3e7bfabfa1999224ba9d77cbe0feff07, type: 2}
-  - {fileID: 2100000, guid: 7af7cb2be9dfad04da778faf68b830cd, type: 2}
-  _viewportWidth: 860
-  _itemWidth: 98
-  _itemSpacing: 14
-  _wheelScrollSpeed: 0.55
 --- !u!1 &9911000022
 GameObject:
   m_ObjectHideFlags: 0
@@ -4863,63 +4797,43 @@ MonoBehaviour:
   m_Text: "\uD0A4 \uC785\uB825: \uD0A4\uCEA1 \uACF5\uACA9    \xB7    \uC88C\uD074\uB9AD
     \uB4DC\uB798\uADF8: \uD0A4\uBCF4\uB4DC \uD68C\uC804    \xB7    \uD720\uD074\uB9AD:
     \uD0A4\uBCF4\uB4DC \uB9AC\uC14B    \xB7    \uC6B0\uD074\uB9AD: \uD3B8\uC9D1 \uC885\uB8CC"
---- !u!1001 &7000000000000000000
-PrefabInstance:
+--- !u!114 &9911000090
+MonoBehaviour:
   m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1000000000000000001, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_Name
-      value: KeyboardWallRack
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.82
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -4
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9911000020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e02df7475f546d197008fbd0d8de997, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardEditOverlayUI
+  _keycapButton: {fileID: 9911000091}
+  _switchAxisButton: {fileID: 9911000092}
+  _ledButton: {fileID: 9911000093}
+  _caseButton: {fileID: 9911000128}
+  _customButton: {fileID: 9911000138}
+  _previewKeycapPrefab: {fileID: 2324825244143828177, guid: 1889f29d74f2d354eb36117e3485caa8, type: 3}
+  _keycapMaterials:
+  - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
+  - {fileID: 2100000, guid: 0a1a2ec0d6ed18c459f87b5d181564bf, type: 2}
+  - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
+  - {fileID: 2100000, guid: 994431c627356934b98175a03bb95d66, type: 2}
+  - {fileID: 2100000, guid: ef29bfa57b8eeaa4684755d94aec900c, type: 2}
+  - {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
+  - {fileID: 2100000, guid: 1c359114b88294f4faf80ab69cd546a9, type: 2}
+  - {fileID: 2100000, guid: dc81f37b2d349b54faeb49ad09dc0abf, type: 2}
+  - {fileID: 2100000, guid: b390153fd5970104f9ca9f3f820ea816, type: 2}
+  - {fileID: 2100000, guid: 5629585690d5fc044b4375325e8357fe, type: 2}
+  - {fileID: 2100000, guid: 1930ccd51f7ac86448e47ae31c67e6bc, type: 2}
+  - {fileID: 2100000, guid: 3e7bfabfa1999224ba9d77cbe0feff07, type: 2}
+  - {fileID: 2100000, guid: 7af7cb2be9dfad04da778faf68b830cd, type: 2}
+  _viewportWidth: 860
+  _itemWidth: 98
+  _itemSpacing: 14
+  _wheelScrollSpeed: 0.55
+  _photoStorage: {fileID: 9911000150}
 --- !u!114 &9911000091
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5052,23 +4966,44 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &9911000009
+--- !u!222 &9911000094
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9911000020}
+  m_CullTransparentMesh: 1
+--- !u!114 &9911000095
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9911000001}
+  m_GameObject: {fileID: 9911000020}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
-  m_IgnoreReversedGraphics: 1
-  m_BlockingObjects: 0
-  m_BlockingMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &9911000100
 GameObject:
   m_ObjectHideFlags: 0
@@ -5148,44 +5083,6 @@ MonoBehaviour:
   m_PointerBehavior: 0
   m_CursorLockBehavior: 0
   m_ScrollDeltaPerTick: 6
---- !u!222 &9911000094
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9911000020}
-  m_CullTransparentMesh: 1
---- !u!114 &9911000095
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9911000020}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &9911000120
 GameObject:
   m_ObjectHideFlags: 0
@@ -5541,7 +5438,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "커스텀 교체"
+  m_Text: "\uCEE4\uC2A4\uD140 \uAD50\uCCB4"
 --- !u!114 &9911000138
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5653,6 +5550,63 @@ MonoBehaviour:
   - ea89b2db33fa46548baccf9021c579f6:2100000
   - eb9bef93fd5c48d4da2e0d9f41939e65:2100000
   - ef29bfa57b8eeaa4684755d94aec900c:2100000
+--- !u!1001 &7000000000000000000
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1000000000000000001, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_Name
+      value: KeyboardWallRack
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.82
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000002, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0367630d243742c6a95c7c310a6c0e15, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -5665,5 +5619,5 @@ SceneRoots:
   - {fileID: 7000000000000000000}
   - {fileID: 9911000002}
   - {fileID: 9900990301}
-  - {fileID: 92401599}
   - {fileID: 9911000101}
+  - {fileID: 439298123}

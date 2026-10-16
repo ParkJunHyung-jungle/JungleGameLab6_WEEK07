@@ -42,14 +42,15 @@ function InputStack(label, input, maximum) {
   const total = input.normal + input.special + input.unknown;
   return '<div class="stack-row"><div><b>' + E(label) + '</b><span>일반 ' + F(input.normal) + ' / 기믹 ' + F(input.special) + ' / 분류 불가 ' + F(input.unknown) + '</span></div><div class="stack"><span class="normal-fill" style="width:' + input.normal / maximum * 100 + '%"></span><span class="special-fill" style="width:' + input.special / maximum * 100 + '%"></span><span class="unknown-fill" style="width:' + input.unknown / maximum * 100 + '%"></span></div><small class="muted">분류된 입력 중 기믹 비중 ' + (input.normal + input.special ? F(input.special / (input.normal + input.special) * 100, 1) + '%' : '해당 없음') + ' · 현재 범위 합계 ' + total + '</small></div>';
 }
-/** 기록된 점 또는 구간을 공통 SVG 좌표에 그려 단위를 명시한 차트를 반환한다. */
-function Plot(series, unit, step = false) {
+/** 기록된 점·구간과 선택적인 이벤트 표시점을 공통 SVG 좌표에 그려 차트와 범례를 반환한다. */
+function Plot(series, unit, step = false, markers = []) {
   const valid = series.filter(item => item.points.some(point => Number.isFinite(point.x) && Number.isFinite(point.y)));
   if (!valid.length) return Empty("이 범위의 " + unit + " 기록이 없습니다. 값을 추정하지 않습니다.");
   const points = valid.flatMap(item => item.points).filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
-  const maxX = Math.max(1, ...points.map(point => point.x)), maxY = Math.max(1, ...points.map(point => point.y)) * 1.12;
+  const maxX = Math.max(1, ...points.map(point => point.x), ...markers.map(marker => marker.x)), maxY = Math.max(1, ...points.map(point => point.y)) * 1.12;
   const x = value => 64 + value / maxX * 766, y = value => 235 - value / maxY * 205;
-  let svg = '<svg viewBox="0 0 860 285" role="img" aria-label="' + E(unit) + ' 시간별 그래프"><text x="12" y="16">' + E(unit) + '</text>';
+  const markerSpace = markers.length ? 48 : 0;
+  let svg = '<svg viewBox="0 0 860 ' + (285 + markerSpace) + '" role="img" aria-label="' + E(unit) + ' 시간별 그래프"><g transform="translate(0,' + markerSpace + ')"><text x="12" y="16">' + E(unit) + '</text>';
   for (let index = 0; index <= 4; index++) {
     svg += '<line class="grid" x1="64" x2="830" y1="' + y(maxY * index / 4) + '" y2="' + y(maxY * index / 4) + '"/><text x="54" text-anchor="end" y="' + (y(maxY * index / 4) + 4) + '">' + F(maxY * index / 4, 0) + '</text>';
     svg += '<text x="' + x(maxX * index / 4) + '" y="256" text-anchor="middle">' + F(maxX * index / 4, 1) + '</text>';
@@ -63,7 +64,10 @@ function Plot(series, unit, step = false) {
     });
     svg += '<path fill="none" stroke="' + item.color + '" stroke-width="2.5" d="' + path + '"/>';
   });
-  return '<div class="chart">' + svg + '<text x="445" y="280" text-anchor="middle">대전 시작 후 시간 (초)</text></svg></div><div class="legend">' + valid.map(item => '<span><i class="dot" style="background:' + item.color + '"></i>' + E(item.label) + '</span>').join('') + '</div>';
+  markers.forEach((marker, index) => {
+    svg += '<line x1="' + x(marker.x) + '" x2="' + x(marker.x) + '" y1="30" y2="235" stroke="#ffad32" stroke-width="1.5" stroke-dasharray="5 4"/><text x="' + x(marker.x) + '" y="' + (-28 + index % 3 * 13) + '" text-anchor="middle" style="fill:#ffad32;font-size:10px">' + E(marker.label) + '</text>';
+  });
+  return '<div class="chart">' + svg + '<text x="445" y="280" text-anchor="middle">대전 시작 후 시간 (초)</text></g></svg></div><div class="legend">' + valid.map(item => '<span><i class="dot" style="background:' + item.color + '"></i>' + E(item.label) + '</span>').join('') + '</div>' + (markers.length ? '<div class="legend">' + markers.map(marker => '<span>│ ' + E(marker.label) + ' · ' + F(marker.x, 3) + '초</span>').join('') + '</div>' : '');
 }
 
 /** 상점 방문의 기록 시간을 라운드별 막대와 추세선으로 표시하고 정상 방문 사이의 증감을 반환한다. */
@@ -151,7 +155,7 @@ function BattleView() {
   const scorePoints = scores.player, enemyPoints = scores.enemy;
   html += Panel('기록된 점수 추이', Plot([{ label: '플레이어 기록 점수', color: '#b9ec82', points: scorePoints }, { label: '로봇 기록 점수', color: '#b5a0f2', points: enemyPoints }], '점', true) + (enemyPoints.length ? '' : '<p class="hint">로봇 ScoreSnapshot은 미수집입니다. 최종 점수로 추이를 만들지 않습니다.</p>'));
   const buckets = Playtest.Buckets(run, file, state.scope, state.interval);
-  html += Panel('시간 구간별 Down', '<label class="hint">집계 간격 <select id="intervalSelect">' + [1, 2, 5, 10].map(value => '<option ' + (state.interval === value ? 'selected' : '') + '>' + value + '</option>').join('') + '</select> 초</label>' + Plot([{ label: '선택 범위 Down', color: '#65bed4', points: buckets.flatMap(bucket => [{ x: bucket.start, y: bucket.count }, { x: bucket.end, y: bucket.count }]) }], 'Down 횟수', true) + Table(['구간(초)', 'Down'], buckets.map(bucket => [F(bucket.start, 2) + '–' + F(bucket.end, 2), F(bucket.count)]), 'buckets'), '횟수 분포입니다. 이를 기록된 APM과 혼용하지 않습니다. 마지막 구간은 짧을 수 있습니다.');
+  html += Panel('시간 구간별 Down', '<label class="hint">집계 간격 <select id="intervalSelect">' + [1, 2, 5, 10].map(value => '<option ' + (state.interval === value ? 'selected' : '') + '>' + value + '</option>').join('') + '</select> 초</label>' + Plot([{ label: '선택 범위 Down', color: '#65bed4', points: buckets.flatMap(bucket => [{ x: bucket.start, y: bucket.count }, { x: bucket.end, y: bucket.count }]) }], 'Down 횟수', true, Playtest.ReplacementMarkers(run)) + Table(['구간(초)', 'Down'], buckets.map(bucket => [F(bucket.start, 2) + '–' + F(bucket.end, 2), F(bucket.count)]), 'buckets'), '횟수 분포입니다. 주황 세로 점선은 플레이어 키보드 보충 후 등장 연출이 끝나 실제 입력 가능한 시점입니다. 최초 입장과 로봇 입장은 표시하지 않습니다. 기록 APM과는 별도 지표이며 마지막 구간은 짧을 수 있습니다.');
   html += Panel('입력 범위와 상태', InputStack('현재 범위', input, Math.max(1, all.raw)) + Table(['원본 input_state', 'Down'], [...all.states].map(([status, entries]) => [E(status), entries.length]), 'states'), '기본은 Alive·Broken. 비활성 포함은 InputDisabled 추가. 원본 전체는 모든 상태를 포함하며 식별할 수 없는 입력은 분류 불가입니다.');
   const intervals = scores.intervals, apm = scores.apm;
   html += Panel('콤보 경계 · 기록 APM', Plot([{ label: 'IntervalSummary.apm', color: '#b5a0f2', points: apm }], '기록 APM', true) + Table(['시작 / 끝(상대 초)', '콤보', '구간', 'APM', '점수/초', '마감 사유'], intervals.map(row => [Number.isFinite(start) ? F(row.start_elapsed_seconds === null ? null : row.start_elapsed_seconds - start, 3) + ' / ' + F(row.end_elapsed_seconds === null ? null : row.end_elapsed_seconds - start, 3) : '미수집', Field(row, 'combo', 0), F(row.interval_kind), Field(row, 'apm', 2), Field(row, 'score_per_second', 2), F(row.end_reason)]), 'intervals'), 'APM은 CSV 값을 그대로 사용합니다. 포함 조건은 시간별 Down 분포와 다를 수 있습니다.');

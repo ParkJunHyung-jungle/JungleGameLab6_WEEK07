@@ -82,6 +82,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public Material KeycapMaterial => _keycapMaterial;
 
+    [Header("Photo Customization")]
+    [SerializeField] private Material _photoMaterialTemplate;
+
     [Header("Switches")]
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
     [SerializeField] private SwitchType _switchType = SwitchType.Red;
@@ -436,7 +439,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             _imageCustomization = GetComponent<KeyboardImageCustomization>();
             if (_imageCustomization == null) _imageCustomization = gameObject.AddComponent<KeyboardImageCustomization>();
         }
-        _imageCustomization.Initialize(_caseRenderers, _keycapRenderers);
+        _imageCustomization.Initialize(_caseRenderers, _keycapRenderers, _photoMaterialTemplate);
         return _imageCustomization;
     }
 

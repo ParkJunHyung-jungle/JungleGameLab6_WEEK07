@@ -14,6 +14,9 @@ using KeyboardModeling;
 [DisallowMultipleComponent]
 public sealed class KeyboardCustomization : MonoBehaviour
 {
+    private const float MAX_LED_INTENSITY = 10f;
+    private const float MAX_LED_SPEED = 10f;
+
     [Header("LED Layer")]
     [SerializeField, HideInInspector] private MeshRenderer _ledRenderer;
     [SerializeField] private KeyboardLED _ledLayer;
@@ -21,9 +24,17 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [Header("LED Settings")]
     [SerializeField] private bool _ledEnabled = true;
     [SerializeField, ColorUsage(false, true)] private Color _ledColor = new Color(0f, 0.8f, 1f, 1f);
-    [SerializeField, Min(0f)] private float _ledIntensity = 3f;
+    [SerializeField, Range(0f, MAX_LED_INTENSITY)] private float _ledIntensity = 3f;
     [SerializeField] private LEDPattern _ledPattern = LEDPattern.Static;
-    [SerializeField, Min(0f)] private float _ledSpeed = 1f;
+    [SerializeField, Range(0f, MAX_LED_SPEED)] private float _ledSpeed = 1f;
+
+    public static float MaxLEDIntensity => MAX_LED_INTENSITY;
+    public static float MaxLEDSpeed => MAX_LED_SPEED;
+    public bool LEDEnabled => _ledEnabled;
+    public Color LEDColor => _ledColor;
+    public float LEDIntensity => _ledIntensity;
+    public LEDPattern CurrentLEDPattern => _ledPattern;
+    public float LEDSpeed => _ledSpeed;
 
     [Header("Shared Materials")]
     [FormerlySerializedAs("_caseMaterials")]
@@ -288,9 +299,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         _ledEnabled = state.LedEnabled;
         _ledColor = state.LedColor;
-        _ledIntensity = state.LedIntensity;
+        _ledIntensity = Mathf.Clamp(state.LedIntensity, 0f, MAX_LED_INTENSITY);
         _ledPattern = state.LedPattern;
-        _ledSpeed = state.LedSpeed;
+        _ledSpeed = Mathf.Clamp(state.LedSpeed, 0f, MAX_LED_SPEED);
         if (_ledRenderer != null) ApplyLED();
     }
 
@@ -707,23 +718,23 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// speed 입력을 LED 애니메이션 속도로 저장하고 레이어에 전달한다.
-    /// 반환값 없이 속도를 갱신하며 음수는 0으로 제한하고 유효하지 않은 실수는 무시한다.
+    /// 반환값 없이 속도를 0~10으로 제한하고 유효하지 않은 실수는 무시한다.
     /// </summary>
     public void SetLEDSpeed(float speed)
     {
         if (float.IsNaN(speed) || float.IsInfinity(speed)) return;
-        _ledSpeed = Mathf.Max(0f, speed);
+        _ledSpeed = Mathf.Clamp(speed, 0f, MAX_LED_SPEED);
         ApplyLED();
     }
 
     /// <summary>
     /// intensity 입력을 LED 밝기로 저장하고 전용 레이어에 전달한다.
-    /// 반환값 없이 밝기를 갱신하며 음수는 0으로 제한하고 유효하지 않은 실수는 무시한다.
+    /// 반환값 없이 밝기를 0~10으로 제한하고 유효하지 않은 실수는 무시한다.
     /// </summary>
     public void SetLEDIntensity(float intensity)
     {
         if (float.IsNaN(intensity) || float.IsInfinity(intensity)) return;
-        _ledIntensity = Mathf.Max(0f, intensity);
+        _ledIntensity = Mathf.Clamp(intensity, 0f, MAX_LED_INTENSITY);
         ApplyLED();
     }
 
@@ -753,6 +764,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     private void ApplyLED()
     {
+        _ledIntensity = Mathf.Clamp(_ledIntensity, 0f, MAX_LED_INTENSITY);
+        _ledSpeed = Mathf.Clamp(_ledSpeed, 0f, MAX_LED_SPEED);
         if (_ledLayer == null && _ledRenderer != null) _ledLayer = _ledRenderer.GetComponent<KeyboardLED>();
         // 기존 프리팹을 새 컴포넌트로 연결하는 동안에는 레이어가 아직 없을 수 있다.
         if (_ledLayer != null) _ledLayer.ApplySettings(_ledEnabled, _ledPattern, _ledColor, _ledIntensity, _ledSpeed);

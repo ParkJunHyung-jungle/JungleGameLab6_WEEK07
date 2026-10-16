@@ -59,6 +59,10 @@ namespace Game.Player
         [SerializeField] private KeyboardCustomizationStorage _photoStorage;
         private KeyboardCustomizationTestUI _photoUI;
 
+        [Header("LED Customization")]
+        private KeyboardCustomization _ledCustomization;
+        private KeyboardLEDPanelUI _ledUI;
+
         public event Action<Material> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<int> CaseMaterialSelected;
@@ -69,7 +73,8 @@ namespace Game.Player
             Keycap,
             SwitchSound,
             CaseMaterial,
-            Photo
+            Photo,
+            Led
         }
 
         void Awake()
@@ -82,6 +87,11 @@ namespace Game.Player
             _photoUI.InitializeEmbedded(_photoStorage);
             _photoUI.CloseRequested += HandlePhotoCloseRequested;
             _photoUI.CustomizationLoaded += HandlePhotoCustomizationLoaded;
+            GameObject ledPanel = new GameObject("LEDCustomizationPanel", typeof(RectTransform));
+            ledPanel.transform.SetParent(transform, false);
+            ledPanel.SetActive(false);
+            _ledUI = ledPanel.AddComponent<KeyboardLEDPanelUI>();
+            _ledUI.Initialize();
         }
 
         void OnEnable()
@@ -153,7 +163,8 @@ namespace Game.Player
                 && !ContainsPointer(_viewport, eventData.position)
                 && !ContainsPointer(_switchSoundViewport, eventData.position)
                 && !ContainsPointer(_caseMaterialViewport, eventData.position)
-                && !_photoUI.IsPointerOverUI(eventData.position))
+                && !_photoUI.IsPointerOverUI(eventData.position)
+                && !_ledUI.IsPointerOverUI(eventData.position))
             {
                 SetPickerMode(PickerMode.None);
             }
@@ -195,6 +206,15 @@ namespace Game.Player
         public void SetPhotoCustomization(KeyboardCustomization customization)
         {
             _photoStorage.SetTarget(customization);
+        }
+
+        /// <summary>
+        /// customization을 LED 편집 대상으로 지정한다.
+        /// 현재 작업대 키보드 참조만 저장하고 실제 설정 읽기와 입력 중지는 LED 패널을 열 때 수행한다.
+        /// </summary>
+        public void SetLEDCustomization(KeyboardCustomization customization)
+        {
+            _ledCustomization = customization;
         }
 
         /// <summary>
@@ -247,12 +267,13 @@ namespace Game.Player
             return ContainsPointer(_viewport, screenPosition)
                 || ContainsPointer(_switchSoundViewport, screenPosition)
                 || ContainsPointer(_caseMaterialViewport, screenPosition)
-                || _photoUI.IsPointerOverUI(screenPosition);
+                || _photoUI.IsPointerOverUI(screenPosition)
+                || _ledUI.IsPointerOverUI(screenPosition);
         }
 
         /// <summary>
-        /// 클릭한 편집 항목에 따라 키캡, 축 사운드, 케이스 목록 또는 사진 편집 UI를 연다.
-        /// button을 사용하며 같은 항목을 다시 누르거나 LED를 누르면 목록을 닫는다.
+        /// 클릭한 편집 항목에 따라 키캡, 축 사운드, 케이스 목록 또는 사진 및 LED 편집 UI를 연다.
+        /// button을 사용하며 같은 항목을 다시 누르면 해당 목록이나 패널을 닫는다.
         /// </summary>
         private void HandleCategoryClicked(KeyboardEditButton button)
         {
@@ -265,6 +286,8 @@ namespace Game.Player
                 mode = PickerMode.CaseMaterial;
             else if (button == _customButton)
                 mode = PickerMode.Photo;
+            else if (button == _ledButton)
+                mode = PickerMode.Led;
             SetPickerMode(mode == _pickerMode ? PickerMode.None : mode);
         }
 
@@ -865,10 +888,14 @@ namespace Game.Player
             {
                 _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial);
             }
+            if (_pickerMode != PickerMode.Photo)
+                _photoUI.HideEmbedded();
+            if (_pickerMode != PickerMode.Led)
+                _ledUI.Close();
             if (_pickerMode == PickerMode.Photo)
                 _photoUI.BeginCustomization();
-            else
-                _photoUI.HideEmbedded();
+            if (_pickerMode == PickerMode.Led)
+                _ledUI.Open(_ledCustomization);
         }
 
         /// <summary>

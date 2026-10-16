@@ -22,9 +22,18 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private GameObject _canvas;
     private GameObject _customizationPanel;
     private GameObject _startPanel;
+    private GameObject _savedPanel;
+    private RawImage _savedPreview;
+    private Texture2D _savedTexture;
+    private bool _embedded;
+    private bool _isCustomizing;
+
+    public event Action CloseRequested;
+    public event Action CustomizationLoaded;
 
     void Start()
     {
+        if (_embedded) return;
         _input = _storage.Customization.GetComponent<KeyboardInputController>();
         _previousInput = _input.InputEnabled;
         _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -36,9 +45,51 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         scaler.matchWidthOrHeight = 1;
         if (EventSystem.current == null)
             new GameObject("PhotoTestEventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule)).transform.SetParent(_canvas.transform);
-        var panel = Rect("Photo customization", _canvas.transform, 20, 20, 340, 710);
+        CreatePanel(_canvas.transform);
+        var startPanel = Rect("Customization start", _canvas.transform, 20, 20, 340, 82);
+        _startPanel = startPanel.gameObject;
+        startPanel.gameObject.AddComponent<Image>().color = new Color(0.08f, 0.1f, 0.14f, 0.96f);
+        Button(startPanel, "Start customization", 18, 18, 304, BeginCustomization);
+        BeginCustomization();
+    }
+
+    /// <summary>
+    /// storage를 사용해 기존 사진 편집 기능을 현재 오버레이의 오른쪽 패널과 상단 단일 저장 슬롯으로 구성한다.
+    /// 별도 Canvas를 생성하지 않으며 표시와 키보드 대상은 WorkShop2의 편집 상태에 연결한다.
+    /// </summary>
+    public void InitializeEmbedded(KeyboardCustomizationStorage storage)
+    {
+        _embedded = true;
+        _storage = storage;
+        _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        CreatePanel(transform);
+        RectTransform panel = (RectTransform)_customizationPanel.transform;
+        panel.anchorMin = panel.anchorMax = Vector2.one;
+        panel.anchoredPosition = new Vector2(-368f, -180f);
+
+        RectTransform saved = Rect("Saved customization", transform, 0f, 24f, 304f, 132f);
+        saved.anchorMin = saved.anchorMax = new Vector2(0.5f, 1f);
+        saved.pivot = new Vector2(0.5f, 1f);
+        saved.gameObject.AddComponent<Image>().color = Color.clear;
+        saved.gameObject.AddComponent<KeyboardCustomizationTestButton>().Clicked += LoadCustomization;
+        _savedPanel = saved.gameObject;
+        _savedPreview = Rect("Saved image", saved, 0f, 0f, 304f, 104f).gameObject.AddComponent<RawImage>();
+        _savedPreview.raycastTarget = false;
+        Label(saved, "Saved customization · Click to load", 0f, 108f, 304f, 24f, 16);
+        _customizationPanel.SetActive(false);
+        _savedPanel.SetActive(false);
+    }
+
+    /// <summary>
+    /// parent 아래에 테스트 씬과 동일한 이미지 선택, 적용, 제거 및 Save/Load UI를 만든다.
+    /// 생성한 패널과 입력란 참조를 저장하며 내장 패널은 별도의 배경 박스를 사용하지 않는다.
+    /// </summary>
+    private void CreatePanel(Transform parent)
+    {
+        var panel = Rect("Photo customization", parent, 20, 20, 340, 710);
         _customizationPanel = panel.gameObject;
-        panel.gameObject.AddComponent<Image>().color = new Color(0.08f, 0.1f, 0.14f, 0.96f);
+        if (!_embedded)
+            panel.gameObject.AddComponent<Image>().color = new Color(0.08f, 0.1f, 0.14f, 0.96f);
         Label(panel, "KEYBOARD PHOTO", 18, 18, 304, 28, 23);
         Label(panel, "Choose PNG / JPG, then apply.\nKeyboard damage input is paused.", 18, 56, 304, 48, 15);
         _preview = Rect("Preview", panel, 18, 112, 304, 150).gameObject.AddComponent<RawImage>();
@@ -53,15 +104,10 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         Button(panel, "Apply to KEY index", 92, 458, 230, ApplySelectedKey);
         Button(panel, "Clear keycaps", 18, 504, 147, () => { _storage.Customization.ClearKeycapImage(); _message.text = "Keycap photos cleared."; });
         Button(panel, "Clear case", 175, 504, 147, () => { _storage.Customization.ClearCaseImage(); _message.text = "Case photo cleared."; });
-        Button(panel, "Save", 18, 550, 147, () => { _storage.SaveCustomization(); _message.text = _storage.LastMessage; });
-        Button(panel, "Load", 175, 550, 147, () => { _storage.LoadCustomization(); _message.text = _storage.LastMessage; });
+        Button(panel, "Save", 18, 550, 147, SaveCustomization);
+        Button(panel, "Load", 175, 550, 147, LoadCustomization);
         Button(panel, "Finish customization", 18, 596, 304, EndCustomization);
         _message = Label(panel, "Ready. All keycaps form one photo canvas.", 18, 642, 304, 60, 15);
-        var startPanel = Rect("Customization start", _canvas.transform, 20, 20, 340, 82);
-        _startPanel = startPanel.gameObject;
-        startPanel.gameObject.AddComponent<Image>().color = new Color(0.08f, 0.1f, 0.14f, 0.96f);
-        Button(startPanel, "Start customization", 18, 18, 304, BeginCustomization);
-        BeginCustomization();
     }
 
     /// <summary>
@@ -70,10 +116,15 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     public void BeginCustomization()
     {
+        if (_isCustomizing || _storage.Customization == null) return;
+        _input = _storage.Customization.GetComponent<KeyboardInputController>();
+        if (_embedded) _previousInput = _input.InputEnabled;
+        _isCustomizing = true;
         EventSystem.current.SetSelectedGameObject(null);
         _input.InputEnabled = false;
-        _startPanel.SetActive(false);
+        if (_startPanel != null) _startPanel.SetActive(false);
         _customizationPanel.SetActive(true);
+        if (_embedded) RefreshSavedPreview();
     }
 
     /// <summary>
@@ -82,16 +133,115 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     public void EndCustomization()
     {
+        if (_embedded)
+        {
+            CloseRequested?.Invoke();
+            return;
+        }
         EventSystem.current.SetSelectedGameObject(null);
         _customizationPanel.SetActive(false);
         _startPanel.SetActive(true);
         _input.InputEnabled = true;
+        _isCustomizing = false;
+    }
+
+    /// <summary>
+    /// 내장 사진 편집 패널과 저장 슬롯을 닫고 진입 전 키보드 입력을 복원한다.
+    /// 현재 활성 상태를 사용하며 다른 편집 항목 선택이나 오버레이 종료 시 호출한다.
+    /// </summary>
+    public void HideEmbedded()
+    {
+        if (!_isCustomizing) return;
+        _isCustomizing = false;
+        EventSystem.current.SetSelectedGameObject(null);
+        _customizationPanel.SetActive(false);
+        _savedPanel.SetActive(false);
+        if (_input != null) _input.InputEnabled = _previousInput;
+    }
+
+    /// <summary>
+    /// screenPosition이 현재 열린 사진 패널 또는 저장 슬롯에 포함되는지 반환한다.
+    /// 오버레이 Canvas의 카메라를 사용해 키보드 회전 및 확대 입력과 UI 입력을 구분한다.
+    /// </summary>
+    public bool IsPointerOverUI(Vector2 screenPosition)
+    {
+        if (!_isCustomizing) return false;
+        Canvas canvas = GetComponentInParent<Canvas>();
+        Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+        return RectTransformUtility.RectangleContainsScreenPoint((RectTransform)_customizationPanel.transform, screenPosition, camera)
+            || (_savedPanel.activeSelf && RectTransformUtility.RectangleContainsScreenPoint((RectTransform)_savedPanel.transform, screenPosition, camera));
+    }
+
+    /// <summary>
+    /// 기존 저장 함수를 호출해 단일 파일을 덮어쓰고 성공 시 상단 미리보기를 갱신한다.
+    /// 별도 저장 형식을 만들지 않으며 처리 결과를 안내 문구에 표시한다.
+    /// </summary>
+    private void SaveCustomization()
+    {
+        bool saved = _storage.SaveCustomization();
+        _message.text = _storage.LastMessage;
+        if (saved && _embedded) RefreshSavedPreview();
+    }
+
+    /// <summary>
+    /// 기존 Load 함수를 사용해 저장 상태를 현재 키보드에 적용한다.
+    /// 결과를 안내하며 성공 시 저장 사진을 미리보기로 표시하고 선택 UI 갱신 이벤트를 전달한다.
+    /// </summary>
+    private void LoadCustomization()
+    {
+        bool loaded = _storage.LoadCustomization();
+        _message.text = _storage.LastMessage;
+        if (!loaded) return;
+        if (_embedded)
+        {
+            RefreshSavedPreview();
+            if (_texture != null) Destroy(_texture);
+            _texture = null;
+            _path.text = "";
+            _preview.texture = _savedTexture;
+            _preview.color = _savedTexture != null ? Color.white : Color.gray;
+            FitPreview(_preview, _savedTexture, new Vector2(304f, 150f));
+        }
+        CustomizationLoaded?.Invoke();
+    }
+
+    /// <summary>
+    /// 기존 저장 파일에서 대표 사진을 읽어 상단의 단일 저장 슬롯을 갱신한다.
+    /// 이전 미리보기 텍스처를 해제하며 저장 파일이 없으면 슬롯을 숨긴다.
+    /// </summary>
+    private void RefreshSavedPreview()
+    {
+        bool showingSavedImage = _savedTexture != null && _preview.texture == _savedTexture;
+        if (showingSavedImage) _preview.texture = null;
+        if (_savedTexture != null) Destroy(_savedTexture);
+        _savedTexture = _storage.LoadSavedPreview();
+        if (showingSavedImage)
+        {
+            _preview.texture = _savedTexture;
+            _preview.color = _savedTexture != null ? Color.white : Color.gray;
+            FitPreview(_preview, _savedTexture, new Vector2(304f, 150f));
+        }
+        _savedPreview.texture = _savedTexture;
+        _savedPreview.color = _savedTexture != null ? Color.white : Color.clear;
+        FitPreview(_savedPreview, _savedTexture, new Vector2(304f, 104f));
+        _savedPanel.SetActive(_storage.HasSave);
+    }
+
+    /// <summary>
+    /// image의 종횡비를 유지하도록 preview를 size 안에 맞춘다.
+    /// 사진이 없으면 입력 크기를 사용하고 미리보기 RectTransform 크기를 변경한다.
+    /// </summary>
+    private void FitPreview(RawImage preview, Texture2D image, Vector2 size)
+    {
+        float ratio = image != null ? Mathf.Min(size.x / image.width, size.y / image.height) : 1f;
+        preview.rectTransform.sizeDelta = image != null ? new Vector2(image.width, image.height) * ratio : size;
     }
 
     void OnDestroy()
     {
-        if (_input != null) _input.InputEnabled = _previousInput;
+        if (_input != null && (!_embedded || _isCustomizing)) _input.InputEnabled = _previousInput;
         if (_texture != null) Destroy(_texture);
+        if (_savedTexture != null) Destroy(_savedTexture);
         if (_canvas != null) Destroy(_canvas);
     }
 

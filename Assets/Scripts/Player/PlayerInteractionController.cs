@@ -60,6 +60,9 @@ namespace Game.Player
         [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
         [SerializeField] private GameObject _keyboardEditOverlay;
         [SerializeField] private GameObject _centerReticle;
+        [SerializeField, Range(0.1f, 1f)] private float _keyboardEditMinZoom = 0.5f;
+        [SerializeField, Min(1f)] private float _keyboardEditMaxZoom = 2f;
+        [SerializeField, Min(0.01f)] private float _keyboardEditZoomStep = 0.1f;
         private KeyboardEditOverlayUI _keyboardEditOverlayUI;
         private KeyboardInputController _editingKeyboard;
         private Coroutine _cameraTransition;
@@ -72,6 +75,8 @@ namespace Game.Player
         private InputAction _keyboardResetInput;
         private Quaternion _initialEditingKeyboardRotation;
         private Vector3 _editingKeyboardCenterOffset;
+        private Vector3 _initialEditingKeyboardScale;
+        private float _editingKeyboardZoom = 1f;
         private bool _isDraggingEditingKeyboard;
         private Vector2 _pendingKeyboardRotationDelta;
         private readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
@@ -151,6 +156,7 @@ namespace Game.Player
         {
             UpdateInteractionPrompt();
             CaptureEditingKeyboardMouseDelta();
+            UpdateEditingKeyboardZoom();
         }
 
         /// <summary>
@@ -377,6 +383,7 @@ namespace Game.Player
             _keyboardEditOverlayUI?.SetSelectedMaterial(customization != null ? customization.KeycapMaterial : null);
             _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
             _keyboardEditOverlayUI?.SetCaseCustomization(customization);
+            _keyboardEditOverlayUI?.SetPhotoCustomization(customization);
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(true);
             if (_centerReticle != null)
@@ -384,6 +391,8 @@ namespace Game.Player
 
             _editingKeyboardBody = holder.KeyboardBody;
             _initialEditingKeyboardRotation = holder.InitialKeyboardRotation;
+            _initialEditingKeyboardScale = _editingKeyboardBody.transform.localScale;
+            _editingKeyboardZoom = 1f;
             KeyboardPickupTarget pickupTarget = _editingKeyboardBody.GetComponent<KeyboardPickupTarget>();
             _editingKeyboardCenterOffset = pickupTarget.GetVisualCenterLocalPosition(_editingKeyboardBody.transform);
             _savedPlayerPosition = transform.position;
@@ -438,6 +447,7 @@ namespace Game.Player
         {
             _isKeyboardEditMode = false;
             StopEditingKeyboardRotation();
+            RestoreEditingKeyboardScale();
             if (_keyboardEditOverlay != null)
                 _keyboardEditOverlay.SetActive(false);
             if (_centerReticle != null)
@@ -493,6 +503,7 @@ namespace Game.Player
         /// </summary>
         private void RestoreKeyboardEditInput()
         {
+            RestoreEditingKeyboardScale();
             if (_editingKeyboard != null)
                 _editingKeyboard.SetInputEnabled(false);
 
@@ -614,6 +625,59 @@ namespace Game.Player
             }
 
             _pendingKeyboardRotationDelta += mouse.delta.ReadValue();
+        }
+
+        /// <summary>
+        /// 편집 중 UI 밖의 휠 입력을 사용해 키보드를 설정된 배율 범위에서 확대하거나 축소한다.
+        /// Mouse.scroll과 감도를 사용하며 카메라 전환 중에는 크기를 변경하지 않는다.
+        /// </summary>
+        private void UpdateEditingKeyboardZoom()
+        {
+            if (!_isKeyboardEditMode || _cameraTransition != null || _editingKeyboardBody == null)
+                return;
+
+            Mouse mouse = Mouse.current;
+            if (mouse == null)
+                return;
+
+            float scrollDelta = mouse.scroll.y.ReadValue();
+            if (scrollDelta == 0f
+                || (_keyboardEditOverlayUI != null && _keyboardEditOverlayUI.IsPointerOverUI(mouse.position.ReadValue())))
+            {
+                return;
+            }
+
+            float zoom = Mathf.Clamp(
+                _editingKeyboardZoom + scrollDelta * _keyboardEditZoomStep,
+                _keyboardEditMinZoom,
+                _keyboardEditMaxZoom);
+            if (!Mathf.Approximately(zoom, _editingKeyboardZoom))
+                SetEditingKeyboardZoom(zoom);
+        }
+
+        /// <summary>
+        /// 진입 시 저장한 크기에 zoom 배율을 곱하고 키보드의 시각적 중심 위치를 유지한다.
+        /// zoom과 중앙 오프셋을 사용해 localScale, Rigidbody 위치와 현재 배율을 갱신한다.
+        /// </summary>
+        private void SetEditingKeyboardZoom(float zoom)
+        {
+            Transform keyboardTransform = _editingKeyboardBody.transform;
+            Vector3 visualCenter = keyboardTransform.TransformPoint(_editingKeyboardCenterOffset);
+            keyboardTransform.localScale = _initialEditingKeyboardScale * zoom;
+            _editingKeyboardBody.position = visualCenter - keyboardTransform.TransformVector(_editingKeyboardCenterOffset);
+            _editingKeyboardZoom = zoom;
+        }
+
+        /// <summary>
+        /// 편집 대상과 현재 배율을 확인해 키보드 크기를 편집 진입 전 상태로 복원한다.
+        /// 저장한 원래 크기를 사용하며 종료와 비활성화 시 확대 상태가 남지 않도록 한다.
+        /// </summary>
+        private void RestoreEditingKeyboardScale()
+        {
+            if (_editingKeyboardBody == null || _editingKeyboardZoom == 1f)
+                return;
+
+            SetEditingKeyboardZoom(1f);
         }
 
         /// <summary>

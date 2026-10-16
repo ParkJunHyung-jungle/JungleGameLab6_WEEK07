@@ -18,6 +18,45 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     public string SavePath => Path.Combine(Application.persistentDataPath, SAVE_FILE_NAME);
     public string LastMessage => _lastMessage;
     public KeyboardCustomization Customization => _customization;
+    public bool HasSave => File.Exists(SavePath);
+
+    /// <summary>
+    /// customization을 현재 저장 및 복원 대상으로 지정한다.
+    /// 등록된 재질 카탈로그와 단일 저장 파일 경로는 유지한다.
+    /// </summary>
+    public void SetTarget(KeyboardCustomization customization)
+    {
+        _customization = customization;
+    }
+
+    /// <summary>
+    /// 기존 저장 파일의 첫 사진을 읽어 상단 저장 슬롯에 표시할 텍스처를 반환한다.
+    /// 저장 상태는 적용하지 않으며 사진이 없거나 유효하지 않으면 null을 반환하고 호출자가 텍스처를 해제한다.
+    /// </summary>
+    public Texture2D LoadSavedPreview()
+    {
+        Texture2D texture = null;
+        try
+        {
+            if (!HasSave) return null;
+            KeyboardCustomizationState state = JsonUtility.FromJson<KeyboardCustomizationState>(File.ReadAllText(SavePath));
+            string[] images = state?.ImageState?.Images;
+            if (images == null || images.Length == 0 || string.IsNullOrEmpty(images[0])) return null;
+            if (images[0].Length > 32 * 1024 * 1024 * 2) return null;
+            byte[] bytes = Convert.FromBase64String(images[0]);
+            if (bytes.Length > 32 * 1024 * 1024) return null;
+            texture = new Texture2D(2, 2);
+            if (texture.LoadImage(bytes) && texture.width <= 8192 && texture.height <= 8192)
+                return texture;
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
+        {
+            _lastMessage = "Preview failed: " + exception.Message;
+        }
+
+        if (texture != null) Destroy(texture);
+        return null;
+    }
 
     /// <summary>
     /// 연결된 커스터마이저의 현재 상태를 JSON 파일 하나로 저장한다.

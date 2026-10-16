@@ -21,6 +21,7 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _switchAxisButton;
         [SerializeField] private KeyboardEditButton _ledButton;
         [SerializeField] private KeyboardEditButton _caseButton;
+        [SerializeField] private KeyboardEditButton _customButton;
         private PickerMode _pickerMode;
 
         [Header("Keycap Material Picker")]
@@ -54,6 +55,10 @@ namespace Game.Player
         private readonly List<Image> _caseSelectionIndicators = new List<Image>();
         private readonly List<Texture2D> _casePreviewTextures = new List<Texture2D>();
 
+        [Header("Photo Customization")]
+        [SerializeField] private KeyboardCustomizationStorage _photoStorage;
+        private KeyboardCustomizationTestUI _photoUI;
+
         public event Action<Material> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<int> CaseMaterialSelected;
@@ -63,7 +68,8 @@ namespace Game.Player
             None,
             Keycap,
             SwitchSound,
-            CaseMaterial
+            CaseMaterial,
+            Photo
         }
 
         void Awake()
@@ -72,6 +78,10 @@ namespace Game.Player
             _keyboardEditPanel = transform.Find("KeyboardEditPanel") as RectTransform;
             CreateMaterialPicker();
             CreateSwitchSoundPicker();
+            _photoUI = gameObject.AddComponent<KeyboardCustomizationTestUI>();
+            _photoUI.InitializeEmbedded(_photoStorage);
+            _photoUI.CloseRequested += HandlePhotoCloseRequested;
+            _photoUI.CustomizationLoaded += HandlePhotoCustomizationLoaded;
         }
 
         void OnEnable()
@@ -81,6 +91,7 @@ namespace Game.Player
             _switchAxisButton.Clicked += HandleCategoryClicked;
             _ledButton.Clicked += HandleCategoryClicked;
             _caseButton.Clicked += HandleCategoryClicked;
+            _customButton.Clicked += HandleCategoryClicked;
             foreach (KeyboardEditButton button in _previewButtons)
             {
                 button.Clicked += HandlePreviewClicked;
@@ -105,6 +116,7 @@ namespace Game.Player
             _switchAxisButton.Clicked -= HandleCategoryClicked;
             _ledButton.Clicked -= HandleCategoryClicked;
             _caseButton.Clicked -= HandleCategoryClicked;
+            _customButton.Clicked -= HandleCategoryClicked;
             foreach (KeyboardEditButton button in _previewButtons)
             {
                 button.Clicked -= HandlePreviewClicked;
@@ -125,6 +137,8 @@ namespace Game.Player
 
         void OnDestroy()
         {
+            _photoUI.CloseRequested -= HandlePhotoCloseRequested;
+            _photoUI.CustomizationLoaded -= HandlePhotoCustomizationLoaded;
             DestroyPreviewTextures(_previewTextures);
             DestroyPreviewTextures(_casePreviewTextures);
         }
@@ -138,7 +152,8 @@ namespace Game.Player
             if (eventData.button == PointerEventData.InputButton.Left
                 && !ContainsPointer(_viewport, eventData.position)
                 && !ContainsPointer(_switchSoundViewport, eventData.position)
-                && !ContainsPointer(_caseMaterialViewport, eventData.position))
+                && !ContainsPointer(_caseMaterialViewport, eventData.position)
+                && !_photoUI.IsPointerOverUI(eventData.position))
             {
                 SetPickerMode(PickerMode.None);
             }
@@ -174,6 +189,34 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// customization을 기존 사진 편집 UI의 저장 및 복원 대상으로 연결한다.
+        /// 작업대에서 편집하는 키보드만 변경되며 단일 저장 파일과 재질 카탈로그는 유지한다.
+        /// </summary>
+        public void SetPhotoCustomization(KeyboardCustomization customization)
+        {
+            _photoStorage.SetTarget(customization);
+        }
+
+        /// <summary>
+        /// 사진 편집 완료 요청을 받아 오른쪽 패널과 상단 저장 슬롯을 닫는다.
+        /// 별도 입력 없이 선택 모드를 해제하고 기존 키보드 입력 상태를 복원한다.
+        /// </summary>
+        private void HandlePhotoCloseRequested()
+        {
+            SetPickerMode(PickerMode.None);
+        }
+
+        /// <summary>
+        /// 사진 저장 상태를 복원한 키보드의 재질 선택 표시를 갱신한다.
+        /// 현재 저장 대상의 키캡 및 케이스 선택을 사용하며 사진 편집 모드는 유지한다.
+        /// </summary>
+        private void HandlePhotoCustomizationLoaded()
+        {
+            SetSelectedMaterial(_photoStorage.Customization.KeycapMaterial);
+            RefreshCaseMaterialSelection();
+        }
+
+        /// <summary>
         /// 현재 케이스의 재질 인덱스와 일치하는 미리보기에 선택 표시를 켠다.
         /// 편집 대상과 재질 인덱스 목록을 사용하며 각 표시의 활성 상태를 갱신한다.
         /// </summary>
@@ -203,11 +246,12 @@ namespace Game.Player
 
             return ContainsPointer(_viewport, screenPosition)
                 || ContainsPointer(_switchSoundViewport, screenPosition)
-                || ContainsPointer(_caseMaterialViewport, screenPosition);
+                || ContainsPointer(_caseMaterialViewport, screenPosition)
+                || _photoUI.IsPointerOverUI(screenPosition);
         }
 
         /// <summary>
-        /// 클릭한 편집 항목에 따라 키캡, 축 사운드 또는 케이스 목록을 연다.
+        /// 클릭한 편집 항목에 따라 키캡, 축 사운드, 케이스 목록 또는 사진 편집 UI를 연다.
         /// button을 사용하며 같은 항목을 다시 누르거나 LED를 누르면 목록을 닫는다.
         /// </summary>
         private void HandleCategoryClicked(KeyboardEditButton button)
@@ -219,6 +263,8 @@ namespace Game.Player
                 mode = PickerMode.SwitchSound;
             else if (button == _caseButton)
                 mode = PickerMode.CaseMaterial;
+            else if (button == _customButton)
+                mode = PickerMode.Photo;
             SetPickerMode(mode == _pickerMode ? PickerMode.None : mode);
         }
 
@@ -819,6 +865,10 @@ namespace Game.Player
             {
                 _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial);
             }
+            if (_pickerMode == PickerMode.Photo)
+                _photoUI.BeginCustomization();
+            else
+                _photoUI.HideEmbedded();
         }
 
         /// <summary>

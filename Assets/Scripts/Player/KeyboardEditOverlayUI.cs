@@ -23,6 +23,7 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _switchAxisButton;
         [SerializeField] private KeyboardEditButton _ledButton;
         [SerializeField] private KeyboardEditButton _caseButton;
+        [SerializeField] private KeyboardEditButton _plateButton;
         [SerializeField] private KeyboardEditButton _customButton;
 
         [Header("Mode Buttons")]
@@ -62,6 +63,15 @@ namespace Game.Player
         private readonly List<Image> _caseSelectionIndicators = new List<Image>();
         private readonly List<Texture2D> _casePreviewTextures = new List<Texture2D>();
 
+        [Header("Plate Picker")]
+        private KeyboardCustomization _plateCustomization;
+        private RectTransform _plateViewport;
+        private readonly List<KeyboardEditButton> _platePreviewButtons = new List<KeyboardEditButton>();
+        private readonly List<PlateType> _plateTypes = new List<PlateType>();
+        private readonly List<PlateType> _platePreviewTypes = new List<PlateType>();
+        private readonly List<Image> _plateSelectionIndicators = new List<Image>();
+        private readonly List<Texture2D> _platePreviewTextures = new List<Texture2D>();
+
         [Header("Photo Customization")]
         [SerializeField] private KeyboardCustomizationStorage _photoStorage;
         private KeyboardCustomizationTestUI _photoUI;
@@ -73,6 +83,7 @@ namespace Game.Player
         public event Action<Material> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<int> CaseMaterialSelected;
+        public event Action<PlateType> PlateTypeSelected;
         public event Action<bool> AttackModeSelected;
 
         private enum PickerMode
@@ -81,6 +92,7 @@ namespace Game.Player
             Keycap,
             SwitchSound,
             CaseMaterial,
+            Plate,
             Photo,
             Led
         }
@@ -105,10 +117,12 @@ namespace Game.Player
         void OnEnable()
         {
             CreateCaseMaterialPicker();
+            CreatePlatePicker();
             _keycapButton.Clicked += HandleCategoryClicked;
             _switchAxisButton.Clicked += HandleCategoryClicked;
             _ledButton.Clicked += HandleCategoryClicked;
             _caseButton.Clicked += HandleCategoryClicked;
+            _plateButton.Clicked += HandleCategoryClicked;
             _customButton.Clicked += HandleCategoryClicked;
             _generalModeButton.Clicked += HandleGeneralModeClicked;
             _attackModeButton.Clicked += HandleAttackModeClicked;
@@ -127,6 +141,11 @@ namespace Game.Player
                 button.Clicked += HandleCasePreviewClicked;
             }
 
+            foreach (KeyboardEditButton button in _platePreviewButtons)
+            {
+                button.Clicked += HandlePlatePreviewClicked;
+            }
+
             SetPickerMode(PickerMode.None);
         }
 
@@ -136,6 +155,7 @@ namespace Game.Player
             _switchAxisButton.Clicked -= HandleCategoryClicked;
             _ledButton.Clicked -= HandleCategoryClicked;
             _caseButton.Clicked -= HandleCategoryClicked;
+            _plateButton.Clicked -= HandleCategoryClicked;
             _customButton.Clicked -= HandleCategoryClicked;
             _generalModeButton.Clicked -= HandleGeneralModeClicked;
             _attackModeButton.Clicked -= HandleAttackModeClicked;
@@ -154,6 +174,11 @@ namespace Game.Player
                 button.Clicked -= HandleCasePreviewClicked;
             }
 
+            foreach (KeyboardEditButton button in _platePreviewButtons)
+            {
+                button.Clicked -= HandlePlatePreviewClicked;
+            }
+
             SetPickerMode(PickerMode.None);
         }
 
@@ -163,6 +188,7 @@ namespace Game.Player
             _photoUI.CustomizationLoaded -= HandlePhotoCustomizationLoaded;
             DestroyPreviewTextures(_previewTextures);
             DestroyPreviewTextures(_casePreviewTextures);
+            DestroyPreviewTextures(_platePreviewTextures);
         }
 
         /// <summary>
@@ -175,6 +201,7 @@ namespace Game.Player
                 && !ContainsPointer(_viewport, eventData.position)
                 && !ContainsPointer(_switchSoundViewport, eventData.position)
                 && !ContainsPointer(_caseMaterialViewport, eventData.position)
+                && !ContainsPointer(_plateViewport, eventData.position)
                 && !_photoUI.IsPointerOverUI(eventData.position)
                 && !_ledUI.IsPointerOverUI(eventData.position))
             {
@@ -209,6 +236,15 @@ namespace Game.Player
         public void SetCaseCustomization(KeyboardCustomization customization)
         {
             _caseCustomization = customization;
+        }
+
+        /// <summary>
+        /// 보강판 선택 UI가 사용할 편집 키보드를 지정한다.
+        /// customization의 보강판 데이터와 현재 타입을 목록 생성 및 선택 표시에 사용한다.
+        /// </summary>
+        public void SetPlateCustomization(KeyboardCustomization customization)
+        {
+            _plateCustomization = customization;
         }
 
         /// <summary>
@@ -263,6 +299,7 @@ namespace Game.Player
         {
             SetSelectedMaterial(_photoStorage.Customization.KeycapMaterial);
             RefreshCaseMaterialSelection();
+            RefreshPlateSelection();
         }
 
         /// <summary>
@@ -274,6 +311,21 @@ namespace Game.Player
             for (int index = 0; index < _caseSelectionIndicators.Count; index++)
             {
                 _caseSelectionIndicators[index].enabled = _caseMaterialIndices[index] == _caseCustomization.CaseMaterialIndex;
+            }
+        }
+
+        /// <summary>
+        /// 현재 보강판 타입과 일치하는 미리보기의 선택 표시를 갱신한다.
+        /// 편집 대상의 현재 타입과 목록 순서를 사용하며 선택된 항목만 표시한다.
+        /// </summary>
+        public void RefreshPlateSelection()
+        {
+            if (_plateCustomization == null)
+                return;
+
+            for (int index = 0; index < _plateSelectionIndicators.Count; index++)
+            {
+                _plateSelectionIndicators[index].enabled = _platePreviewTypes[index] == _plateCustomization.CurrentPlateType;
             }
         }
 
@@ -296,12 +348,13 @@ namespace Game.Player
             return ContainsPointer(_viewport, screenPosition)
                 || ContainsPointer(_switchSoundViewport, screenPosition)
                 || ContainsPointer(_caseMaterialViewport, screenPosition)
+                || ContainsPointer(_plateViewport, screenPosition)
                 || _photoUI.IsPointerOverUI(screenPosition)
                 || _ledUI.IsPointerOverUI(screenPosition);
         }
 
         /// <summary>
-        /// 클릭한 편집 항목에 따라 키캡, 축 사운드, 케이스 목록 또는 사진 및 LED 편집 UI를 연다.
+        /// 클릭한 편집 항목에 따라 키캡, 축 사운드, 케이스, 보강판 목록 또는 사진 및 LED 편집 UI를 연다.
         /// button을 사용하며 같은 항목을 다시 누르면 해당 목록이나 패널을 닫는다.
         /// </summary>
         private void HandleCategoryClicked(KeyboardEditButton button)
@@ -313,6 +366,8 @@ namespace Game.Player
                 mode = PickerMode.SwitchSound;
             else if (button == _caseButton)
                 mode = PickerMode.CaseMaterial;
+            else if (button == _plateButton)
+                mode = PickerMode.Plate;
             else if (button == _customButton)
                 mode = PickerMode.Photo;
             else if (button == _ledButton)
@@ -363,6 +418,19 @@ namespace Game.Player
         private void HandleCasePreviewClicked(KeyboardEditButton button)
         {
             CaseMaterialSelected?.Invoke(_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]);
+        }
+
+        /// <summary>
+        /// 클릭한 보강판 미리보기의 타입을 편집 대상으로 전달한다.
+        /// button의 목록 인덱스를 사용하며 보강판 타입을 C# 이벤트로 전달한다.
+        /// </summary>
+        private void HandlePlatePreviewClicked(KeyboardEditButton button)
+        {
+            int index = _platePreviewButtons.IndexOf(button);
+            if (index < 0 || index >= _platePreviewTypes.Count)
+                return;
+
+            PlateTypeSelected?.Invoke(_platePreviewTypes[index]);
         }
 
         /// <summary>
@@ -813,6 +881,62 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 편집 키보드의 등록된 보강판 재질을 이름 없는 가로 미리보기 목록으로 만든다.
+        /// 보강판 메시와 PlateData를 사용하며 선택 버튼, 타입, 표시 텍스처를 저장한다.
+        /// </summary>
+        private void CreatePlatePicker()
+        {
+            if (_plateViewport != null)
+            {
+                Destroy(_plateViewport.gameObject);
+                _plateViewport = null;
+            }
+
+            _platePreviewButtons.Clear();
+            _plateTypes.Clear();
+            _platePreviewTypes.Clear();
+            _plateSelectionIndicators.Clear();
+            DestroyPreviewTextures(_platePreviewTextures);
+
+            _plateButton.interactable = _plateCustomization != null
+                && _plateCustomization.PlateRenderer != null;
+            if (!_plateButton.interactable)
+                return;
+
+            MeshFilter plateMeshFilter = _plateCustomization.PlateRenderer.GetComponent<MeshFilter>();
+            if (plateMeshFilter == null || plateMeshFilter.sharedMesh == null)
+            {
+                _plateButton.interactable = false;
+                return;
+            }
+
+            List<Material> materials = new List<Material>();
+            foreach (PlateData plateData in _plateCustomization.AvailablePlates)
+            {
+                if (plateData == null || plateData.Material == null)
+                    continue;
+
+                _plateTypes.Add(plateData.Type);
+                materials.Add(plateData.Material);
+            }
+
+            if (materials.Count == 0)
+            {
+                _plateButton.interactable = false;
+                return;
+            }
+
+            Texture2D[] previews = CreateMaterialPreviewTextures(
+                plateMeshFilter.sharedMesh,
+                materials,
+                _platePreviewTextures,
+                "Plate");
+            _plateViewport = CreateScrollViewport("Plate", previews.Length, out RectTransform content);
+            CreatePlatePreviewItems(content, previews);
+            RefreshPlateSelection();
+        }
+
+        /// <summary>
         /// 등록된 케이스 렌더러의 메시를 키보드 로컬 좌표로 합친다.
         /// 편집 대상의 파츠 변환과 서브메시를 사용하며 합친 메시 또는 파츠가 없으면 null을 반환한다.
         /// </summary>
@@ -904,6 +1028,65 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 보강판 재질 미리보기마다 이름 없는 선택 버튼과 선택 표시를 만든다.
+        /// content와 previews를 사용하며 버튼, PlateType, 표시 참조를 같은 순서로 저장한다.
+        /// </summary>
+        private void CreatePlatePreviewItems(RectTransform content, Texture2D[] previews)
+        {
+            float stride = _itemWidth + _itemSpacing;
+            for (int index = 0; index < previews.Length; index++)
+            {
+                if (previews[index] == null)
+                    continue;
+
+                GameObject itemObject = new GameObject(
+                    "PlateMaterialPreview", typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton));
+                RectTransform itemRect = itemObject.GetComponent<RectTransform>();
+                itemRect.SetParent(content, false);
+                itemRect.anchorMin = new Vector2(0f, 0.5f);
+                itemRect.anchorMax = new Vector2(0f, 0.5f);
+                itemRect.pivot = new Vector2(0.5f, 0.5f);
+                itemRect.anchoredPosition = new Vector2(index * stride + _itemWidth * 0.5f, 0f);
+                itemRect.sizeDelta = new Vector2(_itemWidth, 116f);
+                Image itemImage = itemObject.GetComponent<Image>();
+                itemImage.color = Color.clear;
+                itemImage.raycastTarget = true;
+
+                GameObject imageObject = new GameObject("PlatePreviewImage", typeof(RectTransform), typeof(RawImage));
+                RectTransform imageRect = imageObject.GetComponent<RectTransform>();
+                imageRect.SetParent(itemRect, false);
+                imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+                imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+                imageRect.anchoredPosition = new Vector2(0f, 5f);
+                imageRect.sizeDelta = new Vector2(92f, 92f);
+                RawImage image = imageObject.GetComponent<RawImage>();
+                image.texture = previews[index];
+                image.raycastTarget = false;
+
+                KeyboardEditButton button = itemObject.GetComponent<KeyboardEditButton>();
+                button.targetGraphic = image;
+                button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+                GameObject indicatorObject = new GameObject("SelectedIndicator", typeof(RectTransform), typeof(Image));
+                RectTransform indicatorRect = indicatorObject.GetComponent<RectTransform>();
+                indicatorRect.SetParent(itemRect, false);
+                indicatorRect.anchorMin = new Vector2(0.5f, 0f);
+                indicatorRect.anchorMax = new Vector2(0.5f, 0f);
+                indicatorRect.pivot = new Vector2(0.5f, 0f);
+                indicatorRect.anchoredPosition = new Vector2(0f, 2f);
+                indicatorRect.sizeDelta = new Vector2(48f, 3f);
+                Image indicator = indicatorObject.GetComponent<Image>();
+                indicator.color = new Color(0.36f, 0.82f, 1f, 1f);
+                indicator.raycastTarget = false;
+                indicator.enabled = false;
+
+                _platePreviewButtons.Add(button);
+                _platePreviewTypes.Add(_plateTypes[index]);
+                _plateSelectionIndicators.Add(indicator);
+            }
+        }
+
+        /// <summary>
         /// 목록이 소유한 미리보기 텍스처를 해제한다.
         /// textures의 생성된 텍스처를 파괴하고 목록을 비운다.
         /// </summary>
@@ -934,6 +1117,10 @@ namespace Game.Player
             if (_caseMaterialViewport != null)
             {
                 _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial);
+            }
+            if (_plateViewport != null)
+            {
+                _plateViewport.gameObject.SetActive(_pickerMode == PickerMode.Plate);
             }
             if (_pickerMode != PickerMode.Photo)
                 _photoUI.HideEmbedded();

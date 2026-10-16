@@ -16,6 +16,8 @@ public sealed class KeyboardPlate : MonoBehaviour
     [SerializeField] private MeshRenderer _plateRenderer;
 
     public PlateData CurrentData => _currentData;
+    public IReadOnlyList<PlateData> AvailablePlates => _plateData;
+    public MeshRenderer PlateRenderer => _plateRenderer;
     public event Action<PlateData> PlateChanged;
 
     /// <summary>

@@ -93,6 +93,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private KeyboardPlate _plate;
     [SerializeField] private PlateType _plateType = PlateType.Brass;
 
+    public IReadOnlyList<PlateData> AvailablePlates => _plate != null ? _plate.AvailablePlates : Array.Empty<PlateData>();
+    public MeshRenderer PlateRenderer => _plate != null ? _plate.PlateRenderer : null;
+    public PlateType CurrentPlateType => _plateType;
+
     void OnEnable()
     {
         CacheKeycaps();

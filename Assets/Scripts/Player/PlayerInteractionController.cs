@@ -126,6 +126,7 @@ namespace Game.Player
                 _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected += HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected += HandleCaseMaterialSelected;
+                _keyboardEditOverlayUI.PlateTypeSelected += HandlePlateTypeSelected;
                 _keyboardEditOverlayUI.AttackModeSelected += HandleAttackModeSelected;
             }
             _clickInput.action.started += HandleClickStarted;
@@ -144,6 +145,7 @@ namespace Game.Player
                 _keyboardEditOverlayUI.KeycapMaterialSelected -= HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected -= HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected -= HandleCaseMaterialSelected;
+                _keyboardEditOverlayUI.PlateTypeSelected -= HandlePlateTypeSelected;
                 _keyboardEditOverlayUI.AttackModeSelected -= HandleAttackModeSelected;
             }
             _clickInput.action.started -= HandleClickStarted;
@@ -426,6 +428,7 @@ namespace Game.Player
             _keyboardEditOverlayUI?.SetSelectedMaterial(customization != null ? customization.KeycapMaterial : null);
             _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
             _keyboardEditOverlayUI?.SetCaseCustomization(customization);
+            _keyboardEditOverlayUI?.SetPlateCustomization(customization);
             _keyboardEditOverlayUI?.SetPhotoCustomization(customization);
             _keyboardEditOverlayUI?.SetLEDCustomization(customization);
             if (_keyboardEditOverlay != null)
@@ -807,6 +810,22 @@ namespace Game.Player
             {
                 customization.SetCaseMaterialIndex(index);
                 _keyboardEditOverlayUI.RefreshCaseMaterialSelection();
+            }
+        }
+
+        /// <summary>
+        /// 선택한 보강판 타입을 현재 편집 키보드에 적용한다.
+        /// type과 편집 대상의 KeyboardCustomization을 사용하며 적용 성공 시 목록의 선택 표시를 갱신한다.
+        /// </summary>
+        private void HandlePlateTypeSelected(PlateType type)
+        {
+            if (_editingKeyboard == null)
+                return;
+
+            KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
+            if (customization != null && customization.SetPlateType(type))
+            {
+                _keyboardEditOverlayUI.RefreshPlateSelection();
             }
         }
 

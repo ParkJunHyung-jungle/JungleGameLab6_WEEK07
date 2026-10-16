@@ -6,8 +6,11 @@ public class FMODEvents : MonoBehaviour
     [field: Header("Keyboard SFX")]
     [field: SerializeField] public EventReference BlueSwitch { get; private set; }
     [field: SerializeField] public EventReference BrownSwitch { get; private set; }
-    [field: SerializeField] public EventReference SansSwitch { get; private set; }
     [field: SerializeField] public EventReference RedSwitch { get; private set; }
+    [field: SerializeField] public EventReference SansSwitch { get; private set; }
+
+    [field: SerializeField] public EventReference PopSwitch { get; private set; }
+    [field: SerializeField] public EventReference TypewriterSwitch { get; private set; }
     [field: SerializeField] public EventReference BreakKeyCap { get; private set; }
 
 
@@ -27,4 +30,6 @@ public class FMODEvents : MonoBehaviour
         if (instance == this)
             instance = null;
     }
+
+
 }

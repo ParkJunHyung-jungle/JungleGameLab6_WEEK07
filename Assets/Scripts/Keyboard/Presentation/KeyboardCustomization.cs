@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 #if UNITY_EDITOR
@@ -78,6 +79,40 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
 
     public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
+    public int PhotoKeycapCount => GetImageCustomization().KeycapCount;
+
+    /// <summary>
+    /// 입력 키에 바인딩된 물리 키캡을 사진용 키캡 배열의 인덱스로 변환한다.
+    /// key를 사용하며, 대응하는 키캡이 없으면 false와 -1을 반환한다.
+    /// </summary>
+    public bool TryGetPhotoKeycapIndex(Key key, out int keycapIndex)
+    {
+        keycapIndex = -1;
+        KeyboardInputController input = GetComponent<KeyboardInputController>();
+        if (input == null || !input.TryGetKeycapTransform(key, out Transform inputKeycap))
+            return false;
+
+        if (_keycaps == null)
+            CacheKeycaps();
+
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            Transform photoKeycap = _keycaps[index];
+            if (photoKeycap == null)
+                continue;
+
+            if (photoKeycap == inputKeycap
+                || photoKeycap.IsChildOf(inputKeycap)
+                || inputKeycap.IsChildOf(photoKeycap))
+            {
+                keycapIndex = index;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// 현재 전체 키캡에 지정된 Material을 반환한다.
     /// 사용자 지정 상태를 읽으며 반환값은 _keycapMaterial이다.
@@ -484,6 +519,42 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
+    /// 이미지 편집 프레임에 사용할 전체 키캡, 개별 키캡 또는 케이스 경계 크기를 반환한다.
+    /// caseImage와 keycapIndex를 사용하며 키보드 로컬 XZ 크기를 반환한다.
+    /// </summary>
+    public Vector2 GetPhotoCanvasSize(bool caseImage, int keycapIndex = -1)
+    {
+        return GetImageCustomization().GetCanvasSize(caseImage, keycapIndex);
+    }
+
+    /// <summary>
+    /// 이미지 편집 중 전체 키캡 또는 지정 키캡에 임시 사진 배치를 표시한다.
+    /// image와 배치값을 사용하며 원래 저장 상태는 변경하지 않는다.
+    /// </summary>
+    public bool PreviewKeycapImage(Texture2D image, int keycapIndex, Vector2 offset, float zoom)
+    {
+        return GetImageCustomization().PreviewKeycapImage(image, keycapIndex, offset, zoom);
+    }
+
+    /// <summary>
+    /// 이미지 편집 중 케이스 전체에 임시 사진 배치를 표시한다.
+    /// image와 배치값을 사용하며 원래 저장 상태는 변경하지 않는다.
+    /// </summary>
+    public bool PreviewCaseImage(Texture2D image, Vector2 offset, float zoom)
+    {
+        return GetImageCustomization().PreviewCaseImage(image, offset, zoom);
+    }
+
+    /// <summary>
+    /// 편집 화면을 닫을 때 임시 사진을 지우고 기존 적용 상태를 복구한다.
+    /// 반환값 없이 이미지 미리보기 오버레이를 정리한다.
+    /// </summary>
+    public void ClearPhotoImagePreview()
+    {
+        if (_imageCustomization != null) _imageCustomization.ClearImagePreview();
+    }
+
+    /// <summary>
     /// path의 PNG 또는 JPEG 파일을 전체 키캡이나 keycapIndex 한 곳에 적용한다.
     /// 성공 여부를 반환하고 음수 인덱스는 전체 캔버스를 의미한다.
     /// </summary>
@@ -495,12 +566,32 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
+    /// PNG 또는 JPEG 이미지를 지정 키캡에 배치값과 함께 적용한다.
+    /// path, keycapIndex, 오프셋과 배율을 사용하며 성공 시 해당 키캡을 활성화한다.
+    /// </summary>
+    public bool LoadKeycapImage(string path, int keycapIndex, Vector2 offset, float zoom)
+    {
+        bool applied = GetImageCustomization().LoadImage(path, false, keycapIndex, offset, zoom);
+        if (applied) EnableKeycaps(keycapIndex);
+        return applied;
+    }
+
+    /// <summary>
     /// path의 PNG 또는 JPEG 파일을 읽어 Case 사진으로 적용한다.
     /// 성공 여부를 반환하며 잘못된 파일은 기존 외관을 유지한다.
     /// </summary>
     public bool LoadCaseImage(string path)
     {
         return GetImageCustomization().LoadImage(path, true);
+    }
+
+    /// <summary>
+    /// PNG 또는 JPEG 이미지를 케이스 전체에 배치값과 함께 적용한다.
+    /// path, 오프셋과 배율을 사용하며 성공 여부를 반환한다.
+    /// </summary>
+    public bool LoadCaseImage(string path, Vector2 offset, float zoom)
+    {
+        return GetImageCustomization().LoadImage(path, true, -1, offset, zoom);
     }
 
     /// <summary>

@@ -74,7 +74,11 @@ namespace Game.Player
 
         [Header("Photo Customization")]
         [SerializeField] private KeyboardCustomizationStorage _photoStorage;
+        [SerializeField, Range(0.01f, 0.2f)]
+        [Tooltip("휠 한 칸당 확대·축소 비율입니다. 0.03은 한 번에 약 3% 변하며 플레이 중 변경도 적용됩니다.")]
+        private float _photoWheelZoomSensitivity = 0.03f;
         private KeyboardCustomizationTestUI _photoUI;
+        private float _appliedPhotoWheelZoomSensitivity;
 
         [Header("LED Customization")]
         private KeyboardCustomization _ledCustomization;
@@ -104,7 +108,8 @@ namespace Game.Player
             CreateMaterialPicker();
             CreateSwitchSoundPicker();
             _photoUI = gameObject.AddComponent<KeyboardCustomizationTestUI>();
-            _photoUI.InitializeEmbedded(_photoStorage);
+            _photoUI.InitializeEmbedded(_photoStorage, _photoWheelZoomSensitivity);
+            _appliedPhotoWheelZoomSensitivity = Mathf.Clamp(_photoWheelZoomSensitivity, 0.01f, 0.2f);
             _photoUI.CloseRequested += HandlePhotoCloseRequested;
             _photoUI.CustomizationLoaded += HandlePhotoCustomizationLoaded;
             GameObject ledPanel = new GameObject("LEDCustomizationPanel", typeof(RectTransform));
@@ -112,6 +117,19 @@ namespace Game.Player
             ledPanel.SetActive(false);
             _ledUI = ledPanel.AddComponent<KeyboardLEDPanelUI>();
             _ledUI.Initialize();
+        }
+
+        void LateUpdate()
+        {
+            if (_photoUI == null)
+                return;
+
+            float sensitivity = Mathf.Clamp(_photoWheelZoomSensitivity, 0.01f, 0.2f);
+            if (Mathf.Approximately(sensitivity, _appliedPhotoWheelZoomSensitivity))
+                return;
+
+            _photoUI.SetWheelZoomSensitivity(sensitivity);
+            _appliedPhotoWheelZoomSensitivity = sensitivity;
         }
 
         void OnEnable()

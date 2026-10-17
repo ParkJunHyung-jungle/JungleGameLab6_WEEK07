@@ -179,6 +179,25 @@ namespace KeyboardModeling
             return layout;
         }
 
+        /// <summary>
+        /// key에 바인딩된 물리 키캡 Transform을 찾아 반환한다.
+        /// 바인딩이 없으면 false와 null을 반환한다.
+        /// </summary>
+        public bool TryGetKeycapTransform(Key key, out Transform keycap)
+        {
+            foreach (KeyBinding binding in _bindings)
+            {
+                if (binding.Key != key)
+                    continue;
+
+                keycap = binding.Keycap;
+                return keycap != null;
+            }
+
+            keycap = null;
+            return false;
+        }
+
         /// <summary>토너먼트의 완파 대상을 A~Z로 제한하며 기존 씬의 대상 설정은 변경하지 않는다.</summary>
         public void UseAlphabetDestructionKeys() { _alphabetKeysRequired = true; }
 

@@ -29,6 +29,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     private Material _photoMaterialTemplate;
     private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
     private string _lastError;
+    private Func<int, bool> _hasSwitchForKeycap;
 
     public string LastError => _lastError;
 
@@ -66,9 +67,10 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     /// cases와 keycaps에서 외피 렌더러를 수집하고 photoMaterialTemplate을 사진용 기본 재질로 보관한다.
     /// 최초 호출에서만 참조와 사진 상태를 초기화해 이후 개별 꾸미기 상태를 유지한다.
     /// </summary>
-    public void Initialize(MeshRenderer[] cases, MeshRenderer[] keycaps, Material photoMaterialTemplate)
+    public void Initialize(MeshRenderer[] cases, MeshRenderer[] keycaps, Material photoMaterialTemplate, Func<int, bool> hasSwitchForKeycap)
     {
         _photoMaterialTemplate = photoMaterialTemplate;
+        _hasSwitchForKeycap = hasSwitchForKeycap;
         if (_shells != null) return;
         _cases = cases;
         var shells = new List<MeshRenderer>();
@@ -95,6 +97,11 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         }
         if (keycapIndex >= 0)
         {
+            if (!_hasSwitchForKeycap(keycapIndex))
+            {
+                _lastError = "Install a switch before customizing this keycap.";
+                return false;
+            }
             MeshRenderer renderer = _shells[keycapIndex];
             if (renderer == null || !CanApply(renderer)) return false;
             ApplyImage(renderer, image, GetCanvasBounds(new[] { renderer }));
@@ -103,11 +110,21 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         }
         else
         {
-            foreach (MeshRenderer renderer in _shells)
-                if (renderer != null && !CanApply(renderer)) return false;
+            bool hasTarget = false;
             for (int index = 0; index < _shells.Length; index++)
             {
-                if (_shells[index] == null) continue;
+                if (!_hasSwitchForKeycap(index) || _shells[index] == null) continue;
+                if (!CanApply(_shells[index])) return false;
+                hasTarget = true;
+            }
+            if (!hasTarget)
+            {
+                _lastError = "Install switches before customizing keycaps.";
+                return false;
+            }
+            for (int index = 0; index < _shells.Length; index++)
+            {
+                if (_shells[index] == null || !_hasSwitchForKeycap(index)) continue;
                 ApplyImage(_shells[index], image, _keycapCanvas);
                 _keycapImages[index] = image;
                 _individualImages[index] = false;

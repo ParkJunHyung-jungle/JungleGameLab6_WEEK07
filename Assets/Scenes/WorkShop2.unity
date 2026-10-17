@@ -2060,6 +2060,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1061663983}
   m_CullTransparentMesh: 1
+--- !u!1 &1070504514
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1070504516}
+  - component: {fileID: 1070504515}
+  m_Layer: 0
+  m_Name: IndoorAmbient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1070504515
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1070504514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 595c609dd1b17dd4180c22c5d62f8eef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SceneIndoorAmbient
+  _volume: 1
+  _fadeDuration: 1
+--- !u!4 &1070504516
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1070504514}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1082932468
 GameObject:
   m_ObjectHideFlags: 0
@@ -2918,6 +2964,7 @@ GameObject:
   - component: {fileID: 1379226033}
   - component: {fileID: 1379226032}
   - component: {fileID: 7500000001}
+  - component: {fileID: 7500000002}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -4423,6 +4470,21 @@ MonoBehaviour:
   _keyboardEditMinFieldOfView: 40
   _keyboardEditMaxFieldOfView: 100
   _keyboardEditFieldOfViewStep: 2
+--- !u!114 &7500000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379226030}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0ee1e74d58fc76428efd094a330fe3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerFootstepController
+  _stepDistance: 2.2
+  _minimumWalkingSpeed: 0.1
+  _minimumStepInterval: 0.3
 --- !u!114 &7500000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9641,3 +9703,4 @@ SceneRoots:
   - {fileID: 9900990301}
   - {fileID: 1711265684}
   - {fileID: 1770770338}
+  - {fileID: 1070504516}

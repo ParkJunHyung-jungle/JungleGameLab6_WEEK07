@@ -15,7 +15,7 @@ public sealed class KeyboardDispenser : MonoBehaviour
     [SerializeField, Min(0f)] private float _ejectImpulse = 1.5f;
 
     /// <summary>
-    /// 등록된 프리팹 중 하나를 배출 위치에 생성하고 밀어낸 뒤 자판기 배출음을 한 번 재생한다.
+    /// 등록된 프리팹 중 하나를 배출 위치에 생성하고 밀어낸다.
     /// _keyboardPrefabs와 _outputPoint를 사용하며 생성 오브젝트를 keyboardRoot에 저장하고 성공 여부를 반환한다.
     /// </summary>
     public bool TryDispense(out GameObject keyboardRoot)
@@ -68,8 +68,6 @@ public sealed class KeyboardDispenser : MonoBehaviour
 
         if (keyboardBody != null)
             keyboardBody.AddForce(_outputPoint.forward * _ejectImpulse, ForceMode.Impulse);
-
-        AudioManager.instance.PlayOneShot(FMODEvents.instance.VendingMachineThud, _outputPoint.position);
         return true;
     }
 }

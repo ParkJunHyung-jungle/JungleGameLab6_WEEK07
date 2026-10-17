@@ -30,16 +30,6 @@ public class AudioManager : MonoBehaviour
     [Header("Event Instances")]
     private List<EventInstance> eventInstances;
 
-    [Header("Indoor Ambient Runtime")]
-    private EventInstance _indoorAmbient;
-    private bool _ambientRequested;
-    private bool _ambientIsOneshot;
-    private bool _ambientFailed;
-    private bool _ambientStopped = true;
-    private float _ambientVolume;
-    private float _ambientTargetVolume;
-    private float _ambientFadeDuration = 1f;
-
     public static AudioManager instance { get; private set; }
 
     /// <summary>
@@ -76,73 +66,6 @@ public class AudioManager : MonoBehaviour
     void OnApplicationQuit()
     {
         _isQuitting = true;
-    }
-
-    void Update()
-    {
-        if (!_indoorAmbient.isValid() || _ambientFailed || _isQuitting || _ambientStopped) return;
-
-        float target = _ambientRequested ? _ambientTargetVolume : 0f;
-        _ambientVolume = Mathf.MoveTowards(_ambientVolume, target,
-            Time.deltaTime * Mathf.Max(_ambientTargetVolume, 0.0001f) / _ambientFadeDuration);
-        if (!CheckAmbientResult(_indoorAmbient.setVolume(_ambientVolume), "볼륨 적용")) return;
-        if (!CheckAmbientResult(_indoorAmbient.getPlaybackState(out PLAYBACK_STATE state), "상태 조회")) return;
-
-        if (!_ambientRequested && _ambientVolume <= 0f)
-        {
-            if (state != PLAYBACK_STATE.STOPPED)
-                CheckAmbientResult(_indoorAmbient.stop(FMOD.Studio.STOP_MODE.IMMEDIATE), "정지");
-            _ambientStopped = true;
-            return;
-        }
-
-        if (_ambientRequested && _ambientIsOneshot && state == PLAYBACK_STATE.STOPPED)
-            CheckAmbientResult(_indoorAmbient.start(), "반복 재생");
-    }
-
-    /// <summary>
-    /// IndoorAmbient 인스턴스 하나를 생성하거나 재사용하여 실내 배경음을 시작한다.
-    /// volume과 fadeDuration으로 목표 음량과 페이드 시간을 설정하며 키보드 효과와 독립적으로 재생한다.
-    /// </summary>
-    public void PlayIndoorAmbient(float volume, float fadeDuration)
-    {
-        _ambientFailed = false;
-        _ambientTargetVolume = Mathf.Clamp01(volume);
-        _ambientFadeDuration = Mathf.Max(0.01f, fadeDuration);
-        if (!_indoorAmbient.isValid())
-        {
-            _indoorAmbient = CreateEventInstance(FMODEvents.instance.IndoorAmbient);
-            if (!CheckAmbientResult(_indoorAmbient.getDescription(out EventDescription description), "이벤트 조회")) return;
-            if (!CheckAmbientResult(description.isOneshot(out _ambientIsOneshot), "반복 설정 조회")) return;
-        }
-
-        if (!CheckAmbientResult(_indoorAmbient.setVolume(_ambientVolume), "초기 음량 적용")) return;
-        if (!CheckAmbientResult(_indoorAmbient.getPlaybackState(out PLAYBACK_STATE state), "상태 조회")) return;
-        if (state == PLAYBACK_STATE.STOPPED && !CheckAmbientResult(_indoorAmbient.start(), "재생")) return;
-        _ambientRequested = true;
-        _ambientStopped = false;
-    }
-
-    /// <summary>
-    /// 실내 배경음의 재생 요청을 해제하여 현재 페이드 시간에 걸쳐 음량을 줄이고 정지한다.
-    /// 입력과 반환값 없이 관리 중인 인스턴스의 목표 음량을 무음으로 변경한다.
-    /// </summary>
-    public void StopIndoorAmbient()
-    {
-        _ambientRequested = false;
-    }
-
-    /// <summary>
-    /// 실내 배경음 작업의 result를 확인하고 성공 여부를 반환한다.
-    /// 실패하면 operation 이름과 FMOD 오류를 출력하고 반복 시도를 중단한다.
-    /// </summary>
-    private bool CheckAmbientResult(FMOD.RESULT result, string operation)
-    {
-        if (result == FMOD.RESULT.OK) return true;
-        _ambientFailed = true;
-        _ambientRequested = false;
-        Debug.LogError($"[FMOD] IndoorAmbient {operation} 실패: {result} ({FMOD.Error.String(result)}).", this);
-        return false;
     }
 
     /// <summary>

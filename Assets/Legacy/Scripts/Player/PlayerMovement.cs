@@ -1,5 +1,3 @@
-using System;
-
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -25,8 +23,6 @@ public sealed class PlayerMovement : MonoBehaviour
     [SerializeField] private float _gravity = -20f;
     private float _verticalVelocity;
 
-    public event Action<Vector3, Vector3, bool> MovementProcessed;
-
     void Awake()
     {
         _controller = GetComponent<CharacterController>();
@@ -44,7 +40,6 @@ public sealed class PlayerMovement : MonoBehaviour
     {
         _moveInput.action.Disable();
         _wasInputCamReady = false;
-        MovementProcessed?.Invoke(Vector3.zero, transform.position, false);
     }
 
     void Update()
@@ -52,7 +47,6 @@ public sealed class PlayerMovement : MonoBehaviour
         if (_brain.ActiveVirtualCamera != (ICinemachineCamera)_inputCam || _brain.IsBlending || !_wasInputCamReady || !Application.isFocused)
         {
             _verticalVelocity = 0f;
-            MovementProcessed?.Invoke(Vector3.zero, transform.position, false);
             return;
         }
 
@@ -64,14 +58,7 @@ public sealed class PlayerMovement : MonoBehaviour
         if (_controller.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
         else _verticalVelocity += _gravity * Time.deltaTime;
 
-        Vector3 previousPosition = transform.position;
-        bool wasGrounded = _controller.isGrounded;
         _controller.Move((movement + Vector3.up * _verticalVelocity) * Time.deltaTime);
-        Vector3 displacement = Vector3.ProjectOnPlane(transform.position - previousPosition, Vector3.up);
-        Bounds bounds = _controller.bounds;
-        Vector3 footPosition = bounds.center - Vector3.up * bounds.extents.y;
-        bool canStep = wasGrounded && _controller.isGrounded && _moveInput.action.enabled && input.sqrMagnitude > 0f;
-        MovementProcessed?.Invoke(displacement, footPosition, canStep);
     }
 
     void LateUpdate()
@@ -102,6 +89,5 @@ public sealed class PlayerMovement : MonoBehaviour
         _inputCam.transform.localPosition = _cameraLocalPosition;
         _controller.enabled = true;
         _verticalVelocity = 0f;
-        MovementProcessed?.Invoke(Vector3.zero, transform.position, false);
     }
 }

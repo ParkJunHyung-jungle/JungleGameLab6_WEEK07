@@ -10557,7 +10557,6 @@ GameObject:
   - component: {fileID: 5599136489010714831}
   - component: {fileID: 374767421738865439}
   - component: {fileID: 5246662257406206278}
-  - component: {fileID: 1985949058611238361}
   m_Layer: 0
   m_Name: Keyboard_TKL_87_Neon_Game
   m_TagString: Untagged
@@ -10778,7 +10777,6 @@ MonoBehaviour:
   _logInput: 1
   _audioSource: {fileID: 2413946416118993268}
   _pressSound: {fileID: 8300000, guid: 5871cb8f54e12774ebe12e9c708bd284, type: 3}
-  _fmodSwitchSound: 0
 --- !u!54 &2635951001103394244
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -10942,23 +10940,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.NeonKeyboardGradient
   _bandMaterial: {fileID: 2100000, guid: 35526b543471e6844a3a7af84333e124, type: 2}
---- !u!114 &1985949058611238361
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2136423454153178800}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7fe699182f42ab9459654bc9b651eeed, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCollisionAudio
-  _minimumImpactSpeed: 2
-  _minimumPlayInterval: 0.2
-  _surfaceLayers:
-    serializedVersion: 2
-    m_Bits: 1
 --- !u!1 &2150282322797532260
 GameObject:
   m_ObjectHideFlags: 0

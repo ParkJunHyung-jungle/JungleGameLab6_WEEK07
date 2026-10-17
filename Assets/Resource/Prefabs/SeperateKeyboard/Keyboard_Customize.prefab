@@ -34742,7 +34742,6 @@ GameObject:
   - component: {fileID: 731598260174095312}
   - component: {fileID: 16919128326509319}
   - component: {fileID: 16919128326509320}
-  - component: {fileID: 3233378293799950656}
   m_Layer: 0
   m_Name: Keyboard_Customize
   m_TagString: Untagged
@@ -36429,23 +36428,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 510c1bee6e0fcfd4c8843892cec42486, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardImageCustomization
---- !u!114 &3233378293799950656
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5648102524883158503}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7fe699182f42ab9459654bc9b651eeed, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCollisionAudio
-  _minimumImpactSpeed: 2
-  _minimumPlayInterval: 0.2
-  _surfaceLayers:
-    serializedVersion: 2
-    m_Bits: 1
 --- !u!1 &5689495446983780148
 GameObject:
   m_ObjectHideFlags: 0

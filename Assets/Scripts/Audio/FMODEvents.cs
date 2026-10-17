@@ -3,8 +3,6 @@ using FMODUnity;
 
 public class FMODEvents : MonoBehaviour
 {
-    [field: Header("Ambient Sound")]
-    [field: SerializeField] public EventReference IndoorAmbient { get; private set; }
     [field: Header("Keyboard SFX")]
     [field: SerializeField] public EventReference BlueSwitch { get; private set; }
     [field: SerializeField] public EventReference BrownSwitch { get; private set; }
@@ -16,10 +14,6 @@ public class FMODEvents : MonoBehaviour
     [field: SerializeField] public EventReference FireWorksSwitch { get; private set; }
     [field: SerializeField] public EventReference AnimalSwitch { get; private set; }
     [field: SerializeField] public EventReference BreakKeyCap { get; private set; }
-    [field: Header("Other SFX")]
-    [field: SerializeField] public EventReference FootSteps { get; private set; }
-    [field: SerializeField] public EventReference VendingMachineThud { get; private set; }
-    [field: SerializeField] public EventReference ThumpKeyBoard { get; private set; }
 
 
     public static FMODEvents instance { get; private set; }

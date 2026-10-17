@@ -778,10 +778,14 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 선택된 material을 현재 편집 중인 키보드의 사용자 지정 컴포넌트에 전달한다.
-        /// material과 _editingKeyboard를 사용하며 전체 키캡 재질을 변경한다.
+        /// 확정된 키캡 재질과 적용 범위의 변경 기록을 남긴다.
+        /// material, previousMaterial, allKeys, keycapIndex와 _editingKeyboard를 사용한다.
         /// </summary>
-        private void HandleKeycapMaterialSelected(Material material)
+        private void HandleKeycapMaterialSelected(
+            Material material,
+            Material previousMaterial,
+            bool allKeys,
+            int keycapIndex)
         {
             if (_editingKeyboard == null || material == null)
                 return;
@@ -789,10 +793,11 @@ namespace Game.Player
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
             if (customization != null)
             {
-                string previous = customization.KeycapMaterial != null ? customization.KeycapMaterial.name : "";
-                customization.SetKeycapMaterial(material);
+                string previous = previousMaterial != null ? previousMaterial.name : "";
                 Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Keycap", material.name,
-                    previous, changed: previous != material.name);
+                    previous, changed: previous != material.name,
+                    scope: allKeys ? "AllKeycaps" : "SingleKeycap",
+                    key: allKeys ? "" : keycapIndex.ToString());
             }
         }
 

@@ -114,13 +114,16 @@ namespace Game.Player
         [Tooltip("휠 한 칸당 확대·축소 비율입니다. 0.03은 한 번에 약 3% 변하며 플레이 중 변경도 적용됩니다.")]
         private float _photoWheelZoomSensitivity = 0.03f;
         private KeyboardCustomizationTestUI _photoUI;
+        private KeyboardKeycapPanelUI _keycapUI;
+        private bool _hasPendingKeycapMaterial;
+        private bool _hasActiveKeycapMaterialPreview;
         private float _appliedPhotoWheelZoomSensitivity;
 
         [Header("LED Customization")]
         private KeyboardCustomization _ledCustomization;
         private KeyboardLEDPanelUI _ledUI;
 
-        public event Action<Material> KeycapMaterialSelected;
+        public event Action<Material, Material, bool, int> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<int> CaseMaterialSelected;
         public event Action<Material> PlateMaterialSelected;
@@ -157,6 +160,15 @@ namespace Game.Player
             _appliedPhotoWheelZoomSensitivity = Mathf.Clamp(_photoWheelZoomSensitivity, 0.01f, 0.2f);
             _photoUI.CloseRequested += HandlePhotoCloseRequested;
             _photoUI.CustomizationLoaded += HandlePhotoCustomizationLoaded;
+            GameObject keycapPanel = new GameObject("KeycapCustomizationPanel", typeof(RectTransform));
+            keycapPanel.transform.SetParent(transform, false);
+            keycapPanel.SetActive(false);
+            _keycapUI = keycapPanel.AddComponent<KeyboardKeycapPanelUI>();
+            _keycapUI.Initialize();
+            _keycapUI.TargetChanged += HandleKeycapTargetChanged;
+            _keycapUI.KeyInputCaptured += HandleKeycapKeyInputCaptured;
+            _keycapUI.UndoRequested += HandleKeycapUndoRequested;
+            _keycapUI.ApplyRequested += HandleKeycapApplyRequested;
             GameObject ledPanel = new GameObject("LEDCustomizationPanel", typeof(RectTransform));
             ledPanel.transform.SetParent(transform, false);
             ledPanel.SetActive(false);
@@ -244,6 +256,10 @@ namespace Game.Player
         {
             _photoUI.CloseRequested -= HandlePhotoCloseRequested;
             _photoUI.CustomizationLoaded -= HandlePhotoCustomizationLoaded;
+            _keycapUI.TargetChanged -= HandleKeycapTargetChanged;
+            _keycapUI.KeyInputCaptured -= HandleKeycapKeyInputCaptured;
+            _keycapUI.UndoRequested -= HandleKeycapUndoRequested;
+            _keycapUI.ApplyRequested -= HandleKeycapApplyRequested;
             DestroyPreviewTextures(_previewTextures);
             DestroyPreviewTextures(_casePreviewTextures);
             DestroyPreviewTextures(_platePreviewTextures);
@@ -261,6 +277,7 @@ namespace Game.Player
                 && !ContainsPointer(_caseMaterialViewport, eventData.position)
                 && !ContainsPointer(_plateViewport, eventData.position)
                 && !_photoUI.IsPointerOverUI(eventData.position)
+                && !_keycapUI.IsPointerOverUI(eventData.position)
                 && !_ledUI.IsPointerOverUI(eventData.position))
             {
                 SetPickerMode(PickerMode.None);
@@ -320,6 +337,8 @@ namespace Game.Player
         /// </summary>
         public void SetPhotoCustomization(KeyboardCustomization customization)
         {
+            if (_photoStorage.Customization != customization)
+                CancelKeycapMaterialPreview();
             _photoStorage.SetTarget(customization);
         }
 
@@ -360,14 +379,168 @@ namespace Game.Player
         /// </summary>
         private void HandlePhotoCustomizationLoaded()
         {
-            SetSelectedMaterial(_photoStorage.Customization.KeycapMaterial);
+            RefreshKeycapMaterialSelection();
             RefreshCaseMaterialSelection();
             RefreshPlateSelection();
         }
 
         /// <summary>
-        /// 현재 케이스 재질과 일치하는 선택 카드의 배경과 체크를 갱신한다.
-        /// 편집 대상과 재질 인덱스 목록을 사용하며 각 버튼의 선택 상태를 바꾼다.
+        /// 키캡 적용 범위가 바뀌면 선택 재질의 미리보기를 새 범위에 맞춰 갱신한다.
+        /// allKeys와 keycapIndex를 사용하며 적용 전 상태는 스냅샷에서 다시 구성한다.
+        /// </summary>
+        private void HandleKeycapTargetChanged(bool allKeys, int keycapIndex)
+        {
+            KeyboardCustomization customization = _photoStorage.Customization;
+            if (_hasPendingKeycapMaterial)
+            {
+                bool targetIsValid = allKeys || keycapIndex >= 0;
+                if (!targetIsValid)
+                {
+                    customization.CancelKeycapMaterialPreview();
+                    _hasActiveKeycapMaterialPreview = false;
+                }
+                else
+                {
+                    _hasActiveKeycapMaterialPreview = customization.PreviewKeycapMaterial(
+                        _selectedMaterial, allKeys, keycapIndex);
+                    _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
+                }
+                _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
+                return;
+            }
+
+            if (!allKeys && keycapIndex < 0)
+                return;
+
+            _selectedMaterial = allKeys
+                ? customization.KeycapMaterial
+                : customization.GetKeycapMaterial(keycapIndex);
+            RefreshSelectionIndicators();
+        }
+
+        /// <summary>
+        /// 현재 키캡 재질 미리보기를 취소하고 적용 상태의 재질 표시로 복귀한다.
+        /// 버튼 입력 없이 키보드 상태와 선택 표시를 되돌린다.
+        /// </summary>
+        private void HandleKeycapUndoRequested()
+        {
+            CancelKeycapMaterialPreview();
+            RefreshKeycapMaterialSelection();
+        }
+
+        /// <summary>
+        /// 유효한 미리보기를 확정하고 선택 재질과 범위를 관찰 이벤트로 전달한다.
+        /// 현재 적용 범위 및 키 번호를 사용하며 새 적용 상태를 기준으로 삼는다.
+        /// </summary>
+        private void HandleKeycapApplyRequested()
+        {
+            if (!_keycapUI.TryGetTarget(out bool allKeys, out int keycapIndex))
+                return;
+
+            CommitPendingKeycapMaterial(allKeys, keycapIndex);
+        }
+
+        /// <summary>
+        /// 단일 키 입력 직후 선택된 재질을 해당 키에 확정하고 다음 키 입력을 준비한다.
+        /// keycapIndex를 사용하며 설치 연출 뒤 선택 재질을 유지한다.
+        /// </summary>
+        private void HandleKeycapKeyInputCaptured(int keycapIndex)
+        {
+            CommitPendingKeycapMaterial(false, keycapIndex, true);
+        }
+
+        /// <summary>
+        /// 선택 재질의 유효한 미리보기를 전체 또는 단일 키에 적용한다.
+        /// allKeys, keycapIndex와 retainMaterialSelection을 사용해 적용 및 다음 키 입력 상태를 갱신한다.
+        /// </summary>
+        private void CommitPendingKeycapMaterial(bool allKeys, int keycapIndex, bool retainMaterialSelection = false)
+        {
+            if (!_hasPendingKeycapMaterial || !_hasActiveKeycapMaterialPreview)
+                return;
+
+            KeyboardCustomization customization = _photoStorage.Customization;
+            Material previousMaterial = customization.GetCommittedKeycapMaterial(allKeys, keycapIndex);
+            if (!customization.CommitKeycapMaterialPreview(_selectedMaterial, allKeys, keycapIndex))
+            {
+                CancelKeycapMaterialPreview();
+                RefreshKeycapMaterialSelection();
+                return;
+            }
+
+            KeycapMaterialSelected?.Invoke(_selectedMaterial, previousMaterial, allKeys, keycapIndex);
+            _hasPendingKeycapMaterial = retainMaterialSelection;
+            _hasActiveKeycapMaterialPreview = false;
+            _keycapUI.SetCanApply(false, _hasPendingKeycapMaterial);
+            RefreshKeycapMaterialSelection();
+        }
+
+        /// <summary>
+        /// 미적용 키캡 재질 변경을 취소하고 패널 버튼 상태를 초기화한다.
+        /// 현재 사진 저장 대상의 스냅샷을 사용하며 선택 표시를 유지한다.
+        /// </summary>
+        private void CancelKeycapMaterialPreview()
+        {
+            if (_photoStorage != null && _photoStorage.Customization != null)
+                _photoStorage.Customization.CancelKeycapMaterialPreview();
+            _hasPendingKeycapMaterial = false;
+            _hasActiveKeycapMaterialPreview = false;
+            if (_keycapUI != null)
+                _keycapUI.SetCanApply(false, false);
+        }
+
+        /// <summary>
+        /// 현재 키캡 범위에 적용된 재질을 찾아 선택 카드 강조를 갱신한다.
+        /// 전체 범위는 공통 재질을, 단일 범위는 현재 키의 개별 재질을 읽는다.
+        /// </summary>
+        private void RefreshKeycapMaterialSelection()
+        {
+            if (_photoStorage == null || _photoStorage.Customization == null)
+                return;
+
+            if (_pickerMode == PickerMode.Keycap && _keycapUI.TryGetTarget(out bool allKeys, out int keycapIndex))
+            {
+                _selectedMaterial = allKeys
+                    ? _photoStorage.Customization.KeycapMaterial
+                    : _photoStorage.Customization.GetKeycapMaterial(keycapIndex);
+            }
+            else
+            {
+                _selectedMaterial = _photoStorage.Customization.KeycapMaterial;
+            }
+
+            RefreshSelectionIndicators();
+        }
+
+        /// <summary>
+        /// 빠진 키캡이 있으면 축이 설치된 키 전체에 미리보기를 시작한다.
+        /// 키캡이 모두 빠진 경우 첫 재질을 선택하고 재질 및 축 상태로 적용 가능 여부를 갱신한다.
+        /// </summary>
+        private void PreviewMissingKeycapsWithCurrentMaterial()
+        {
+            KeyboardCustomization customization = _photoStorage.Customization;
+            if (!customization.HasMissingKeycaps() || !customization.HasAnySwitchForKeycaps())
+                return;
+
+            if (!customization.HasAnyInstalledKeycaps() && _previewMaterials.Count > 0)
+            {
+                _selectedMaterial = _previewMaterials[0];
+                RefreshSelectionIndicators();
+            }
+
+            if (_selectedMaterial == null)
+                return;
+
+            _hasActiveKeycapMaterialPreview = customization.PreviewKeycapMaterial(
+                _selectedMaterial,
+                true,
+                -1);
+            _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
+            _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
+        }
+
+        /// <summary>
+        /// 현재 케이스 재질과 일치하는 카드의 선택 표시를 갱신한다.
+        /// 케이스 재질 인덱스를 사용하며 각 카드의 배경과 체크 표시를 변경한다.
         /// </summary>
         public void RefreshCaseMaterialSelection()
         {
@@ -1204,8 +1377,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// index에 해당하는 Material을 저장하고 선택 표시와 C# 이벤트를 갱신한다.
-        /// 유효한 항목의 재질을 사용하며 반환값 없이 선택 상태를 변경한다.
+        /// index 재질을 선택 표시와 현재 키캡 범위의 키보드 미리보기에 반영한다.
+        /// 유효한 재질과 패널 대상 상태를 사용하며 적용 전 변경으로 보관한다.
         /// </summary>
         private void SelectMaterial(int index)
         {
@@ -1216,7 +1389,25 @@ namespace Game.Player
 
             _selectedMaterial = _previewMaterials[index];
             RefreshSelectionIndicators();
-            KeycapMaterialSelected?.Invoke(_selectedMaterial);
+            if (_pickerMode != PickerMode.Keycap)
+                return;
+
+            bool targetIsValid = _keycapUI.TryGetTarget(out bool allKeys, out int keycapIndex);
+            if (!targetIsValid)
+            {
+                _hasPendingKeycapMaterial = true;
+                _hasActiveKeycapMaterialPreview = false;
+                _photoStorage.Customization.CancelKeycapMaterialPreview();
+            }
+            else
+            {
+                _hasActiveKeycapMaterialPreview = _photoStorage.Customization.PreviewKeycapMaterial(
+                    _selectedMaterial,
+                    allKeys,
+                    keycapIndex);
+                _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
+            }
+            _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
         }
 
         /// <summary>
@@ -1770,6 +1961,10 @@ namespace Game.Player
         {
             PickerMode previous = _pickerMode;
             _pickerMode = mode == PickerMode.Keycap && _viewport == null ? PickerMode.None : mode;
+            if (previous == PickerMode.Keycap && _pickerMode != PickerMode.Keycap)
+            {
+                CancelKeycapMaterialPreview();
+            }
             _keycapButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Keycap);
             _switchAxisButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.SwitchSound);
             _ledButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Led);
@@ -1790,12 +1985,20 @@ namespace Game.Player
             {
                 _plateViewport.gameObject.SetActive(_pickerMode == PickerMode.Plate);
             }
+            if (_pickerMode != PickerMode.Keycap)
+                _keycapUI.Close();
             if (_pickerMode != PickerMode.Photo)
                 _photoUI.HideEmbedded();
             if (_pickerMode != PickerMode.Led)
                 _ledUI.Close();
             if (_pickerMode == PickerMode.Photo)
                 _photoUI.BeginCustomization();
+            if (_pickerMode == PickerMode.Keycap)
+            {
+                _keycapUI.Open(_photoStorage.Customization);
+                RefreshKeycapMaterialSelection();
+                PreviewMissingKeycapsWithCurrentMaterial();
+            }
             if (_pickerMode == PickerMode.Led)
                 _ledUI.Open(_ledCustomization);
             if (previous != _pickerMode)

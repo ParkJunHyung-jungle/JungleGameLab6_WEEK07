@@ -77,15 +77,24 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private Transform[] _keycaps;
     private KeyboardImageCustomization _imageCustomization;
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
+    private KeycapMaterialPreviewSnapshot _keycapMaterialPreviewSnapshot;
 
     public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
     public int PhotoKeycapCount => GetImageCustomization().KeycapCount;
+    public int KeycapCount
+    {
+        get
+        {
+            if (_keycaps == null) CacheKeycaps();
+            return _keycaps.Length;
+        }
+    }
 
     /// <summary>
-    /// 입력 키에 바인딩된 물리 키캡을 사진용 키캡 배열의 인덱스로 변환한다.
-    /// key를 사용하며, 대응하는 키캡이 없으면 false와 -1을 반환한다.
+    /// 입력 키에 바인딩된 물리 키캡을 재질 및 이미지 편집용 인덱스로 변환한다.
+    /// key를 사용하며 대응하는 키캡이 없으면 false와 -1을 반환한다.
     /// </summary>
-    public bool TryGetPhotoKeycapIndex(Key key, out int keycapIndex)
+    public bool TryGetKeycapIndex(Key key, out int keycapIndex)
     {
         keycapIndex = -1;
         KeyboardInputController input = GetComponent<KeyboardInputController>();
@@ -114,10 +123,55 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
+    /// 기존 사진 편집 입력 키를 사진용 키캡 배열 인덱스로 변환한다.
+    /// key를 사용하며 대응하는 키캡이 없으면 false와 -1을 반환한다.
+    /// </summary>
+    public bool TryGetPhotoKeycapIndex(Key key, out int keycapIndex)
+    {
+        return TryGetKeycapIndex(key, out keycapIndex);
+    }
+
+    /// <summary>
     /// 현재 전체 키캡에 지정된 Material을 반환한다.
     /// 사용자 지정 상태를 읽으며 반환값은 _keycapMaterial이다.
     /// </summary>
     public Material KeycapMaterial => _keycapMaterial;
+
+    /// <summary>
+    /// keycapIndex 키캡에 현재 지정된 개별 재질 또는 공통 재질을 반환한다.
+    /// 유효하지 않은 인덱스는 null을 반환하며 개별 재질이 있으면 우선 사용한다.
+    /// </summary>
+    public Material GetKeycapMaterial(int keycapIndex)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (keycapIndex < 0 || keycapIndex >= _keycaps.Length || _keycaps[keycapIndex] == null)
+            return null;
+
+        return _keycapMaterialOverrides.TryGetValue(_keycaps[keycapIndex], out Material material)
+            ? material
+            : _keycapMaterial;
+    }
+
+    /// <summary>
+    /// 진행 중인 미리보기를 제외한 적용 재질을 범위에 맞춰 반환한다.
+    /// allKeycaps이면 공통 재질을 반환하고 아니면 keycapIndex의 개별 재질을 반환한다.
+    /// </summary>
+    public Material GetCommittedKeycapMaterial(bool allKeycaps, int keycapIndex)
+    {
+        if (_keycapMaterialPreviewSnapshot == null)
+            return allKeycaps ? _keycapMaterial : GetKeycapMaterial(keycapIndex);
+
+        if (allKeycaps)
+            return _keycapMaterialPreviewSnapshot.KeycapMaterial;
+
+        if (_keycaps == null) CacheKeycaps();
+        if (keycapIndex < 0 || keycapIndex >= _keycaps.Length || _keycaps[keycapIndex] == null)
+            return null;
+
+        return _keycapMaterialPreviewSnapshot.MaterialOverrides.TryGetValue(_keycaps[keycapIndex], out Material material)
+            ? material
+            : _keycapMaterialPreviewSnapshot.KeycapMaterial;
+    }
 
     [Header("Photo Customization")]
     [SerializeField] private Material _photoMaterialTemplate;
@@ -281,6 +335,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     void OnDisable()
     {
+        CancelKeycapMaterialPreview();
         AudioManager.Ready -= HandleAudioManagerReady;
         if (_plateAudioManager != null) _plateAudioManager.SuspendKeyboardEffects(this);
 #if UNITY_EDITOR
@@ -950,8 +1005,83 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// keycapIndex 키캡을 활성화하며 음수 입력은 전체 키캡을 대상으로 한다.
-    /// 반환값 없이 꺼진 루트만 켜고 축과 다른 키의 활성 상태는 유지한다.
+    /// 키캡 대상 중 축이 설치된 키가 하나라도 있는지 반환한다.
+    /// 캐시된 키캡 인덱스와 각 인덱스의 축 활성 상태를 확인한다.
+    /// </summary>
+    public bool HasAnySwitchForKeycaps()
+    {
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (HasSwitchForKeycap(index))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 비활성화되거나 파손된 키캡이 하나라도 있는지 반환한다.
+    /// 키캡 루트와 외피 Renderer 활성 상태를 확인해 재설치가 필요한 대상을 찾는다.
+    /// </summary>
+    public bool HasMissingKeycaps()
+    {
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (!IsKeycapInstalled(index))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 설치된 키캡이 하나라도 있는지 반환한다.
+    /// 캐시된 키캡 루트와 외피 Renderer 상태를 확인한다.
+    /// </summary>
+    public bool HasAnyInstalledKeycaps()
+    {
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (IsKeycapInstalled(index))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// keycapIndex 키캡의 루트와 외피 Renderer가 모두 표시 상태인지 반환한다.
+    /// 유효한 키캡 인덱스와 캐시된 Renderer 배열을 사용한다.
+    /// </summary>
+    private bool IsKeycapInstalled(int keycapIndex)
+    {
+        if (keycapIndex < 0 || keycapIndex >= _keycaps.Length)
+            return false;
+
+        Transform keycap = _keycaps[keycapIndex];
+        if (keycap == null || !keycap.gameObject.activeSelf)
+            return false;
+
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null
+                && renderer.name == "PBT_SculptedShell"
+                && renderer.transform.IsChildOf(keycap)
+                && renderer.enabled)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 축이 설치된 키캡만 활성화하며 음수 입력은 전체 키캡을 대상으로 한다.
+    /// keycapIndex와 축 상태를 사용하며 설치 대상에는 기존 키캡 연출을 재생한다.
     /// </summary>
     private void EnableKeycaps(int keycapIndex = -1)
     {
@@ -979,36 +1109,12 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// keycapIndex의 키캡에만 material을 적용하며 각인과 다른 키캡은 유지한다.
-    /// 키캡 순서는 렌더러 배열의 외피 순서이며 잘못된 입력 또는 파괴된 키캡은 false를 반환한다.
+    /// 축이 설치된 keycapIndex 키캡에 material을 적용하고 기존 설치 연출을 재생한다.
+    /// material과 인덱스를 사용하며 축 미설치, 잘못된 인덱스 또는 렌더러 누락은 false를 반환한다.
     /// </summary>
     public bool SetKeycapMaterial(int keycapIndex, Material material)
     {
-        if (_keycaps == null) CacheKeycaps();
-        if (material == null || keycapIndex < 0 || keycapIndex >= _keycaps.Length || !HasSwitchForKeycap(keycapIndex))
-        {
-            return false;
-        }
-
-        Transform keycap = _keycaps[keycapIndex];
-        if (keycap == null) return false;
-
-        ClearKeycapImage(keycapIndex);
-        _keycapMaterialOverrides[keycap] = material;
-
-        bool applied = false;
-        foreach (MeshRenderer renderer in _keycapRenderers)
-        {
-            if (renderer != null && renderer.transform.IsChildOf(keycap))
-            {
-                renderer.sharedMaterial = material;
-                KeyboardToonSurface.ApplyBounds(renderer);
-                applied = true;
-            }
-        }
-
-        if (applied) EnableKeycaps(keycapIndex);
-        return applied;
+        return ApplyKeycapMaterialToKey(keycapIndex, material, true);
     }
 
     /// <summary>
@@ -1030,8 +1136,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// material 입력을 전체 키캡의 공통 재질로 저장하고 연결된 키캡에 적용한다.
-    /// 반환값 없이 키캡 외형 재질을 변경하며 null 입력은 무시한다.
+    /// material을 전체 키캡의 공통 재질로 저장하고 축이 설치된 키캡에 적용한다.
+    /// 축이 없는 키캡은 건너뛰고 설치된 축이 없거나 material이 null이면 상태를 유지한다.
     /// </summary>
     public void SetKeycapMaterial(Material material)
     {
@@ -1040,13 +1146,282 @@ public sealed class KeyboardCustomization : MonoBehaviour
             return;
         }
 
+        if (_keycaps == null) CacheKeycaps();
+        if (!HasAnySwitchForKeycaps())
+            return;
+
         _keycapMaterial = material;
         _keycapMaterialIndex = Array.IndexOf(_materials, material);
-        if (_keycaps == null) CacheKeycaps();
+        _keycapMaterialOverrides.Clear();
         for (int index = 0; index < _keycaps.Length; index++)
         {
-            if (!HasSwitchForKeycap(index)) continue;
-            SetKeycapMaterial(index, material);
+            ApplyKeycapMaterialToKey(index, material, true);
+        }
+    }
+
+    /// <summary>
+    /// 축이 설치된 적용 대상에만 키캡 재질 미리보기를 표시하고 이전 상태를 보관한다.
+    /// material, allKeycaps, keycapIndex를 사용하며 대상에 축이 없으면 false를 반환한다.
+    /// </summary>
+    public bool PreviewKeycapMaterial(Material material, bool allKeycaps, int keycapIndex)
+    {
+        if (material == null)
+            return false;
+
+        bool targetHasSwitch = allKeycaps
+            ? HasAnySwitchForKeycaps()
+            : HasSwitchForKeycap(keycapIndex);
+        if (!targetHasSwitch)
+        {
+            CancelKeycapMaterialPreview();
+            return false;
+        }
+
+        if (_keycapMaterialPreviewSnapshot == null)
+        {
+            _keycapMaterialPreviewSnapshot = CaptureKeycapMaterialPreviewSnapshot();
+        }
+        else
+        {
+            RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
+        }
+
+        bool applied = false;
+        if (allKeycaps)
+        {
+            _keycapMaterial = material;
+            _keycapMaterialIndex = Array.IndexOf(_materials, material);
+            if (_keycaps == null) CacheKeycaps();
+            _keycapMaterialOverrides.Clear();
+            for (int index = 0; index < _keycaps.Length; index++)
+            {
+                applied |= ApplyKeycapMaterialToKey(index, material, false);
+            }
+        }
+        else
+        {
+            applied = ApplyKeycapMaterialToKey(keycapIndex, material, false);
+        }
+
+        if (applied)
+            return true;
+
+        CancelKeycapMaterialPreview();
+        return false;
+    }
+
+    /// <summary>
+    /// 진행 중인 키캡 재질 미리보기를 취소하고 저장한 재질 및 이미지 상태를 복원한다.
+    /// 입력과 반환값 없이 미리보기 전의 공통 재질, 개별 재질, 키캡 사진을 되돌린다.
+    /// </summary>
+    public void CancelKeycapMaterialPreview()
+    {
+        if (_keycapMaterialPreviewSnapshot == null)
+            return;
+
+        RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
+        _keycapMaterialPreviewSnapshot = null;
+    }
+
+    /// <summary>
+    /// 축이 설치된 미리보기 대상을 기존 전체 또는 개별 적용 함수로 확정한다.
+    /// material, allKeycaps, keycapIndex를 사용하며 대상에 축이 없으면 false를 반환한다.
+    /// </summary>
+    public bool CommitKeycapMaterialPreview(Material material, bool allKeycaps, int keycapIndex)
+    {
+        if (_keycapMaterialPreviewSnapshot == null || material == null)
+            return false;
+
+        bool targetHasSwitch = allKeycaps
+            ? HasAnySwitchForKeycaps()
+            : HasSwitchForKeycap(keycapIndex);
+        if (!targetHasSwitch)
+        {
+            CancelKeycapMaterialPreview();
+            return false;
+        }
+
+        RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
+
+        bool applied;
+        if (allKeycaps)
+        {
+            SetKeycapMaterial(material);
+            applied = true;
+        }
+        else
+        {
+            applied = SetKeycapMaterial(keycapIndex, material);
+        }
+
+        if (!applied)
+            return false;
+
+        _keycapMaterialPreviewSnapshot = null;
+        return true;
+    }
+
+    /// <summary>
+    /// 공통 재질, 개별 재질, 렌더러 슬롯과 이미지 상태를 미리보기 스냅샷으로 수집한다.
+    /// 반환된 스냅샷은 미리보기 취소 때 현재 키보드 외형을 정확히 복구하는 데 사용한다.
+    /// </summary>
+    private KeycapMaterialPreviewSnapshot CaptureKeycapMaterialPreviewSnapshot()
+    {
+        if (_keycaps == null) CacheKeycaps();
+
+        Transform[] keycaps = (Transform[])_keycaps.Clone();
+        bool[] keycapActiveStates = new bool[keycaps.Length];
+        for (int index = 0; index < keycaps.Length; index++)
+        {
+            keycapActiveStates[index] = keycaps[index] != null && keycaps[index].gameObject.activeSelf;
+        }
+
+        var rendererMaterials = new Material[_keycapRenderers.Length][];
+        bool[] rendererActiveStates = new bool[_keycapRenderers.Length];
+        bool[] rendererEnabledStates = new bool[_keycapRenderers.Length];
+        for (int index = 0; index < _keycapRenderers.Length; index++)
+        {
+            MeshRenderer renderer = _keycapRenderers[index];
+            rendererMaterials[index] = renderer != null ? renderer.sharedMaterials : Array.Empty<Material>();
+            rendererActiveStates[index] = renderer != null && renderer.gameObject.activeSelf;
+            rendererEnabledStates[index] = renderer != null && renderer.enabled;
+        }
+
+        return new KeycapMaterialPreviewSnapshot(
+            _keycapMaterial,
+            _keycapMaterialIndex,
+            new Dictionary<Transform, Material>(_keycapMaterialOverrides),
+            keycaps,
+            keycapActiveStates,
+            rendererMaterials,
+            rendererActiveStates,
+            rendererEnabledStates,
+            GetImageCustomization().CaptureState());
+    }
+
+    /// <summary>
+    /// snapshot의 키캡 재질, 렌더러 슬롯과 사진 배치를 현재 키보드에 복원한다.
+    /// snapshot의 참조 상태를 사용하며 반환값 없이 기존 외형과 사용자 지정 데이터를 되돌린다.
+    /// </summary>
+    private void RestoreKeycapMaterialPreviewSnapshot(KeycapMaterialPreviewSnapshot snapshot)
+    {
+        KeyboardImageCustomization images = GetImageCustomization();
+        images.ClearKeycapImage();
+        _keycapMaterial = snapshot.KeycapMaterial;
+        _keycapMaterialIndex = snapshot.KeycapMaterialIndex;
+        _keycapMaterialOverrides.Clear();
+        foreach (KeyValuePair<Transform, Material> materialOverride in snapshot.MaterialOverrides)
+            _keycapMaterialOverrides[materialOverride.Key] = materialOverride.Value;
+
+        for (int index = 0; index < _keycapRenderers.Length; index++)
+        {
+            MeshRenderer renderer = _keycapRenderers[index];
+            if (renderer == null) continue;
+            renderer.gameObject.SetActive(snapshot.RendererActiveStates[index]);
+            renderer.enabled = snapshot.RendererEnabledStates[index];
+            renderer.sharedMaterials = (Material[])snapshot.RendererMaterials[index].Clone();
+            KeyboardToonSurface.ApplyBounds(renderer);
+        }
+
+        Texture2D[] textures = images.PrepareState(snapshot.ImageState);
+        images.RestoreState(snapshot.ImageState, textures);
+
+        for (int index = 0; index < snapshot.Keycaps.Length; index++)
+        {
+            Transform keycap = snapshot.Keycaps[index];
+            if (keycap != null)
+                keycap.gameObject.SetActive(snapshot.KeycapActiveStates[index]);
+        }
+    }
+
+    /// <summary>
+    /// 축이 설치된 keycapIndex 키캡에 material을 반영하고 필요하면 설치 연출을 재생한다.
+    /// playInstallation이 true면 기존 연출과 파손 키캡 복구를 실행하며 축이 없거나 렌더러가 없으면 false를 반환한다.
+    /// 유효한 입력은 개별 재질과 사진 상태를 갱신한다.
+    /// </summary>
+    private bool ApplyKeycapMaterialToKey(int keycapIndex, Material material, bool playInstallation)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (material == null
+            || keycapIndex < 0
+            || keycapIndex >= _keycaps.Length
+            || !HasSwitchForKeycap(keycapIndex))
+            return false;
+
+        Transform keycap = _keycaps[keycapIndex];
+        if (keycap == null) return false;
+
+        ClearKeycapImage(keycapIndex);
+        _keycapMaterialOverrides[keycap] = material;
+
+        bool applied = false;
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer == null || !renderer.transform.IsChildOf(keycap)) continue;
+            if (!playInstallation)
+            {
+                renderer.gameObject.SetActive(true);
+                renderer.enabled = true;
+            }
+            renderer.sharedMaterial = material;
+            KeyboardToonSurface.ApplyBounds(renderer);
+            applied = true;
+        }
+
+        if (applied && !playInstallation)
+        {
+            keycap.gameObject.SetActive(true);
+        }
+        else if (applied)
+        {
+            EnableKeycaps(keycapIndex);
+            if (Application.IsPlaying(gameObject))
+            {
+                KeycapHealth keycapHealth = keycap.GetComponent<KeycapHealth>();
+                if (keycapHealth != null && keycapHealth.CurrentHP <= 0)
+                    keycapHealth.RestoreHealth();
+            }
+        }
+
+        return applied;
+    }
+
+    private sealed class KeycapMaterialPreviewSnapshot
+    {
+        public Material KeycapMaterial { get; }
+        public int KeycapMaterialIndex { get; }
+        public Dictionary<Transform, Material> MaterialOverrides { get; }
+        public Transform[] Keycaps { get; }
+        public bool[] KeycapActiveStates { get; }
+        public Material[][] RendererMaterials { get; }
+        public bool[] RendererActiveStates { get; }
+        public bool[] RendererEnabledStates { get; }
+        public KeyboardImageState ImageState { get; }
+
+        /// <summary>
+        /// 미리보기 전 키캡 루트, 재질, 렌더러와 이미지 상태를 보관한다.
+        /// 생성 인수의 표시 상태와 외형 데이터는 미리보기 취소와 확정 전 복원에 사용한다.
+        /// </summary>
+        public KeycapMaterialPreviewSnapshot(
+            Material keycapMaterial,
+            int keycapMaterialIndex,
+            Dictionary<Transform, Material> materialOverrides,
+            Transform[] keycaps,
+            bool[] keycapActiveStates,
+            Material[][] rendererMaterials,
+            bool[] rendererActiveStates,
+            bool[] rendererEnabledStates,
+            KeyboardImageState imageState)
+        {
+            KeycapMaterial = keycapMaterial;
+            KeycapMaterialIndex = keycapMaterialIndex;
+            MaterialOverrides = materialOverrides;
+            Keycaps = keycaps;
+            KeycapActiveStates = keycapActiveStates;
+            RendererMaterials = rendererMaterials;
+            RendererActiveStates = rendererActiveStates;
+            RendererEnabledStates = rendererEnabledStates;
+            ImageState = imageState;
         }
     }
 

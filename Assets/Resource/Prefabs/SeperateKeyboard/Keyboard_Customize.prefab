@@ -59995,6 +59995,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6c380f1e883926043b3dbecc9c980996, type: 2}
   - {fileID: 11400000, guid: 8f826efd0c3ec5941941d1e269490a42, type: 2}
   - {fileID: 11400000, guid: bd31123c656224b4eb33cd51b321d11a, type: 2}
+  - {fileID: 11400000, guid: b103a6afca946d640b4c502acc209e77, type: 2}
   _plateRenderer: {fileID: 534380275776001789}
 --- !u!23 &5999264866688161344 stripped
 MeshRenderer:

@@ -17,6 +17,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private const float MAX_LED_INTENSITY = 10f;
     private const float MAX_LED_SPEED = 10f;
 
+    private static readonly IReadOnlyList<PlateEffect> _plateEffects = Array.AsReadOnly((PlateEffect[])Enum.GetValues(typeof(PlateEffect)));
+
     [Header("LED Layer")]
     [SerializeField, HideInInspector] private MeshRenderer _ledRenderer;
     [SerializeField] private KeyboardLED _ledLayer;
@@ -38,7 +40,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     [Header("Shared Materials")]
     [FormerlySerializedAs("_caseMaterials")]
-    [Tooltip("키보드 테두리와 키캡 모두 사용하는 공유 Material")]
+    [Tooltip("키보드 테두리, 키캡과 보강판이 사용하는 공유 Material")]
     [SerializeField] private Material[] _materials = new Material[0];
 
     [Header("Case: 키보드 테두리(상하좌우 아래)")]
@@ -92,9 +94,20 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
     [SerializeField] private SwitchType _switchType = SwitchType.Red;
 
-    [Header("Plate")]
+    [Header("보강판 재질")]
     [SerializeField] private KeyboardPlate _plate;
-    [SerializeField] private PlateType _plateType = PlateType.Nomal;
+    [SerializeField] private Material _plateMaterial;
+    [SerializeField, Min(-1)] private int _plateMaterialIndex = -1;
+    [SerializeField, HideInInspector] private PlateType _plateType = PlateType.Nomal;
+    [SerializeField, HideInInspector] private bool _plateSettingsSeparated;
+    private Material _appliedPlateMaterial;
+    private int _appliedPlateMaterialIndex = -1;
+    private bool _plateMaterialApplied;
+
+    [Header("보강판 효과")]
+    [SerializeField] private PlateEffect _plateEffect = PlateEffect.None;
+    private PlateEffect _appliedPlateEffect;
+    private bool _plateEffectApplied;
     private AudioManager _plateAudioManager;
     private int _plateAudioSelection;
 
@@ -103,6 +116,13 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public IReadOnlyList<PlateData> AvailablePlates => _plate != null ? _plate.AvailablePlates : Array.Empty<PlateData>();
     public MeshRenderer PlateRenderer => _plate != null ? _plate.PlateRenderer : null;
     public PlateType CurrentPlateType => _plateType;
+    public IReadOnlyList<Material> PlateMaterials => Array.AsReadOnly(_materials);
+    public Material PlateMaterial => _plateMaterial;
+    public int PlateMaterialIndex => _plateMaterialIndex;
+    public IReadOnlyList<PlateEffect> AvailablePlateEffects => _plateEffects;
+    public PlateEffect CurrentPlateEffect => _plateEffect;
+    public event Action<Material> PlateMaterialChanged;
+    public event Action<PlateEffect> PlateEffectChanged;
 
     /// <summary>
     /// 실제 적용된 파츠 설정을 로그용 식별자 목록으로 반환한다.
@@ -113,7 +133,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         yield return new[] { "Keycap", _keycapMaterial != null ? _keycapMaterial.name : "" };
         yield return new[] { "Case", _caseMaterial != null ? _caseMaterial.name : "" };
         yield return new[] { "Switch", _switchType.ToString() };
-        yield return new[] { "Plate", _plateType.ToString() };
+        yield return new[] { "Plate", _plateMaterial != null ? _plateMaterial.name : "" };
+        yield return new[] { "PlateEffect", _plateEffect.ToString() };
         yield return new[] { "LED", _ledPattern.ToString() };
         yield return new[] { "LEDColor", ColorUtility.ToHtmlStringRGBA(_ledColor) };
         yield return new[] { "LEDEnabled", _ledEnabled ? "true" : "false" };
@@ -126,8 +147,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         CacheKeycaps();
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
+        ApplySelectedPlateSettings();
         if (_switches.Length > 0) ApplySwitchType(_switchType, false);
         if (_plate != null) SetPlateType(_plateType);
+        
         if (_ledRenderer != null)
         {
             ApplyLED();
@@ -179,11 +202,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
+        ApplySelectedPlateSettings();
         if (_switches.Length > 0) ApplySwitchType(_switchType, false);
         if (_plate != null) SetPlateType(_plateType);
+        
         if (!Application.IsPlaying(gameObject))
         {
             EditorUtility.SetDirty(this);
+            if (PrefabUtility.IsPartOfPrefabInstance(this)) PrefabUtility.RecordPrefabInstancePropertyModifications(this);
             foreach (MeshRenderer renderer in _caseRenderers)
             {
                 if (renderer == null)
@@ -236,6 +262,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public KeyboardCustomizationState CaptureState(Material[] catalog, string[] materialIds)
     {
+        ApplySelectedPlateSettings();
         if (catalog.Length != materialIds.Length) throw new InvalidOperationException("Material registry is invalid.");
         MeshRenderer[] renderers = GetCustomizationRenderers();
         var paths = new string[renderers.Length];
@@ -257,11 +284,13 @@ public sealed class KeyboardCustomization : MonoBehaviour
             switchTypes[index] = _switches[index].CurrentData != null ? _switches[index].CurrentData.Type : _switchType;
         }
 
+        int plateMaterialIndex = GetMaterialIndex(_plateMaterial, catalog);
         return new KeyboardCustomizationState(_ledEnabled, _ledColor, _ledIntensity,
             new[] { GetMaterialIndex(_caseMaterial, catalog), GetMaterialIndex(_keycapMaterial, catalog), _caseMaterialIndex, _keycapMaterialIndex },
             (string[])materialIds.Clone(), paths, counts, indices.ToArray(), switchTypes,
-            _plate != null && _plate.CurrentData != null ? _plate.CurrentData.Type : _plateType, _ledPattern, _ledSpeed,
-            _imageCustomization != null ? _imageCustomization.CaptureState() : null);
+            _plateType, _ledPattern, _ledSpeed,
+            GetImageCustomization().CaptureState(),
+            plateMaterialIndex >= 0 ? materialIds[plateMaterialIndex] : null, _plateEffect);
     }
 
     /// <summary>
@@ -270,7 +299,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds)
     {
-        if (state == null || (state.Version < 1 || state.Version > 3) || state.Selection == null || state.Selection.Length != 4 ||
+        if (state == null || (state.Version < 1 || state.Version > 4) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
             throw new InvalidOperationException("Save data is invalid or unsupported.");
@@ -308,7 +337,26 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (!_switches[index].HasSwitchType(state.SwitchTypes[index])) throw new InvalidOperationException("A saved switch type is unavailable.");
         }
 
-        if (_plate != null && !_plate.HasPlateType(state.PlateType)) throw new InvalidOperationException("The saved Plate type is unavailable.");
+        Material plateMaterial = null;
+        PlateEffect plateEffect;
+        if (state.Version >= 4)
+        {
+            plateEffect = state.PlateEffect;
+            if (!Enum.IsDefined(typeof(PlateEffect), plateEffect)) throw new InvalidOperationException("The saved Plate effect is invalid.");
+            if (_plate != null)
+            {
+                int materialIndex = Array.IndexOf(materialIds, state.PlateMaterialId);
+                if (string.IsNullOrEmpty(state.PlateMaterialId) || materialIndex < 0 || catalog[materialIndex] == null)
+                    throw new InvalidOperationException("The saved Plate material is unavailable.");
+                plateMaterial = catalog[materialIndex];
+            }
+        }
+        else
+        {
+            plateEffect = GetLegacyPlateEffect(state.PlateType);
+            if (_plate != null && !_plate.TryGetMaterial(state.PlateType, out plateMaterial))
+                throw new InvalidOperationException("The saved Plate type is unavailable.");
+        }
 
         KeyboardImageCustomization images = GetImageCustomization();
         Texture2D[] preparedImages = images.PrepareState(state.ImageState);
@@ -321,7 +369,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
             _switchType = state.SwitchTypes[0];
             GetComponent<KeyboardInputController>().SetSwitchSound(_switchType);
         }
-        if (_plate != null) SetPlateType(state.PlateType);
+        if (_plate != null) SetPlateMaterial(plateMaterial);
+        SetPlateEffect(plateEffect);
         _caseMaterial = state.Selection[0] < 0 ? null : catalog[remap[state.Selection[0]]];
         _keycapMaterial = state.Selection[1] < 0 ? null : catalog[remap[state.Selection[1]]];
         _caseMaterialIndex = Mathf.Max(0, Array.IndexOf(_materials, _caseMaterial));
@@ -517,14 +566,123 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// type 입력을 Plate 컴포넌트에 전달해 재질을 변경한다.
-    /// 성공 여부를 반환하며 성공할 때만 현재 선택 타입을 저장한다.
+    /// 기존 UI의 type 입력을 대응하는 재질 선택으로 변환한다.
+    /// 성공 여부와 호환용 타입을 갱신하며 독립적으로 선택한 효과는 유지한다.
     /// </summary>
     public bool SetPlateType(PlateType type)
     {
-        if (_plate == null || !_plate.ChangePlate(type)) return false;
+        if (_plate == null || !_plate.TryGetMaterial(type, out Material material) || !SetPlateMaterial(material)) return false;
         _plateType = type;
         return true;
+    }
+
+    /// <summary>
+    /// material을 현재 보강판 재질로 선택하고 Renderer와 공유 목록 인덱스를 동기화한다.
+    /// 성공 여부를 반환하며 효과는 유지하고 실제 선택 변경 시 재질 이벤트를 발생시킨다.
+    /// </summary>
+    public bool SetPlateMaterial(Material material)
+    {
+        InitializePlateSettings();
+        if (_plate == null || !_plate.SetMaterial(material)) return false;
+        int index = Array.IndexOf(_materials, material);
+        bool changed = !_plateMaterialApplied || _appliedPlateMaterial != material || _appliedPlateMaterialIndex != index;
+        _plateMaterial = material;
+        _plateMaterialIndex = index;
+        _appliedPlateMaterial = material;
+        _appliedPlateMaterialIndex = index;
+        _plateMaterialApplied = true;
+        foreach (PlateData data in _plate.AvailablePlates)
+        {
+            if (data != null && data.Material == material) { _plateType = data.Type; break; }
+        }
+        if (changed) PlateMaterialChanged?.Invoke(material);
+        return true;
+    }
+
+    /// <summary>
+    /// index에 해당하는 공유 재질을 기존 재질 변경 경로로 적용한다.
+    /// 선택 성공 여부를 반환하며 범위 밖 인덱스는 현재 설정을 변경하지 않는다.
+    /// </summary>
+    public bool SetPlateMaterialIndex(int index)
+    {
+        InitializePlateSettings();
+        return index >= 0 && index < _materials.Length && SetPlateMaterial(_materials[index]);
+    }
+
+    /// <summary>
+    /// effect를 현재 보강판 효과로 선택하고 변경 이벤트를 발생시킨다.
+    /// 성공 여부를 반환하며 재질과 재질 인덱스는 변경하지 않는다.
+    /// </summary>
+    public bool SetPlateEffect(PlateEffect effect)
+    {
+        InitializePlateSettings();
+        if (!Enum.IsDefined(typeof(PlateEffect), effect)) return false;
+        bool changed = !_plateEffectApplied || _appliedPlateEffect != effect;
+        _plateEffect = effect;
+        _appliedPlateEffect = effect;
+        _plateEffectApplied = true;
+        if (changed) PlateEffectChanged?.Invoke(effect);
+        return true;
+    }
+
+    /// <summary>
+    /// 이전 보강판 타입을 독립 재질과 효과의 초기값으로 한 번만 변환한다.
+    /// 기존 PlateData의 실제 재질과 과거 오디오 매핑을 보존하고 변환 완료 상태를 기록한다.
+    /// </summary>
+    private void InitializePlateSettings()
+    {
+        if (_plateSettingsSeparated) return;
+        if (_plateMaterial == null && _plate != null)
+        {
+            if (!_plate.TryGetMaterial(_plateType, out _plateMaterial))
+                _plateMaterial = _plate.PlateRenderer.sharedMaterial;
+        }
+        _plateMaterialIndex = Array.IndexOf(_materials, _plateMaterial);
+        _plateEffect = GetLegacyPlateEffect(_plateType);
+        _plateSettingsSeparated = true;
+#if UNITY_EDITOR
+        if (!Application.IsPlaying(gameObject))
+        {
+            EditorUtility.SetDirty(this);
+            if (PrefabUtility.IsPartOfPrefabInstance(this)) PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+        }
+#endif
+    }
+
+    /// <summary>
+    /// legacyType에 대응하던 과거 오디오 효과를 반환한다.
+    /// 이전 데이터 변환에만 사용하며 현재 재질 선택에는 효과를 연결하지 않는다.
+    /// </summary>
+    private static PlateEffect GetLegacyPlateEffect(PlateType legacyType)
+    {
+        return legacyType switch
+        {
+            PlateType.UnderWater => PlateEffect.Reverb,
+            PlateType.Golden => PlateEffect.Delay,
+            PlateType.RainBow or PlateType.Steel => PlateEffect.Pitch,
+            _ => PlateEffect.None
+        };
+    }
+
+    /// <summary>
+    /// Inspector 또는 초기화에서 선택한 재질과 효과를 각각의 공개 변경 경로로 적용한다.
+    /// 변경된 인덱스를 우선 반영하며 재질 직접 지정과 효과 변경도 동일한 이벤트로 알린다.
+    /// </summary>
+    private void ApplySelectedPlateSettings()
+    {
+        InitializePlateSettings();
+        if (_plate != null)
+        {
+            bool materialApplied;
+            if ((_plateMaterialApplied || _plateMaterial == null) &&
+                _plateMaterialIndex != _appliedPlateMaterialIndex && _plateMaterialIndex >= 0 && _plateMaterialIndex < _materials.Length)
+                materialApplied = SetPlateMaterialIndex(_plateMaterialIndex);
+            else
+                materialApplied = SetPlateMaterial(_plateMaterial);
+            if (!materialApplied)
+                SetPlateMaterial(_appliedPlateMaterial != null ? _appliedPlateMaterial : _plate.PlateRenderer.sharedMaterial);
+        }
+        if (!SetPlateEffect(_plateEffect)) SetPlateEffect(_plateEffectApplied ? _appliedPlateEffect : PlateEffect.None);
     }
 
     #endregion

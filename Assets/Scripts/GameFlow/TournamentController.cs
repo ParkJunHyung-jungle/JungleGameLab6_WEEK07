@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -210,9 +210,10 @@ namespace Game.Tournament
             PlaytestShopStateChanged?.Invoke(this, true, "ShopOpened");
             _message = "구매한 부품은 오른쪽 인벤토리에서 장착할 수 있습니다.";
             RollOffers();
+            var enemyShown = new HashSet<KeyboardPartDefinition>();
             for (int i = 0; i < _offers.Length; i++)
             {
-                KeyboardPartDefinition part = DrawOffer();
+                KeyboardPartDefinition part = DrawOffer(_enemyInventory, enemyShown);
                 long before = _enemyCurrency;
                 Observe("OfferShown", i, part, before, false, true);
                 if (part != null && _enemyCurrency >= part.Price && _enemyInventory.TryAdd(part, _keyLayout))
@@ -225,16 +226,29 @@ namespace Game.Tournament
             Changed?.Invoke();
         }
 
-        /// <summary>현재 프리셋 상품 중 하나를 무작위 반환한다. 비어 있는 카탈로그는 null을 반환한다.</summary>
-        private KeyboardPartDefinition DrawOffer() { return _catalog.Count == 0 ? null : _catalog[UnityEngine.Random.Range(0, _catalog.Count)]; }
+        /// <summary>inventory가 보유하거나 shown에 이미 제시한 전체 부품을 제외해 상품 하나를 추첨한다. 키캡 중복은 허용하고 후보가 없으면 null을 반환하며 제시된 전체 부품을 기록한다.</summary>
+        private KeyboardPartDefinition DrawOffer(TournamentInventory inventory, HashSet<KeyboardPartDefinition> shown)
+        {
+            var candidates = new List<KeyboardPartDefinition>();
+            foreach (KeyboardPartDefinition part in _catalog)
+            {
+                if (!(part is KeycapDefinition) && (inventory.GetCount(part) > 0 || shown.Contains(part))) continue;
+                candidates.Add(part);
+            }
+            if (candidates.Count == 0) return null;
+            KeyboardPartDefinition selected = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            if (!(selected is KeycapDefinition)) shown.Add(selected);
+            return selected;
+        }
 
         /// <summary>상품 세대를 증가시키고 3개 슬롯을 새로 추첨한다. 구매한 부품과 고정 배치는 유지한다.</summary>
         private void RollOffers()
         {
             _offerGeneration++;
+            var shown = new HashSet<KeyboardPartDefinition>();
             for (int i = 0; i < _offers.Length; i++)
             {
-                _offers[i] = DrawOffer();
+                _offers[i] = DrawOffer(_inventory, shown);
                 _purchased[i] = false;
                 Observe("OfferShown", i, _offers[i], Currency, false, false);
             }

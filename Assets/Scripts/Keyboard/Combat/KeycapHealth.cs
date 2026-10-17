@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
+using Game.Tournament;
+
 using KeyboardModeling;
 
 using Random = UnityEngine.Random;
@@ -22,6 +24,11 @@ public sealed class KeycapHealth : MonoBehaviour
     public event Action<KeycapHealth> Broken;
     public event Action<KeycapDamage> Damaged;
     public event Action<KeycapHealth> DamageApplied;
+
+    [Header("Status Effects")]
+    private KeycapStatusEffects _statusEffects;
+    public int ActiveStatusCount => _statusEffects.Count;
+    public event Action<KeycapHealth, KeycapHitKind> HitReceived;
 
     [Header("Runtime Rarity")]
     [SerializeField] private bool _supportsRarity;
@@ -61,6 +68,7 @@ public sealed class KeycapHealth : MonoBehaviour
 
     void Awake()
     {
+        _statusEffects = new KeycapStatusEffects(transform);
         if (_audioSource == null || !_audioSource.gameObject.scene.IsValid())
             _audioSource = GetComponentInParent<AudioSource>();
 
@@ -85,6 +93,7 @@ public sealed class KeycapHealth : MonoBehaviour
     /// </summary>
     public void RestoreHealth()
     {
+        _statusEffects.Clear();
         _currentHP = _maxHP;
         _broken = false;
         for (int index = 0; index < _renderers.Length; index++)
@@ -154,15 +163,33 @@ public sealed class KeycapHealth : MonoBehaviour
     /// 양수 damage로 체력을 줄이고 실제 감소한 경우 DamageApplied로 이 키캡을 알린다.
     /// 체력이 0이면 파괴하며 이미 파괴되었거나 체력이 소진된 키캡은 무시하고 피해 Toast 이벤트는 발생시키지 않는다.
     /// </summary>
-    public void TakeDamage(int damage)
+    public void TakeDamage(int damage) { TakeDamage(damage, KeycapHitKind.Direct); }
+
+    /// <summary>damage와 kind로 상태가 반영된 최종 피해를 한 번 계산해 체력을 줄인다. 양수 입력만 상태를 소모하며 피격과 파괴 이벤트를 알린다.</summary>
+    public void TakeDamage(int damage, KeycapHitKind kind)
     {
         if (_broken || _currentHP <= 0 || damage <= 0) return;
+        damage = _statusEffects.ResolveDamage(damage, kind);
         int previousHP = _currentHP;
         _currentHP = Mathf.Max(0, _currentHP - damage);
         UpdateDamageDecal();
         if (_currentHP < previousHP) DamageApplied?.Invoke(this);
+        HitReceived?.Invoke(this, kind);
         if (_currentHP == 0) Break();
     }
+
+    /// <summary>살아 있는 키캡에 definition의 상태를 부여한다. 유효한 SO를 사용하며 파괴된 키캡은 무시한다.</summary>
+    public void ApplyStatus(KeycapStatusEffectDefinition definition)
+    {
+        if (!_broken && _currentHP > 0 && definition != null) _statusEffects.Apply(definition);
+    }
+
+    /// <summary>입력 없이 현재 상태와 표시를 모두 초기화한다. 체력과 장착된 키캡 SO는 유지한다.</summary>
+    public void ClearStatuses() { _statusEffects.Clear(); }
+
+    void Update() { _statusEffects.Tick(Time.deltaTime); }
+    void OnDisable() { _statusEffects.Clear(); }
+    void OnDestroy() { _statusEffects.Clear(); }
 
     /// <summary>현재 체력 비율과 세 단계 균열 재질을 사용해 데칼을 갱신하고, 체력이 충분하거나 소진되면 데칼을 숨긴다.</summary>
     private void UpdateDamageDecal()
@@ -186,6 +213,7 @@ public sealed class KeycapHealth : MonoBehaviour
     private void Break()
     {
         _broken = true;
+        _statusEffects.Clear();
         foreach (Renderer renderer in GetComponentsInChildren<Renderer>()) renderer.enabled = false;
         foreach (Collider collider in _colliders) collider.enabled = false;
         Broken?.Invoke(this);

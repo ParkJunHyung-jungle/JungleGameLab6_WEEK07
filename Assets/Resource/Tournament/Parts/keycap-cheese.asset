@@ -23,8 +23,4 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 3bb8df0ffe1d9fe43b02f2865b0ae9a4, type: 2}
   - {fileID: 2100000, guid: ff3dbed506349b941bfa6d51f220461d, type: 2}
   _oneUnitOnly: 1
-  _ability: 2
-  _damage: 3
-  _neighborCount: 12
-  _delay: 0
-  _waveDuration: 0.45
+  _ability: {fileID: 11400000, guid: 05e7223fa768408b9bfc0fca5468dbb9, type: 2}

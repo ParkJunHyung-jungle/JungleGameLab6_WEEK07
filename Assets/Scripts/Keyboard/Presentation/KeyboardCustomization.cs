@@ -421,6 +421,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             }
 
             renderers[index].sharedMaterials = materials;
+            KeyboardToonSurface.ApplyBounds(renderers[index]);
         }
 
         RememberKeycapMaterialOverrides();
@@ -934,6 +935,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (renderer != null && renderer.transform.IsChildOf(keycap))
             {
                 renderer.sharedMaterial = material;
+                KeyboardToonSurface.ApplyBounds(renderer);
                 applied = true;
             }
         }
@@ -1030,7 +1032,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
             Material material = _keycapMaterialOverrides.TryGetValue(keycap, out Material selected) ? selected : _keycapMaterial;
             foreach (MeshRenderer renderer in _keycapRenderers)
                 if (renderer != null && renderer.transform.IsChildOf(keycap) &&
-                    (_imageCustomization == null || !_imageCustomization.HasImage(renderer))) renderer.sharedMaterial = material;
+                    (_imageCustomization == null || !_imageCustomization.HasImage(renderer)))
+                {
+                    renderer.sharedMaterial = material;
+                    KeyboardToonSurface.ApplyBounds(renderer);
+                }
         }
     }
 
@@ -1114,6 +1120,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (renderer != null && (_imageCustomization == null || !_imageCustomization.HasImage(renderer)))
             {
                 renderer.sharedMaterial = _caseMaterial;
+                KeyboardToonSurface.ApplyBounds(renderer);
             }
         }
     }
@@ -1190,3 +1197,4 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     #endregion
 }
+

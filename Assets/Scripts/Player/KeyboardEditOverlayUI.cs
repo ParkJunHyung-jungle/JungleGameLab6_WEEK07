@@ -573,6 +573,7 @@ namespace Game.Player
             renderTexture.Create();
             previewCamera.targetTexture = renderTexture;
             RenderTexture previousActiveTexture = RenderTexture.active;
+            var previewMaterials = new List<Material>();
 
             try
             {
@@ -584,7 +585,8 @@ namespace Game.Player
                         continue;
                     }
 
-                    meshRenderer.sharedMaterial = material;
+                    meshRenderer.sharedMaterial = CreatePreviewMaterial(material, previewMaterials);
+                    KeyboardToonSurface.ApplyBounds(meshRenderer);
                     previewCamera.Render();
                     RenderTexture.active = renderTexture;
                     Texture2D previewTexture = new Texture2D(
@@ -610,9 +612,48 @@ namespace Game.Player
                 Destroy(renderTexture);
                 previewStage.SetActive(false);
                 Destroy(previewStage);
+                foreach (Material material in previewMaterials) Destroy(material);
             }
 
             return previews;
+        }
+
+        /// <summary>
+        /// material이 투명 재질이면 미리보기용 복제본을 불투명 렌더링으로 전환해 형태를 표시한다.
+        /// 원본 재질은 유지하고 복제본은 ownedMaterials에 등록해 렌더링 후 해제하며 표시용 재질을 반환한다.
+        /// </summary>
+        private Material CreatePreviewMaterial(Material material, List<Material> ownedMaterials)
+        {
+            if (material.HasProperty("_Opacity") && material.HasProperty("_EdgeOpacity"))
+            {
+                var glassPreview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
+                glassPreview.SetFloat("_Opacity", 1f);
+                glassPreview.SetFloat("_EdgeOpacity", 1f);
+                ownedMaterials.Add(glassPreview);
+                return glassPreview;
+            }
+            if (!material.HasProperty("_Surface") || material.GetFloat("_Surface") < 0.5f ||
+                !material.HasProperty("_BaseColor")) return material;
+
+            Color color = material.GetColor("_BaseColor");
+            var preview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
+            color.a = 1f;
+            preview.SetColor("_BaseColor", color);
+            if (preview.HasProperty("_Color")) preview.SetColor("_Color", color);
+            preview.SetFloat("_Surface", 0f);
+            preview.SetFloat("_SrcBlend", (float)BlendMode.One);
+            preview.SetFloat("_DstBlend", (float)BlendMode.Zero);
+            preview.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+            preview.SetFloat("_DstBlendAlpha", (float)BlendMode.Zero);
+            preview.SetFloat("_ZWrite", 1f);
+            preview.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            preview.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            preview.DisableKeyword("_ALPHAMODULATE_ON");
+            preview.SetOverrideTag("RenderType", "Opaque");
+            preview.renderQueue = (int)RenderQueue.Geometry;
+            preview.SetShaderPassEnabled("DepthOnly", true);
+            ownedMaterials.Add(preview);
+            return preview;
         }
 
         /// <summary>

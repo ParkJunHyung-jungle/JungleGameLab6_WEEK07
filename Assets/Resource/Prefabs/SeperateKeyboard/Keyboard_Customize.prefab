@@ -35126,6 +35126,12 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
   - {fileID: 2100000, guid: 16b8e1e43f86b614eaa4f02c773c3c57, type: 2}
   - {fileID: 2100000, guid: 459ddb0e8f4742b48a738f361185deb4, type: 2}
+  - {fileID: 2100000, guid: a1ae9176952bf514d9ae80df6921947d, type: 2}
+  - {fileID: 2100000, guid: 95c93150b8ded314ebf7a9c1fd6f195f, type: 2}
+  - {fileID: 2100000, guid: c57b28e491a04f638d215e93b407c6a2, type: 2}
+  - {fileID: 2100000, guid: 227931973824b224ba90d10fd191701c, type: 2}
+  - {fileID: 2100000, guid: e41f85b26c934a179a024d53e8f6b1c5, type: 2}
+  - {fileID: 2100000, guid: f52e96c37d844b288b135e64f9a7c2d6, type: 2}
   _caseRenderers:
   - {fileID: 7448335059736704784}
   - {fileID: 8780478049414863374}
@@ -36187,6 +36193,7 @@ MonoBehaviour:
   _keycapMaterial: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   _keycapMaterialIndex: 0
   _photoMaterialTemplate: {fileID: 2100000, guid: 4a96a34eedb48104fa0dffe02c1580f0, type: 2}
+  _partInstallation: {fileID: 0}
   _switches:
   - {fileID: 1927684077526527268}
   - {fileID: 3871779480709502322}
@@ -36277,7 +36284,11 @@ MonoBehaviour:
   - {fileID: 8664602989658992375}
   _switchType: 1
   _plate: {fileID: 8932257725727091314}
+  _plateMaterial: {fileID: 2100000, guid: b6cacee2f02e3874d97f82f41749ddc0, type: 2}
+  _plateMaterialIndex: -1
   _plateType: 0
+  _plateSettingsSeparated: 1
+  _plateEffect: 0
 --- !u!114 &731598260174095312
 MonoBehaviour:
   m_ObjectHideFlags: 0

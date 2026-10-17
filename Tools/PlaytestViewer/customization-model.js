@@ -2,9 +2,20 @@
 
 const Customization = (() => {
   const PARTS = { Keycap: "키캡", Switch: "축", LED: "LED", Case: "케이스", Plate: "보강판", CustomImage: "커스텀 이미지" };
-  const COLORS = { Keycap: "#38a9ff", Switch: "#ffad32", LED: "#b5a0f2", Case: "#67d7aa", Plate: "#f18eb6", CustomImage: "#e6d36f" };
+  const ELEMENT_PARTS = { Keycap: "키캡", Switch: "축", LED: "LED", Case: "케이스", Plate: "보강판 재질", PlateEffect: "보강판 효과", PlateMaterial: "보강판 재질", CustomImage: "커스텀 이미지" };
+  const COLORS = { Keycap: "#38a9ff", Switch: "#ffad32", LED: "#b5a0f2", Case: "#67d7aa", Plate: "#f18eb6", PlateEffect: "#f18eb6", PlateMaterial: "#f18eb6", CustomImage: "#e6d36f" };
   const NUMBERS = new Set(["schema_version", "sequence", "elapsed_seconds", "keycap_index", "start_elapsed_seconds", "end_elapsed_seconds", "duration_seconds", "focused_duration_seconds"]);
   const BOOLS = new Set(["apply_success", "value_changed", "is_complete"]);
+
+  /** 보강판 재질(Plate·PlateMaterial)의 기록 열 이름을 동일 파츠로 매칭한다. */
+  function SameElementPart(rowPart, part) {
+    return part === "Plate" ? rowPart === "Plate" || rowPart === "PlateMaterial" : rowPart === part;
+  }
+
+  /** 상단 6개 탭 기준으로 보강판 탭(Plate·PlateMaterial·PlateEffect) 소속 여부를 반환한다. */
+  function SameTabPart(rowPart, tabPart) {
+    return tabPart === "Plate" ? rowPart === "Plate" || rowPart === "PlateMaterial" || rowPart === "PlateEffect" : rowPart === tabPart;
+  }
 
   /** 원본 셀과 헤더를 받아 커스터마이징 전용 숫자·불리언·누락 상태를 분리해 반환한다. */
   function Decode(header, cells, index) {
@@ -100,11 +111,11 @@ const Customization = (() => {
       const run = { key: id + ":" + key, id: context.customization_run_id, index: index + 1, fileId: id, fileName: name,
         tester: context.tester_id, session: context.session_id, keyboard: context.keyboard_id, build: context.build_version,
         start, end, rows: entries, snapshots, snapshotBatches, visits, duration: end?.duration_seconds ?? null, focused: end?.focused_duration_seconds ?? null,
-        complete: end?.is_complete === true && end.end_reason === "RightClickExit" };
+        complete: end?.is_complete === true && ["RightClickExit", "NextScene"].includes(end.end_reason) };
       run.selected = entries.filter(row => row.record_type === "ElementSelected");
       run.imageApplies = entries.filter(IsImageApply);
       run.options = entries.filter(row => row.record_type === "AvailableOption");
-      run.partOffered = new Set(run.options.map(row => row.part));
+      run.partOffered = new Set(run.options.map(row => row.part === "PlateMaterial" || row.part === "PlateEffect" ? "Plate" : row.part));
       if (!start || !end) warnings.push("편집 " + run.index + "회차: " + (!start ? "시작" : "종료") + " 행 누락");
       if (visits.some(visit => !visit.end)) warnings.push("편집 " + run.index + "회차: 미종료 방문 있음 · 시간 추정하지 않음");
       return run;
@@ -133,7 +144,7 @@ const Customization = (() => {
   /** 선택 범위 회차의 여섯 항목별 클릭·방문·체류·접근률을 계산해 반환한다. */
   function Parts(runs) {
     return Object.keys(PARTS).map(part => {
-      const events = runs.flatMap(run => run.rows.filter(row => row.part === part));
+      const events = runs.flatMap(run => run.rows.filter(row => SameTabPart(row.part, part)));
       const visits = runs.flatMap(run => run.visits.filter(visit => visit.part === part));
       const ended = visits.filter(visit => visit.end);
       const offered = runs.filter(run => run.partOffered.has(part));
@@ -155,16 +166,16 @@ const Customization = (() => {
 
   /** 제공 요소와 선택을 빌드·항목별로 연결하고 선택 비중과 최종 유지 분모를 반환한다. */
   function Elements(runs, part) {
-    const all = runs.flatMap(run => run.rows.filter(row => row.part === part && ["AvailableOption", "ElementSelected"].includes(row.record_type)));
+    const all = runs.flatMap(run => run.rows.filter(row => SameElementPart(row.part, part) && ["AvailableOption", "ElementSelected"].includes(row.record_type)));
     return [...Playtest.Group(all, row => JSON.stringify([row.build_version, row.element_id])).values()].map(rows => {
       const element = rows[0].element_id, build = rows[0].build_version;
       const buildRuns = runs.filter(run => run.build === build);
       const selected = rows.filter(row => row.record_type === "ElementSelected");
-      const offered = buildRuns.filter(run => run.options.some(row => row.part === part && row.element_id === element));
+      const offered = buildRuns.filter(run => run.options.some(row => SameElementPart(row.part, part) && row.element_id === element));
       const eligible = offered.filter(run => run.complete && run.snapshots.get("Final")?.get(part)?.element_id !== null && run.snapshots.get("Final")?.has(part));
       const retained = eligible.filter(run => run.snapshots.get("Final").get(part).element_id === element);
       const denominator = all.filter(row => row.record_type === "ElementSelected" && row.build_version === build).length;
-      const testers = new Set(buildRuns.flatMap(run => run.selected.filter(row => row.part === part && row.element_id === element).map(() => run.tester)).filter(Boolean));
+      const testers = new Set(buildRuns.flatMap(run => run.selected.filter(row => SameElementPart(row.part, part) && row.element_id === element).map(() => run.tester)).filter(Boolean));
       const offeredTesters = new Set(offered.map(run => run.tester).filter(Boolean));
       return { element, build, ...Selections(selected),
         share: denominator ? selected.length / denominator : null, denominator,
@@ -184,7 +195,7 @@ const Customization = (() => {
       retention: completedUsed.length && known.length === completedUsed.length ? known.filter(run => Images(run).retained).length / completedUsed.length : null };
   }
 
-  const FINAL_PARTS = ['Keycap', 'Switch', 'Case', 'Plate', 'LED', 'LEDColor', 'LEDEnabled'];
+  const FINAL_PARTS = ['Keycap', 'Switch', 'Case', 'Plate', 'PlateEffect', 'LED', 'LEDColor', 'LEDEnabled'];
   /** 회차의 순서 연속성과 성공 선택의 이전값 연결을 확인하여 파츠별 초기·최종 판정을 반환한다. */
   function FinalParts(run) {
     const initial = run.snapshots.get('Initial'), final = run.complete ? run.snapshots.get('Final') : null;
@@ -193,7 +204,7 @@ const Customization = (() => {
       const before = initial?.get(part)?.element_id ?? null, after = final?.get(part)?.element_id ?? null;
       const actions = run.rows.filter(row => part === 'LEDColor' || part === 'LEDEnabled'
         ? row.record_type === 'Adjustment' && row.part === 'LED' && row.element_id === (part === 'LEDColor' ? 'Color' : 'Power')
-        : row.record_type === 'ElementSelected' && row.part === part);
+        : row.record_type === 'ElementSelected' && SameElementPart(row.part, part));
       let current = before, away = false, reliable = continuous && before !== null;
       actions.forEach(row => {
         if (row.apply_success === false) return;
@@ -248,12 +259,12 @@ const Customization = (() => {
   /** 완료 회차의 빌드별 탐색과 최종 구성을 집계하고 각 비율의 독립 분모를 반환한다. */
   function FinalElements(runs) {
     const completed = runs.filter(run => run.complete), result = [];
-    for (const part of FINAL_PARTS.slice(0, 5)) {
+    for (const part of FINAL_PARTS.slice(0, 6)) {
       for (const [build, items] of Playtest.Group(completed, run => run.build)) {
         const known = items.filter(run => run.snapshots.get('Final')?.get(part)?.element_id != null);
-        const values = new Set(items.flatMap(run => [...run.options.filter(row => row.part === part).map(row => row.element_id), ...run.selected.filter(row => row.part === part).map(row => row.element_id), run.snapshots.get('Final')?.get(part)?.element_id]).filter(value => value != null));
+        const values = new Set(items.flatMap(run => [...run.options.filter(row => SameElementPart(row.part, part)).map(row => row.element_id), ...run.selected.filter(row => SameElementPart(row.part, part)).map(row => row.element_id), run.snapshots.get('Final')?.get(part)?.element_id]).filter(value => value != null));
         values.forEach(element => {
-          const matching = run => run.selected.filter(row => row.part === part && row.element_id === element);
+          const matching = run => run.selected.filter(row => SameElementPart(row.part, part) && row.element_id === element);
           const selected = items.filter(run => matching(run).length), successful = items.filter(run => matching(run).some(row => row.apply_success === true));
           const selectedKnown = successful.filter(run => known.includes(run)), retained = known.filter(run => run.snapshots.get('Final').get(part).element_id === element);
           result.push({ part, build, element, ...Selections(selected.flatMap(matching)), testers: new Set(selected.map(run => run.tester).filter(Boolean)).size, selected: selected.length,
@@ -268,9 +279,10 @@ const Customization = (() => {
   /** 완료 회차의 완전한 기본 조합과 확인 가능한 이미지 유형을 빌드별로 집계한다. */
   function Combinations(runs) {
     const completed = runs.filter(run => run.complete), basic = [], image = [];
+    const baseParts = ['Keycap', 'Switch', 'Case', 'Plate', 'LED'];
     let excluded = 0;
     completed.forEach(run => {
-      const values = FINAL_PARTS.slice(0, 5).map(part => run.snapshots.get('Final')?.get(part)?.element_id);
+      const values = baseParts.map(part => run.snapshots.get('Final')?.get(part)?.element_id);
       if (values.some(value => value == null)) excluded++; else basic.push({ run, value: values.join(' + '), build: run.build });
       const state = Images(run);
       const type = state.caseRetained === null || state.keycaps === null ? '판정 불가' : state.caseRetained ? state.keycaps > 0 ? '케이스와 키캡' : '케이스만' : state.keycaps > 0 ? '키캡만' : '없음';
@@ -280,5 +292,5 @@ const Customization = (() => {
     return { basic: group(basic), image: group(image), excluded };
   }
 
-  return { PARTS, COLORS, Decode, Sum, Describe, Build, Images, Parts, Elements, IsImageApply, ImageMetrics, Selections, FINAL_PARTS, FinalParts, ImageChanges, Storage, FinalElements, Combinations };
+  return { PARTS, ELEMENT_PARTS, COLORS, SameElementPart, SameTabPart, Decode, Sum, Describe, Build, Images, Parts, Elements, IsImageApply, ImageMetrics, Selections, FINAL_PARTS, FinalParts, ImageChanges, Storage, FinalElements, Combinations };
 })();

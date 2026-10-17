@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+using Game.Logging;
 using Game.Player;
 using Game.Tournament;
 
@@ -51,6 +52,7 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
             KeyboardCustomization keyboard = _holder.KeyboardBody.GetComponent<KeyboardCustomization>();
             KeyboardCustomizationState state = _storage.CaptureForBattle(keyboard);
             TournamentKeyboardSession.Select(state);
+            CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
 #if UNITY_EDITOR
             if (!Application.CanStreamedLevelBeLoaded(_battleScenePath))
             {

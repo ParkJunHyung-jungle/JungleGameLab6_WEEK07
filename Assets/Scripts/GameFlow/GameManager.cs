@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 
 using UnityEngine;
@@ -212,11 +212,13 @@ public class GameManager : MonoBehaviour
         if (_keyboardSpawner != null)
         {
             _keyboardSpawner.KeyboardSpawned += HandleKeyboardSpawned;
+            _keyboardSpawner.KeyboardCreated += HandlePlayerKeyboardCreated;
         }
 
         if (_enemyKeyboardSpawner != null)
         {
             _enemyKeyboardSpawner.KeyboardSpawned += HandleEnemyKeyboardSpawned;
+            _enemyKeyboardSpawner.KeyboardCreated += HandleEnemyKeyboardCreated;
         }
 
         if (_tournamentController != null)
@@ -277,15 +279,35 @@ public class GameManager : MonoBehaviour
         if (_keyboardSpawner != null)
         {
             _keyboardSpawner.KeyboardSpawned -= HandleKeyboardSpawned;
+            _keyboardSpawner.KeyboardCreated -= HandlePlayerKeyboardCreated;
         }
 
         if (_enemyKeyboardSpawner != null)
         {
             _enemyKeyboardSpawner.KeyboardSpawned -= HandleEnemyKeyboardSpawned;
+            _enemyKeyboardSpawner.KeyboardCreated -= HandleEnemyKeyboardCreated;
         }
 
         UnsubscribeKeyboardDestruction();
         UnsubscribeEnemyKeyboardDestruction();
+    }
+
+    /// <summary>
+    /// 생성 직후 keyboard에 플레이어 토너먼트 구성을 적용하도록 알린다.
+    /// 입력 활성화와 등장 완료 이벤트 전에 전투 키보드 상태를 확정한다.
+    /// </summary>
+    private void HandlePlayerKeyboardCreated(GameObject keyboard)
+    {
+        if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(keyboard, false);
+    }
+
+    /// <summary>
+    /// 생성 직후 keyboard에 로봇 토너먼트 구성을 적용하도록 알린다.
+    /// 로봇 타건과 등장 완료 이벤트 전에 전투 키보드 상태를 확정한다.
+    /// </summary>
+    private void HandleEnemyKeyboardCreated(GameObject keyboard)
+    {
+        if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(keyboard, true);
     }
 
     /// <summary>
@@ -298,7 +320,6 @@ public class GameManager : MonoBehaviour
 
         // 등록된 스폰 포인트를 기준으로 키보드 생성을 요청한다.
         _activeKeyboard = _keyboardSpawner.SpawnKeyboard(_keyboardSpawnPoint, withAnimation);
-        if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(_activeKeyboard, false);
 
         if (_activeKeyboard != null)
         {
@@ -746,7 +767,6 @@ public class GameManager : MonoBehaviour
 
         // 등록된 로봇 스폰 포인트를 기준으로 키보드 생성을 요청한다.
         _activeEnemyKeyboard = _enemyKeyboardSpawner.SpawnKeyboard(_enemyKeyboardSpawnPoint, withAnimation);
-        if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(_activeEnemyKeyboard, true);
 
         if (_activeEnemyKeyboard != null)
         {

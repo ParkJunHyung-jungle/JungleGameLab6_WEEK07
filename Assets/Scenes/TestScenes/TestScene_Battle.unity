@@ -2285,6 +2285,7 @@ GameObject:
   - component: {fileID: 577925187}
   - component: {fileID: 577925186}
   - component: {fileID: 577925189}
+  - component: {fileID: 577925190}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -2375,6 +2376,23 @@ MonoBehaviour:
   - {fileID: 2100000, guid: c29bcdb7cea0deb44b5b2f6e97e96075, type: 2}
   - {fileID: 2100000, guid: 257eea9f366692e4c93249bb14d8e72d, type: 2}
   _view: {fileID: 1704865274}
+  _keyboardStorage: {fileID: 577925190}
+--- !u!114 &577925190
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 577925185}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89e1d2440af59244ba58f7663b574ad6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomizationStorage
+  _customization: {fileID: 0}
+  _catalog: {fileID: 11400000, guid: 067fd65342d9d114ba14af37cab52dc3, type: 2}
+  _materialCatalog: []
+  _materialIds: []
 --- !u!1 &578330430
 GameObject:
   m_ObjectHideFlags: 0

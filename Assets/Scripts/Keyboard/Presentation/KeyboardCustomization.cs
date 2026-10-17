@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -167,6 +167,48 @@ public sealed class KeyboardCustomization : MonoBehaviour
             DisableSwitches();
             SetLEDEnabled(false);
         }
+    }
+
+    /// <summary>
+    /// 새 전투 키보드의 축과 키캡을 즉시 표시한다.
+    /// 현재 재질과 축별 타입을 유지하고 작업실 초기 비활성 상태만 해제한다.
+    /// </summary>
+    public void PrepareForBattle()
+    {
+        foreach (KeyboardSwitch keyboardSwitch in _switches) keyboardSwitch.gameObject.SetActive(true);
+        if (_keycaps == null) CacheKeycaps();
+        foreach (Transform keycap in _keycaps) keycap.gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// catalog와 materialIds로 구성을 복사하고 미설치 부품만 defaults의 값으로 채운다.
+    /// 전투용 상태를 반환하며 작업실 키보드의 재질과 설치 여부는 유지한다.
+    /// </summary>
+    public KeyboardCustomizationState CaptureBattleState(Material[] catalog, string[] materialIds, KeyboardCustomizationState defaults)
+    {
+        KeyboardCustomizationState state = CaptureState(catalog, materialIds);
+        MeshRenderer[] renderers = GetCustomizationRenderers();
+        int slot = 0;
+        for (int index = 0; index < renderers.Length; index++)
+        {
+            bool missing = false;
+            for (int key = 0; key < _keycaps.Length; key++)
+            {
+                if (renderers[index].transform.IsChildOf(_keycaps[key]) &&
+                    !_keycaps[key].gameObject.activeSelf)
+                {
+                    missing = true;
+                    state.ImageState.KeycapImages[key] = -1;
+                    state.ImageState.IndividualImages[key] = false;
+                    break;
+                }
+            }
+            for (int material = 0; material < state.SlotCounts[index]; material++, slot++)
+                if (missing) state.MaterialIndices[slot] = defaults.MaterialIndices[slot];
+        }
+        for (int index = 0; index < _switches.Length; index++)
+            if (!_switches[index].gameObject.activeSelf) state.SwitchTypes[index] = defaults.SwitchTypes[index];
+        return state;
     }
 
     void OnValidate()

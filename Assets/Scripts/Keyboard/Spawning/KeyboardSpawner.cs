@@ -23,6 +23,7 @@ public class KeyboardSpawner : MonoBehaviour
     public bool IsSpawning => _spawnRoutine != null;
 
     public event Action<GameObject> KeyboardSpawned;
+    public event Action<GameObject> KeyboardCreated;
 
     /// <summary>생성 중인 연출을 중단하여 종료된 대전의 입력 재개와 완료 알림을 방지한다.</summary>
     public void CancelSpawn()
@@ -90,6 +91,7 @@ public class KeyboardSpawner : MonoBehaviour
         // 원본 프리팹의 로컬 스케일을 유지하며 키보드 인스턴스를 생성한다.
         GameObject keyboardInstance = Instantiate(_keyboardPrefab, position, rotation);
         keyboardInstance.transform.localScale = _keyboardPrefab.transform.localScale;
+        KeyboardCreated?.Invoke(keyboardInstance);
         return keyboardInstance;
     }
 

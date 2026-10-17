@@ -34642,6 +34642,8 @@ GameObject:
   - component: {fileID: 4484957135179497554}
   - component: {fileID: 3967785068815222441}
   - component: {fileID: 731598260174095312}
+  - component: {fileID: 1204908660925959386}
+  - component: {fileID: 16919128326509319}
   m_Layer: 0
   m_Name: Keyboard_Customize
   m_TagString: Untagged
@@ -36187,6 +36189,7 @@ MonoBehaviour:
   _keycapMaterial: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   _keycapMaterialIndex: 0
   _photoMaterialTemplate: {fileID: 2100000, guid: 4a96a34eedb48104fa0dffe02c1580f0, type: 2}
+  _partInstallation: {fileID: 16919128326509319}
   _switches:
   - {fileID: 1927684077526527268}
   - {fileID: 3871779480709502322}
@@ -36277,7 +36280,11 @@ MonoBehaviour:
   - {fileID: 8664602989658992375}
   _switchType: 1
   _plate: {fileID: 8932257725727091314}
+  _plateMaterial: {fileID: 2100000, guid: b6cacee2f02e3874d97f82f41749ddc0, type: 2}
+  _plateMaterialIndex: -1
   _plateType: 0
+  _plateSettingsSeparated: 1
+  _plateEffect: 0
 --- !u!114 &731598260174095312
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -36291,6 +36298,32 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardLegendRenderer
   _materialTemplate: {fileID: 2100000, guid: abd5db41bc189fb47b822bf20b9b7d40, type: 2}
+--- !u!114 &1204908660925959386
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648102524883158503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 510c1bee6e0fcfd4c8843892cec42486, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardImageCustomization
+--- !u!114 &16919128326509319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648102524883158503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c024d23aded89c14e976d8b93dbd263c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardPartInstallation
+  _height: 2
+  _duration: 0.4
 --- !u!1 &5689495446983780148
 GameObject:
   m_ObjectHideFlags: 0

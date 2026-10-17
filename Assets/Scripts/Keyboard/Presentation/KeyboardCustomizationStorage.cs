@@ -11,6 +11,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     [SerializeField] private KeyboardCustomization _customization;
 
     [Header("Material Registry")]
+    [SerializeField] private KeyboardMaterialCatalog _catalog;
     [SerializeField] private Material[] _materialCatalog = new Material[0];
     [SerializeField] private string[] _materialIds = new string[0];
     private string _lastMessage = "Ready";
@@ -19,6 +20,64 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     public string LastMessage => _lastMessage;
     public KeyboardCustomization Customization => _customization;
     public bool HasSave => File.Exists(SavePath);
+
+    /// <summary>
+    /// 공통 카탈로그에 등록된 기본 구성을 keyboard에 적용한다.
+    /// 반환값 없이 인스턴스의 외형을 복원하며 저장 파일은 변경하지 않는다.
+    /// </summary>
+    public void ApplyDefaultCustomization(KeyboardCustomization keyboard)
+    {
+        _catalog.Apply(_catalog.GetDefaultState(), keyboard);
+    }
+
+    /// <summary>
+    /// keyboard의 현재 구성에서 빈 부품을 기본값으로 채운 전투용 상태를 반환한다.
+    /// 공통 카탈로그를 사용하며 원본 인스턴스와 저장 파일은 유지한다.
+    /// </summary>
+    public KeyboardCustomizationState CaptureForBattle(KeyboardCustomization keyboard)
+    {
+        return _catalog.CaptureForBattle(keyboard);
+    }
+
+    /// <summary>
+    /// keyboard의 현재 구성을 공통 카탈로그로 수집해 반환한다.
+    /// 기존 씬의 개별 재질 배열도 호환하며 저장 파일은 변경하지 않는다.
+    /// </summary>
+    public KeyboardCustomizationState CaptureCustomization(KeyboardCustomization keyboard)
+    {
+        return _catalog != null ? _catalog.Capture(keyboard) : keyboard.CaptureState(_materialCatalog, _materialIds);
+    }
+
+    /// <summary>
+    /// state를 keyboard에 공통 카탈로그로 적용한다.
+    /// 대상 인스턴스만 변경하며 기존 배열 설정도 호환한다.
+    /// </summary>
+    public void ApplyCustomization(KeyboardCustomizationState state, KeyboardCustomization keyboard)
+    {
+        if (_catalog != null) _catalog.Apply(state, keyboard);
+        else keyboard.ApplyState(state, _materialCatalog, _materialIds);
+    }
+
+    /// <summary>
+    /// 저장 파일의 구성을 읽어 state로 반환한다.
+    /// 키보드와 파일은 변경하지 않으며 실패 시 false와 안내 상태를 남긴다.
+    /// </summary>
+    public bool TryReadCustomization(out KeyboardCustomizationState state)
+    {
+        state = null;
+        try
+        {
+            if (!HasSave) return false;
+            state = JsonUtility.FromJson<KeyboardCustomizationState>(File.ReadAllText(SavePath));
+            if (state == null) throw new InvalidOperationException("Save data is empty.");
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
+        {
+            _lastMessage = "Read failed: " + exception.Message;
+            return false;
+        }
+    }
 
     /// <summary>
     /// customization을 현재 저장 및 복원 대상으로 지정한다.
@@ -66,7 +125,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     {
         try
         {
-            KeyboardCustomizationState state = _customization.CaptureState(_materialCatalog, _materialIds);
+            KeyboardCustomizationState state = CaptureCustomization(_customization);
             string temporaryPath = SavePath + ".tmp";
             File.WriteAllText(temporaryPath, JsonUtility.ToJson(state, true));
             if (File.Exists(SavePath)) File.Replace(temporaryPath, SavePath, null);
@@ -96,7 +155,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
             }
 
             var state = JsonUtility.FromJson<KeyboardCustomizationState>(File.ReadAllText(SavePath));
-            _customization.ApplyState(state, _materialCatalog, _materialIds);
+            ApplyCustomization(state, _customization);
             _lastMessage = "Loaded";
             return true;
         }

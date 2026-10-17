@@ -19,6 +19,7 @@ namespace Game.Tournament
         [SerializeField] private TournamentKeyLayout _keyLayout;
         [SerializeField] private Material[] _decalMaterials;
         [SerializeField] private TournamentView _view;
+        [SerializeField] private KeyboardCustomizationStorage _keyboardStorage;
 
         [Header("Runtime")]
         private GameManager _manager;
@@ -98,6 +99,9 @@ namespace Game.Tournament
             Result = null;
             Round = 1;
             PlaytestInventorySnapshotRequested?.Invoke(this, "TournamentStart");
+            if (!TournamentKeyboardSession.HasSelection && _keyboardStorage.TryReadCustomization(out KeyboardCustomizationState saved))
+                TournamentKeyboardSession.Select(saved);
+            TournamentKeyboardSession.Begin();
             BeginBattle(false);
         }
 
@@ -126,6 +130,22 @@ namespace Game.Tournament
         /// <summary>keyboard와 isEnemy로 소유자별 보유 키캡, 체력, 점수 및 임시 표시를 생성한다.</summary>
         private void ConfigureKeyboard(GameObject keyboard, bool isEnemy)
         {
+            KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
+            customization.PrepareForBattle();
+            KeyboardCustomizationState state = isEnemy ? null : TournamentKeyboardSession.GetCurrent();
+            if (state == null) _keyboardStorage.ApplyDefaultCustomization(customization);
+            else
+            {
+                try
+                {
+                    _keyboardStorage.ApplyCustomization(state, customization);
+                }
+                catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
+                {
+                    Debug.LogWarning("키보드 구성을 복원할 수 없어 기본 구성을 사용합니다: " + exception.Message, this);
+                    _keyboardStorage.ApplyDefaultCustomization(customization);
+                }
+            }
             KeyboardScoreCombo score = isEnemy ? _manager.PlaytestEnemyScore : _manager.PlaytestPlayerScore;
             keyboard.GetComponent<TournamentKeyboardEffects>().Initialize(this,
                 isEnemy ? _enemyInventory : _inventory, score, _keyLayout, _settings.KeycapHealth, _decalMaterials);

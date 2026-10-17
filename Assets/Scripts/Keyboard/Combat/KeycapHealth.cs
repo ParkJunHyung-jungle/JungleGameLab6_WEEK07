@@ -35,6 +35,9 @@ public sealed class KeycapHealth : MonoBehaviour
     private MeshRenderer _shellRenderer;
     private MeshFilter _shellFilter;
 
+    [Header("Model Appearance")]
+    private bool _usesCustomModel;
+
     [Header("Damage decal")]
     [SerializeField] private DecalProjector _damageDecal;
     [SerializeField] private Material[] _crackMaterials;
@@ -78,17 +81,26 @@ public sealed class KeycapHealth : MonoBehaviour
 
     /// <summary>
     /// 저장된 초기 표시 및 충돌 상태를 사용해 파손된 키캡과 체력을 복원한다.
-    /// 별도 입력 없이 체력을 최대로 채우고 파손 상태와 균열 표시를 초기화하며 현재 재질은 유지한다.
+    /// 별도 입력 없이 체력을 최대로 채우고 파손 상태와 균열 표시를 초기화하며 현재 재질과 사진 오버레이를 복원한다.
     /// </summary>
     public void RestoreHealth()
     {
         _currentHP = _maxHP;
         _broken = false;
         for (int index = 0; index < _renderers.Length; index++)
-            _renderers[index].enabled = _initialRendererStates[index];
+            _renderers[index].enabled = _initialRendererStates[index]
+                && (!_usesCustomModel || !KeycapModelAppearance.IsOriginalDetail(_renderers[index]));
         for (int index = 0; index < _colliders.Length; index++)
             _colliders[index].enabled = _initialColliderStates[index];
+        foreach (Renderer renderer in GetComponentsInChildren<Renderer>())
+            if (renderer.name.EndsWith("_PhotoOverlay", StringComparison.Ordinal)) renderer.enabled = true;
         UpdateDamageDecal();
+    }
+
+    /// <summary>usesCustomModel을 현재 외피 모델 상태로 저장한다. 체력 복원 시 원본 각인과 사각 내부 벽이 다시 표시되지 않도록 한다.</summary>
+    public void SetCustomModel(bool usesCustomModel)
+    {
+        _usesCustomModel = usesCustomModel;
     }
 
     /// <summary>
@@ -174,7 +186,7 @@ public sealed class KeycapHealth : MonoBehaviour
     private void Break()
     {
         _broken = true;
-        foreach (Renderer renderer in _renderers) renderer.enabled = false;
+        foreach (Renderer renderer in GetComponentsInChildren<Renderer>()) renderer.enabled = false;
         foreach (Collider collider in _colliders) collider.enabled = false;
         Broken?.Invoke(this);
 

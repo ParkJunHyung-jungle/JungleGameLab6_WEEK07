@@ -6,6 +6,7 @@ public sealed class KeyboardMaterialCatalog : ScriptableObject
     [Header("Materials")]
     [SerializeField] private Material[] _materials = new Material[0];
     [SerializeField] private string[] _ids = new string[0];
+    [SerializeField] private Game.Tournament.KeycapDefinition[] _keycapDefinitions = new Game.Tournament.KeycapDefinition[0];
     [SerializeField, HideInInspector] private string _defaultStateJson;
 
     /// <summary>
@@ -42,6 +43,6 @@ public sealed class KeyboardMaterialCatalog : ScriptableObject
     /// </summary>
     public void Apply(KeyboardCustomizationState state, KeyboardCustomization keyboard)
     {
-        keyboard.ApplyState(state, _materials, _ids);
+        keyboard.ApplyState(state, _materials, _ids, _keycapDefinitions);
     }
 }

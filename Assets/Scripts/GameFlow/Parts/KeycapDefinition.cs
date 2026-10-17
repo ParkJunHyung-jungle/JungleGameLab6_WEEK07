@@ -10,6 +10,9 @@ namespace Game.Tournament
         [Header("Appearance")]
         [SerializeField] private Material _material;
         [SerializeField] private string _materialId;
+        [SerializeField] private Mesh _shellMesh;
+        [SerializeField] private Material[] _modelMaterials = new Material[0];
+        [SerializeField] private bool _oneUnitOnly;
         [Header("Ability")]
         [SerializeField] private KeycapAbility _ability;
         [SerializeField, Min(0)] private int _damage;
@@ -18,6 +21,9 @@ namespace Game.Tournament
         [SerializeField, Min(0.01f)] private float _waveDuration = 0.45f;
         public Material Material => _material;
         public string MaterialId => _materialId;
+        public Mesh ShellMesh => _shellMesh;
+        public Material[] ModelMaterials => _modelMaterials;
+        public bool OneUnitOnly => _oneUnitOnly;
         public KeycapAbility Ability => _ability;
         public int Damage => _damage;
         public int NeighborCount => _neighborCount;

@@ -119,7 +119,7 @@ namespace Game.Logging
             SceneManager.sceneUnloaded += HandleSceneUnloaded;
             Write("SessionStart");
             Flush();
-            if (!_failed) Debug.Log($"[CustomizationLogger] CSV 기록 시작: {FilePath}");
+            //if (!_failed) Debug.Log($"[CustomizationLogger] CSV 기록 시작: {FilePath}");
         }
 
         /// <summary>

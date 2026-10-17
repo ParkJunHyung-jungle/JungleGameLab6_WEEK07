@@ -123,7 +123,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         CacheKeycaps();
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
-        if (_switches.Length > 0) SetSwitchType(_switchType);
+        if (_switches.Length > 0) ApplySwitchType(_switchType, false);
         if (_plate != null) SetPlateType(_plateType);
         if (_ledRenderer != null)
         {
@@ -134,6 +134,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
             AudioManager.Ready -= HandleAudioManagerReady;
             AudioManager.Ready += HandleAudioManagerReady;
             if (AudioManager.instance != null) HandleAudioManagerReady(AudioManager.instance);
+        }
+        if (Application.IsPlaying(gameObject))
+        {
+            /*
+            DisableKeycaps();
+            DisableSwitches();
+            SetLEDEnabled(false);
+            */
         }
     }
 
@@ -170,7 +178,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
-        if (_switches.Length > 0) SetSwitchType(_switchType);
+        if (_switches.Length > 0) ApplySwitchType(_switchType, false);
         if (_plate != null) SetPlateType(_plateType);
         if (!Application.IsPlaying(gameObject))
         {
@@ -400,7 +408,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public bool SetKeycapImage(Texture2D image)
     {
-        return GetImageCustomization().SetKeycapImage(image);
+        bool applied = GetImageCustomization().SetKeycapImage(image);
+        if (applied) EnableKeycaps();
+        return applied;
     }
 
     /// <summary>
@@ -409,7 +419,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public bool SetKeycapImage(int keycapIndex, Texture2D image)
     {
-        return GetImageCustomization().SetKeycapImage(image, keycapIndex);
+        bool applied = GetImageCustomization().SetKeycapImage(image, keycapIndex);
+        if (applied) EnableKeycaps(keycapIndex);
+        return applied;
     }
 
     /// <summary>
@@ -427,7 +439,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public bool LoadKeycapImage(string path, int keycapIndex = -1)
     {
-        return GetImageCustomization().LoadImage(path, false, keycapIndex);
+        bool applied = GetImageCustomization().LoadImage(path, false, keycapIndex);
+        if (applied) EnableKeycaps(keycapIndex);
+        return applied;
     }
 
     /// <summary>
@@ -517,10 +531,31 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #region 축
 
     /// <summary>
+    /// 입력 없이 등록된 모든 축의 GameObject를 비활성화한다.
+    /// 반환값 없이 축만 숨기며 키캡과 선택한 축 데이터는 유지한다.
+    /// </summary>
+    public void DisableSwitches()
+    {
+        foreach (KeyboardSwitch keyboardSwitch in _switches)
+        {
+            if (keyboardSwitch != null) keyboardSwitch.gameObject.SetActive(false);
+        }
+    }
+
+    /// <summary>
     /// type 입력을 모든 축 컴포넌트에 전달해 외형과 사운드 선택을 일괄 변경한다.
     /// 모든 축에 데이터가 있을 때만 적용하며 성공 여부와 현재 선택 타입을 갱신한다.
     /// </summary>
     public bool SetSwitchType(SwitchType type)
+    {
+        return ApplySwitchType(type, true);
+    }
+
+    /// <summary>
+    /// type의 축 외형과 소리를 적용하고 activate가 true이면 축 GameObject도 활성화한다.
+    /// 적용 성공 여부를 반환하며 초기화와 에디터 미리보기에서는 장착 상태를 유지한다.
+    /// </summary>
+    private bool ApplySwitchType(SwitchType type, bool activate)
     {
         if (_switches.Length == 0) return false;
         foreach (KeyboardSwitch keyboardSwitch in _switches)
@@ -535,6 +570,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         foreach (KeyboardSwitch keyboardSwitch in _switches)
         {
             keyboardSwitch.ChangeSwitch(type);
+            if (activate && !keyboardSwitch.gameObject.activeSelf) keyboardSwitch.gameObject.SetActive(true);
         }
 
         _switchType = type;
@@ -545,6 +581,34 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #endregion
 
     #region 키캡
+
+    /// <summary>
+    /// keycapIndex 키캡을 활성화하며 음수 입력은 전체 키캡을 대상으로 한다.
+    /// 반환값 없이 꺼진 루트만 켜고 축과 다른 키의 활성 상태는 유지한다.
+    /// </summary>
+    private void EnableKeycaps(int keycapIndex = -1)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (keycapIndex >= 0 && index != keycapIndex) continue;
+            Transform keycap = _keycaps[index];
+            if (keycap != null && !keycap.gameObject.activeSelf) keycap.gameObject.SetActive(true);
+        }
+    }
+
+    /// <summary>
+    /// 입력 없이 캐시된 모든 키캡 루트 GameObject를 비활성화한다.
+    /// 반환값 없이 키캡만 숨기며 축과 커스터마이징 설정은 유지한다.
+    /// </summary>
+    public void DisableKeycaps()
+    {
+        if (_keycaps == null) CacheKeycaps();
+        foreach (Transform keycap in _keycaps)
+        {
+            if (keycap != null) keycap.gameObject.SetActive(false);
+        }
+    }
 
     /// <summary>
     /// keycapIndex의 키캡에만 material을 적용하며 각인과 다른 키캡은 유지한다.
@@ -574,6 +638,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             }
         }
 
+        if (applied) EnableKeycaps(keycapIndex);
         return applied;
     }
 
@@ -611,6 +676,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _keycapMaterialOverrides.Clear();
         ClearKeycapImage();
         ApplyKeycapMaterial();
+        EnableKeycaps();
     }
 
     /// <summary>
@@ -628,6 +694,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _keycapMaterialOverrides.Clear();
         ClearKeycapImage();
         ApplySelectedKeycapMaterial();
+        if (_keycapMaterial != null) EnableKeycaps();
     }
 
     /// <summary>
@@ -830,5 +897,3 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     #endregion
 }
-
-

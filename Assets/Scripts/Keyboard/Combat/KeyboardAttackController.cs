@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 
@@ -36,6 +36,11 @@ namespace KeyboardModeling
 
         [Header("Attack")]
         [SerializeField, Min(1)] private int _baseDamage = 1;
+
+        private int _partDamageBonus;
+
+        /// <summary>bonus를 현재 장착 부품의 직접 타격 보너스로 저장한다. 기존 기본 대미지와 강화 설정은 유지한다.</summary>
+        public void ConfigurePartDamage(int bonus) { _partDamageBonus = Mathf.Max(0, bonus); }
 
         void OnEnable()
         {
@@ -137,7 +142,7 @@ namespace KeyboardModeling
             int hammerBaseDamage = _gameSession != null ? _gameSession.Upgrades.GetHammerDamage() : 0;
             float multiplier = _feverController != null ? _feverController.DamageMultiplier : 1f;
 
-            int damage = Mathf.CeilToInt((_baseDamage + damageBonus) * multiplier);
+            int damage = Mathf.CeilToInt((_baseDamage + damageBonus + _partDamageBonus) * multiplier);
             int fistDamage = Mathf.CeilToInt(fistBaseDamage * multiplier);
             int hammerDamage = Mathf.CeilToInt(hammerBaseDamage * multiplier);
 

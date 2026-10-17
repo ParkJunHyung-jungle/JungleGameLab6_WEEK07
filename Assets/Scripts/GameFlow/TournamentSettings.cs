@@ -1,10 +1,9 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 
 namespace Game.Tournament
 {
-    public enum SpecialKeycapType { None, Explosion, Bonus, Row, Column, All }
     public enum TournamentPhase { Preparing, Battle, Result, Shop, Discard, Finished }
 
     [CreateAssetMenu(menuName = "Game/Tournament Settings")]
@@ -17,10 +16,8 @@ namespace Game.Tournament
 
         [Header("Shop")]
         [SerializeField, Min(1)] private int _scorePerCurrency = 100;
-        [SerializeField, Min(1)] private int _bundleSize = 3;
         [SerializeField, Min(0)] private int _rerollCost = 5;
         [SerializeField, Min(1)] private int _rerollLimit = 3;
-        [SerializeField] private int[] _prices = { 0, 40, 100, 60, 60, 50 };
 
         [Header("Rewards")]
         [SerializeField, Min(0f)] private float _currencyRewardMultiplier = 1.2f;
@@ -39,14 +36,10 @@ namespace Game.Tournament
         public int Capacity => _capacity;
         public int ScorePerCurrency => _scorePerCurrency;
         public float CurrencyRewardMultiplier => _currencyRewardMultiplier;
-        /// <summary>type이 폭발 또는 전체 타격이면 1개, 그 외에는 설정된 판매 수량을 반환한다.</summary>
-        public int GetBundleSize(SpecialKeycapType type) => type == SpecialKeycapType.Explosion || type == SpecialKeycapType.All ? 1 : _bundleSize;
         public int RerollCost => _rerollCost;
         public int RerollLimit => _rerollLimit;
         public int RoundCount => _rounds.Length;
 
-        /// <summary>type에 해당하는 묶음 가격을 반환하며 설정 상태를 변경하지 않는다.</summary>
-        public int GetPrice(SpecialKeycapType type) => _prices[(int)type];
 
         /// <summary>rank에 해당하는 작업실 골드를 반환하며 4위 이하에는 기타 보상을 사용한다.</summary>
         public int GetGold(int rank) => _goldRewards[Mathf.Clamp(rank - 1, 0, 3)];

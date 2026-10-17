@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 namespace Game.Tournament
@@ -12,17 +12,15 @@ namespace Game.Tournament
         [SerializeField] private RectTransform _mark;
         [SerializeField] private Text _symbol;
 
-        /// <summary>type과 count로 상품 이름, 효과 및 특수 키캡의 색상과 무늬를 화면에 표시한다.</summary>
-        public void Show(SpecialKeycapType type, int count)
+        /// <summary>part의 이름, 구매 수량과 능력을 카드에 표시한다. null 상품은 빈 슬롯으로 표시하며 게임 상태는 변경하지 않는다.</summary>
+        public void Show(KeyboardPartDefinition part)
         {
-            _title.text = $"{TournamentView.GetName(type)} 키캡 × {count}";
-            _description.text = TournamentView.GetDescription(type);
-            _keycap.color = type == SpecialKeycapType.Explosion ? new Color32(188, 2, 2, 255)
-                : type == SpecialKeycapType.Bonus ? new Color32(242, 169, 0, 255) : new Color32(247, 238, 216, 255);
-            _mark.gameObject.SetActive(type == SpecialKeycapType.Row || type == SpecialKeycapType.Column || type == SpecialKeycapType.All);
-            _mark.sizeDelta = type == SpecialKeycapType.Row ? new Vector2(110, 32)
-                : type == SpecialKeycapType.Column ? new Vector2(32, 100) : new Vector2(110, 100);
-            _symbol.text = type == SpecialKeycapType.Bonus ? "×2" : type == SpecialKeycapType.Explosion ? "+" : "";
+            _title.text = part != null ? $"{part.DisplayName} ×{part.Quantity}" : "상품 없음";
+            _description.text = part != null ? part.Description : "작업실에서 부품을 선택해 주세요.";
+            _mark.gameObject.SetActive(false);
+            _symbol.text = part is KeycapDefinition ? "KEY" : part is SwitchDefinition ? "SW" : part is PlateDefinition ? "PL" : part is HousingDefinition ? "CASE" : "";
+            Material material = part is KeycapDefinition keycap ? keycap.Material : part is HousingDefinition housing ? housing.Material : part is PlateDefinition plate ? plate.Data.Material : null;
+            _keycap.color = material != null && material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") : new Color32(225, 225, 225, 255);
         }
     }
 }

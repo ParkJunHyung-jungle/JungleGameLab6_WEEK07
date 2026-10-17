@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -7,17 +7,21 @@ using UnityEngine.InputSystem;
 
 using KeyboardModeling;
 
-using Random = UnityEngine.Random;
-
 namespace Game.Tournament
 {
     public sealed class TournamentKeyboardEffects : MonoBehaviour
     {
         public static event Action<TournamentKeyboardEffects, Key, KeycapDefinition, string, string, string> PlaytestEffectObserved;
 
+        private struct Activation
+        {
+            public int Index;
+            public string Id;
+        }
+
         [Header("Runtime")]
-        private readonly Queue<int> _pending = new Queue<int>();
-        private readonly HashSet<int> _delayedExplosions = new HashSet<int>();
+        private readonly Queue<Activation> _pending = new Queue<Activation>();
+        private readonly Dictionary<string, int> _delayedEffects = new Dictionary<string, int>();
         private readonly Dictionary<KeycapHealth, int> _indices = new Dictionary<KeycapHealth, int>();
         private TournamentController _tournament;
         private KeycapDefinition[] _parts;
@@ -25,9 +29,9 @@ namespace Game.Tournament
         private KeyboardDestruction _destruction;
         private KeyboardFeedbackManager _feedback;
         private KeycapHealth[] _keycaps;
-        private KeycapAbility[] _types;
+        private KeycapAbilityDefinition[] _abilities;
         private Key[] _keys;
-        private string[] _effectIds;
+        private bool _statusesCleared;
         private Vector2Int[] _coordinates;
         private Vector2[] _positions;
         private KeyboardNeighborLayout _neighbors;
@@ -51,9 +55,8 @@ namespace Game.Tournament
             IReadOnlyDictionary<Key, KeycapHealth> bindings = _keyboard.GetKeycapLayout();
             Dictionary<Key, Vector2Int> coordinates = layout.CreateCoordinates();
             _keycaps = new KeycapHealth[bindings.Count];
-            _types = new KeycapAbility[bindings.Count];
+            _abilities = new KeycapAbilityDefinition[bindings.Count];
             _keys = new Key[bindings.Count];
-            _effectIds = new string[bindings.Count];
             _coordinates = new Vector2Int[bindings.Count];
             _positions = new Vector2[bindings.Count];
             _parts = new KeycapDefinition[bindings.Count];
@@ -69,87 +72,106 @@ namespace Game.Tournament
                 if (inventory.Keycaps.TryGetValue(binding.Key, out KeycapDefinition part))
                 {
                     _parts[index] = part;
-                    _types[index] = part.Ability;
-                    if (part.Ability != KeycapAbility.None) binding.Value.Broken += HandleBroken;
+                    _abilities[index] = part.Ability;
+                    if (part.Ability != null && part.Ability.Target != KeycapTargetPattern.None)
+                    {
+                        if (part.Ability.Trigger == KeycapAbilityTrigger.Broken) binding.Value.Broken += HandleBroken;
+                        else binding.Value.HitReceived += HandleHit;
+                    }
                 }
                 _indices.Add(binding.Value, index++);
             }
             _neighbors = new KeyboardNeighborLayout(_positions);
         }
 
-        /// <summary>keycap의 파괴 효과를 예약하고 보너스는 먼저 활성화하여 해당 파괴 점수부터 적용한다.</summary>
+        /// <summary>keycap 파괴를 받아 능력을 한 번 예약한다. 파괴 이벤트를 해제하고 실행별 관찰 ID를 생성한다.</summary>
         private void HandleBroken(KeycapHealth keycap)
         {
             keycap.Broken -= HandleBroken;
-            int index = _indices[keycap];
-            _effectIds[index] = Guid.NewGuid().ToString("N");
-            ObserveEffect(index, "Broken", "");
-            if (!_tournament.IsBattleActive)
-            {
-                ObserveEffect(index, "Skipped", "BattleInactive");
-                return;
-            }
-            _pending.Enqueue(index);
-            ObserveEffect(index, "Queued", "");
+            QueueActivation(_indices[keycap], "Broken");
+        }
+
+        /// <summary>keycap의 kind가 직접 타격일 때 능력을 예약한다. 능력 피해로 피격 능력이 서로 재귀 발동하지 않도록 제한한다.</summary>
+        private void HandleHit(KeycapHealth keycap, KeycapHitKind kind)
+        {
+            if (kind == KeycapHitKind.Direct) QueueActivation(_indices[keycap], "Hit");
+        }
+
+        /// <summary>index의 능력을 trigger 관찰 정보와 함께 예약한다. 실행마다 독립된 ID를 만들며 비활성 대전은 예약하지 않는다.</summary>
+        private void QueueActivation(int index, string trigger)
+        {
+            var activation = new Activation { Index = index, Id = Guid.NewGuid().ToString("N") };
+            ObserveEffect(activation, trigger, "");
+            if (!_tournament.IsBattleActive) { ObserveEffect(activation, "Skipped", "BattleInactive"); return; }
+            _pending.Enqueue(activation);
+            ObserveEffect(activation, "Queued", "");
         }
 
         void LateUpdate()
         {
-            if (!_tournament.IsBattleActive) { CancelPendingEffects("BattleInactive"); return; }
+            if (!_tournament.IsBattleActive || _destruction.IsBroken)
+            {
+                CancelPendingEffects(!_tournament.IsBattleActive ? "BattleInactive" : "KeyboardBroken");
+                if (!_statusesCleared)
+                {
+                    foreach (KeycapHealth keycap in _keycaps) keycap.ClearStatuses();
+                    _statusesCleared = true;
+                }
+                return;
+            }
             while (_pending.Count > 0 && !_destruction.IsBroken)
             {
-                int center = _pending.Dequeue();
-                KeycapAbility type = _types[center];
-                if (type == KeycapAbility.All)
+                Activation activation = _pending.Dequeue();
+                if (_abilities[activation.Index].Delay > 0f)
                 {
-                    bool started = false;
-                    _feedback.PlayHammerShockwave(_keyboard, _keycaps, _positions, center, keycap => ApplyDamage(_indices[keycap], _parts[center].Damage), false, false,
-                        () => { started = true; ObserveEffect(center, "Activated", ""); }, travelDuration: _parts[center].WaveDuration);
-                    if (!started) ObserveEffect(center, "Skipped", "WaveUnavailable");
-                    continue;
+                    _delayedEffects.Add(activation.Id, activation.Index);
+                    StartCoroutine(ActivateAfterDelay(activation));
                 }
-                if (type == KeycapAbility.Explosion)
-                {
-                    _delayedExplosions.Add(center);
-                    StartCoroutine(ExplodeAfterDelay(center));
-                    continue;
-                }
-                PlayAreaWave(center, type);
+                else Activate(activation);
             }
         }
 
         /// <summary>
-        /// center 키캡의 파괴 효과를 0.25초 지연한 뒤 주변 12칸에 피해 4를 적용한다.
-        /// 대전 종료나 완파 시 취소를 기록하고 지연 중인 폭발 목록에서 제거한다.
+        /// activation에 해당하는 능력 SO의 지연 후 효과를 실행한다.
+        /// 대전 종료나 완파 시 취소를 기록하고 지연 중인 효과 목록에서 제거한다.
         /// </summary>
-        private IEnumerator ExplodeAfterDelay(int center)
+        private IEnumerator ActivateAfterDelay(Activation activation)
         {
+            int center = activation.Index;
             float elapsed = 0f;
-            while (elapsed < _parts[center].Delay && _tournament.IsBattleActive && !_destruction.IsBroken)
+            while (elapsed < _abilities[center].Delay && _tournament.IsBattleActive && !_destruction.IsBroken)
             {
                 yield return null;
                 elapsed += Time.deltaTime;
             }
-            _delayedExplosions.Remove(center);
+            _delayedEffects.Remove(activation.Id);
             if (!_tournament.IsBattleActive || _destruction.IsBroken)
             {
-                ObserveEffect(center, "Cancelled", !_tournament.IsBattleActive ? "BattleInactive" : "KeyboardBroken");
+                ObserveEffect(activation, "Cancelled", !_tournament.IsBattleActive ? "BattleInactive" : "KeyboardBroken");
                 yield break;
             }
-            PlayAreaWave(center, KeycapAbility.Explosion);
+            Activate(activation);
         }
 
         /// <summary>
-        /// center와 type으로 주변 12칸 또는 같은 행열을 선정하여 해당 범위에만 물결과 도달 피해를 적용한다.
-        /// 폭발은 0.35초에 피해 4, 행열은 0.45초에 피해 3을 전달하고 실제 시작 여부를 로그에 기록한다.
+        /// activation의 대상 선정 설정에 따라 전파할 키 목록을 구성한다.
+        /// 범위와 효과를 분리해 도달한 키마다 같은 효과 목록을 순서대로 적용한다.
         /// </summary>
-        private void PlayAreaWave(int center, KeycapAbility type)
+        private void Activate(Activation activation)
         {
-            List<KeycapHealth> targets = new List<KeycapHealth> { _keycaps[center] };
-            List<Vector2> positions = new List<Vector2> { _positions[center] };
-            if (type == KeycapAbility.Explosion)
+            int center = activation.Index;
+            KeycapAbilityDefinition ability = _abilities[center];
+            if (ability.Target == KeycapTargetPattern.Self)
             {
-                int count = Mathf.Min(_parts[center].NeighborCount, _neighbors.GetNeighborCount(center));
+                PlayActivationEffect(activation);
+                ApplyEffects(center, ability);
+                return;
+            }
+            var targets = new List<KeycapHealth> { _keycaps[center] };
+            var positions = new List<Vector2> { _positions[center] };
+            if (ability.Target == KeycapTargetPattern.Neighbors)
+            {
+                int count = Mathf.Min(ability.NeighborCount, _neighbors.GetNeighborCount(center));
                 for (int index = 0; index < count; index++)
                 {
                     int neighbor = _neighbors.GetNeighbor(center, index);
@@ -161,27 +183,43 @@ namespace Game.Tournament
             {
                 for (int index = 0; index < _keycaps.Length; index++)
                 {
-                    bool sameLine = type == KeycapAbility.Row
-                        ? _coordinates[index].x == _coordinates[center].x
-                        : _coordinates[index].y == _coordinates[center].y;
-                    if (index == center || !sameLine) continue;
+                    bool matches = ability.Target == KeycapTargetPattern.All
+                        || (ability.Target == KeycapTargetPattern.Row && _coordinates[index].x == _coordinates[center].x)
+                        || (ability.Target == KeycapTargetPattern.Column && _coordinates[index].y == _coordinates[center].y);
+                    if (index == center || !matches) continue;
                     targets.Add(_keycaps[index]);
                     positions.Add(_positions[index]);
                 }
             }
-            int damage = _parts[center].Damage;
             bool started = false;
             _feedback.PlayHammerShockwave(_keyboard, targets.ToArray(), positions.ToArray(), 0,
-                keycap => ApplyDamage(_indices[keycap], damage), false, false,
-                () => { started = true; ObserveEffect(center, "Activated", ""); },
-                travelDuration: _parts[center].WaveDuration);
-            if (!started) ObserveEffect(center, "Skipped", "WaveUnavailable");
+                keycap => { if (keycap != _keycaps[center]) ApplyEffects(_indices[keycap], ability); }, false, false,
+                () => { started = true; PlayActivationEffect(activation); }, travelDuration: ability.WaveDuration);
+            if (!started) ObserveEffect(activation, "Skipped", "WaveUnavailable");
         }
-        /// <summary>index의 살아 있는 키에 damage를 적용하며 종료된 대전과 완파 상태의 지연 피해는 무시한다.</summary>
-        private void ApplyDamage(int index, int damage)
+
+        /// <summary>activation의 발동을 기록하고 능력 SO의 선택적 프리팹을 표시한다. 키보드 제거 또는 설정된 수명 만료 시 연출을 정리한다.</summary>
+        private void PlayActivationEffect(Activation activation)
+        {
+            ObserveEffect(activation, "Activated", "");
+            KeycapAbilityDefinition ability = _abilities[activation.Index];
+            if (ability.ActivationEffectPrefab == null) return;
+            GameObject effect = Instantiate(ability.ActivationEffectPrefab, _keycaps[activation.Index].transform.position,
+                transform.rotation, transform);
+            effect.transform.localScale *= ability.EffectScale;
+            Destroy(effect, ability.EffectLifetime);
+        }
+
+        /// <summary>살아 있는 index 키캡에 ability의 피해 또는 상태 효과 목록을 순서대로 적용한다. 능력 피해로 구분해 추가 피해의 재귀 호출과 피격 능력 재발동을 방지한다.</summary>
+        private void ApplyEffects(int index, KeycapAbilityDefinition ability)
         {
             if (!_tournament.IsBattleActive || _destruction.IsBroken || _keycaps[index].CurrentHP <= 0) return;
-            _keycaps[index].TakeDamage(damage);
+            foreach (KeycapAbilityEffect effect in ability.Effects)
+            {
+                if (_destruction.IsBroken || _keycaps[index].CurrentHP <= 0) break;
+                if (effect.Kind == KeycapEffectKind.Damage) _keycaps[index].TakeDamage(effect.Damage, KeycapHitKind.Ability);
+                else _keycaps[index].ApplyStatus(effect.Status);
+            }
         }
 
         /// <summary>
@@ -197,12 +235,13 @@ namespace Game.Tournament
         public Vector2Int GetPlaytestCoordinates(KeycapHealth keycap) { return _coordinates[_indices[keycap]]; }
 
         /// <summary>
-        /// index의 기믹 파괴 또는 발동 상태를 action과 reason으로 알린다.
+        /// activation의 기믹 발동 상태를 action과 reason으로 알린다.
         /// 실제 키와 유형 및 효과 식별자를 전달하며 피해나 점수를 계산하지 않는다.
         /// </summary>
-        private void ObserveEffect(int index, string action, string reason)
+        private void ObserveEffect(Activation activation, string action, string reason)
         {
-            PlaytestEffectObserved?.Invoke(this, _keys[index], _parts[index], action, reason, _effectIds[index]);
+            int index = activation.Index;
+            PlaytestEffectObserved?.Invoke(this, _keys[index], _parts[index], action, reason, activation.Id);
         }
 
         /// <summary>
@@ -224,10 +263,15 @@ namespace Game.Tournament
         void OnDestroy()
         {
             CancelPendingEffects("KeyboardDestroyed");
-            foreach (int center in _delayedExplosions) ObserveEffect(center, "Cancelled", "KeyboardDestroyed");
-            _delayedExplosions.Clear();
+            foreach (var effect in _delayedEffects) ObserveEffect(new Activation { Index = effect.Value, Id = effect.Key }, "Cancelled", "KeyboardDestroyed");
+            _delayedEffects.Clear();
             foreach (KeycapHealth keycap in _indices.Keys)
-                if (keycap != null) keycap.Broken -= HandleBroken;
+                if (keycap != null)
+                {
+                    keycap.Broken -= HandleBroken;
+                    keycap.HitReceived -= HandleHit;
+                    keycap.ClearStatuses();
+                }
         }
     }
 }

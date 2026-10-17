@@ -59,11 +59,8 @@ public static class CheeseKeycapBuilder
         data.FindProperty("_shellMesh").objectReferenceValue = mesh;
         SetReferences(data.FindProperty("_modelMaterials"), materials);
         data.FindProperty("_oneUnitOnly").boolValue = true;
-        data.FindProperty("_ability").enumValueIndex = (int)KeycapAbility.Row;
-        data.FindProperty("_damage").intValue = 3;
-        data.FindProperty("_neighborCount").intValue = 12;
-        data.FindProperty("_delay").floatValue = 0f;
-        data.FindProperty("_waveDuration").floatValue = 0.45f;
+        if (data.FindProperty("_ability").objectReferenceValue == null)
+            data.FindProperty("_ability").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KeycapAbilityDefinition>("Assets/Resource/Tournament/Abilities/keycap-cheese-ability.asset");
         data.ApplyModifiedPropertiesWithoutUndo();
         RegisterPart(part, materials);
         GameObject cap = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resource/Prefabs/Keycaps/Keycap_1u.prefab"));

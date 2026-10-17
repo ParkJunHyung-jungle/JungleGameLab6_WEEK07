@@ -22,8 +22,4 @@ MonoBehaviour:
   _modelMaterials:
   - {fileID: 2100000, guid: 5df5c29b25382434cb9ee861d3a1cbbf, type: 2}
   _oneUnitOnly: 1
-  _ability: 3
-  _damage: 3
-  _neighborCount: 12
-  _delay: 0
-  _waveDuration: 0.45
+  _ability: {fileID: 11400000, guid: 362e6544732b44f5b2e446bf6064386a, type: 2}

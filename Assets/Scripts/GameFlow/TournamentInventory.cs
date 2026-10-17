@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine.InputSystem;
 
@@ -22,7 +22,7 @@ namespace Game.Tournament
         /// <summary>capacity를 키캡 한도로 사용하는 빈 장착 상태를 생성한다. 기본 부품은 구매 수량에 포함하지 않는다.</summary>
         public TournamentInventory(int capacity) { _capacity = capacity; }
 
-        /// <summary>part의 구매 수량과 키캡 보유 한도를 검사한다. layout의 키 크기 제한도 확인하며 보유 및 장착 상태는 변경하지 않는다.</summary>
+        /// <summary>part의 구매 수량과 키캡 보유 한도를 검사한다. layout의 키 크기와 전체 부품의 중복 보유도 확인하며 보유 및 장착 상태는 변경하지 않는다.</summary>
         public bool CanPurchase(KeyboardPartDefinition part, TournamentKeyLayout layout)
         {
             if (part == null) return false;
@@ -40,7 +40,7 @@ namespace Game.Tournament
                     && (!keycap.OneUnitOnly || oneUnitOnly + part.Quantity
                         <= RandomKeycapPlacement.CountAvailable(layout, new Key[0], true));
             }
-            return part is SwitchDefinition || part is PlateDefinition || part is HousingDefinition;
+            return (part is SwitchDefinition || part is PlateDefinition || part is HousingDefinition) && GetCount(part) == 0;
         }
 
         /// <summary>part를 구매 재고에 추가한다. layout으로 한도를 검사하고 장착 상태는 변경하지 않으며 성공 여부를 반환한다.</summary>

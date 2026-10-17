@@ -18,8 +18,4 @@ MonoBehaviour:
   _quantity: 3
   _material: {fileID: 2100000, guid: 5629585690d5fc044b4375325e8357fe, type: 2}
   _materialId: 5629585690d5fc044b4375325e8357fe:2100000
-  _ability: 1
-  _damage: 4
-  _neighborCount: 12
-  _delay: 0.25
-  _waveDuration: 0.35
+  _ability: {fileID: 11400000, guid: 570d7aba4450420296c513b7182f4076, type: 2}

@@ -20,6 +20,11 @@ namespace Game.Player
         private const float PICKER_PREVIEW_WIDTH = 80f;
         private const float PICKER_PREVIEW_HEIGHT = 72f;
         private const float PICKER_SCROLLBAR_HEIGHT = 6f;
+        private const float PLATE_PICKER_TAB_TOP_PADDING = 7f;
+        private const float PLATE_PICKER_TAB_HEIGHT = 28f;
+        private const float PLATE_PICKER_ITEM_HEIGHT = 108f;
+        private const float PLATE_PICKER_PREVIEW_WIDTH = 68f;
+        private const float PLATE_PICKER_PREVIEW_HEIGHT = 60f;
 
         private static readonly Color _pickerPanelColor = new Color32(37, 52, 68, 255);
         private static readonly Color _pickerPanelBorderColor = new Color32(69, 91, 112, 255);
@@ -86,11 +91,21 @@ namespace Game.Player
         [Header("Plate Picker")]
         private KeyboardCustomization _plateCustomization;
         private RectTransform _plateViewport;
-        private readonly List<KeyboardEditButton> _platePreviewButtons = new List<KeyboardEditButton>();
-        private readonly List<Image> _plateCardBackgrounds = new List<Image>();
-        private readonly List<PlateType> _plateTypes = new List<PlateType>();
-        private readonly List<PlateType> _platePreviewTypes = new List<PlateType>();
-        private readonly List<Text> _plateSelectionIndicators = new List<Text>();
+        private RectTransform _plateMaterialContent;
+        private RectTransform _plateEffectContent;
+        private KeyboardEditButton _plateMaterialTabButton;
+        private KeyboardEditButton _plateEffectTabButton;
+        private PlatePickerSection _platePickerSection;
+        private readonly List<KeyboardEditButton> _plateMaterialButtons = new List<KeyboardEditButton>();
+        private readonly List<Image> _plateMaterialCardBackgrounds = new List<Image>();
+        private readonly List<Material> _plateMaterials = new List<Material>();
+        private readonly List<Material> _plateMaterialButtonMaterials = new List<Material>();
+        private readonly List<string> _plateMaterialLabels = new List<string>();
+        private readonly List<Text> _plateMaterialSelectionIndicators = new List<Text>();
+        private readonly List<KeyboardEditButton> _plateEffectButtons = new List<KeyboardEditButton>();
+        private readonly List<Image> _plateEffectCardBackgrounds = new List<Image>();
+        private readonly List<PlateEffect> _plateEffects = new List<PlateEffect>();
+        private readonly List<Text> _plateEffectSelectionIndicators = new List<Text>();
         private readonly List<Texture2D> _platePreviewTextures = new List<Texture2D>();
 
         [Header("Photo Customization")]
@@ -108,8 +123,15 @@ namespace Game.Player
         public event Action<Material> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<int> CaseMaterialSelected;
-        public event Action<PlateType> PlateTypeSelected;
+        public event Action<Material> PlateMaterialSelected;
+        public event Action<PlateEffect> PlateEffectSelected;
         public event Action<bool> AttackModeSelected;
+
+        private enum PlatePickerSection
+        {
+            Material,
+            Effect
+        }
 
         private enum PickerMode
         {
@@ -182,10 +204,7 @@ namespace Game.Player
                 button.Clicked += HandleCasePreviewClicked;
             }
 
-            foreach (KeyboardEditButton button in _platePreviewButtons)
-            {
-                button.Clicked += HandlePlatePreviewClicked;
-            }
+            SetPlatePickerEventBindings(true);
 
             SetPickerMode(PickerMode.None);
         }
@@ -216,10 +235,7 @@ namespace Game.Player
                 button.Clicked -= HandleCasePreviewClicked;
             }
 
-            foreach (KeyboardEditButton button in _platePreviewButtons)
-            {
-                button.Clicked -= HandlePlatePreviewClicked;
-            }
+            SetPlatePickerEventBindings(false);
 
             SetPickerMode(PickerMode.None);
         }
@@ -281,12 +297,21 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 보강판 선택 UI가 사용할 편집 키보드를 지정한다.
-        /// customization의 보강판 데이터와 현재 타입을 목록 생성 및 선택 표시에 사용한다.
+        /// 보강판 색상과 효과 선택 UI가 사용할 편집 키보드를 지정한다.
+        /// customization의 재질과 효과 목록을 카드 구성과 독립 선택 표시에 사용한다.
         /// </summary>
         public void SetPlateCustomization(KeyboardCustomization customization)
         {
+            if (_plateCustomization == customization)
+                return;
+
             _plateCustomization = customization;
+            if (!isActiveAndEnabled)
+                return;
+
+            SetPlatePickerEventBindings(false);
+            CreatePlatePicker();
+            SetPlatePickerEventBindings(true);
         }
 
         /// <summary>
@@ -357,21 +382,30 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 보강판 타입과 일치하는 선택 카드의 배경과 체크를 갱신한다.
-        /// 편집 대상의 현재 타입과 목록 순서를 사용하며 버튼의 선택 상태를 바꾼다.
+        /// 현재 보강판 재질과 효과에 맞춰 두 선택 목록의 카드 상태를 갱신한다.
+        /// 편집 대상의 PlateMaterial과 CurrentPlateEffect를 사용하며 각 선택 표시를 변경한다.
         /// </summary>
         public void RefreshPlateSelection()
         {
             if (_plateCustomization == null)
                 return;
 
-            for (int index = 0; index < _plateSelectionIndicators.Count; index++)
+            for (int index = 0; index < _plateMaterialSelectionIndicators.Count; index++)
             {
                 SetPickerItemSelection(
-                    _platePreviewButtons[index],
-                    _plateCardBackgrounds[index],
-                    _plateSelectionIndicators[index],
-                    _platePreviewTypes[index] == _plateCustomization.CurrentPlateType);
+                    _plateMaterialButtons[index],
+                    _plateMaterialCardBackgrounds[index],
+                    _plateMaterialSelectionIndicators[index],
+                    _plateMaterialButtonMaterials[index] == _plateCustomization.PlateMaterial);
+            }
+
+            for (int index = 0; index < _plateEffectSelectionIndicators.Count; index++)
+            {
+                SetPickerItemSelection(
+                    _plateEffectButtons[index],
+                    _plateEffectCardBackgrounds[index],
+                    _plateEffectSelectionIndicators[index],
+                    _plateEffects[index] == _plateCustomization.CurrentPlateEffect);
             }
         }
 
@@ -469,16 +503,47 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 클릭한 보강판 미리보기의 타입을 편집 대상으로 전달한다.
-        /// button의 목록 인덱스를 사용하며 보강판 타입을 C# 이벤트로 전달한다.
+        /// 색상 탭을 선택하고 재질 목록을 표시한다.
+        /// button은 탭 클릭 이벤트에서 전달되며 효과 설정은 변경하지 않는다.
         /// </summary>
-        private void HandlePlatePreviewClicked(KeyboardEditButton button)
+        private void HandlePlateMaterialTabClicked(KeyboardEditButton button)
         {
-            int index = _platePreviewButtons.IndexOf(button);
-            if (index < 0 || index >= _platePreviewTypes.Count)
+            SetPlatePickerSection(PlatePickerSection.Material);
+        }
+
+        /// <summary>
+        /// 효과 탭을 선택하고 효과 목록을 표시한다.
+        /// button은 탭 클릭 이벤트에서 전달되며 재질 설정은 변경하지 않는다.
+        /// </summary>
+        private void HandlePlateEffectTabClicked(KeyboardEditButton button)
+        {
+            SetPlatePickerSection(PlatePickerSection.Effect);
+        }
+
+        /// <summary>
+        /// 클릭한 보강판 색상 카드의 재질을 편집 대상으로 전달한다.
+        /// button의 카드 목록 인덱스를 사용하며 재질 선택 이벤트를 발생시킨다.
+        /// </summary>
+        private void HandlePlateMaterialClicked(KeyboardEditButton button)
+        {
+            int index = _plateMaterialButtons.IndexOf(button);
+            if (index < 0 || index >= _plateMaterialButtonMaterials.Count)
                 return;
 
-            PlateTypeSelected?.Invoke(_platePreviewTypes[index]);
+            PlateMaterialSelected?.Invoke(_plateMaterialButtonMaterials[index]);
+        }
+
+        /// <summary>
+        /// 클릭한 보강판 효과 카드의 효과를 편집 대상으로 전달한다.
+        /// button의 카드 목록 인덱스를 사용하며 효과 선택 이벤트를 발생시킨다.
+        /// </summary>
+        private void HandlePlateEffectClicked(KeyboardEditButton button)
+        {
+            int index = _plateEffectButtons.IndexOf(button);
+            if (index < 0 || index >= _plateEffects.Count)
+                return;
+
+            PlateEffectSelected?.Invoke(_plateEffects[index]);
         }
 
         /// <summary>
@@ -1216,8 +1281,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 편집 키보드의 등록된 보강판 재질을 타입 이름이 있는 가로 목록으로 만든다.
-        /// 보강판 메시와 PlateData를 사용하며 선택 버튼, 타입, 카드 배경을 저장한다.
+        /// 편집 키보드의 보강판 색상과 효과를 탭으로 나눈 상단 선택 패널에 구성한다.
+        /// 등록된 PlateData와 효과 목록을 사용하며 재질 미리보기, 효과 카드, 선택 상태를 저장한다.
         /// </summary>
         private void CreatePlatePicker()
         {
@@ -1227,11 +1292,20 @@ namespace Game.Player
                 _plateViewport = null;
             }
 
-            _platePreviewButtons.Clear();
-            _plateCardBackgrounds.Clear();
-            _plateTypes.Clear();
-            _platePreviewTypes.Clear();
-            _plateSelectionIndicators.Clear();
+            _plateMaterialContent = null;
+            _plateEffectContent = null;
+            _plateMaterialTabButton = null;
+            _plateEffectTabButton = null;
+            _plateMaterialButtons.Clear();
+            _plateMaterialCardBackgrounds.Clear();
+            _plateMaterials.Clear();
+            _plateMaterialButtonMaterials.Clear();
+            _plateMaterialLabels.Clear();
+            _plateMaterialSelectionIndicators.Clear();
+            _plateEffectButtons.Clear();
+            _plateEffectCardBackgrounds.Clear();
+            _plateEffects.Clear();
+            _plateEffectSelectionIndicators.Clear();
             DestroyPreviewTextures(_platePreviewTextures);
 
             _plateButton.interactable = _plateCustomization != null
@@ -1246,30 +1320,364 @@ namespace Game.Player
                 return;
             }
 
-            List<Material> materials = new List<Material>();
             foreach (PlateData plateData in _plateCustomization.AvailablePlates)
             {
                 if (plateData == null || plateData.Material == null)
                     continue;
 
-                _plateTypes.Add(plateData.Type);
-                materials.Add(plateData.Material);
+                _plateMaterials.Add(plateData.Material);
+                _plateMaterialLabels.Add(GetPlateMaterialLabel(plateData.Type));
             }
 
-            if (materials.Count == 0)
+            if (_plateMaterials.Count == 0)
             {
                 _plateButton.interactable = false;
                 return;
             }
 
+            _plateEffects.AddRange(_plateCustomization.AvailablePlateEffects);
             Texture2D[] previews = CreateMaterialPreviewTextures(
                 plateMeshFilter.sharedMesh,
-                materials,
+                _plateMaterials,
                 _platePreviewTextures,
                 "Plate");
-            _plateViewport = CreateScrollViewport("Plate", previews.Length, out RectTransform content);
-            CreatePlatePreviewItems(content, previews);
+            _plateViewport = CreateScrollViewport("Plate", _plateMaterials.Count, out _plateMaterialContent);
+            Vector2 plateViewportSize = _plateViewport.sizeDelta;
+            plateViewportSize.y += PLATE_PICKER_TAB_HEIGHT;
+            _plateViewport.sizeDelta = plateViewportSize;
+            ConfigurePlatePickerContent(_plateMaterialContent, _plateMaterials.Count);
+            _plateEffectContent = CreatePlatePickerContent("PlateEffectContent", _plateEffects.Count);
+            CreatePlateMaterialItems(_plateMaterialContent, previews);
+            CreatePlateEffectItems(_plateEffectContent);
+            _plateMaterialTabButton = CreatePlatePickerTab(
+                _plateViewport,
+                "PlateMaterialTab",
+                "보강판 색상",
+                new Vector2(12f, -PLATE_PICKER_TAB_TOP_PADDING));
+            _plateEffectTabButton = CreatePlatePickerTab(
+                _plateViewport,
+                "PlateEffectTab",
+                "타건 효과",
+                new Vector2(166f, -PLATE_PICKER_TAB_TOP_PADDING));
+            SetPlatePickerSection(_platePickerSection);
             RefreshPlateSelection();
+        }
+
+        /// <summary>
+        /// viewport 안에 효과 카드가 표시될 가로 content 영역을 만든다.
+        /// name, itemCount, 현재 보강판 viewport를 사용하며 스크롤 content를 반환한다.
+        /// </summary>
+        private RectTransform CreatePlatePickerContent(string name, int itemCount)
+        {
+            GameObject contentObject = new GameObject(name, typeof(RectTransform));
+            RectTransform content = contentObject.GetComponent<RectTransform>();
+            content.SetParent(_plateViewport, false);
+            ConfigurePlatePickerContent(content, itemCount);
+            return content;
+        }
+
+        /// <summary>
+        /// 보강판 카드 content를 탭 아래에 배치하고 스크롤 가능한 너비를 설정한다.
+        /// content와 항목 수를 사용하며 content의 위치와 크기를 변경한다.
+        /// </summary>
+        private void ConfigurePlatePickerContent(RectTransform content, int itemCount)
+        {
+            float viewportWidth = _plateViewport.rect.width;
+            float itemContentWidth = itemCount > 0
+                ? itemCount * (_itemWidth + _itemSpacing) - _itemSpacing
+                : 0f;
+            float contentWidth = Mathf.Max(
+                viewportWidth,
+                itemContentWidth + PICKER_LEFT_ITEM_PADDING + PICKER_PANEL_PADDING);
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(0f, 1f);
+            content.pivot = new Vector2(0f, 1f);
+            content.anchoredPosition = new Vector2(
+                0f,
+                -(PLATE_PICKER_TAB_TOP_PADDING + PLATE_PICKER_TAB_HEIGHT + PICKER_PANEL_PADDING));
+            content.sizeDelta = new Vector2(contentWidth, PLATE_PICKER_ITEM_HEIGHT);
+        }
+
+        /// <summary>
+        /// 보강판 선택 영역 상단에 라벨이 있는 탭 버튼을 만든다.
+        /// parent, name, label, position을 사용하며 클릭 이벤트를 받을 버튼을 반환한다.
+        /// </summary>
+        private KeyboardEditButton CreatePlatePickerTab(
+            RectTransform parent,
+            string name,
+            string label,
+            Vector2 position)
+        {
+            GameObject tabObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(KeyboardEditButton));
+            RectTransform tabRect = tabObject.GetComponent<RectTransform>();
+            tabRect.SetParent(parent, false);
+            tabRect.anchorMin = Vector2.up;
+            tabRect.anchorMax = Vector2.up;
+            tabRect.pivot = Vector2.up;
+            tabRect.anchoredPosition = position;
+            tabRect.sizeDelta = new Vector2(146f, PLATE_PICKER_TAB_HEIGHT);
+
+            Image tabImage = tabObject.GetComponent<Image>();
+            tabImage.sprite = _pickerSprite;
+            tabImage.type = Image.Type.Sliced;
+            tabImage.color = _pickerCardColor;
+            tabImage.raycastTarget = true;
+
+            KeyboardEditButton button = tabObject.GetComponent<KeyboardEditButton>();
+            button.targetGraphic = tabImage;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+            GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(tabRect, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(4f, 1f);
+            labelRect.offsetMax = new Vector2(-4f, -1f);
+            Text tabLabel = labelObject.GetComponent<Text>();
+            tabLabel.font = _pickerFont;
+            tabLabel.text = label;
+            tabLabel.fontSize = 12;
+            tabLabel.fontStyle = FontStyle.Bold;
+            tabLabel.alignment = TextAnchor.MiddleCenter;
+            tabLabel.color = Color.white;
+            tabLabel.raycastTarget = false;
+            return button;
+        }
+
+        /// <summary>
+        /// 재질 카드마다 미리보기와 현지화한 색상 이름을 만든다.
+        /// content와 previews를 사용하며 클릭할 Material 및 선택 시각 요소를 저장한다.
+        /// </summary>
+        private void CreatePlateMaterialItems(RectTransform content, Texture2D[] previews)
+        {
+            for (int index = 0; index < previews.Length; index++)
+            {
+                if (previews[index] == null)
+                    continue;
+
+                Material material = _plateMaterials[index];
+                KeyboardEditButton button = CreatePlatePickerItemButton(
+                    content,
+                    "PlateMaterial_" + material.name,
+                    _plateMaterialButtons.Count,
+                    _plateMaterialLabels[index],
+                    out Image cardBackground,
+                    out Text selectionIndicator);
+                CreateMaterialPreviewImage(
+                    button.transform,
+                    "PlatePreviewImage",
+                    previews[index],
+                    new Vector2(PLATE_PICKER_PREVIEW_WIDTH, PLATE_PICKER_PREVIEW_HEIGHT),
+                    18f);
+                selectionIndicator.transform.SetAsLastSibling();
+
+                _plateMaterialButtons.Add(button);
+                _plateMaterialCardBackgrounds.Add(cardBackground);
+                _plateMaterialButtonMaterials.Add(material);
+                _plateMaterialSelectionIndicators.Add(selectionIndicator);
+            }
+        }
+
+        /// <summary>
+        /// 지정한 타건 효과마다 이름과 간단한 설명이 있는 선택 카드를 만든다.
+        /// _plateEffects와 content를 사용하며 버튼, 효과 값, 선택 시각 요소를 저장한다.
+        /// </summary>
+        private void CreatePlateEffectItems(RectTransform content)
+        {
+            for (int index = 0; index < _plateEffects.Count; index++)
+            {
+                PlateEffect effect = _plateEffects[index];
+                KeyboardEditButton button = CreatePlatePickerItemButton(
+                    content,
+                    "PlateEffect_" + effect,
+                    index,
+                    GetPlateEffectLabel(effect),
+                    out Image cardBackground,
+                    out Text selectionIndicator);
+                CreatePlateEffectDescription(button.transform, GetPlateEffectDescription(effect));
+                selectionIndicator.transform.SetAsLastSibling();
+
+                _plateEffectButtons.Add(button);
+                _plateEffectCardBackgrounds.Add(cardBackground);
+                _plateEffectSelectionIndicators.Add(selectionIndicator);
+            }
+        }
+
+        /// <summary>
+        /// 보강판 목록의 카드 버튼을 탭 아래 위치와 높이로 만든다.
+        /// content, itemName, index, labelText를 사용하며 카드와 배경 및 선택 표시를 반환한다.
+        /// </summary>
+        private KeyboardEditButton CreatePlatePickerItemButton(
+            RectTransform content,
+            string itemName,
+            int index,
+            string labelText,
+            out Image cardBackground,
+            out Text selectionIndicator)
+        {
+            KeyboardEditButton button = CreatePickerItemButton(
+                content,
+                itemName,
+                index,
+                labelText,
+                out cardBackground,
+                out selectionIndicator);
+            RectTransform itemRect = button.transform as RectTransform;
+            itemRect.sizeDelta = new Vector2(_itemWidth, PLATE_PICKER_ITEM_HEIGHT);
+            itemRect.anchoredPosition = new Vector2(
+                PICKER_LEFT_ITEM_PADDING + index * (_itemWidth + _itemSpacing) + _itemWidth * 0.5f,
+                0f);
+            return button;
+        }
+
+        /// <summary>
+        /// 효과 카드 중앙에 효과 동작을 설명하는 텍스트를 배치한다.
+        /// parent와 description을 사용하며 카드 안에 설명 라벨을 생성한다.
+        /// </summary>
+        private void CreatePlateEffectDescription(Transform parent, string description)
+        {
+            GameObject descriptionObject = new GameObject(
+                "EffectDescription",
+                typeof(RectTransform),
+                typeof(Text));
+            RectTransform descriptionRect = descriptionObject.GetComponent<RectTransform>();
+            descriptionRect.SetParent(parent, false);
+            descriptionRect.anchorMin = new Vector2(0.5f, 0.5f);
+            descriptionRect.anchorMax = new Vector2(0.5f, 0.5f);
+            descriptionRect.pivot = new Vector2(0.5f, 0.5f);
+            descriptionRect.anchoredPosition = new Vector2(0f, 18f);
+            descriptionRect.sizeDelta = new Vector2(_itemWidth - 12f, 38f);
+
+            Text descriptionText = descriptionObject.GetComponent<Text>();
+            descriptionText.font = _pickerFont;
+            descriptionText.text = description;
+            descriptionText.fontSize = 11;
+            descriptionText.resizeTextForBestFit = true;
+            descriptionText.resizeTextMinSize = 9;
+            descriptionText.resizeTextMaxSize = 11;
+            descriptionText.alignment = TextAnchor.MiddleCenter;
+            descriptionText.color = new Color32(195, 211, 224, 255);
+            descriptionText.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// 보강판 탭과 카드의 C# 클릭 이벤트를 활성화하거나 해제한다.
+        /// isBound를 사용하며 색상 및 효과 버튼의 핸들러 구독 상태를 변경한다.
+        /// </summary>
+        private void SetPlatePickerEventBindings(bool isBound)
+        {
+            if (_plateMaterialTabButton != null)
+            {
+                if (isBound) _plateMaterialTabButton.Clicked += HandlePlateMaterialTabClicked;
+                else _plateMaterialTabButton.Clicked -= HandlePlateMaterialTabClicked;
+            }
+            if (_plateEffectTabButton != null)
+            {
+                if (isBound) _plateEffectTabButton.Clicked += HandlePlateEffectTabClicked;
+                else _plateEffectTabButton.Clicked -= HandlePlateEffectTabClicked;
+            }
+            foreach (KeyboardEditButton button in _plateMaterialButtons)
+            {
+                if (isBound) button.Clicked += HandlePlateMaterialClicked;
+                else button.Clicked -= HandlePlateMaterialClicked;
+            }
+            foreach (KeyboardEditButton button in _plateEffectButtons)
+            {
+                if (isBound) button.Clicked += HandlePlateEffectClicked;
+                else button.Clicked -= HandlePlateEffectClicked;
+            }
+        }
+
+        /// <summary>
+        /// 보강판 선택 패널에서 색상 또는 효과 목록으로 전환한다.
+        /// section에 맞춰 content와 탭 강조를 갱신하며 재질이나 효과 값은 변경하지 않는다.
+        /// </summary>
+        private void SetPlatePickerSection(PlatePickerSection section)
+        {
+            if (_plateViewport == null || _plateMaterialContent == null || _plateEffectContent == null)
+                return;
+
+            _platePickerSection = section;
+            RectTransform activeContent = section == PlatePickerSection.Material
+                ? _plateMaterialContent
+                : _plateEffectContent;
+            _plateMaterialContent.gameObject.SetActive(section == PlatePickerSection.Material);
+            _plateEffectContent.gameObject.SetActive(section == PlatePickerSection.Effect);
+            ScrollRect scrollRect = _plateViewport.GetComponent<ScrollRect>();
+            scrollRect.content = activeContent;
+            scrollRect.horizontalNormalizedPosition = 0f;
+            SetPlatePickerTabSelection(_plateMaterialTabButton, section == PlatePickerSection.Material);
+            SetPlatePickerTabSelection(_plateEffectTabButton, section == PlatePickerSection.Effect);
+        }
+
+        /// <summary>
+        /// 보강판 탭 버튼의 색상을 선택 여부에 맞춰 갱신한다.
+        /// button과 isSelected를 사용하며 버튼 배경 및 포인터 강조 색을 변경한다.
+        /// </summary>
+        private void SetPlatePickerTabSelection(KeyboardEditButton button, bool isSelected)
+        {
+            Image background = button.GetComponent<Image>();
+            background.color = isSelected ? _pickerSelectedCardColor : _pickerCardColor;
+            ColorBlock colors = button.colors;
+            colors.normalColor = isSelected ? _pickerSelectedColor : _pickerBorderColor;
+            colors.highlightedColor = isSelected ? _pickerFocusColor : _pickerHoverColor;
+            colors.pressedColor = new Color32(128, 234, 255, 255);
+            colors.selectedColor = colors.normalColor;
+            button.colors = colors;
+        }
+
+        /// <summary>
+        /// PlateType에 대응하는 재질 선택 카드 이름을 반환한다.
+        /// type을 사용하며 표시용 한국어 이름 또는 타입 기본 이름을 반환한다.
+        /// </summary>
+        private static string GetPlateMaterialLabel(PlateType type)
+        {
+            switch (type)
+            {
+                case PlateType.Nomal: return "기본";
+                case PlateType.Golden: return "골드";
+                case PlateType.UnderWater: return "아쿠아";
+                case PlateType.RainBow: return "레인보우";
+                case PlateType.Steel: return "스틸";
+                default: return type.ToString();
+            }
+        }
+
+        /// <summary>
+        /// 효과 선택 카드에 사용할 짧은 한국어 이름을 반환한다.
+        /// effect를 사용하며 None, Reverb, Pitch, Delay의 이름을 반환한다.
+        /// </summary>
+        private static string GetPlateEffectLabel(PlateEffect effect)
+        {
+            switch (effect)
+            {
+                case PlateEffect.None: return "기본";
+                case PlateEffect.Reverb: return "수중";
+                case PlateEffect.Pitch: return "하이 피치";
+                case PlateEffect.Delay: return "에코";
+                default: return effect.ToString();
+            }
+        }
+
+        /// <summary>
+        /// 효과 카드에 표시할 동작 설명을 반환한다.
+        /// effect를 사용하며 실제 효과를 짧은 한국어 문구로 반환한다.
+        /// </summary>
+        private static string GetPlateEffectDescription(PlateEffect effect)
+        {
+            switch (effect)
+            {
+                case PlateEffect.None: return "효과 없이 재생";
+                case PlateEffect.Reverb: return "물속 잔향";
+                case PlateEffect.Pitch: return "높은 음색";
+                case PlateEffect.Delay: return "짧은 메아리";
+                default: return string.Empty;
+            }
         }
 
         /// <summary>
@@ -1336,40 +1744,6 @@ namespace Game.Player
                 _caseCardBackgrounds.Add(cardBackground);
                 _caseMaterialIndices.Add(index);
                 _caseSelectionIndicators.Add(selectionIndicator);
-            }
-        }
-
-        /// <summary>
-        /// 보강판 재질 미리보기마다 타입 이름과 선택 표시가 있는 버튼을 만든다.
-        /// content와 previews를 사용하며 버튼, PlateType, 시각 요소를 같은 순서로 저장한다.
-        /// </summary>
-        private void CreatePlatePreviewItems(RectTransform content, Texture2D[] previews)
-        {
-            for (int index = 0; index < previews.Length; index++)
-            {
-                if (previews[index] == null)
-                    continue;
-
-                PlateType type = _plateTypes[index];
-                KeyboardEditButton button = CreatePickerItemButton(
-                    content,
-                    "PlateMaterial_" + type,
-                    _platePreviewButtons.Count,
-                    type.ToString(),
-                    out Image cardBackground,
-                    out Text selectionIndicator);
-                CreateMaterialPreviewImage(
-                    button.transform,
-                    "PlatePreviewImage",
-                    previews[index],
-                    new Vector2(PICKER_PREVIEW_WIDTH, PICKER_PREVIEW_HEIGHT),
-                    14f);
-                selectionIndicator.transform.SetAsLastSibling();
-
-                _platePreviewButtons.Add(button);
-                _plateCardBackgrounds.Add(cardBackground);
-                _platePreviewTypes.Add(type);
-                _plateSelectionIndicators.Add(selectionIndicator);
             }
         }
 
@@ -1458,8 +1832,10 @@ namespace Game.Player
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Switch", type.ToString());
             foreach (int index in _caseMaterialIndices)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Case", _caseCustomization.CaseMaterials[index].name);
-            foreach (PlateType type in _platePreviewTypes)
-                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Plate", type.ToString());
+            foreach (Material material in _plateMaterialButtonMaterials)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "PlateMaterial", material.name);
+            foreach (PlateEffect effect in _plateEffects)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "PlateEffect", effect.ToString());
             foreach (LEDPattern pattern in Enum.GetValues(typeof(LEDPattern)))
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "LED", pattern.ToString());
             foreach (string scope in new[] { "CaseWhole", "SingleKeycap", "AllKeycapsCanvas" })

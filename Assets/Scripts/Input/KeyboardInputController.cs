@@ -92,7 +92,9 @@ namespace KeyboardModeling
             Sans,
             Red,
             Pop,
-            Typewriter
+            Typewriter,
+            FireWorks,
+            Animal
         }
 
         public bool InputEnabled
@@ -119,6 +121,8 @@ namespace KeyboardModeling
             FmodSwitchSound.Sans => SwitchType.Sans,
             FmodSwitchSound.Pop => SwitchType.Pop,
             FmodSwitchSound.Typewriter => SwitchType.Typewriter,
+            FmodSwitchSound.FireWorks => SwitchType.FireWorks,
+            FmodSwitchSound.Animal => SwitchType.Animal,
             _ => null
         };
 
@@ -334,6 +338,8 @@ namespace KeyboardModeling
                     FmodSwitchSound.Red => FMODEvents.instance.RedSwitch,
                     FmodSwitchSound.Pop =>FMODEvents.instance.PopSwitch,
                     FmodSwitchSound.Typewriter =>FMODEvents.instance.TypewriterSwitch,
+                    FmodSwitchSound.FireWorks => FMODEvents.instance.FireWorksSwitch,
+                    FmodSwitchSound.Animal => FMODEvents.instance.AnimalSwitch,
                     _ => FMODEvents.instance.BlueSwitch
                 };
                 AudioManager.instance.PlayKeyboardOneShot(sound, transform.position, gameObject);
@@ -358,6 +364,8 @@ namespace KeyboardModeling
                 case SwitchType.Sans: sound = FmodSwitchSound.Sans; break;
                 case SwitchType.Pop: sound = FmodSwitchSound.Pop; break;
                 case SwitchType.Typewriter: sound = FmodSwitchSound.Typewriter; break;
+                case SwitchType.FireWorks: sound = FmodSwitchSound.FireWorks; break;
+                case SwitchType.Animal: sound = FmodSwitchSound.Animal; break;
                 default: return false;
             }
 

@@ -11,6 +11,8 @@ public class FMODEvents : MonoBehaviour
 
     [field: SerializeField] public EventReference PopSwitch { get; private set; }
     [field: SerializeField] public EventReference TypewriterSwitch { get; private set; }
+    [field: SerializeField] public EventReference FireWorksSwitch { get; private set; }
+    [field: SerializeField] public EventReference AnimalSwitch { get; private set; }
     [field: SerializeField] public EventReference BreakKeyCap { get; private set; }
 
 

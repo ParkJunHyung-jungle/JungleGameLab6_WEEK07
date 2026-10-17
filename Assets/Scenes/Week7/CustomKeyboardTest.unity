@@ -310,10 +310,64 @@ MonoBehaviour:
   - {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   - {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}
   - {fileID: 2100000, guid: c4da2edb164328841934d091e98ee3a2, type: 2}
+  - {fileID: 2100000, guid: 0a1a2ec0d6ed18c459f87b5d181564bf, type: 2}
+  - {fileID: 2100000, guid: 16b8e1e43f86b614eaa4f02c773c3c57, type: 2}
+  - {fileID: 2100000, guid: 1930ccd51f7ac86448e47ae31c67e6bc, type: 2}
+  - {fileID: 2100000, guid: 1c359114b88294f4faf80ab69cd546a9, type: 2}
+  - {fileID: 2100000, guid: 1ec738c6989e9f54cb8027d2a531a28d, type: 2}
+  - {fileID: 2100000, guid: 3e7bfabfa1999224ba9d77cbe0feff07, type: 2}
+  - {fileID: 2100000, guid: 43c9cbe2ad8adeb47b9aaac1c2d505c9, type: 2}
+  - {fileID: 2100000, guid: 459ddb0e8f4742b48a738f361185deb4, type: 2}
+  - {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
+  - {fileID: 2100000, guid: 5629585690d5fc044b4375325e8357fe, type: 2}
+  - {fileID: 2100000, guid: 71a7ea23368f8774d83fa7b13e4cdcfe, type: 2}
+  - {fileID: 2100000, guid: 794f0db3eb283b546b2d078b8b6ba4b3, type: 2}
+  - {fileID: 2100000, guid: 7af7cb2be9dfad04da778faf68b830cd, type: 2}
+  - {fileID: 2100000, guid: 994431c627356934b98175a03bb95d66, type: 2}
+  - {fileID: 2100000, guid: 9947c8e32db262144832a15355c38bf8, type: 2}
+  - {fileID: 2100000, guid: a67ebba28beff7146acdeb0c28625a63, type: 2}
+  - {fileID: 2100000, guid: b390153fd5970104f9ca9f3f820ea816, type: 2}
+  - {fileID: 2100000, guid: c8b9a474c4aa2c94ea91dcbb809bd8ef, type: 2}
+  - {fileID: 2100000, guid: d1d390a20db744e0acb7c1e0ea6d0705, type: 2}
+  - {fileID: 2100000, guid: d76f514a9a2ecec4d9346ff56354ca6e, type: 2}
+  - {fileID: 2100000, guid: dc81f37b2d349b54faeb49ad09dc0abf, type: 2}
+  - {fileID: 2100000, guid: ea89b2db33fa46548baccf9021c579f6, type: 2}
+  - {fileID: 2100000, guid: ef29bfa57b8eeaa4684755d94aec900c, type: 2}
+  - {fileID: 2100000, guid: b6cacee2f02e3874d97f82f41749ddc0, type: 2}
+  - {fileID: 2100000, guid: 8433af2752acfe04eab141abed9206ac, type: 2}
+  - {fileID: 2100000, guid: 43ec742d9ac7444088a6ed4fcb7b14e5, type: 2}
+  - {fileID: 2100000, guid: 6cf19c9eabf65e64c931b45cedcd9854, type: 2}
   _materialIds:
   - eb9bef93fd5c48d4da2e0d9f41939e65:2100000
   - 49c3ca8fd4e59c34ea8d550486382ebb:2100000
   - c4da2edb164328841934d091e98ee3a2:2100000
+  - 0a1a2ec0d6ed18c459f87b5d181564bf:2100000
+  - 16b8e1e43f86b614eaa4f02c773c3c57:2100000
+  - 1930ccd51f7ac86448e47ae31c67e6bc:2100000
+  - 1c359114b88294f4faf80ab69cd546a9:2100000
+  - 1ec738c6989e9f54cb8027d2a531a28d:2100000
+  - 3e7bfabfa1999224ba9d77cbe0feff07:2100000
+  - 43c9cbe2ad8adeb47b9aaac1c2d505c9:2100000
+  - 459ddb0e8f4742b48a738f361185deb4:2100000
+  - 4a0a69a01cf224a46928ca01abe1b600:2100000
+  - 5629585690d5fc044b4375325e8357fe:2100000
+  - 71a7ea23368f8774d83fa7b13e4cdcfe:2100000
+  - 794f0db3eb283b546b2d078b8b6ba4b3:2100000
+  - 7af7cb2be9dfad04da778faf68b830cd:2100000
+  - 994431c627356934b98175a03bb95d66:2100000
+  - 9947c8e32db262144832a15355c38bf8:2100000
+  - a67ebba28beff7146acdeb0c28625a63:2100000
+  - b390153fd5970104f9ca9f3f820ea816:2100000
+  - c8b9a474c4aa2c94ea91dcbb809bd8ef:2100000
+  - d1d390a20db744e0acb7c1e0ea6d0705:2100000
+  - d76f514a9a2ecec4d9346ff56354ca6e:2100000
+  - dc81f37b2d349b54faeb49ad09dc0abf:2100000
+  - ea89b2db33fa46548baccf9021c579f6:2100000
+  - ef29bfa57b8eeaa4684755d94aec900c:2100000
+  - b6cacee2f02e3874d97f82f41749ddc0:2100000
+  - 8433af2752acfe04eab141abed9206ac:2100000
+  - 43ec742d9ac7444088a6ed4fcb7b14e5:2100000
+  - 6cf19c9eabf65e64c931b45cedcd9854:2100000
 --- !u!4 &641193458
 Transform:
   m_ObjectHideFlags: 0
@@ -416,6 +470,26 @@ PrefabInstance:
     - target: {fileID: 1264139386206111033, guid: f5b5770352c706c46827af4de924c16d, type: 3}
       propertyPath: _fmodSwitchSound
       value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 3967785068815222441, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: _plateType
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3967785068815222441, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: _plateEffect
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3967785068815222441, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: _plateMaterial
+      value: 
+      objectReference: {fileID: 2100000, guid: b6cacee2f02e3874d97f82f41749ddc0, type: 2}
+    - target: {fileID: 3967785068815222441, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: _plateMaterialIndex
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 3967785068815222441, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+      propertyPath: _plateSettingsSeparated
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
       propertyPath: m_Name

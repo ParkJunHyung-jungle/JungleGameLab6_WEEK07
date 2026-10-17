@@ -13,7 +13,6 @@ public class AudioManager : MonoBehaviour
     [Header("Plate Audio Selection")]
     [SerializeField] private KeyboardCustomization _initialKeyboard;
     private KeyboardCustomization _activeKeyboard;
-    private KeyboardPlate _activePlate;
     private int _selectionVersion;
 
     [Header("FMOD Effect Values")]
@@ -24,7 +23,7 @@ public class AudioManager : MonoBehaviour
     private bool _isQuitting;
 
     [Header("Temporary Keyboard Event Pitch")]
-    [Tooltip("Pitch Shifter 대신 RainBow와 Steel 타건 이벤트에 직접 적용하는 음정 배율입니다.")]
+    [Tooltip("피치 효과를 선택한 타건 이벤트에 직접 적용하는 기존 음정 배율입니다.")]
     [SerializeField, Min(0.01f)] private float _temporaryKeyboardPitch = 1.2f;
     private float _keyboardEventPitch = 1f;
 
@@ -60,7 +59,7 @@ public class AudioManager : MonoBehaviour
 
     void OnDisable()
     {
-        if (_activeKeyboard != null) ApplyPlateEffects(PlateType.Nomal);
+        if (_activeKeyboard != null) ApplyPlateEffects(PlateEffect.None);
         DetachPlate();
     }
 
@@ -79,14 +78,14 @@ public class AudioManager : MonoBehaviour
         if (keyboard != null && (!keyboard.isActiveAndEnabled || !Application.IsPlaying(keyboard.gameObject))) return;
         DetachPlate();
         _selectionVersion++;
-        if (keyboard == null) { ApplyPlateEffects(PlateType.Nomal); return; }
+        if (keyboard == null) { ApplyPlateEffects(PlateEffect.None); return; }
         keyboard.RememberPlateAudioSelection(this, _selectionVersion);
         ResumeKeyboardEffects(keyboard, _selectionVersion);
     }
 
     /// <summary>
-    /// keyboard와 selectionVersion이 최신 선택이면 PlateChanged를 구독한다.
-    /// CurrentData를 즉시 적용하여 동일 플레이트의 재활성화에도 효과를 복원한다.
+    /// keyboard와 selectionVersion이 최신 선택이면 독립 효과 변경 이벤트를 구독한다.
+    /// 현재 효과를 즉시 적용하여 동일 선택의 재활성화에도 효과를 복원한다.
     /// </summary>
     public void ResumeKeyboardEffects(KeyboardCustomization keyboard, int selectionVersion)
     {
@@ -100,10 +99,8 @@ public class AudioManager : MonoBehaviour
             !Application.IsPlaying(keyboard.gameObject)) return;
         DetachPlate();
         _activeKeyboard = keyboard;
-        _activePlate = keyboard.Plate;
-        if (_activePlate == null) return;
-        _activePlate.PlateChanged += HandlePlateChanged;
-        HandlePlateChanged(_activePlate.CurrentData);
+        _activeKeyboard.PlateEffectChanged += HandlePlateEffectChanged;
+        HandlePlateEffectChanged(_activeKeyboard.CurrentPlateEffect);
     }
 
     /// <summary>
@@ -114,7 +111,7 @@ public class AudioManager : MonoBehaviour
     {
         if (_activeKeyboard != keyboard) return;
         DetachPlate();
-        ApplyPlateEffects(PlateType.Nomal);
+        ApplyPlateEffects(PlateEffect.None);
     }
 
     /// <summary>
@@ -134,32 +131,31 @@ public class AudioManager : MonoBehaviour
     /// </summary>
     private void DetachPlate()
     {
-        if (_activePlate != null) _activePlate.PlateChanged -= HandlePlateChanged;
-        _activePlate = null;
+        if (_activeKeyboard != null) _activeKeyboard.PlateEffectChanged -= HandlePlateEffectChanged;
         _activeKeyboard = null;
     }
 
     /// <summary>
-    /// 활성 키보드의 data를 효과 설정으로 전달한다.
-    /// 데이터가 없으면 Nomal을 적용하며 비활성 인스턴스는 무시한다.
+    /// 활성 키보드에서 선택한 effect를 오디오 설정으로 전달한다.
+    /// 비활성 키보드의 알림을 무시하며 재질과 기존 보강판 타입은 조회하지 않는다.
     /// </summary>
-    private void HandlePlateChanged(PlateData data)
+    private void HandlePlateEffectChanged(PlateEffect effect)
     {
         if (_activeKeyboard == null || !_activeKeyboard.isActiveAndEnabled) return;
-        ApplyPlateEffects(data != null ? data.Type : PlateType.Nomal);
+        ApplyPlateEffects(effect);
     }
 
     /// <summary>
-    /// type에 대응하는 효과를 선택하고 RainBow와 Steel의 이벤트 음정 배율을 변경한다.
-    /// Pitch Shifter는 꺼짐 값으로 유지하며 다른 플레이트에서는 이벤트 배율을 1로 복원한다.
+    /// effect에 대응하는 단일 효과를 선택하고 이벤트 음정 배율을 변경한다.
+    /// 기존 Pitch Shifter 꺼짐 값을 유지하며 효과 없음에서는 이벤트 배율을 1로 복원한다.
     /// </summary>
-    private void ApplyPlateEffects(PlateType type)
+    private void ApplyPlateEffects(PlateEffect effect)
     {
         if (!Application.isPlaying || _isQuitting) return;
-        _keyboardEventPitch = type == PlateType.RainBow || type == PlateType.Steel ? _temporaryKeyboardPitch : 1f;
+        _keyboardEventPitch = effect == PlateEffect.Pitch ? _temporaryKeyboardPitch : 1f;
         SetKeyboardEffects(
-            type == PlateType.UnderWater ? _reverbOffOn.y : _reverbOffOn.x,
-            type == PlateType.Golden ? _delayOffOn.y : _delayOffOn.x,
+            effect == PlateEffect.Reverb ? _reverbOffOn.y : _reverbOffOn.x,
+            effect == PlateEffect.Delay ? _delayOffOn.y : _delayOffOn.x,
             _pitchOffOn.x);
     }
 
@@ -277,3 +273,4 @@ public class AudioManager : MonoBehaviour
         CleanUp();
     }
 }
+

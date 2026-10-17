@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public sealed class KeyboardCustomizationState
 {
-    [SerializeField] private int _version = 3;
+    [SerializeField] private int _version = 4;
     [SerializeField] private bool _ledEnabled;
     [SerializeField] private Color _ledColor;
     [SerializeField] private float _ledIntensity;
@@ -19,6 +19,8 @@ public sealed class KeyboardCustomizationState
     [SerializeField] private SwitchType[] _switchTypes;
     [SerializeField] private PlateType _plateType;
     [SerializeField] private KeyboardImageState _imageState;
+    [SerializeField] private string _plateMaterialId;
+    [SerializeField] private PlateEffect _plateEffect;
 
     public int Version => _version;
     public bool LedEnabled => _ledEnabled;
@@ -34,15 +36,17 @@ public sealed class KeyboardCustomizationState
     public SwitchType[] SwitchTypes => _switchTypes;
     public PlateType PlateType => _plateType;
     public KeyboardImageState ImageState => _version < 3 ? null : _imageState;
+    public string PlateMaterialId => _plateMaterialId;
+    public PlateEffect PlateEffect => _plateEffect;
 
     /// <summary>
-    /// LED 설정, 선택값, 카탈로그 ID, 렌더러별 재질과 축 및 Plate 타입을 저장용 상태로 구성한다.
+    /// LED, 카탈로그, 렌더러, 축과 독립 보강판 재질 ID 및 효과를 저장용 상태로 구성한다.
     /// 입력받은 배열과 값을 보관하며 Unity 오브젝트 참조는 저장하지 않는다.
     /// </summary>
     public KeyboardCustomizationState(bool ledEnabled, Color ledColor, float ledIntensity, int[] selection,
         string[] catalogIds, string[] rendererPaths, int[] slotCounts, int[] materialIndices,
         SwitchType[] switchTypes, PlateType plateType, LEDPattern ledPattern = LEDPattern.Static, float ledSpeed = 1f,
-        KeyboardImageState imageState = null)
+        KeyboardImageState imageState = null, string plateMaterialId = null, PlateEffect plateEffect = PlateEffect.None)
     {
         _ledEnabled = ledEnabled;
         _ledColor = ledColor;
@@ -57,5 +61,7 @@ public sealed class KeyboardCustomizationState
         _switchTypes = switchTypes;
         _plateType = plateType;
         _imageState = imageState;
+        _plateMaterialId = plateMaterialId;
+        _plateEffect = plateEffect;
     }
 }

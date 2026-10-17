@@ -21,6 +21,34 @@ public sealed class KeyboardPlate : MonoBehaviour
     public event Action<PlateData> PlateChanged;
 
     /// <summary>
+    /// type에 등록된 기존 보강판 재질을 material로 반환한다.
+    /// 조회 성공 여부를 반환하며 Renderer와 현재 선택은 변경하지 않는다.
+    /// </summary>
+    public bool TryGetMaterial(PlateType type, out Material material)
+    {
+        material = null;
+        if (!BuildDataMap() || !_plateDataMap.TryGetValue(type, out PlateData data)) return false;
+        material = data.Material;
+        return material != null;
+    }
+
+    /// <summary>
+    /// material을 보강판 Renderer의 공유 재질로 적용한다.
+    /// 재질에 맞는 현재 데이터를 갱신하고 성공 여부를 반환하며 오디오 효과와 이벤트는 변경하지 않는다.
+    /// </summary>
+    public bool SetMaterial(Material material)
+    {
+        if (material == null) return false;
+        _plateRenderer.sharedMaterial = material;
+        _currentData = null;
+        foreach (PlateData data in _plateData)
+        {
+            if (data != null && data.Material == material) { _currentData = data; break; }
+        }
+        return true;
+    }
+
+    /// <summary>
     /// type에 해당하는 Plate SO와 Material이 등록되어 있는지 확인한다.
     /// 외형과 현재 선택은 변경하지 않고 적용 가능 여부를 반환한다.
     /// </summary>

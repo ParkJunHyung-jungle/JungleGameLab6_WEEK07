@@ -23,6 +23,11 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private Vector2 _pitchOffOn = new Vector2(0f, 1f);
     private bool _isQuitting;
 
+    [Header("Temporary Keyboard Event Pitch")]
+    [Tooltip("Pitch Shifter 대신 RainBow와 Steel 타건 이벤트에 직접 적용하는 음정 배율입니다.")]
+    [SerializeField, Min(0.01f)] private float _temporaryKeyboardPitch = 1.2f;
+    private float _keyboardEventPitch = 1f;
+
     [Header("Event Instances")]
     private List<EventInstance> eventInstances;
 
@@ -145,16 +150,17 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>
-    /// type에 대응하는 효과만 선택하며 RainBow에는 피치만 적용한다.
-    /// 세 전역 파라미터를 함께 변경하여 이전 플레이트 효과를 해제한다.
+    /// type에 대응하는 효과를 선택하고 RainBow와 Steel의 이벤트 음정 배율을 변경한다.
+    /// Pitch Shifter는 꺼짐 값으로 유지하며 다른 플레이트에서는 이벤트 배율을 1로 복원한다.
     /// </summary>
     private void ApplyPlateEffects(PlateType type)
     {
         if (!Application.isPlaying || _isQuitting) return;
+        _keyboardEventPitch = type == PlateType.RainBow || type == PlateType.Steel ? _temporaryKeyboardPitch : 1f;
         SetKeyboardEffects(
             type == PlateType.UnderWater ? _reverbOffOn.y : _reverbOffOn.x,
             type == PlateType.Golden ? _delayOffOn.y : _delayOffOn.x,
-            type == PlateType.RainBow ? _pitchOffOn.y : _pitchOffOn.x);
+            _pitchOffOn.x);
     }
 
     /// <summary>
@@ -213,6 +219,30 @@ public class AudioManager : MonoBehaviour
     public void PlayOneShot(EventReference sound, Vector3 worldPos)
     {
         RuntimeManager.PlayOneShot(sound, worldPos);
+    }
+
+    /// <summary>
+    /// sound를 worldPos에서 재생하며 선택된 keyboard의 타건에만 이벤트 음정 배율을 적용한다.
+    /// FMOD 설정과 재생 결과를 확인하고 인스턴스를 해제 예약하여 재생 종료 후 정리한다.
+    /// </summary>
+    public void PlayKeyboardOneShot(EventReference sound, Vector3 worldPos, GameObject keyboard)
+    {
+        EventInstance eventInstance = RuntimeManager.CreateInstance(sound);
+        float pitch = _activeKeyboard != null && _activeKeyboard.gameObject == keyboard ? _keyboardEventPitch : 1f;
+        try
+        {
+            FMOD.RESULT result = eventInstance.set3DAttributes(RuntimeUtils.To3DAttributes(worldPos));
+            if (result == FMOD.RESULT.OK) result = eventInstance.setPitch(pitch);
+            if (result == FMOD.RESULT.OK) result = eventInstance.start();
+            if (result != FMOD.RESULT.OK)
+                Debug.LogError($"[FMOD] 타건 이벤트 재생 실패: pitch={pitch}, {result} ({FMOD.Error.String(result)}).", this);
+        }
+        finally
+        {
+            FMOD.RESULT result = eventInstance.release();
+            if (result != FMOD.RESULT.OK)
+                Debug.LogError($"[FMOD] 타건 이벤트 해제 실패: {result} ({FMOD.Error.String(result)}).", this);
+        }
     }
 
     /// <summary>

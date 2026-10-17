@@ -317,7 +317,7 @@ namespace KeyboardModeling
                     FmodSwitchSound.Typewriter =>FMODEvents.instance.TypewriterSwitch,
                     _ => FMODEvents.instance.BlueSwitch
                 };
-                AudioManager.instance.PlayOneShot(sound, transform.position);
+                AudioManager.instance.PlayKeyboardOneShot(sound, transform.position, gameObject);
                 return;
             }
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;

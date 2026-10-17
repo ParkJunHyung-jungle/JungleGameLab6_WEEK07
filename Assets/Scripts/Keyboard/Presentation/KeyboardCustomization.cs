@@ -78,6 +78,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private KeyboardImageCustomization _imageCustomization;
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
     private KeycapMaterialPreviewSnapshot _keycapMaterialPreviewSnapshot;
+    private readonly Dictionary<Transform, KeycapModelAppearance> _keycapModels = new Dictionary<Transform, KeycapModelAppearance>();
+    private readonly Dictionary<Transform, Game.Tournament.KeycapDefinition> _keycapModelDefinitions = new Dictionary<Transform, Game.Tournament.KeycapDefinition>();
 
     public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
     public int PhotoKeycapCount => GetImageCustomization().KeycapCount;
@@ -318,9 +320,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
         _keycapMaterial = defaultKeycap.Material;
         _keycapMaterialIndex = Array.IndexOf(_materials, _keycapMaterial);
         _keycapMaterialOverrides.Clear();
+        ResetKeycapModels();
         foreach (var binding in GetComponent<KeyboardInputController>().GetKeycapLayout())
             if (inventory.Keycaps.TryGetValue(binding.Key, out Game.Tournament.KeycapDefinition part))
+            {
                 _keycapMaterialOverrides[binding.Value.transform] = part.Material;
+                SetKeycapModel(binding.Value.transform, part);
+            }
+            else SetKeycapModel(binding.Value.transform, defaultKeycap);
         ApplyKeycapMaterial();
         images.RestoreState(photos, prepared);
     }
@@ -454,8 +461,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// state와 현재 Material 카탈로그를 검증한 뒤 LED, 실제 재질, 축 및 Plate 선택을 복원한다.
     /// 반환값 없이 현재 인스턴스만 변경하며 호환되지 않는 데이터는 적용 전에 예외로 알린다.
     /// </summary>
-    public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds)
+    public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds,
+        IReadOnlyList<Game.Tournament.KeycapDefinition> keycapDefinitions = null)
     {
+        if (_keycaps == null) CacheKeycaps();
         if (state == null || (state.Version < 1 || state.Version > 4) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
@@ -479,8 +488,23 @@ public sealed class KeyboardCustomization : MonoBehaviour
         int totalSlots = 0;
         for (int index = 0; index < renderers.Length; index++)
         {
+            int expectedSlots = renderers[index] != null ? renderers[index].sharedMaterials.Length : 0;
+            if (renderers[index] != null && renderers[index].name == "PBT_SculptedShell")
+            {
+                Game.Tournament.KeycapDefinition model = null;
+                if (totalSlots < state.MaterialIndices.Length)
+                {
+                    int savedMaterial = state.MaterialIndices[totalSlots];
+                    if (savedMaterial >= 0 && savedMaterial < remap.Length)
+                        model = FindKeycapModel(catalog[remap[savedMaterial]], keycapDefinitions);
+                }
+                KeycapModelAppearance appearance = _keycapModels[renderers[index].transform.parent];
+                if (model != null && model.OneUnitOnly && !appearance.IsOneUnit)
+                    throw new InvalidOperationException("A saved keycap model requires a 1u slot.");
+                expectedSlots = model != null ? model.ModelMaterials.Length : appearance.OriginalMaterialCount;
+            }
             if (renderers[index] == null || state.RendererPaths[index] != GetRendererPath(renderers[index].transform) ||
-                state.SlotCounts[index] != renderers[index].sharedMaterials.Length)
+                state.SlotCounts[index] != expectedSlots)
                 throw new InvalidOperationException("The saved renderer layout is incompatible.");
             totalSlots += state.SlotCounts[index];
         }
@@ -520,6 +544,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         images.ClearKeycapImage();
         images.ClearCaseImage();
 
+        ResetKeycapModels();
+
         for (int index = 0; index < _switches.Length; index++) _switches[index].ChangeSwitch(state.SwitchTypes[index]);
         if (_switches.Length > 0)
         {
@@ -543,6 +569,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
             }
 
             renderers[index].sharedMaterials = materials;
+            if (renderers[index].name == "PBT_SculptedShell")
+            {
+                Game.Tournament.KeycapDefinition model = FindKeycapModel(materials[0], keycapDefinitions);
+                if (model != null) SetKeycapModel(renderers[index].transform.parent, model);
+            }
             KeyboardToonSurface.ApplyBounds(renderers[index]);
         }
 
@@ -1114,7 +1145,32 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public bool SetKeycapMaterial(int keycapIndex, Material material)
     {
-        return ApplyKeycapMaterialToKey(keycapIndex, material, true);
+        if (_keycaps == null) CacheKeycaps();
+        if (material == null || keycapIndex < 0 || keycapIndex >= _keycaps.Length || !HasSwitchForKeycap(keycapIndex))
+        {
+            return false;
+        }
+
+        Transform keycap = _keycaps[keycapIndex];
+        if (keycap == null) return false;
+
+        ClearKeycapImage(keycapIndex);
+        SetKeycapModel(keycap, null);
+        _keycapMaterialOverrides[keycap] = material;
+
+        bool applied = false;
+        foreach (MeshRenderer renderer in _keycapRenderers)
+        {
+            if (renderer != null && renderer.transform.IsChildOf(keycap))
+            {
+                renderer.sharedMaterial = material;
+                KeyboardToonSurface.ApplyBounds(renderer);
+                applied = true;
+            }
+        }
+
+        if (applied) EnableKeycaps(keycapIndex);
+        return applied;
     }
 
     /// <summary>
@@ -1129,10 +1185,46 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (renderer != null && renderer.name == "PBT_SculptedShell")
             {
                 keycaps.Add(renderer.transform.parent);
+                if (!_keycapModels.ContainsKey(renderer.transform.parent))
+                    _keycapModels.Add(renderer.transform.parent, new KeycapModelAppearance(renderer));
             }
         }
 
         _keycaps = keycaps.ToArray();
+    }
+
+    /// <summary>keycap 외피에 definition의 모델을 적용하거나 원본으로 복원한다. 1u 제한과 재질 슬롯을 검증하고 현재 모델 연결을 갱신한다.</summary>
+    private void SetKeycapModel(Transform keycap, Game.Tournament.KeycapDefinition definition)
+    {
+        KeycapModelAppearance appearance = _keycapModels[keycap];
+        if (definition != null && definition.ShellMesh != null)
+        {
+            if (definition.OneUnitOnly && !appearance.IsOneUnit)
+                throw new InvalidOperationException("The keycap model requires a 1u slot.");
+            if (definition.ModelMaterials.Length != definition.ShellMesh.subMeshCount ||
+                definition.ModelMaterials.Length == 0 || definition.ModelMaterials[0] != definition.Material)
+                throw new InvalidOperationException("Keycap model material slots must match the mesh and primary material.");
+            _keycapModelDefinitions[keycap] = definition;
+        }
+        else _keycapModelDefinitions.Remove(keycap);
+        appearance.Apply(definition);
+    }
+
+    /// <summary>캐시된 키캡의 원본 메시와 표시 범위를 복원한다. 현재 모델 연결을 비우며 입력과 체력 컴포넌트는 유지한다.</summary>
+    private void ResetKeycapModels()
+    {
+        _keycapModelDefinitions.Clear();
+        foreach (KeycapModelAppearance appearance in _keycapModels.Values) appearance.Apply(null);
+    }
+
+    /// <summary>material과 definitions를 비교해 등록된 모델 부품을 반환한다. 모델이 없거나 기존 재질 전용 부품이면 null을 반환한다.</summary>
+    private Game.Tournament.KeycapDefinition FindKeycapModel(Material material,
+        IReadOnlyList<Game.Tournament.KeycapDefinition> definitions)
+    {
+        if (definitions == null) return null;
+        foreach (Game.Tournament.KeycapDefinition definition in definitions)
+            if (definition.Material == material && definition.ShellMesh != null) return definition;
+        return null;
     }
 
     /// <summary>
@@ -1477,6 +1569,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
                     (_imageCustomization == null || !_imageCustomization.HasImage(renderer)))
                 {
                     renderer.sharedMaterial = material;
+                    if (renderer.name == "PBT_SculptedShell" && _keycapModelDefinitions.TryGetValue(keycap, out Game.Tournament.KeycapDefinition model))
+                        renderer.sharedMaterials = model.ModelMaterials;
                     KeyboardToonSurface.ApplyBounds(renderer);
                 }
         }

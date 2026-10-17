@@ -37,7 +37,7 @@ namespace Game.Tournament
             if (!CanAdd(part)) return false;
             if (part is KeycapDefinition keycap)
             {
-                List<Key> slots = RandomKeycapPlacement.Select(layout, _keycaps.Keys, part.Quantity);
+                List<Key> slots = RandomKeycapPlacement.Select(layout, _keycaps.Keys, part.Quantity, keycap.OneUnitOnly);
                 if (slots.Count != part.Quantity) return false;
                 foreach (Key key in slots) _keycaps.Add(key, keycap);
             }

@@ -126,7 +126,8 @@ namespace Game.Player
                 _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected += HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected += HandleCaseMaterialSelected;
-                _keyboardEditOverlayUI.PlateTypeSelected += HandlePlateTypeSelected;
+                _keyboardEditOverlayUI.PlateMaterialSelected += HandlePlateMaterialSelected;
+                _keyboardEditOverlayUI.PlateEffectSelected += HandlePlateEffectSelected;
                 _keyboardEditOverlayUI.AttackModeSelected += HandleAttackModeSelected;
             }
             _clickInput.action.started += HandleClickStarted;
@@ -145,7 +146,8 @@ namespace Game.Player
                 _keyboardEditOverlayUI.KeycapMaterialSelected -= HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected -= HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected -= HandleCaseMaterialSelected;
-                _keyboardEditOverlayUI.PlateTypeSelected -= HandlePlateTypeSelected;
+                _keyboardEditOverlayUI.PlateMaterialSelected -= HandlePlateMaterialSelected;
+                _keyboardEditOverlayUI.PlateEffectSelected -= HandlePlateEffectSelected;
                 _keyboardEditOverlayUI.AttackModeSelected -= HandleAttackModeSelected;
             }
             _clickInput.action.started -= HandleClickStarted;
@@ -838,20 +840,42 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 선택한 보강판 타입을 현재 편집 키보드에 적용한다.
-        /// type과 편집 대상의 KeyboardCustomization을 사용하며 적용 성공 시 목록의 선택 표시를 갱신한다.
+        /// 선택한 보강판 재질을 현재 편집 키보드에 적용한다.
+        /// material과 KeyboardCustomization을 사용하며 색상 카드의 선택 표시와 재질 로그를 갱신한다.
         /// </summary>
-        private void HandlePlateTypeSelected(PlateType type)
+        private void HandlePlateMaterialSelected(Material material)
         {
             if (_editingKeyboard == null)
                 return;
 
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
             if (customization == null) return;
-            string previous = customization.CurrentPlateType.ToString();
-            bool applied = customization.SetPlateType(type);
-            Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Plate", type.ToString(),
-                previous, applied, applied && previous != customization.CurrentPlateType.ToString());
+            Material previous = customization.PlateMaterial;
+            bool applied = customization.SetPlateMaterial(material);
+            Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "PlateMaterial",
+                material != null ? material.name : "", previous != null ? previous.name : "", applied,
+                applied && previous != customization.PlateMaterial);
+            if (applied)
+            {
+                _keyboardEditOverlayUI.RefreshPlateSelection();
+            }
+        }
+
+        /// <summary>
+        /// 선택한 보강판 효과를 현재 편집 키보드에 적용한다.
+        /// effect와 KeyboardCustomization을 사용하며 효과 카드의 선택 표시와 효과 로그를 갱신한다.
+        /// </summary>
+        private void HandlePlateEffectSelected(PlateEffect effect)
+        {
+            if (_editingKeyboard == null)
+                return;
+
+            KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
+            if (customization == null) return;
+            PlateEffect previous = customization.CurrentPlateEffect;
+            bool applied = customization.SetPlateEffect(effect);
+            Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "PlateEffect", effect.ToString(),
+                previous.ToString(), applied, applied && previous != customization.CurrentPlateEffect);
             if (applied)
             {
                 _keyboardEditOverlayUI.RefreshPlateSelection();

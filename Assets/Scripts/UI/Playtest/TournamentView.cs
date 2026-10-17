@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,129 +15,73 @@ namespace Game.Tournament
         [SerializeField] private Text _panelTitle;
         [SerializeField] private Text _wallet;
         [SerializeField] private Text _bonusStatus;
-
         [Header("Shop")]
         [SerializeField] private GameObject _shopPanel;
         [SerializeField] private TournamentActionButton[] _buyButtons;
         [SerializeField] private TournamentOfferCard[] _offerCards;
         [SerializeField] private TournamentActionButton _rerollButton;
-
-        [Header("Discard")]
         [SerializeField] private GameObject _discardPanel;
-        [SerializeField] private TournamentActionButton[] _discardButtons;
-        [SerializeField] private TournamentActionButton _confirmButton;
-        [SerializeField] private TournamentActionButton _cancelButton;
-
         [Header("Navigation")]
         [SerializeField] private TournamentActionButton _continueButton;
         [SerializeField] private TournamentActionButton _restartButton;
         private TournamentController _controller;
+        private Image _background;
+        private Color _backgroundColor;
 
-        void Update()
-        {
-            if (_controller == null) return;
-            float remaining = _controller.PlayerBonusRemaining;
-            _bonusStatus.gameObject.SetActive(_controller.IsBattleActive && remaining > 0f);
-            if (remaining > 0f) _bonusStatus.text = $"점수 ×2   {remaining:0.0}초";
-        }
-
-        /// <summary>controller의 상태와 버튼의 C# 이벤트를 연결하고 현재 토너먼트 화면을 표시한다.</summary>
+        /// <summary>controller와 버튼의 C# 이벤트를 연결한다. 기존 패널 배경색을 보관하고 폐기 UI는 비활성화한다.</summary>
         public void Bind(TournamentController controller)
         {
             _controller = controller;
+            _background = _panel.GetComponent<Image>();
+            _backgroundColor = _background.color;
+            _bonusStatus.gameObject.SetActive(false);
+            _discardPanel.SetActive(false);
             controller.Changed += Refresh;
             foreach (TournamentActionButton button in _buyButtons) button.Clicked += Buy;
             _rerollButton.Clicked += Reroll;
-            foreach (TournamentActionButton button in _discardButtons) button.Clicked += Discard;
-            _confirmButton.Clicked += Confirm;
-            _cancelButton.Clicked += Cancel;
             _continueButton.Clicked += Continue;
             _restartButton.Clicked += Restart;
         }
 
-        /// <summary>입력값 없이 현재 진행, 잔액, 상품과 폐기 선택을 읽어 연결된 UI 상태를 갱신한다.</summary>
+        /// <summary>현재 진행 상태와 부품 보유 목록을 읽어 화면을 갱신한다. 상점에서는 작업대가 보이도록 전체 배경을 투명하게 한다.</summary>
         private void Refresh()
         {
             TournamentPhase phase = _controller.Phase;
-            _header.text = $"TOURNAMENT  {_controller.Round} / {_controller.Settings.RoundCount}    재화 {_controller.Currency:N0}";
+            bool shop = phase == TournamentPhase.Shop;
+            _header.text = $"TOURNAMENT {_controller.Round} / {_controller.Settings.RoundCount} · 재화 {_controller.Currency:N0}";
             _header.gameObject.SetActive(phase == TournamentPhase.Battle || phase == TournamentPhase.Preparing);
             _panel.SetActive(phase != TournamentPhase.Battle && phase != TournamentPhase.Preparing);
-            _panelTitle.text = phase == TournamentPhase.Shop ? "키캡 상점" : phase == TournamentPhase.Discard ? "키캡 보유 정리" : "대전 결과";
-            _wallet.text = $"재화  {_controller.Currency:N0}";
-            _shopPanel.SetActive(phase == TournamentPhase.Shop);
-            _rerollButton.gameObject.SetActive(phase == TournamentPhase.Shop);
-            _rerollButton.SetState($"리롤\n{_controller.Settings.RerollCost} 재화\n{_controller.RerollsRemaining} / {_controller.Settings.RerollLimit}회", _controller.CanReroll);
-            _discardPanel.SetActive(phase == TournamentPhase.Discard);
+            _background.color = shop ? new Color(0f, 0f, 0f, 0f) : _backgroundColor;
+            _panelTitle.text = shop ? "부품 상점 · 작업대" : "대전 결과";
+            _wallet.text = $"재화 {_controller.Currency:N0} · 로봇 {_controller.EnemyCurrency:N0}";
+            _shopPanel.SetActive(shop);
+            _rerollButton.gameObject.SetActive(shop);
+            _rerollButton.SetState($"리롤 {_controller.Settings.RerollCost} 재화\n남은 { _controller.RerollsRemaining}회", _controller.CanReroll);
             _message.text = _controller.Message;
-            _continueButton.gameObject.SetActive(phase != TournamentPhase.Discard);
-            _continueButton.SetState(phase == TournamentPhase.Shop ? "다음 대전" : phase == TournamentPhase.Finished ? "작업실로" : "계속", true);
+            _message.color = shop ? Color.white : new Color(0.25f, 0.2f, 0.18f);
+            _inventory.color = shop ? Color.white : new Color(0.25f, 0.2f, 0.18f);
+            _continueButton.SetState(shop ? "이 구성으로 다음 대전" : phase == TournamentPhase.Finished ? "작업실로" : "계속", true);
             _restartButton.gameObject.SetActive(phase == TournamentPhase.Finished);
             _restartButton.SetState("다시 시작", true);
-            TournamentInventory inventory = phase == TournamentPhase.Discard ? _controller.PendingInventory : _controller.Inventory;
-            StringBuilder summary = new StringBuilder($"특수 키캡 {inventory.Total} / {_controller.Settings.Capacity}    기본 {Mathf.Max(0, _controller.Settings.Capacity - inventory.Total)}\n");
-            for (int type = 1; type <= 5; type++) summary.Append($"{GetName((SpecialKeycapType)type)} {inventory.GetCount((SpecialKeycapType)type)}   ");
+            StringBuilder summary = new StringBuilder($"키캡 {_controller.Inventory.Total} / {_controller.Settings.Capacity} · 직접 타격 +{_controller.Inventory.DamageBonus}\n");
+            foreach (var item in _controller.Inventory.Counts) summary.Append($"{item.Key.DisplayName} ×{item.Value}  ");
             _inventory.text = summary.ToString();
-            if (phase == TournamentPhase.Shop)
-                for (int index = 0; index < _buyButtons.Length; index++)
+            if (shop)
+                for (int i = 0; i < _buyButtons.Length; i++)
                 {
-                    SpecialKeycapType type = _controller.GetOffer(index);
-                    string sold = _controller.IsPurchased(index) ? "구매 완료" : $"{_controller.Settings.GetPrice(type)} 재화";
-                    _offerCards[index].Show(type, _controller.Settings.GetBundleSize(type));
-                    _buyButtons[index].SetState(sold, _controller.CanBuy(index));
+                    KeyboardPartDefinition part = _controller.GetOffer(i);
+                    _offerCards[i].Show(part);
+                    _buyButtons[i].SetState(_controller.IsPurchased(i) ? "구매 완료" : part != null ? $"{part.Price} 재화" : "상품 없음", _controller.CanBuy(i));
                 }
-            if (phase == TournamentPhase.Discard)
-            {
-                _message.text += $"\n추가 폐기 {_controller.RequiredDiscards}개";
-                for (int index = 0; index < _discardButtons.Length; index++)
-                {
-                    SpecialKeycapType type = (SpecialKeycapType)(index + 1);
-                    _discardButtons[index].SetState($"{GetName(type)} ({inventory.GetCount(type)})\n1개 폐기", _controller.RequiredDiscards > 0 && inventory.GetCount(type) > 0);
-                }
-                _confirmButton.SetState("구매 확정", _controller.RequiredDiscards == 0);
-                _cancelButton.SetState("구매 취소", true);
-            }
         }
 
-        /// <summary>type의 한글 표시 이름을 반환하며 게임 상태를 변경하지 않는다.</summary>
-        public static string GetName(SpecialKeycapType type)
-        {
-            switch (type)
-            {
-                case SpecialKeycapType.Explosion: return "폭발";
-                case SpecialKeycapType.Bonus: return "보너스";
-                case SpecialKeycapType.Row: return "가로";
-                case SpecialKeycapType.Column: return "세로";
-                case SpecialKeycapType.All: return "전체 타격";
-                default: return "기본";
-            }
-        }
-
-        /// <summary>type의 상점 효과 설명을 반환하며 표시용 문구 이외의 상태는 변경하지 않는다.</summary>
-        public static string GetDescription(SpecialKeycapType type)
-        {
-            switch (type)
-            {
-                case SpecialKeycapType.Explosion: return "파괴: 주변 12칸에 피해 5";
-                case SpecialKeycapType.Bonus: return "파괴: 3초간 점수 2배";
-                case SpecialKeycapType.Row: return "파괴: 같은 행에 피해 3";
-                case SpecialKeycapType.Column: return "파괴: 같은 열에 피해 3";
-                default: return "파괴: 전체에 피해 2";
-            }
-        }
-
-        /// <summary>index 상품 구매를 연결된 토너먼트에 요청한다.</summary>
+        /// <summary>index 슬롯의 구매를 요청한다. 구매 성공 시 컨트롤러가 작업대와 화면을 갱신한다.</summary>
         private void Buy(int index) { _controller.Buy(index); }
-        /// <summary>index는 사용하지 않고 현재 상점 상품의 유료 리롤을 요청한다.</summary>
+        /// <summary>index는 사용하지 않고 유료 상품 재추첨을 요청한다. 실제 비용 검사는 컨트롤러가 수행한다.</summary>
         private void Reroll(int index) { _controller.Reroll(); }
-        /// <summary>index에 해당하는 유형의 키캡 하나를 구매 후보에서 폐기하도록 요청한다.</summary>
-        private void Discard(int index) { _controller.Discard((SpecialKeycapType)(index + 1)); }
-        /// <summary>index는 사용하지 않고 구매 후보의 확정을 요청한다.</summary>
-        private void Confirm(int index) { _controller.ConfirmPurchase(); }
-        /// <summary>index는 사용하지 않고 구매와 폐기 선택의 취소를 요청한다.</summary>
-        private void Cancel(int index) { _controller.CancelPurchase(); }
-        /// <summary>index는 사용하지 않고 현재 결과의 다음 진행을 요청한다.</summary>
+        /// <summary>index는 사용하지 않고 현재 단계의 다음 진행을 요청한다. 구매 구성은 컨트롤러가 확정한다.</summary>
         private void Continue(int index) { _controller.Continue(); }
-        /// <summary>index는 사용하지 않고 종료된 토너먼트의 재시작을 요청한다.</summary>
+        /// <summary>index는 사용하지 않고 종료된 토너먼트 재시작을 요청한다. 원본 작업실 데이터는 유지한다.</summary>
         private void Restart(int index) { _controller.Restart(); }
 
         void OnDestroy()
@@ -146,9 +90,6 @@ namespace Game.Tournament
             _controller.Changed -= Refresh;
             foreach (TournamentActionButton button in _buyButtons) button.Clicked -= Buy;
             _rerollButton.Clicked -= Reroll;
-            foreach (TournamentActionButton button in _discardButtons) button.Clicked -= Discard;
-            _confirmButton.Clicked -= Confirm;
-            _cancelButton.Clicked -= Cancel;
             _continueButton.Clicked -= Continue;
             _restartButton.Clicked -= Restart;
         }

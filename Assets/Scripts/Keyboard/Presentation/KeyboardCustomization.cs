@@ -246,6 +246,31 @@ public sealed class KeyboardCustomization : MonoBehaviour
         return state;
     }
 
+    /// <summary>
+    /// inventory의 고정 키 배치와 전체 부품을 기본 키캡 위에 즉시 적용한다.
+    /// defaultKeycap을 사용하며 사진은 유지하고 설치 연출 없이 외형과 축 종류를 갱신한다.
+    /// </summary>
+    public void ApplyTournamentParts(Game.Tournament.TournamentInventory inventory, Game.Tournament.KeycapDefinition defaultKeycap)
+    {
+        PrepareForBattle();
+        KeyboardImageCustomization images = GetImageCustomization();
+        KeyboardImageState photos = images.CaptureState();
+        Texture2D[] prepared = images.PrepareState(photos);
+        images.ClearKeycapImage();
+        images.ClearCaseImage();
+        if (inventory.Switch != null) ApplySwitchType(inventory.Switch.Data.Type, false);
+        if (inventory.Plate != null) SetPlateMaterial(inventory.Plate.Data.Material);
+        if (inventory.Housing != null) SetCaseMaterial(inventory.Housing.Material);
+        _keycapMaterial = defaultKeycap.Material;
+        _keycapMaterialIndex = Array.IndexOf(_materials, _keycapMaterial);
+        _keycapMaterialOverrides.Clear();
+        foreach (var binding in GetComponent<KeyboardInputController>().GetKeycapLayout())
+            if (inventory.Keycaps.TryGetValue(binding.Key, out Game.Tournament.KeycapDefinition part))
+                _keycapMaterialOverrides[binding.Value.transform] = part.Material;
+        ApplyKeycapMaterial();
+        images.RestoreState(photos, prepared);
+    }
+
     void OnValidate()
     {
 #if UNITY_EDITOR

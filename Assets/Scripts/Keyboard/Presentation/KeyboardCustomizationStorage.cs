@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 using UnityEngine;
@@ -20,6 +20,9 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     public string LastMessage => _lastMessage;
     public KeyboardCustomization Customization => _customization;
     public bool HasSave => File.Exists(SavePath);
+
+    /// <summary>공통 카탈로그의 기본 구성을 독립 객체로 반환한다. 저장 파일과 작업실 인스턴스는 변경하지 않는다.</summary>
+    public KeyboardCustomizationState GetDefaultCustomization() { return _catalog.GetDefaultState(); }
 
     /// <summary>
     /// 공통 카탈로그에 등록된 기본 구성을 keyboard에 적용한다.

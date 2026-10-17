@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -16,10 +16,8 @@ MonoBehaviour:
   _keycapHealth: 5
   _capacity: 80
   _scorePerCurrency: 100
-  _bundleSize: 3
   _rerollCost: 5
   _rerollLimit: 3
-  _prices: 0000000028000000640000003c0000003c00000032000000
   _currencyRewardMultiplier: 1.2
   _goldRewards: 32000000280000001e0000000a000000
   _rounds:

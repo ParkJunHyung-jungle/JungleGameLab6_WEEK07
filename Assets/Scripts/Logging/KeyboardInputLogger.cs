@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -397,28 +397,33 @@ namespace Game.Logging
             string reason, string snapshotId)
         {
             double now = Time.realtimeSinceStartupAsDouble;
-            for (int type = 0; type <= (int)SpecialKeycapType.All; type++)
+            foreach (var item in inventory.Counts)
             {
                 PlaytestRecord row = new PlaytestRecord("InventorySnapshot", now);
                 if (reason == "BattleStart") _stages.AddStageContext(row);
                 PlaytestStageRecorder.AddTournamentContext(row, source);
-                if (reason == "TournamentStart")
-                {
-                    row.Set(PlaytestColumn.Phase, "Preparing");
-                    row.Set(PlaytestColumn.BattleKind, "TimedRound");
-                }
                 row.Set(PlaytestColumn.SnapshotId, snapshotId);
                 row.Set(PlaytestColumn.Action, reason);
                 row.Set(PlaytestColumn.Owner, owner);
-                row.Set(PlaytestColumn.SpecialType, ((SpecialKeycapType)type).ToString());
-                row.Set(PlaytestColumn.Quantity, type == 0 ? Mathf.Max(0, inventory.Capacity - inventory.Total)
-                    : inventory.GetCount((SpecialKeycapType)type));
+                row.Set(PlaytestColumn.SpecialType, item.Key.Id);
+                row.Set(PlaytestColumn.Quantity, item.Value);
                 row.Set(PlaytestColumn.InventoryCapacity, inventory.Capacity);
                 row.Set(PlaytestColumn.InventoryTotal, inventory.Total);
-                row.Set(PlaytestColumn.CurrencyAfter, source.Currency);
+                row.Set(PlaytestColumn.CurrencyAfter, owner == "Enemy" ? source.EnemyCurrency : source.Currency);
                 if (ReferenceEquals(source, _shopSource)) row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
                 _writer.Write(row);
             }
+            PlaytestRecord basic = new PlaytestRecord("InventorySnapshot", now);
+            PlaytestStageRecorder.AddTournamentContext(basic, source);
+            if (reason == "BattleStart") _stages.AddStageContext(basic);
+            basic.Set(PlaytestColumn.SnapshotId, snapshotId);
+            basic.Set(PlaytestColumn.Action, reason);
+            basic.Set(PlaytestColumn.Owner, owner);
+            basic.Set(PlaytestColumn.SpecialType, "keycap-aluminum");
+            basic.Set(PlaytestColumn.Quantity, 87 - inventory.Total);
+            basic.Set(PlaytestColumn.InventoryTotal, inventory.Total);
+            basic.Set(PlaytestColumn.CurrencyAfter, owner == "Enemy" ? source.EnemyCurrency : source.Currency);
+            _writer.Write(basic);
         }
 
         /// <summary>
@@ -433,7 +438,7 @@ namespace Game.Logging
             if (ReferenceEquals(source, _shopSource)) row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
             row.Set(PlaytestColumn.ShopTransactionId, observation.TransactionId);
             row.Set(PlaytestColumn.Action, observation.Action);
-            row.Set(PlaytestColumn.Owner, "Player");
+            row.Set(PlaytestColumn.Owner, observation.IsEnemy ? "Enemy" : "Player");
             if (observation.Slot >= 0) row.Set(PlaytestColumn.OfferSlot, observation.Slot);
             row.Set(PlaytestColumn.OfferGeneration, observation.Generation);
             if (observation.Action != "Reroll") row.Set(PlaytestColumn.SpecialType, observation.Type.ToString());
@@ -445,7 +450,7 @@ namespace Game.Logging
             string snapshotId = observation.Action == "PurchaseConfirmed" ? Guid.NewGuid().ToString("N") : null;
             if (snapshotId != null) row.Set(PlaytestColumn.SnapshotId, snapshotId);
             _writer.Write(row);
-            if (snapshotId != null) WriteInventory(source, source.Inventory, "Player", "PurchaseConfirmed", snapshotId);
+            if (snapshotId != null) WriteInventory(source, observation.IsEnemy ? source.PlaytestEnemyInventory : source.Inventory, observation.IsEnemy ? "Enemy" : "Player", "PurchaseConfirmed", snapshotId);
             _writer.Flush();
         }
 
@@ -453,7 +458,7 @@ namespace Game.Logging
         /// source의 key에서 관찰한 type 기믹 상태를 action과 reason 및 effectId로 기록한다.
         /// 원래 키보드의 대전 식별자를 유지하며 파괴, 대기, 발동과 취소를 구분한다.
         /// </summary>
-        private void HandleSpecialEffect(TournamentKeyboardEffects source, Key key, SpecialKeycapType type,
+        private void HandleSpecialEffect(TournamentKeyboardEffects source, Key key, KeycapDefinition type,
             string action, string reason, string effectId)
         {
             if (_closed || !_effectContexts.TryGetValue(source.PlaytestKeyboard, out KeyboardState state)) return;
@@ -462,7 +467,7 @@ namespace Game.Logging
             if (source.PlaytestTournament != null)
                 row.Set(PlaytestColumn.Phase, source.PlaytestTournament.Phase.ToString());
             row.Set(PlaytestColumn.Key, key.ToString());
-            row.Set(PlaytestColumn.SpecialType, type.ToString());
+            row.Set(PlaytestColumn.SpecialType, type != null ? type.Id : "keycap-aluminum");
             row.Set(PlaytestColumn.Action, action);
             row.Set(PlaytestColumn.EndReason, reason);
             row.Set(PlaytestColumn.EffectId, effectId);

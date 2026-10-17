@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Game.Tournament
 {
@@ -46,6 +46,12 @@ namespace Game.Tournament
         public static void UpdateCurrent(KeyboardCustomizationState state)
         {
             _currentJson = JsonUtility.ToJson(state);
+        }
+
+        /// <summary>작업실에서 선택한 원본 구성을 독립 객체로 반환한다. 상점 상품 추출에 사용하며 현재 전투 구성은 변경하지 않는다.</summary>
+        public static KeyboardCustomizationState GetSelection()
+        {
+            return string.IsNullOrEmpty(_initialJson) ? null : JsonUtility.FromJson<KeyboardCustomizationState>(_initialJson);
         }
 
         /// <summary>

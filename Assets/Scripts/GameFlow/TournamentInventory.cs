@@ -1,55 +1,55 @@
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+
+using UnityEngine.InputSystem;
 
 namespace Game.Tournament
 {
     public sealed class TournamentInventory
     {
-        private readonly int[] _counts = new int[6];
+        private readonly Dictionary<Key, KeycapDefinition> _keycaps = new Dictionary<Key, KeycapDefinition>();
+        private readonly Dictionary<KeyboardPartDefinition, int> _counts = new Dictionary<KeyboardPartDefinition, int>();
         private readonly int _capacity;
         public int Capacity => _capacity;
-        public int Total { get; private set; }
+        public int Total => _keycaps.Count;
+        public IReadOnlyDictionary<Key, KeycapDefinition> Keycaps => _keycaps;
+        public IReadOnlyDictionary<KeyboardPartDefinition, int> Counts => _counts;
+        public SwitchDefinition Switch { get; private set; }
+        public PlateDefinition Plate { get; private set; }
+        public HousingDefinition Housing { get; private set; }
+        public int DamageBonus => (Switch != null ? Switch.DamageBonus : 0) + (Plate != null ? Plate.DamageBonus : 0) + (Housing != null ? Housing.DamageBonus : 0);
 
-        /// <summary>capacity를 상한으로 하는 빈 특수 키캡 보유 상태를 생성한다.</summary>
+        /// <summary>capacity를 키캡 한도로 사용하는 빈 장착 상태를 생성한다. 기본 부품은 구매 수량에 포함하지 않는다.</summary>
         public TournamentInventory(int capacity) { _capacity = capacity; }
 
-        /// <summary>source의 수량을 복사하고 capacity를 사용할 독립 보유 상태를 생성한다.</summary>
-        public TournamentInventory(TournamentInventory source, int capacity)
+        /// <summary>part의 수량과 부품별 한도를 검사해 구매 가능 여부를 반환한다. 보유 및 배치 상태는 변경하지 않는다.</summary>
+        public bool CanAdd(KeyboardPartDefinition part)
         {
-            _capacity = capacity;
-            Array.Copy(source._counts, _counts, _counts.Length);
-            Total = source.Total;
+            if (part == null) return false;
+            if (part is KeycapDefinition) return Total + part.Quantity <= _capacity;
+            if (part is SwitchDefinition) return Switch == null;
+            if (part is PlateDefinition) return Plate == null;
+            return part is HousingDefinition && Housing == null;
         }
 
-        /// <summary>type의 현재 보유 개수를 반환하며 수량을 변경하지 않는다.</summary>
-        public int GetCount(SpecialKeycapType type) => _counts[(int)type];
-
-        /// <summary>type을 count개 추가하고 성공 여부를 반환하며 상한 초과와 잘못된 수량은 거부한다.</summary>
-        public bool TryAdd(SpecialKeycapType type, int count)
+        /// <summary>part를 layout의 빈 위치 또는 전체 부품 슬롯에 장착하고 성공 여부를 반환한다. 키캡 무작위 배치는 이 구매 시점에만 결정한다.</summary>
+        public bool TryAdd(KeyboardPartDefinition part, TournamentKeyLayout layout)
         {
-            if (type == SpecialKeycapType.None || count <= 0 || Total + count > _capacity) return false;
-            _counts[(int)type] += count;
-            Total += count;
+            if (!CanAdd(part)) return false;
+            if (part is KeycapDefinition keycap)
+            {
+                List<Key> slots = RandomKeycapPlacement.Select(layout, _keycaps.Keys, part.Quantity);
+                if (slots.Count != part.Quantity) return false;
+                foreach (Key key in slots) _keycaps.Add(key, keycap);
+            }
+            else if (part is SwitchDefinition axis) Switch = axis;
+            else if (part is PlateDefinition plate) Plate = plate;
+            else Housing = (HousingDefinition)part;
+            _counts[part] = GetCount(part) + part.Quantity;
             return true;
         }
 
-        /// <summary>type의 키캡을 하나 폐기하고 성공 여부를 반환하며 총 보유 수량을 감소시킨다.</summary>
-        public bool RemoveOne(SpecialKeycapType type)
-        {
-            if (_counts[(int)type] == 0) return false;
-            _counts[(int)type]--;
-            Total--;
-            return true;
-        }
-
-        /// <summary>현재 보유 수량대로 유형 목록을 생성하여 반환하며 원본 수량은 유지한다.</summary>
-        public List<SpecialKeycapType> CreateTypes()
-        {
-            List<SpecialKeycapType> types = new List<SpecialKeycapType>(Total);
-            for (int type = 1; type < _counts.Length; type++)
-                for (int index = 0; index < _counts[type]; index++) types.Add((SpecialKeycapType)type);
-            return types;
-        }
+        /// <summary>part의 현재 구매 수량을 반환한다. 미구매 부품은 0을 반환한다.</summary>
+        public int GetCount(KeyboardPartDefinition part) { return _counts.TryGetValue(part, out int count) ? count : 0; }
     }
 
     public sealed class TournamentResult

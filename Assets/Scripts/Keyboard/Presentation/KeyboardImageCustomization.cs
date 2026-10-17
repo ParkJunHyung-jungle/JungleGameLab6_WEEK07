@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 
 using UnityEngine;
+using UnityEngine.Rendering;
 
 [DisallowMultipleComponent]
 public sealed class KeyboardImageCustomization : MonoBehaviour
 {
     private const int MAX_IMAGE_BYTES = 32 * 1024 * 1024;
     private const int MAX_IMAGE_DIMENSION = 8192;
+    private const float MIN_IMAGE_ZOOM = 0.1f;
+    private const float MAX_IMAGE_ZOOM = 10f;
     private static readonly int _baseMapProperty = Shader.PropertyToID("_BaseMap");
-    private static readonly int _baseMapTransformProperty = Shader.PropertyToID("_BaseMap_ST");
     private static readonly int _baseColorProperty = Shader.PropertyToID("_BaseColor");
 
     [Header("Runtime Images")]
@@ -18,20 +20,35 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     private MeshRenderer[] _shells;
     private Texture2D[] _keycapImages;
     private bool[] _individualImages;
+    private Vector2[] _keycapOffsets;
+    private float[] _keycapZooms;
     private Texture2D _caseImage;
+    private Vector2 _caseOffset;
+    private float _caseZoom = 1f;
     private Bounds _keycapCanvas;
     private Bounds _caseCanvas;
-    private readonly Dictionary<MeshRenderer, Mesh> _originalMeshes = new Dictionary<MeshRenderer, Mesh>();
-    private readonly Dictionary<MeshRenderer, Mesh> _imageMeshes = new Dictionary<MeshRenderer, Mesh>();
-    private readonly Dictionary<MeshRenderer, MaterialPropertyBlock> _originalProperties = new Dictionary<MeshRenderer, MaterialPropertyBlock>();
-    private readonly Dictionary<MeshRenderer, Material[]> _originalMaterials = new Dictionary<MeshRenderer, Material[]>();
+    private readonly Dictionary<MeshRenderer, PhotoOverlay> _imageOverlays = new Dictionary<MeshRenderer, PhotoOverlay>();
+    private readonly Dictionary<MeshRenderer, PhotoOverlay> _previewOverlays = new Dictionary<MeshRenderer, PhotoOverlay>();
+    private readonly List<PhotoOverlay> _hiddenImageOverlays = new List<PhotoOverlay>();
     private Material _photoMaterial;
     private Material _photoMaterialTemplate;
     private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
     private string _lastError;
+
+    private sealed class PhotoOverlay
+    {
+        public GameObject GameObject;
+        public Mesh Mesh;
+        public Mesh SourceMesh;
+        public MeshRenderer Renderer;
+        public Vector3[] Vertices;
+        public Vector2[] UV;
+        public MaterialPropertyBlock Properties;
+    }
     private Func<int, bool> _hasSwitchForKeycap;
 
     public string LastError => _lastError;
+    public int KeycapCount => _shells != null ? _shells.Length : 0;
 
     /// <summary>
     /// 현재 케이스와 키캡의 이미지 적용 상태를 로그용 목록으로 반환한다.
@@ -51,7 +68,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     /// </summary>
     public bool HasImage(MeshRenderer renderer)
     {
-        return _originalMaterials.ContainsKey(renderer);
+        return _imageOverlays.ContainsKey(renderer);
     }
 
     /// <summary>
@@ -60,7 +77,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     /// </summary>
     public Material[] GetMaterialsForStorage(MeshRenderer renderer)
     {
-        return _originalMaterials.TryGetValue(renderer, out Material[] materials) ? materials : renderer.sharedMaterials;
+        return renderer.sharedMaterials;
     }
 
     /// <summary>
@@ -79,6 +96,9 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         _shells = shells.ToArray();
         _keycapImages = new Texture2D[_shells.Length];
         _individualImages = new bool[_shells.Length];
+        _keycapOffsets = new Vector2[_shells.Length];
+        _keycapZooms = new float[_shells.Length];
+        for (int index = 0; index < _keycapZooms.Length; index++) _keycapZooms[index] = 1f;
         _keycapCanvas = GetCanvasBounds(_shells);
         _caseCanvas = GetCanvasBounds(_cases);
     }
@@ -89,12 +109,23 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     /// </summary>
     public bool SetKeycapImage(Texture2D image, int keycapIndex = -1)
     {
-        if (!ValidateImage(image)) return false;
+        return SetKeycapImage(image, keycapIndex, Vector2.zero, 1f);
+    }
+
+    /// <summary>
+    /// image를 전체 키캡 또는 지정 키캡에 배치 오프셋과 확대 배율을 적용해 씌운다.
+    /// image와 대상 경계를 사용하며 성공 시 이미지 및 배치 상태를 갱신한다.
+    /// </summary>
+    public bool SetKeycapImage(Texture2D image, int keycapIndex, Vector2 offset, float zoom)
+    {
+        if (!ValidateImage(image) || !ValidatePlacement(offset, zoom)) return false;
         if (keycapIndex < -1 || keycapIndex >= _shells.Length)
         {
             _lastError = "Key index is outside the keyboard layout.";
             return false;
         }
+
+        ClearImagePreview();
         if (keycapIndex >= 0)
         {
             if (!_hasSwitchForKeycap(keycapIndex))
@@ -104,9 +135,11 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             }
             MeshRenderer renderer = _shells[keycapIndex];
             if (renderer == null || !CanApply(renderer)) return false;
-            ApplyImage(renderer, image, GetCanvasBounds(new[] { renderer }));
+            ApplyImage(renderer, image, GetCanvasBounds(new[] { renderer }), offset, zoom, _imageOverlays);
             _keycapImages[keycapIndex] = image;
             _individualImages[keycapIndex] = true;
+            _keycapOffsets[keycapIndex] = offset;
+            _keycapZooms[keycapIndex] = zoom;
         }
         else
         {
@@ -125,9 +158,11 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             for (int index = 0; index < _shells.Length; index++)
             {
                 if (_shells[index] == null || !_hasSwitchForKeycap(index)) continue;
-                ApplyImage(_shells[index], image, _keycapCanvas);
+                ApplyImage(_shells[index], image, _keycapCanvas, offset, zoom, _imageOverlays);
                 _keycapImages[index] = image;
                 _individualImages[index] = false;
+                _keycapOffsets[index] = offset;
+                _keycapZooms[index] = zoom;
             }
         }
 
@@ -137,20 +172,137 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// image를 Case 전체 캔버스의 Base Map으로 적용한다.
-    /// 성공 여부를 반환하며 공유 Material이나 원본 Mesh는 변경하지 않는다.
+    /// image를 케이스 전체에 기본 위치와 배율로 적용한다.
+    /// 기존 public 호출과 호환되며 성공 여부를 반환한다.
     /// </summary>
     public bool SetCaseImage(Texture2D image)
     {
-        if (!ValidateImage(image)) return false;
+        return SetCaseImage(image, Vector2.zero, 1f);
+    }
+
+    /// <summary>
+    /// image를 케이스 전체 경계에 배치 오프셋과 확대 배율을 적용해 씌운다.
+    /// image와 케이스 메시 경계를 사용하며 성공 시 케이스 사진 상태를 갱신한다.
+    /// </summary>
+    public bool SetCaseImage(Texture2D image, Vector2 offset, float zoom)
+    {
+        if (!ValidateImage(image) || !ValidatePlacement(offset, zoom)) return false;
         foreach (MeshRenderer renderer in _cases)
             if (renderer != null && !CanApply(renderer)) return false;
+        ClearImagePreview();
         foreach (MeshRenderer renderer in _cases)
-            if (renderer != null) ApplyImage(renderer, image, _caseCanvas);
+            if (renderer != null) ApplyImage(renderer, image, _caseCanvas, offset, zoom, _imageOverlays);
         _caseImage = image;
+        _caseOffset = offset;
+        _caseZoom = zoom;
         ReleaseUnusedTextures();
         _lastError = "";
         return true;
+    }
+
+    /// <summary>
+    /// 선택된 대상의 캔버스 가로·세로 크기를 키보드 로컬 좌표로 반환한다.
+    /// caseImage와 keycapIndex로 전체 키캡, 개별 키캡 또는 케이스 경계를 선택한다.
+    /// </summary>
+    public Vector2 GetCanvasSize(bool caseImage, int keycapIndex = -1)
+    {
+        Bounds canvas = caseImage
+            ? _caseCanvas
+            : keycapIndex >= 0 && keycapIndex < _shells.Length
+                ? GetCanvasBounds(new[] { _shells[keycapIndex] })
+                : _keycapCanvas;
+        return new Vector2(Mathf.Max(canvas.size.x, 0.001f), Mathf.Max(canvas.size.z, 0.001f));
+    }
+
+    /// <summary>
+    /// 이미지와 배치값을 전체 키캡 또는 지정 키캡에 임시로 표시한다.
+    /// image, 키 인덱스, 오프셋과 배율을 사용하며 저장된 상태는 변경하지 않는다.
+    /// </summary>
+    public bool PreviewKeycapImage(Texture2D image, int keycapIndex, Vector2 offset, float zoom)
+    {
+        if (!ValidateImage(image) || !ValidatePlacement(offset, zoom)) return false;
+        if (keycapIndex < -1 || keycapIndex >= _shells.Length)
+        {
+            _lastError = "Key index is outside the keyboard layout.";
+            return false;
+        }
+
+        MeshRenderer[] targets = keycapIndex >= 0 ? new[] { _shells[keycapIndex] } : _shells;
+        foreach (MeshRenderer renderer in targets)
+        {
+            if (renderer == null)
+            {
+                if (keycapIndex >= 0) return false;
+                continue;
+            }
+            if (!CanApply(renderer)) return false;
+        }
+
+        if (!HasPreviewTargets(targets)) ClearImagePreview();
+        foreach (MeshRenderer renderer in targets)
+        {
+            if (renderer == null) continue;
+            HideAppliedImage(renderer);
+            Bounds canvas = keycapIndex >= 0 ? GetCanvasBounds(new[] { renderer }) : _keycapCanvas;
+            ApplyImage(renderer, image, canvas, offset, zoom, _previewOverlays);
+        }
+
+        _lastError = "";
+        return true;
+    }
+
+    /// <summary>
+    /// 이미지와 배치값을 케이스 전체에 임시로 표시한다.
+    /// image, 오프셋과 배율을 사용하며 저장된 케이스 상태는 변경하지 않는다.
+    /// </summary>
+    public bool PreviewCaseImage(Texture2D image, Vector2 offset, float zoom)
+    {
+        if (!ValidateImage(image) || !ValidatePlacement(offset, zoom)) return false;
+        foreach (MeshRenderer renderer in _cases)
+            if (renderer != null && !CanApply(renderer)) return false;
+
+        if (!HasPreviewTargets(_cases)) ClearImagePreview();
+        foreach (MeshRenderer renderer in _cases)
+        {
+            if (renderer == null) continue;
+            HideAppliedImage(renderer);
+            ApplyImage(renderer, image, _caseCanvas, offset, zoom, _previewOverlays);
+        }
+
+        _lastError = "";
+        return true;
+    }
+
+    /// <summary>
+    /// 임시 사진 오버레이를 제거하고 편집 전 적용 상태를 다시 표시한다.
+    /// 반환값 없이 미리보기 메시를 정리하고 숨긴 오버레이를 복구한다.
+    /// </summary>
+    public void ClearImagePreview()
+    {
+        foreach (PhotoOverlay overlay in _previewOverlays.Values)
+            DestroyOverlay(overlay);
+        _previewOverlays.Clear();
+
+        foreach (PhotoOverlay overlay in _hiddenImageOverlays)
+            if (overlay != null && overlay.GameObject != null) overlay.GameObject.SetActive(true);
+        _hiddenImageOverlays.Clear();
+    }
+
+    /// <summary>
+    /// targets가 현재 임시 사진 오버레이 대상과 같은지 확인한다.
+    /// 렌더러 목록을 사용하며 같으면 프리뷰 메시를 재사용할 수 있음을 반환한다.
+    /// </summary>
+    private bool HasPreviewTargets(MeshRenderer[] targets)
+    {
+        int targetCount = 0;
+        foreach (MeshRenderer renderer in targets)
+        {
+            if (renderer == null) continue;
+            targetCount++;
+            if (!_previewOverlays.ContainsKey(renderer)) return false;
+        }
+
+        return targetCount == _previewOverlays.Count;
     }
 
     /// <summary>
@@ -159,13 +311,22 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     /// </summary>
     public bool LoadImage(string path, bool caseImage, int keycapIndex = -1)
     {
+        return LoadImage(path, caseImage, keycapIndex, Vector2.zero, 1f);
+    }
+
+    /// <summary>
+    /// PNG 또는 JPEG 파일을 읽어 지정 대상에 이미지와 배치 상태를 적용한다.
+    /// path, 대상 종류, 키 인덱스와 배치값을 사용하며 실패 사유를 LastError에 저장한다.
+    /// </summary>
+    public bool LoadImage(string path, bool caseImage, int keycapIndex, Vector2 offset, float zoom)
+    {
         Texture2D texture = null;
         try
         {
             var info = new FileInfo(path);
             if (!info.Exists || info.Length > MAX_IMAGE_BYTES) throw new InvalidOperationException("Image is missing or exceeds 32 MB.");
             texture = DecodeImage(File.ReadAllBytes(path));
-            bool applied = caseImage ? SetCaseImage(texture) : SetKeycapImage(texture, keycapIndex);
+            bool applied = caseImage ? SetCaseImage(texture, offset, zoom) : SetKeycapImage(texture, keycapIndex, offset, zoom);
             if (!applied) return false;
             _ownedTextures.Add(texture);
             texture = null;
@@ -189,12 +350,15 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     public void ClearKeycapImage(int keycapIndex = -1)
     {
         if (keycapIndex >= _shells.Length) return;
+        ClearImagePreview();
         for (int index = 0; index < _shells.Length; index++)
         {
             if (keycapIndex >= 0 && index != keycapIndex) continue;
             ClearImage(_shells[index]);
             _keycapImages[index] = null;
             _individualImages[index] = false;
+            _keycapOffsets[index] = Vector2.zero;
+            _keycapZooms[index] = 1f;
         }
         ReleaseUnusedTextures();
     }
@@ -205,8 +369,11 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     /// </summary>
     public void ClearCaseImage()
     {
+        ClearImagePreview();
         foreach (MeshRenderer renderer in _cases) ClearImage(renderer);
         _caseImage = null;
+        _caseOffset = Vector2.zero;
+        _caseZoom = 1f;
         ReleaseUnusedTextures();
     }
 
@@ -222,7 +389,8 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         int caseIndex = GetImageIndex(_caseImage, textures);
         var images = new string[textures.Count];
         for (int index = 0; index < images.Length; index++) images[index] = Convert.ToBase64String(EncodeImage(textures[index]));
-        return new KeyboardImageState(images, indices, (bool[])_individualImages.Clone(), caseIndex);
+        return new KeyboardImageState(images, indices, (bool[])_individualImages.Clone(), caseIndex,
+            (Vector2[])_keycapOffsets.Clone(), (float[])_keycapZooms.Clone(), _caseOffset, _caseZoom);
     }
 
     /// <summary>
@@ -235,11 +403,23 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         if (state.Images == null || state.KeycapImages == null || state.IndividualImages == null ||
             state.KeycapImages.Length != _shells.Length || state.IndividualImages.Length != _shells.Length)
             throw new InvalidOperationException("Saved image layout is incompatible.");
+        if ((state.KeycapOffsets != null && state.KeycapOffsets.Length != _shells.Length) ||
+            (state.KeycapZooms != null && state.KeycapZooms.Length != _shells.Length))
+            throw new InvalidOperationException("Saved image placement data is incompatible.");
         foreach (int index in state.KeycapImages) ValidateImageIndex(index, state.Images.Length);
         ValidateImageIndex(state.CaseImage, state.Images.Length);
         for (int index = 0; index < _shells.Length; index++)
+        {
+            Vector2 offset = state.KeycapOffsets != null ? state.KeycapOffsets[index] : Vector2.zero;
+            float zoom = state.KeycapZooms != null ? state.KeycapZooms[index] : 1f;
+            if (state.KeycapImages[index] >= 0 && !IsPlacementValid(offset, zoom))
+                throw new InvalidOperationException("Saved keycap image placement is invalid.");
             if (state.KeycapImages[index] >= 0 && _shells[index] != null && !CanApply(_shells[index]))
                 throw new InvalidOperationException(_lastError);
+        }
+        float savedCaseZoom = state.CaseZoom > 0f ? state.CaseZoom : 1f;
+        if (state.CaseImage >= 0 && !IsPlacementValid(state.CaseOffset, savedCaseZoom))
+            throw new InvalidOperationException("Saved case image placement is invalid.");
         if (state.CaseImage >= 0)
             foreach (MeshRenderer renderer in _cases)
                 if (renderer != null && !CanApply(renderer)) throw new InvalidOperationException(_lastError);
@@ -275,75 +455,127 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             int textureIndex = state.KeycapImages[index];
             if (textureIndex < 0 || _shells[index] == null) continue;
             Texture2D image = textures[textureIndex];
-            ApplyImage(_shells[index], image, state.IndividualImages[index] ? GetCanvasBounds(new[] { _shells[index] }) : _keycapCanvas);
+            Vector2 offset = state.KeycapOffsets != null ? state.KeycapOffsets[index] : Vector2.zero;
+            float zoom = state.KeycapZooms != null ? state.KeycapZooms[index] : 1f;
+            ApplyImage(_shells[index], image,
+                state.IndividualImages[index] ? GetCanvasBounds(new[] { _shells[index] }) : _keycapCanvas,
+                offset, zoom, _imageOverlays);
             _keycapImages[index] = image;
             _individualImages[index] = state.IndividualImages[index];
+            _keycapOffsets[index] = offset;
+            _keycapZooms[index] = zoom;
         }
-        if (state.CaseImage >= 0) SetCaseImage(textures[state.CaseImage]);
+        if (state.CaseImage >= 0)
+        {
+            float caseZoom = state.CaseZoom > 0f ? state.CaseZoom : 1f;
+            SetCaseImage(textures[state.CaseImage], state.CaseOffset, caseZoom);
+        }
         _ownedTextures.AddRange(textures);
     }
 
     /// <summary>
-    /// renderer의 UV를 canvas에 대응하도록 인스턴스 Mesh로 만들고 image를 Base Map에 지정한다.
-    /// 반환값 없이 사진 색을 그대로 표시하며 원본 Mesh와 속성은 복원용으로 보관한다.
+    /// renderer의 사진 오버레이 메시를 만들고 배치값에 맞는 UV를 지정한다.
+    /// renderer, image, canvas, 오프셋과 배율을 사용하며 원본 재질 위에 사진을 그린다.
     /// </summary>
-    private void ApplyImage(MeshRenderer renderer, Texture2D image, Bounds canvas)
+    private void ApplyImage(MeshRenderer renderer, Texture2D image, Bounds canvas, Vector2 offset, float zoom,
+        Dictionary<MeshRenderer, PhotoOverlay> overlays)
     {
-        MeshFilter filter = renderer.GetComponent<MeshFilter>();
-        if (!_originalMeshes.ContainsKey(renderer))
+        Mesh sourceMesh = renderer.GetComponent<MeshFilter>().sharedMesh;
+        bool hasReusableOverlay = overlays.TryGetValue(renderer, out PhotoOverlay overlay)
+            && overlay != null && overlay.GameObject != null && overlay.Mesh != null
+            && overlay.SourceMesh == sourceMesh && overlay.Renderer != null;
+        if (!hasReusableOverlay)
         {
-            _originalMeshes.Add(renderer, filter.sharedMesh);
-            var previous = new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(previous);
-            _originalProperties.Add(renderer, previous);
-            _originalMaterials.Add(renderer, renderer.sharedMaterials);
+            if (overlay != null) DestroyOverlay(overlay);
+
+            Mesh mesh = Instantiate(sourceMesh);
+            mesh.name = sourceMesh.name + "_PhotoOverlay";
+            mesh.hideFlags = HideFlags.DontSave;
+            mesh.MarkDynamic();
+
+            var overlayObject = new GameObject(renderer.name + "_PhotoOverlay", typeof(MeshFilter), typeof(MeshRenderer));
+            overlayObject.hideFlags = HideFlags.DontSave;
+            overlayObject.layer = renderer.gameObject.layer;
+            overlayObject.transform.SetParent(renderer.transform, false);
+            overlayObject.GetComponent<MeshFilter>().sharedMesh = mesh;
+
+            MeshRenderer overlayRenderer = overlayObject.GetComponent<MeshRenderer>();
+            var materials = new Material[mesh.subMeshCount];
+            for (int index = 0; index < materials.Length; index++) materials[index] = _photoMaterial;
+            overlayRenderer.sharedMaterials = materials;
+            overlayRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            overlayRenderer.receiveShadows = false;
+            overlayRenderer.lightProbeUsage = LightProbeUsage.Off;
+            overlayRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            overlayRenderer.sortingLayerID = renderer.sortingLayerID;
+            overlayRenderer.sortingOrder = renderer.sortingOrder + 1;
+
+            overlay = new PhotoOverlay
+            {
+                GameObject = overlayObject,
+                Mesh = mesh,
+                SourceMesh = sourceMesh,
+                Renderer = overlayRenderer,
+                Vertices = mesh.vertices,
+                UV = new Vector2[mesh.vertexCount],
+                Properties = new MaterialPropertyBlock()
+            };
+            overlays[renderer] = overlay;
         }
-        if (_imageMeshes.TryGetValue(renderer, out Mesh old)) ReleaseObject(old);
-        Mesh mesh = Instantiate(_originalMeshes[renderer]);
-        mesh.name = _originalMeshes[renderer].name + "_PhotoPreview";
-        mesh.hideFlags = HideFlags.DontSave;
-        Vector3[] vertices = mesh.vertices;
-        var uv = new Vector2[vertices.Length];
-        Matrix4x4 matrix = transform.worldToLocalMatrix * filter.transform.localToWorldMatrix;
-        for (int index = 0; index < vertices.Length; index++)
+
+        Vector2 canvasSize = new Vector2(Mathf.Max(canvas.size.x, 0.001f), Mathf.Max(canvas.size.z, 0.001f));
+        Vector2 coverSize = GetCoverImageSize(image, canvasSize);
+        Vector2 imageSize = coverSize * zoom;
+        Vector2 imageCenter = new Vector2(0.5f + offset.x, 0.5f + offset.y);
+        Vector2 imageMinimum = imageCenter - imageSize * 0.5f;
+        Matrix4x4 matrix = transform.worldToLocalMatrix * renderer.transform.localToWorldMatrix;
+        for (int index = 0; index < overlay.Vertices.Length; index++)
         {
-            Vector3 point = matrix.MultiplyPoint3x4(vertices[index]);
-            uv[index] = new Vector2((point.x - canvas.min.x) / Mathf.Max(canvas.size.x, 0.001f),
-                (point.z - canvas.min.z) / Mathf.Max(canvas.size.z, 0.001f));
+            Vector3 point = matrix.MultiplyPoint3x4(overlay.Vertices[index]);
+            float x = (point.x - canvas.min.x) / canvasSize.x;
+            float y = (point.z - canvas.min.z) / canvasSize.y;
+            overlay.UV[index] = new Vector2((x - imageMinimum.x) / imageSize.x, (y - imageMinimum.y) / imageSize.y);
         }
-        mesh.uv = uv;
-        filter.sharedMesh = mesh;
-        _imageMeshes[renderer] = mesh;
-        var materials = new Material[_originalMaterials[renderer].Length];
-        for (int index = 0; index < materials.Length; index++) materials[index] = _photoMaterial;
-        renderer.sharedMaterials = materials;
-        var properties = new MaterialPropertyBlock();
-        renderer.GetPropertyBlock(properties);
-        properties.SetTexture(_baseMapProperty, image);
-        properties.SetVector(_baseMapTransformProperty, new Vector4(1f, 1f, 0f, 0f));
-        properties.SetColor(_baseColorProperty, Color.white);
-        renderer.SetPropertyBlock(properties);
+        overlay.Mesh.uv = overlay.UV;
+        overlay.Properties.SetTexture(_baseMapProperty, image);
+        overlay.Properties.SetColor(_baseColorProperty, Color.white);
+        overlay.Renderer.SetPropertyBlock(overlay.Properties);
     }
 
     /// <summary>
-    /// renderer의 사진용 Mesh와 속성을 제거하고 보관한 원본 상태로 돌린다.
-    /// 반환값 없이 임시 Mesh를 정리하며 원본 Material 데이터는 유지한다.
+    /// renderer에 연결된 사진 오버레이를 제거한다.
+    /// renderer를 사용하며 원본 메시와 재질은 그대로 둔다.
     /// </summary>
     private void ClearImage(MeshRenderer renderer)
     {
-        if (renderer == null || !_originalMeshes.TryGetValue(renderer, out Mesh original)) return;
-        MeshFilter filter = renderer.GetComponent<MeshFilter>();
-        if (_imageMeshes.TryGetValue(renderer, out Mesh imageMesh))
-        {
-            if (filter.sharedMesh == imageMesh) filter.sharedMesh = original;
-            ReleaseObject(imageMesh);
-            _imageMeshes.Remove(renderer);
-        }
-        renderer.SetPropertyBlock(_originalProperties[renderer]);
-        renderer.sharedMaterials = _originalMaterials[renderer];
-        _originalMaterials.Remove(renderer);
-        _originalMeshes.Remove(renderer);
-        _originalProperties.Remove(renderer);
+        if (renderer == null || !_imageOverlays.TryGetValue(renderer, out PhotoOverlay overlay)) return;
+        DestroyOverlay(overlay);
+        _imageOverlays.Remove(renderer);
+    }
+
+    /// <summary>
+    /// renderer에 적용된 기존 사진 오버레이를 임시로 숨긴다.
+    /// 미리보기 대상 renderer를 사용하며 원본 재질과 저장된 사진 상태는 유지한다.
+    /// </summary>
+    private void HideAppliedImage(MeshRenderer renderer)
+    {
+        if (renderer == null || !_imageOverlays.TryGetValue(renderer, out PhotoOverlay overlay)
+            || overlay == null || overlay.GameObject == null || !overlay.GameObject.activeSelf)
+            return;
+
+        overlay.GameObject.SetActive(false);
+        _hiddenImageOverlays.Add(overlay);
+    }
+
+    /// <summary>
+    /// 사진 오버레이 GameObject와 복제 Mesh를 함께 해제한다.
+    /// overlay의 임시 렌더 자원을 정리하며 원본 메시에는 영향을 주지 않는다.
+    /// </summary>
+    private void DestroyOverlay(PhotoOverlay overlay)
+    {
+        if (overlay == null) return;
+        if (overlay.GameObject != null) ReleaseObject(overlay.GameObject);
+        if (overlay.Mesh != null) ReleaseObject(overlay.Mesh);
     }
 
     /// <summary>
@@ -357,7 +589,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         foreach (MeshRenderer renderer in renderers)
         {
             if (renderer == null) continue;
-            Mesh mesh = _originalMeshes.TryGetValue(renderer, out Mesh original) ? original : renderer.GetComponent<MeshFilter>().sharedMesh;
+            Mesh mesh = renderer.GetComponent<MeshFilter>().sharedMesh;
             Bounds bounds = mesh.bounds;
             Matrix4x4 matrix = transform.worldToLocalMatrix * renderer.transform.localToWorldMatrix;
             for (int corner = 0; corner < 8; corner++)
@@ -369,6 +601,46 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// 이미지가 캔버스를 빈틈없이 덮는 기본 배율에서 이미지의 정규화 크기를 계산한다.
+    /// 이미지 비율과 캔버스 가로·세로 비율을 사용해 확대할 축을 결정한다.
+    /// </summary>
+    private Vector2 GetCoverImageSize(Texture2D image, Vector2 canvasSize)
+    {
+        float imageAspect = (float)image.width / image.height;
+        float canvasAspect = canvasSize.x / canvasSize.y;
+        return imageAspect >= canvasAspect
+            ? new Vector2(imageAspect / canvasAspect, 1f)
+            : new Vector2(1f, canvasAspect / imageAspect);
+    }
+
+    /// <summary>
+    /// 이미지 오프셋과 배율이 유한하며 지원 범위 안에 있는지 확인한다.
+    /// offset과 zoom을 사용하며 유효 여부를 반환하고 잘못된 값의 이유를 기록한다.
+    /// </summary>
+    private bool ValidatePlacement(Vector2 offset, float zoom)
+    {
+        if (!IsPlacementValid(offset, zoom))
+        {
+            _lastError = "Image placement is outside the supported range.";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 저장 또는 입력된 이미지 배치값의 유한성과 확대 배율 범위를 확인한다.
+    /// offset과 zoom이 유효하면 true를 반환한다.
+    /// </summary>
+    private bool IsPlacementValid(Vector2 offset, float zoom)
+    {
+        return !float.IsNaN(offset.x) && !float.IsInfinity(offset.x)
+            && !float.IsNaN(offset.y) && !float.IsInfinity(offset.y)
+            && !float.IsNaN(zoom) && !float.IsInfinity(zoom)
+            && zoom >= MIN_IMAGE_ZOOM && zoom <= MAX_IMAGE_ZOOM;
     }
 
     /// <summary>
@@ -391,14 +663,15 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         MeshFilter filter = renderer.GetComponent<MeshFilter>();
         if (_photoMaterial == null)
         {
-            if (_photoMaterialTemplate == null || !_photoMaterialTemplate.HasProperty(_baseMapProperty))
+            if (_photoMaterialTemplate == null || !_photoMaterialTemplate.HasProperty(_baseMapProperty)
+                || !_photoMaterialTemplate.HasProperty(_baseColorProperty))
             {
-                _lastError = "Assign a photo material with a Base Map in KeyboardCustomization.";
+                _lastError = "Assign a photo overlay material with Base Map and Base Color in KeyboardCustomization.";
                 return false;
             }
             _photoMaterial = new Material(_photoMaterialTemplate) { name = "Keyboard Photo (Instance)", hideFlags = HideFlags.DontSave };
         }
-        if (filter != null && filter.sharedMesh != null && filter.sharedMesh.isReadable) return true;
+        if (filter != null && filter.sharedMesh != null && filter.sharedMesh.isReadable && filter.sharedMesh.subMeshCount > 0) return true;
         _lastError = "Photo customization needs a readable mesh.";
         return false;
     }
@@ -495,9 +768,9 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
 
     void OnDestroy()
     {
-        var renderers = new List<MeshRenderer>(_originalMeshes.Keys);
-        foreach (MeshRenderer renderer in renderers) ClearImage(renderer);
-        foreach (Mesh mesh in _imageMeshes.Values) if (mesh != null) ReleaseObject(mesh);
+        ClearImagePreview();
+        foreach (PhotoOverlay overlay in _imageOverlays.Values) DestroyOverlay(overlay);
+        _imageOverlays.Clear();
         foreach (Texture2D texture in _ownedTextures) if (texture != null) ReleaseObject(texture);
         if (_photoMaterial != null) ReleaseObject(_photoMaterial);
     }

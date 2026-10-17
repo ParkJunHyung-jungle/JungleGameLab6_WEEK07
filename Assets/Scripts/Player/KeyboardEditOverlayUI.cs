@@ -13,9 +13,23 @@ namespace Game.Player
         private const int PREVIEW_LAYER = 31;
         private const int PREVIEW_TEXTURE_SIZE = 128;
         private const float WHEEL_SCROLL_INPUT_SCALE = 20f;
+        private const float PICKER_PANEL_HEIGHT = 164f;
+        private const float PICKER_PANEL_PADDING = 12f;
+        private const float PICKER_LEFT_ITEM_PADDING = 24f;
+        private const float PICKER_ITEM_HEIGHT = 128f;
+        private const float PICKER_PREVIEW_WIDTH = 80f;
+        private const float PICKER_PREVIEW_HEIGHT = 72f;
+        private const float PICKER_SCROLLBAR_HEIGHT = 6f;
 
-        private static readonly Color _activeModeButtonColor = new Color(0.12f, 0.48f, 0.58f, 1f);
-        private static readonly Color _inactiveModeButtonColor = new Color(0.12f, 0.17f, 0.24f, 0.98f);
+        private static readonly Color _pickerPanelColor = new Color32(37, 52, 68, 255);
+        private static readonly Color _pickerPanelBorderColor = new Color32(69, 91, 112, 255);
+        private static readonly Color _pickerBorderColor = new Color32(80, 103, 122, 255);
+        private static readonly Color _pickerHoverColor = new Color32(115, 220, 247, 255);
+        private static readonly Color _pickerFocusColor = new Color32(128, 234, 255, 255);
+        private static readonly Color _pickerSelectedColor = new Color32(87, 214, 243, 255);
+        private static readonly Color _pickerCardColor = new Color32(48, 66, 84, 255);
+        private static readonly Color _pickerSelectedCardColor = new Color32(39, 80, 100, 255);
+        private static readonly Color _pickerScrollbarColor = new Color32(75, 129, 151, 255);
         private static readonly SwitchType[] _switchSoundTypes = (SwitchType[])Enum.GetValues(typeof(SwitchType));
 
         [Header("Edit Buttons")]
@@ -36,45 +50,56 @@ namespace Game.Player
         [SerializeField] private GameObject _previewKeycapPrefab;
         [SerializeField] private Material[] _keycapMaterials = new Material[0];
         [SerializeField, Min(1f)] private float _viewportWidth = 860f;
-        [SerializeField, Min(1f)] private float _itemWidth = 98f;
-        [SerializeField, Min(0f)] private float _itemSpacing = 14f;
+        [SerializeField, Min(1f)] private float _itemWidth = 116f;
+        [SerializeField, Min(0f)] private float _itemSpacing = 11f;
         [SerializeField, Min(0f)] private float _wheelScrollSpeed = 0.55f;
 
         private Canvas _canvas;
+        private Sprite _pickerSprite;
+        private Font _pickerFont;
         private RectTransform _keyboardEditPanel;
         private RectTransform _viewport;
         private RectTransform _content;
         private readonly List<KeyboardEditButton> _previewButtons = new List<KeyboardEditButton>();
         private readonly List<Material> _previewMaterials = new List<Material>();
-        private readonly List<Image> _selectionIndicators = new List<Image>();
+        private readonly List<Image> _previewCardBackgrounds = new List<Image>();
+        private readonly List<Text> _selectionIndicators = new List<Text>();
         private readonly List<Texture2D> _previewTextures = new List<Texture2D>();
         private Material _selectedMaterial;
 
         [Header("Switch Sound Picker")]
         private RectTransform _switchSoundViewport;
         private readonly List<KeyboardEditButton> _switchSoundButtons = new List<KeyboardEditButton>();
+        private readonly List<Image> _switchSoundCardBackgrounds = new List<Image>();
+        private readonly List<Text> _switchSoundSelectionIndicators = new List<Text>();
         private SwitchType? _selectedSwitchSound;
 
         [Header("Case Material Picker")]
         private KeyboardCustomization _caseCustomization;
         private RectTransform _caseMaterialViewport;
         private readonly List<KeyboardEditButton> _casePreviewButtons = new List<KeyboardEditButton>();
+        private readonly List<Image> _caseCardBackgrounds = new List<Image>();
         private readonly List<int> _caseMaterialIndices = new List<int>();
-        private readonly List<Image> _caseSelectionIndicators = new List<Image>();
+        private readonly List<Text> _caseSelectionIndicators = new List<Text>();
         private readonly List<Texture2D> _casePreviewTextures = new List<Texture2D>();
 
         [Header("Plate Picker")]
         private KeyboardCustomization _plateCustomization;
         private RectTransform _plateViewport;
         private readonly List<KeyboardEditButton> _platePreviewButtons = new List<KeyboardEditButton>();
+        private readonly List<Image> _plateCardBackgrounds = new List<Image>();
         private readonly List<PlateType> _plateTypes = new List<PlateType>();
         private readonly List<PlateType> _platePreviewTypes = new List<PlateType>();
-        private readonly List<Image> _plateSelectionIndicators = new List<Image>();
+        private readonly List<Text> _plateSelectionIndicators = new List<Text>();
         private readonly List<Texture2D> _platePreviewTextures = new List<Texture2D>();
 
         [Header("Photo Customization")]
         [SerializeField] private KeyboardCustomizationStorage _photoStorage;
+        [SerializeField, Range(0.01f, 0.2f)]
+        [Tooltip("휠 한 칸당 확대·축소 비율입니다. 0.03은 한 번에 약 3% 변하며 플레이 중 변경도 적용됩니다.")]
+        private float _photoWheelZoomSensitivity = 0.03f;
         private KeyboardCustomizationTestUI _photoUI;
+        private float _appliedPhotoWheelZoomSensitivity;
 
         [Header("LED Customization")]
         private KeyboardCustomization _ledCustomization;
@@ -100,11 +125,14 @@ namespace Game.Player
         void Awake()
         {
             _canvas = GetComponentInParent<Canvas>();
+            _pickerSprite = (_keycapButton.targetGraphic as Image).sprite;
+            _pickerFont = _switchAxisButton.GetComponentInChildren<Text>().font;
             _keyboardEditPanel = transform.Find("KeyboardEditPanel") as RectTransform;
             CreateMaterialPicker();
             CreateSwitchSoundPicker();
             _photoUI = gameObject.AddComponent<KeyboardCustomizationTestUI>();
-            _photoUI.InitializeEmbedded(_photoStorage);
+            _photoUI.InitializeEmbedded(_photoStorage, _photoWheelZoomSensitivity);
+            _appliedPhotoWheelZoomSensitivity = Mathf.Clamp(_photoWheelZoomSensitivity, 0.01f, 0.2f);
             _photoUI.CloseRequested += HandlePhotoCloseRequested;
             _photoUI.CustomizationLoaded += HandlePhotoCustomizationLoaded;
             GameObject ledPanel = new GameObject("LEDCustomizationPanel", typeof(RectTransform));
@@ -112,6 +140,19 @@ namespace Game.Player
             ledPanel.SetActive(false);
             _ledUI = ledPanel.AddComponent<KeyboardLEDPanelUI>();
             _ledUI.Initialize();
+        }
+
+        void LateUpdate()
+        {
+            if (_photoUI == null)
+                return;
+
+            float sensitivity = Mathf.Clamp(_photoWheelZoomSensitivity, 0.01f, 0.2f);
+            if (Mathf.Approximately(sensitivity, _appliedPhotoWheelZoomSensitivity))
+                return;
+
+            _photoUI.SetWheelZoomSensitivity(sensitivity);
+            _appliedPhotoWheelZoomSensitivity = sensitivity;
         }
 
         void OnEnable()
@@ -267,17 +308,13 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 공격 모드 또는 일반 모드 버튼의 선택 색상을 갱신한다.
-        /// attackModeSelected를 사용하며 선택된 모드 버튼을 활성 색상으로 표시한다.
+        /// 공격 모드 또는 일반 모드 버튼의 선택 강조와 상태 문구를 갱신한다.
+        /// attackModeSelected를 사용하며 선택된 버튼의 배경과 아이콘 및 선택 점을 변경한다.
         /// </summary>
         public void SetSelectedAttackMode(bool attackModeSelected)
         {
-            _generalModeButton.targetGraphic.color = attackModeSelected
-                ? _inactiveModeButtonColor
-                : _activeModeButtonColor;
-            _attackModeButton.targetGraphic.color = attackModeSelected
-                ? _activeModeButtonColor
-                : _inactiveModeButtonColor;
+            _generalModeButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(!attackModeSelected);
+            _attackModeButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(attackModeSelected);
             _modeStatus.text = attackModeSelected
                 ? "현재 모드: 공격 모드"
                 : "현재 모드: 일반 모드";
@@ -304,20 +341,24 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 케이스의 재질 인덱스와 일치하는 미리보기에 선택 표시를 켠다.
-        /// 편집 대상과 재질 인덱스 목록을 사용하며 각 표시의 활성 상태를 갱신한다.
+        /// 현재 케이스 재질과 일치하는 선택 카드의 배경과 체크를 갱신한다.
+        /// 편집 대상과 재질 인덱스 목록을 사용하며 각 버튼의 선택 상태를 바꾼다.
         /// </summary>
         public void RefreshCaseMaterialSelection()
         {
             for (int index = 0; index < _caseSelectionIndicators.Count; index++)
             {
-                _caseSelectionIndicators[index].enabled = _caseMaterialIndices[index] == _caseCustomization.CaseMaterialIndex;
+                SetPickerItemSelection(
+                    _casePreviewButtons[index],
+                    _caseCardBackgrounds[index],
+                    _caseSelectionIndicators[index],
+                    _caseMaterialIndices[index] == _caseCustomization.CaseMaterialIndex);
             }
         }
 
         /// <summary>
-        /// 현재 보강판 타입과 일치하는 미리보기의 선택 표시를 갱신한다.
-        /// 편집 대상의 현재 타입과 목록 순서를 사용하며 선택된 항목만 표시한다.
+        /// 현재 보강판 타입과 일치하는 선택 카드의 배경과 체크를 갱신한다.
+        /// 편집 대상의 현재 타입과 목록 순서를 사용하며 버튼의 선택 상태를 바꾼다.
         /// </summary>
         public void RefreshPlateSelection()
         {
@@ -326,7 +367,11 @@ namespace Game.Player
 
             for (int index = 0; index < _plateSelectionIndicators.Count; index++)
             {
-                _plateSelectionIndicators[index].enabled = _platePreviewTypes[index] == _plateCustomization.CurrentPlateType;
+                SetPickerItemSelection(
+                    _platePreviewButtons[index],
+                    _plateCardBackgrounds[index],
+                    _plateSelectionIndicators[index],
+                    _platePreviewTypes[index] == _plateCustomization.CurrentPlateType);
             }
         }
 
@@ -437,8 +482,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 편집 패널에 재질 미리보기 목록과 가로 스크롤 영역을 만든다.
-        /// 프리팹 메시와 재질 배열을 사용하며 화면에는 키캡 이미지만 표시한다.
+        /// 편집 패널에 재질 미리보기와 이름이 있는 가로 선택 목록을 만든다.
+        /// 프리팹 메시와 재질 배열을 사용하며 키캡 버튼과 미리보기 텍스처를 구성한다.
         /// </summary>
         private void CreateMaterialPicker()
         {
@@ -555,6 +600,7 @@ namespace Game.Player
             renderTexture.Create();
             previewCamera.targetTexture = renderTexture;
             RenderTexture previousActiveTexture = RenderTexture.active;
+            var previewMaterials = new List<Material>();
 
             try
             {
@@ -566,7 +612,8 @@ namespace Game.Player
                         continue;
                     }
 
-                    meshRenderer.sharedMaterial = material;
+                    meshRenderer.sharedMaterial = CreatePreviewMaterial(material, previewMaterials);
+                    KeyboardToonSurface.ApplyBounds(meshRenderer);
                     previewCamera.Render();
                     RenderTexture.active = renderTexture;
                     Texture2D previewTexture = new Texture2D(
@@ -592,9 +639,48 @@ namespace Game.Player
                 Destroy(renderTexture);
                 previewStage.SetActive(false);
                 Destroy(previewStage);
+                foreach (Material material in previewMaterials) Destroy(material);
             }
 
             return previews;
+        }
+
+        /// <summary>
+        /// material이 투명 재질이면 미리보기용 복제본을 불투명 렌더링으로 전환해 형태를 표시한다.
+        /// 원본 재질은 유지하고 복제본은 ownedMaterials에 등록해 렌더링 후 해제하며 표시용 재질을 반환한다.
+        /// </summary>
+        private Material CreatePreviewMaterial(Material material, List<Material> ownedMaterials)
+        {
+            if (material.HasProperty("_Opacity") && material.HasProperty("_EdgeOpacity"))
+            {
+                var glassPreview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
+                glassPreview.SetFloat("_Opacity", 1f);
+                glassPreview.SetFloat("_EdgeOpacity", 1f);
+                ownedMaterials.Add(glassPreview);
+                return glassPreview;
+            }
+            if (!material.HasProperty("_Surface") || material.GetFloat("_Surface") < 0.5f ||
+                !material.HasProperty("_BaseColor")) return material;
+
+            Color color = material.GetColor("_BaseColor");
+            var preview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
+            color.a = 1f;
+            preview.SetColor("_BaseColor", color);
+            if (preview.HasProperty("_Color")) preview.SetColor("_Color", color);
+            preview.SetFloat("_Surface", 0f);
+            preview.SetFloat("_SrcBlend", (float)BlendMode.One);
+            preview.SetFloat("_DstBlend", (float)BlendMode.Zero);
+            preview.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+            preview.SetFloat("_DstBlendAlpha", (float)BlendMode.Zero);
+            preview.SetFloat("_ZWrite", 1f);
+            preview.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            preview.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            preview.DisableKeyword("_ALPHAMODULATE_ON");
+            preview.SetOverrideTag("RenderType", "Opaque");
+            preview.renderQueue = (int)RenderQueue.Geometry;
+            preview.SetShaderPassEnabled("DepthOnly", true);
+            ownedMaterials.Add(preview);
+            return preview;
         }
 
         /// <summary>
@@ -607,8 +693,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 화면 상단에 이름과 항목 개수에 맞는 가로 스크롤 목록을 만든다.
-        /// listName과 itemCount로 영역을 구성하고 viewport와 content를 반환한다.
+        /// 화면 상단에 항목 개수에 맞는 고정 높이 가로 선택 패널을 만든다.
+        /// listName과 itemCount로 패널을 구성하고 viewport와 content를 반환한다.
         /// </summary>
         private RectTransform CreateScrollViewport(string listName, int itemCount, out RectTransform content)
         {
@@ -631,10 +717,28 @@ namespace Game.Player
             viewport.anchorMax = new Vector2(0.5f, 1f);
             viewport.pivot = new Vector2(0.5f, 1f);
             viewport.anchoredPosition = new Vector2(0f, -24f);
-            viewport.sizeDelta = new Vector2(viewportWidth, 132f);
+            viewport.sizeDelta = new Vector2(viewportWidth, PICKER_PANEL_HEIGHT);
             Image viewportImage = viewportObject.GetComponent<Image>();
-            viewportImage.color = Color.clear;
+            viewportImage.sprite = _pickerSprite;
+            viewportImage.type = Image.Type.Sliced;
+            viewportImage.color = _pickerPanelBorderColor;
             viewportImage.raycastTarget = true;
+
+            GameObject panelBackgroundObject = new GameObject(
+                listName + "PanelBackground",
+                typeof(RectTransform),
+                typeof(Image));
+            RectTransform panelBackgroundRect = panelBackgroundObject.GetComponent<RectTransform>();
+            panelBackgroundRect.SetParent(viewport, false);
+            panelBackgroundRect.anchorMin = Vector2.zero;
+            panelBackgroundRect.anchorMax = Vector2.one;
+            panelBackgroundRect.offsetMin = Vector2.one;
+            panelBackgroundRect.offsetMax = -Vector2.one;
+            Image panelBackground = panelBackgroundObject.GetComponent<Image>();
+            panelBackground.sprite = _pickerSprite;
+            panelBackground.type = Image.Type.Sliced;
+            panelBackground.color = _pickerPanelColor;
+            panelBackground.raycastTarget = false;
 
             GameObject contentObject = new GameObject(listName + "Content", typeof(RectTransform));
             content = contentObject.GetComponent<RectTransform>();
@@ -643,8 +747,13 @@ namespace Game.Player
             content.anchorMax = new Vector2(0f, 0.5f);
             content.pivot = new Vector2(0f, 0.5f);
             content.anchoredPosition = Vector2.zero;
-            float contentWidth = itemCount * (_itemWidth + _itemSpacing) - _itemSpacing;
-            content.sizeDelta = new Vector2(Mathf.Max(0f, contentWidth), 116f);
+            float itemContentWidth = itemCount > 0
+                ? itemCount * (_itemWidth + _itemSpacing) - _itemSpacing
+                : 0f;
+            float contentWidth = Mathf.Max(
+                viewportWidth,
+                itemContentWidth + PICKER_LEFT_ITEM_PADDING + PICKER_PANEL_PADDING);
+            content.sizeDelta = new Vector2(contentWidth, PICKER_ITEM_HEIGHT);
 
             ScrollRect scrollRect = viewportObject.GetComponent<ScrollRect>();
             scrollRect.viewport = viewport;
@@ -655,86 +764,342 @@ namespace Game.Player
             scrollRect.inertia = false;
             scrollRect.scrollSensitivity = _wheelScrollSpeed * WHEEL_SCROLL_INPUT_SCALE;
 
+            Scrollbar scrollbar = CreateHorizontalScrollbar(viewport, listName);
+            scrollRect.horizontalScrollbar = scrollbar;
+            scrollRect.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+
             viewport.gameObject.SetActive(false);
             return viewport;
         }
 
         /// <summary>
-        /// 지원하는 축 타입마다 이름이 있는 사운드 선택 버튼을 만든다.
-        /// 축 타입 배열과 기존 버튼의 글꼴을 사용하며 상단 목록과 버튼 참조를 저장한다.
+        /// listName에 해당하는 가로 목록에 얇은 스크롤 막대를 만든다.
+        /// viewport를 부모로 사용하며 생성한 Scrollbar를 반환한다.
+        /// </summary>
+        private Scrollbar CreateHorizontalScrollbar(RectTransform viewport, string listName)
+        {
+            GameObject scrollbarObject = new GameObject(
+                listName + "Scrollbar",
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(Scrollbar));
+            RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
+            scrollbarRect.SetParent(viewport, false);
+            scrollbarRect.anchorMin = new Vector2(0f, 0f);
+            scrollbarRect.anchorMax = new Vector2(1f, 0f);
+            scrollbarRect.pivot = new Vector2(0.5f, 0f);
+            scrollbarRect.anchoredPosition = new Vector2(0f, 7f);
+            scrollbarRect.sizeDelta = new Vector2(-PICKER_PANEL_PADDING * 2f, PICKER_SCROLLBAR_HEIGHT);
+
+            Image trackImage = scrollbarObject.GetComponent<Image>();
+            trackImage.sprite = _pickerSprite;
+            trackImage.type = Image.Type.Sliced;
+            trackImage.color = new Color32(28, 40, 53, 220);
+            trackImage.raycastTarget = true;
+
+            GameObject handleObject = new GameObject(
+                "Handle",
+                typeof(RectTransform),
+                typeof(Image));
+            RectTransform handleRect = handleObject.GetComponent<RectTransform>();
+            handleRect.SetParent(scrollbarRect, false);
+            handleRect.anchorMin = Vector2.zero;
+            handleRect.anchorMax = Vector2.one;
+            handleRect.offsetMin = new Vector2(1f, 0f);
+            handleRect.offsetMax = new Vector2(-1f, 0f);
+
+            Image handleImage = handleObject.GetComponent<Image>();
+            handleImage.sprite = _pickerSprite;
+            handleImage.type = Image.Type.Sliced;
+            handleImage.color = _pickerScrollbarColor;
+            handleImage.raycastTarget = true;
+
+            Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
+            scrollbar.handleRect = handleRect;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.direction = Scrollbar.Direction.LeftToRight;
+            return scrollbar;
+        }
+
+        /// <summary>
+        /// 지원하는 축 타입마다 아이콘과 이름이 있는 선택 버튼을 만든다.
+        /// 축 타입 배열과 저장된 글꼴을 사용하며 목록과 시각 요소를 구성한다.
         /// </summary>
         private void CreateSwitchSoundPicker()
         {
             _switchSoundViewport = CreateScrollViewport("SwitchSound", _switchSoundTypes.Length, out RectTransform content);
-            Font font = _switchAxisButton.GetComponentInChildren<Text>().font;
-            float stride = _itemWidth + _itemSpacing;
             for (int index = 0; index < _switchSoundTypes.Length; index++)
             {
-                GameObject itemObject = new GameObject(
-                    "SwitchSound_" + _switchSoundTypes[index],
-                    typeof(RectTransform),
-                    typeof(Image),
-                    typeof(KeyboardEditButton));
-                RectTransform itemRect = itemObject.GetComponent<RectTransform>();
-                itemRect.SetParent(content, false);
-                itemRect.anchorMin = new Vector2(0f, 0.5f);
-                itemRect.anchorMax = new Vector2(0f, 0.5f);
-                itemRect.pivot = new Vector2(0.5f, 0.5f);
-                itemRect.sizeDelta = new Vector2(_itemWidth, 116f);
-                itemRect.anchoredPosition = new Vector2(index * stride + _itemWidth * 0.5f, 0f);
-                Image itemImage = itemObject.GetComponent<Image>();
-                itemImage.color = Color.clear;
-                itemImage.raycastTarget = true;
-
-                GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
-                RectTransform labelRect = labelObject.GetComponent<RectTransform>();
-                labelRect.SetParent(itemRect, false);
-                labelRect.anchorMin = Vector2.zero;
-                labelRect.anchorMax = Vector2.one;
-                labelRect.offsetMin = new Vector2(2f, 10f);
-                labelRect.offsetMax = new Vector2(-2f, -10f);
-                Text label = labelObject.GetComponent<Text>();
-                label.font = font;
-                label.text = _switchSoundTypes[index].ToString();
-                label.fontSize = 20;
-                label.resizeTextForBestFit = true;
-                label.resizeTextMinSize = 14;
-                label.resizeTextMaxSize = 20;
-                label.alignment = TextAnchor.MiddleCenter;
-                label.color = Color.white;
-                label.raycastTarget = false;
-
-                KeyboardEditButton button = itemObject.GetComponent<KeyboardEditButton>();
-                button.targetGraphic = label;
-                button.navigation = new Navigation { mode = Navigation.Mode.None };
+                SwitchType type = _switchSoundTypes[index];
+                KeyboardEditButton button = CreatePickerItemButton(
+                    content,
+                    "SwitchSound_" + type,
+                    index,
+                    type.ToString(),
+                    out Image cardBackground,
+                    out Text selectionIndicator);
+                CreateSwitchPreview(button.transform, type);
+                selectionIndicator.transform.SetAsLastSibling();
                 _switchSoundButtons.Add(button);
+                _switchSoundCardBackgrounds.Add(cardBackground);
+                _switchSoundSelectionIndicators.Add(selectionIndicator);
             }
 
             RefreshSwitchSoundSelection();
         }
 
         /// <summary>
-        /// 적용된 축 사운드와 일치하는 버튼을 청록색으로 표시한다.
-        /// 저장된 선택 타입과 버튼 목록을 사용하며 각 버튼의 기본 색상을 갱신한다.
+        /// 적용된 축 사운드와 일치하는 버튼의 배경과 체크를 갱신한다.
+        /// 저장된 선택 타입과 버튼 목록을 사용하며 각 버튼의 선택 상태를 변경한다.
         /// </summary>
         private void RefreshSwitchSoundSelection()
         {
             for (int index = 0; index < _switchSoundButtons.Count; index++)
             {
                 bool isSelected = _selectedSwitchSound == _switchSoundTypes[index];
-                ColorBlock colors = _switchSoundButtons[index].colors;
-                colors.normalColor = isSelected
-                    ? new Color(0.36f, 0.82f, 1f, 1f)
-                    : Color.white;
-                colors.highlightedColor = isSelected ? colors.normalColor : new Color(0.85f, 0.95f, 1f, 1f);
-                colors.selectedColor = colors.normalColor;
-                _switchSoundButtons[index].colors = colors;
+                SetPickerItemSelection(
+                    _switchSoundButtons[index],
+                    _switchSoundCardBackgrounds[index],
+                    _switchSoundSelectionIndicators[index],
+                    isSelected);
             }
         }
 
         /// <summary>
-        /// 텍스처가 생성된 재질마다 이름 없는 미리보기 버튼을 콘텐츠에 추가한다.
-        /// previews의 텍스처와 재질 순서를 사용하며 버튼과 선택 표시를 저장한다.
+        /// content의 index 위치에 이름과 선택 표시가 있는 아이템 버튼을 만든다.
+        /// labelText를 표시하고 버튼, 배경 Image, 선택 Text를 반환 또는 저장한다.
+        /// </summary>
+        private KeyboardEditButton CreatePickerItemButton(
+            RectTransform content,
+            string itemName,
+            int index,
+            string labelText,
+            out Image cardBackground,
+            out Text selectionIndicator)
+        {
+            GameObject itemObject = new GameObject(
+                itemName,
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(KeyboardEditButton));
+            RectTransform itemRect = itemObject.GetComponent<RectTransform>();
+            itemRect.SetParent(content, false);
+            itemRect.anchorMin = new Vector2(0f, 0.5f);
+            itemRect.anchorMax = new Vector2(0f, 0.5f);
+            itemRect.pivot = new Vector2(0.5f, 0.5f);
+            itemRect.sizeDelta = new Vector2(_itemWidth, PICKER_ITEM_HEIGHT);
+            itemRect.anchoredPosition = new Vector2(
+                PICKER_LEFT_ITEM_PADDING + index * (_itemWidth + _itemSpacing) + _itemWidth * 0.5f,
+                0f);
+
+            Image frameImage = itemObject.GetComponent<Image>();
+            frameImage.sprite = _pickerSprite;
+            frameImage.type = Image.Type.Sliced;
+            frameImage.color = Color.white;
+            frameImage.raycastTarget = true;
+
+            GameObject backgroundObject = new GameObject(
+                "CardBackground",
+                typeof(RectTransform),
+                typeof(Image));
+            RectTransform backgroundRect = backgroundObject.GetComponent<RectTransform>();
+            backgroundRect.SetParent(itemRect, false);
+            backgroundRect.anchorMin = Vector2.zero;
+            backgroundRect.anchorMax = Vector2.one;
+            backgroundRect.offsetMin = new Vector2(2f, 2f);
+            backgroundRect.offsetMax = new Vector2(-2f, -2f);
+            cardBackground = backgroundObject.GetComponent<Image>();
+            cardBackground.sprite = _pickerSprite;
+            cardBackground.type = Image.Type.Sliced;
+            cardBackground.color = _pickerCardColor;
+            cardBackground.raycastTarget = false;
+
+            KeyboardEditButton button = itemObject.GetComponent<KeyboardEditButton>();
+            button.targetGraphic = frameImage;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+            GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(itemRect, false);
+            labelRect.anchorMin = new Vector2(0f, 0f);
+            labelRect.anchorMax = new Vector2(1f, 0f);
+            labelRect.pivot = new Vector2(0.5f, 0f);
+            labelRect.anchoredPosition = new Vector2(0f, 7f);
+            labelRect.sizeDelta = new Vector2(-12f, 22f);
+            Text label = labelObject.GetComponent<Text>();
+            label.font = _pickerFont;
+            label.text = labelText;
+            label.fontSize = 12;
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 8;
+            label.resizeTextMaxSize = 12;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.verticalOverflow = VerticalWrapMode.Truncate;
+            label.fontStyle = FontStyle.Bold;
+            label.color = Color.white;
+            label.raycastTarget = false;
+
+            GameObject indicatorObject = new GameObject(
+                "SelectedIndicator",
+                typeof(RectTransform),
+                typeof(Text));
+            RectTransform indicatorRect = indicatorObject.GetComponent<RectTransform>();
+            indicatorRect.SetParent(itemRect, false);
+            indicatorRect.anchorMin = Vector2.one;
+            indicatorRect.anchorMax = Vector2.one;
+            indicatorRect.pivot = Vector2.one;
+            indicatorRect.anchoredPosition = new Vector2(-7f, -6f);
+            indicatorRect.sizeDelta = new Vector2(18f, 18f);
+            selectionIndicator = indicatorObject.GetComponent<Text>();
+            selectionIndicator.font = _pickerFont;
+            selectionIndicator.text = "✓";
+            selectionIndicator.fontSize = 13;
+            selectionIndicator.fontStyle = FontStyle.Bold;
+            selectionIndicator.alignment = TextAnchor.MiddleCenter;
+            selectionIndicator.color = new Color32(128, 234, 255, 255);
+            selectionIndicator.raycastTarget = false;
+
+            SetPickerItemSelection(button, cardBackground, selectionIndicator, false);
+            return button;
+        }
+
+        /// <summary>
+        /// parent 아래 크기와 색상을 지정한 둥근 아이콘 Image를 만든다.
+        /// name, size, position, color를 사용하며 아이콘 배경 Image를 반환한다.
+        /// </summary>
+        private Image CreatePickerImage(
+            Transform parent,
+            string name,
+            Vector2 size,
+            Vector2 position,
+            Color color)
+        {
+            GameObject imageObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+            RectTransform imageRect = imageObject.GetComponent<RectTransform>();
+            imageRect.SetParent(parent, false);
+            imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+            imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            imageRect.pivot = new Vector2(0.5f, 0.5f);
+            imageRect.anchoredPosition = position;
+            imageRect.sizeDelta = size;
+
+            Image image = imageObject.GetComponent<Image>();
+            image.sprite = _pickerSprite;
+            image.type = Image.Type.Sliced;
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>
+        /// 재질 렌더 텍스처를 아이템 버튼의 미리보기 이미지로 배치한다.
+        /// parent, preview, size, verticalOffset을 사용하며 클릭 입력은 부모 버튼에 맡긴다.
+        /// </summary>
+        private RawImage CreateMaterialPreviewImage(
+            Transform parent,
+            string name,
+            Texture2D preview,
+            Vector2 size,
+            float verticalOffset)
+        {
+            GameObject imageObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(RawImage));
+            RectTransform imageRect = imageObject.GetComponent<RectTransform>();
+            imageRect.SetParent(parent, false);
+            imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+            imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            imageRect.pivot = new Vector2(0.5f, 0.5f);
+            imageRect.anchoredPosition = new Vector2(0f, verticalOffset);
+            imageRect.sizeDelta = size;
+
+            RawImage previewImage = imageObject.GetComponent<RawImage>();
+            previewImage.texture = preview;
+            previewImage.color = Color.white;
+            previewImage.raycastTarget = false;
+            return previewImage;
+        }
+
+        /// <summary>
+        /// type의 색상과 아이콘을 축 사운드 선택 버튼에 추가한다.
+        /// parent를 사용하며 하우징, 축 스템, 십자 표시를 만든다.
+        /// </summary>
+        private void CreateSwitchPreview(Transform parent, SwitchType type)
+        {
+            Image housing = CreatePickerImage(
+                parent,
+                "SwitchHousing",
+                new Vector2(64f, 52f),
+                new Vector2(0f, 14f),
+                new Color32(37, 49, 61, 255));
+            CreatePickerImage(
+                housing.transform,
+                "SwitchStem",
+                new Vector2(42f, 30f),
+                Vector2.zero,
+                GetSwitchSoundColor(type));
+
+            GameObject plusObject = new GameObject("SwitchStemMark", typeof(RectTransform), typeof(Text));
+            RectTransform plusRect = plusObject.GetComponent<RectTransform>();
+            plusRect.SetParent(housing.transform, false);
+            plusRect.anchorMin = new Vector2(0.5f, 0.5f);
+            plusRect.anchorMax = new Vector2(0.5f, 0.5f);
+            plusRect.pivot = new Vector2(0.5f, 0.5f);
+            plusRect.sizeDelta = new Vector2(24f, 26f);
+            Text plus = plusObject.GetComponent<Text>();
+            plus.font = _pickerFont;
+            plus.text = "+";
+            plus.fontSize = 24;
+            plus.fontStyle = FontStyle.Bold;
+            plus.alignment = TextAnchor.MiddleCenter;
+            plus.color = Color.white;
+            plus.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// button의 테두리, 배경과 체크 표시를 선택 상태에 맞춰 갱신한다.
+        /// isSelected를 사용하며 세 시각 요소의 색상과 활성 상태를 변경한다.
+        /// </summary>
+        private void SetPickerItemSelection(
+            KeyboardEditButton button,
+            Image cardBackground,
+            Text selectionIndicator,
+            bool isSelected)
+        {
+            ColorBlock colors = button.colors;
+            colors.normalColor = isSelected ? _pickerSelectedColor : _pickerBorderColor;
+            colors.highlightedColor = isSelected ? _pickerFocusColor : _pickerHoverColor;
+            colors.pressedColor = isSelected ? new Color32(128, 234, 255, 255) : new Color32(64, 90, 112, 255);
+            colors.selectedColor = colors.normalColor;
+            button.colors = colors;
+            cardBackground.color = isSelected ? _pickerSelectedCardColor : _pickerCardColor;
+            selectionIndicator.enabled = isSelected;
+        }
+
+        /// <summary>
+        /// type에 등록된 축 색상을 선택 카드용으로 반환한다.
+        /// 참조 HTML의 타입별 색상을 사용하며 알 수 없는 타입에는 기본 색상을 반환한다.
+        /// </summary>
+        private static Color GetSwitchSoundColor(SwitchType type)
+        {
+            switch (type)
+            {
+                case SwitchType.Blue: return new Color32(38, 124, 179, 255);
+                case SwitchType.Red: return new Color32(217, 88, 99, 255);
+                case SwitchType.Brown: return new Color32(156, 103, 72, 255);
+                case SwitchType.Sans: return new Color32(175, 185, 195, 255);
+                case SwitchType.Pop: return new Color32(235, 145, 197, 255);
+                case SwitchType.Typewriter: return new Color32(146, 153, 161, 255);
+                default: return new Color32(98, 129, 151, 255);
+            }
+        }
+
+        /// <summary>
+        /// 텍스처가 생성된 재질마다 이름과 미리보기가 있는 선택 버튼을 추가한다.
+        /// previews와 _keycapMaterials 순서를 사용하며 버튼과 선택 시각 요소를 저장한다.
         /// </summary>
         private void CreatePreviewItems(Texture2D[] previews)
         {
@@ -743,7 +1108,6 @@ namespace Game.Player
                 return;
             }
 
-            float stride = _itemWidth + _itemSpacing;
             for (int index = 0; index < previews.Length; index++)
             {
                 if (previews[index] == null || _keycapMaterials[index] == null)
@@ -751,63 +1115,26 @@ namespace Game.Player
                     continue;
                 }
 
-                GameObject itemObject = new GameObject(
-                    "KeycapMaterialPreview",
-                    typeof(RectTransform),
-                    typeof(Image),
-                    typeof(KeyboardEditButton));
-                RectTransform itemRect = itemObject.GetComponent<RectTransform>();
-                itemRect.SetParent(_content, false);
-                itemRect.anchorMin = new Vector2(0f, 0.5f);
-                itemRect.anchorMax = new Vector2(0f, 0.5f);
-                itemRect.pivot = new Vector2(0.5f, 0.5f);
-                itemRect.sizeDelta = new Vector2(_itemWidth, 116f);
-                itemRect.anchoredPosition = new Vector2(index * stride + _itemWidth * 0.5f, 0f);
-                Image itemImage = itemObject.GetComponent<Image>();
-                itemImage.color = Color.clear;
-                itemImage.raycastTarget = true;
-
-                GameObject imageObject = new GameObject(
+                Material material = _keycapMaterials[index];
+                KeyboardEditButton previewButton = CreatePickerItemButton(
+                    _content,
+                    "KeycapMaterial_" + material.name,
+                    _previewButtons.Count,
+                    material.name,
+                    out Image cardBackground,
+                    out Text selectionIndicator);
+                CreateMaterialPreviewImage(
+                    previewButton.transform,
                     "KeycapPreviewImage",
-                    typeof(RectTransform),
-                    typeof(CanvasRenderer),
-                    typeof(RawImage));
-                RectTransform imageRect = imageObject.GetComponent<RectTransform>();
-                imageRect.SetParent(itemRect, false);
-                imageRect.anchorMin = new Vector2(0.5f, 0.5f);
-                imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-                imageRect.pivot = new Vector2(0.5f, 0.5f);
-                imageRect.anchoredPosition = new Vector2(0f, 5f);
-                imageRect.sizeDelta = new Vector2(92f, 92f);
-                RawImage previewImage = imageObject.GetComponent<RawImage>();
-                previewImage.texture = previews[index];
-                previewImage.color = Color.white;
-                previewImage.raycastTarget = false;
-
-                KeyboardEditButton previewButton = itemObject.GetComponent<KeyboardEditButton>();
-                previewButton.targetGraphic = previewImage;
-                previewButton.navigation = new Navigation { mode = Navigation.Mode.None };
-
-                GameObject indicatorObject = new GameObject(
-                    "SelectedIndicator",
-                    typeof(RectTransform),
-                    typeof(CanvasRenderer),
-                    typeof(Image));
-                RectTransform indicatorRect = indicatorObject.GetComponent<RectTransform>();
-                indicatorRect.SetParent(itemRect, false);
-                indicatorRect.anchorMin = new Vector2(0.5f, 0f);
-                indicatorRect.anchorMax = new Vector2(0.5f, 0f);
-                indicatorRect.pivot = new Vector2(0.5f, 0f);
-                indicatorRect.anchoredPosition = new Vector2(0f, 2f);
-                indicatorRect.sizeDelta = new Vector2(48f, 3f);
-                Image indicator = indicatorObject.GetComponent<Image>();
-                indicator.color = new Color(0.36f, 0.82f, 1f, 1f);
-                indicator.raycastTarget = false;
-                indicator.enabled = false;
+                    previews[index],
+                    new Vector2(PICKER_PREVIEW_WIDTH, PICKER_PREVIEW_HEIGHT),
+                    14f);
+                selectionIndicator.transform.SetAsLastSibling();
 
                 _previewButtons.Add(previewButton);
-                _previewMaterials.Add(_keycapMaterials[index]);
-                _selectionIndicators.Add(indicator);
+                _previewMaterials.Add(material);
+                _previewCardBackgrounds.Add(cardBackground);
+                _selectionIndicators.Add(selectionIndicator);
             }
         }
 
@@ -828,20 +1155,24 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 저장된 재질과 각 미리보기 재질을 비교해 선택 표시를 갱신한다.
-        /// _selectedMaterial과 목록을 사용하며 일치하는 항목의 표시만 켠다.
+        /// 저장된 재질과 각 미리보기 재질을 비교해 카드 선택 상태를 갱신한다.
+        /// _selectedMaterial과 목록을 사용하며 일치하는 버튼의 배경과 체크를 켠다.
         /// </summary>
         private void RefreshSelectionIndicators()
         {
             for (int index = 0; index < _selectionIndicators.Count; index++)
             {
-                _selectionIndicators[index].enabled = _previewMaterials[index] == _selectedMaterial;
+                SetPickerItemSelection(
+                    _previewButtons[index],
+                    _previewCardBackgrounds[index],
+                    _selectionIndicators[index],
+                    _previewMaterials[index] == _selectedMaterial);
             }
         }
 
         /// <summary>
-        /// 현재 키보드의 케이스 파츠와 재질 목록으로 이름 없는 미리보기 목록을 만든다.
-        /// 저장된 편집 대상을 사용하며 이전 목록과 텍스처를 정리하고 버튼 및 선택 표시를 저장한다.
+        /// 현재 키보드의 케이스 파츠와 재질 목록으로 이름 있는 미리보기 목록을 만든다.
+        /// 저장된 편집 대상을 사용하며 이전 목록과 텍스처를 정리하고 버튼 및 선택 요소를 저장한다.
         /// </summary>
         private void CreateCaseMaterialPicker()
         {
@@ -852,6 +1183,7 @@ namespace Game.Player
             }
 
             _casePreviewButtons.Clear();
+            _caseCardBackgrounds.Clear();
             _caseMaterialIndices.Clear();
             _caseSelectionIndicators.Clear();
             DestroyPreviewTextures(_casePreviewTextures);
@@ -884,8 +1216,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 편집 키보드의 등록된 보강판 재질을 이름 없는 가로 미리보기 목록으로 만든다.
-        /// 보강판 메시와 PlateData를 사용하며 선택 버튼, 타입, 표시 텍스처를 저장한다.
+        /// 편집 키보드의 등록된 보강판 재질을 타입 이름이 있는 가로 목록으로 만든다.
+        /// 보강판 메시와 PlateData를 사용하며 선택 버튼, 타입, 카드 배경을 저장한다.
         /// </summary>
         private void CreatePlatePicker()
         {
@@ -896,6 +1228,7 @@ namespace Game.Player
             }
 
             _platePreviewButtons.Clear();
+            _plateCardBackgrounds.Clear();
             _plateTypes.Clear();
             _platePreviewTypes.Clear();
             _plateSelectionIndicators.Clear();
@@ -973,119 +1306,70 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 케이스 재질 텍스처마다 이름 없는 선택 버튼과 선택 표시를 만든다.
-        /// content와 previews를 사용하며 원본 재질 인덱스와 버튼 참조를 저장한다.
+        /// 케이스 재질 텍스처마다 이름과 미리보기가 있는 선택 버튼을 만든다.
+        /// content와 previews를 사용하며 원본 인덱스와 선택 시각 요소를 저장한다.
         /// </summary>
         private void CreateCasePreviewItems(RectTransform content, Texture2D[] previews)
         {
-            float stride = _itemWidth + _itemSpacing;
             for (int index = 0; index < previews.Length; index++)
             {
                 if (previews[index] == null)
                     continue;
 
-                GameObject itemObject = new GameObject(
-                    "CaseMaterialPreview", typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton));
-                RectTransform itemRect = itemObject.GetComponent<RectTransform>();
-                itemRect.SetParent(content, false);
-                itemRect.anchorMin = new Vector2(0f, 0.5f);
-                itemRect.anchorMax = new Vector2(0f, 0.5f);
-                itemRect.pivot = new Vector2(0.5f, 0.5f);
-                itemRect.anchoredPosition = new Vector2(index * stride + _itemWidth * 0.5f, 0f);
-                itemRect.sizeDelta = new Vector2(_itemWidth, 116f);
-                Image itemImage = itemObject.GetComponent<Image>();
-                itemImage.color = Color.clear;
-                itemImage.raycastTarget = true;
-
-                GameObject imageObject = new GameObject("CasePreviewImage", typeof(RectTransform), typeof(RawImage));
-                RectTransform imageRect = imageObject.GetComponent<RectTransform>();
-                imageRect.SetParent(itemRect, false);
-                imageRect.anchorMin = new Vector2(0.5f, 0.5f);
-                imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-                imageRect.anchoredPosition = new Vector2(0f, 5f);
-                imageRect.sizeDelta = new Vector2(92f, 92f);
-                RawImage image = imageObject.GetComponent<RawImage>();
-                image.texture = previews[index];
-                image.raycastTarget = false;
-
-                KeyboardEditButton button = itemObject.GetComponent<KeyboardEditButton>();
-                button.targetGraphic = image;
-                button.navigation = new Navigation { mode = Navigation.Mode.None };
-
-                GameObject indicatorObject = new GameObject("SelectedIndicator", typeof(RectTransform), typeof(Image));
-                RectTransform indicatorRect = indicatorObject.GetComponent<RectTransform>();
-                indicatorRect.SetParent(itemRect, false);
-                indicatorRect.anchorMin = new Vector2(0.5f, 0f);
-                indicatorRect.anchorMax = new Vector2(0.5f, 0f);
-                indicatorRect.pivot = new Vector2(0.5f, 0f);
-                indicatorRect.anchoredPosition = new Vector2(0f, 2f);
-                indicatorRect.sizeDelta = new Vector2(48f, 3f);
-                Image indicator = indicatorObject.GetComponent<Image>();
-                indicator.color = new Color(0.36f, 0.82f, 1f, 1f);
-                indicator.raycastTarget = false;
+                Material material = _caseCustomization.CaseMaterials[index];
+                KeyboardEditButton button = CreatePickerItemButton(
+                    content,
+                    "CaseMaterial_" + material.name,
+                    _casePreviewButtons.Count,
+                    material.name,
+                    out Image cardBackground,
+                    out Text selectionIndicator);
+                CreateMaterialPreviewImage(
+                    button.transform,
+                    "CasePreviewImage",
+                    previews[index],
+                    new Vector2(PICKER_PREVIEW_WIDTH, PICKER_PREVIEW_HEIGHT),
+                    14f);
+                selectionIndicator.transform.SetAsLastSibling();
 
                 _casePreviewButtons.Add(button);
+                _caseCardBackgrounds.Add(cardBackground);
                 _caseMaterialIndices.Add(index);
-                _caseSelectionIndicators.Add(indicator);
+                _caseSelectionIndicators.Add(selectionIndicator);
             }
         }
 
         /// <summary>
-        /// 보강판 재질 미리보기마다 이름 없는 선택 버튼과 선택 표시를 만든다.
-        /// content와 previews를 사용하며 버튼, PlateType, 표시 참조를 같은 순서로 저장한다.
+        /// 보강판 재질 미리보기마다 타입 이름과 선택 표시가 있는 버튼을 만든다.
+        /// content와 previews를 사용하며 버튼, PlateType, 시각 요소를 같은 순서로 저장한다.
         /// </summary>
         private void CreatePlatePreviewItems(RectTransform content, Texture2D[] previews)
         {
-            float stride = _itemWidth + _itemSpacing;
             for (int index = 0; index < previews.Length; index++)
             {
                 if (previews[index] == null)
                     continue;
 
-                GameObject itemObject = new GameObject(
-                    "PlateMaterialPreview", typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton));
-                RectTransform itemRect = itemObject.GetComponent<RectTransform>();
-                itemRect.SetParent(content, false);
-                itemRect.anchorMin = new Vector2(0f, 0.5f);
-                itemRect.anchorMax = new Vector2(0f, 0.5f);
-                itemRect.pivot = new Vector2(0.5f, 0.5f);
-                itemRect.anchoredPosition = new Vector2(index * stride + _itemWidth * 0.5f, 0f);
-                itemRect.sizeDelta = new Vector2(_itemWidth, 116f);
-                Image itemImage = itemObject.GetComponent<Image>();
-                itemImage.color = Color.clear;
-                itemImage.raycastTarget = true;
-
-                GameObject imageObject = new GameObject("PlatePreviewImage", typeof(RectTransform), typeof(RawImage));
-                RectTransform imageRect = imageObject.GetComponent<RectTransform>();
-                imageRect.SetParent(itemRect, false);
-                imageRect.anchorMin = new Vector2(0.5f, 0.5f);
-                imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-                imageRect.anchoredPosition = new Vector2(0f, 5f);
-                imageRect.sizeDelta = new Vector2(92f, 92f);
-                RawImage image = imageObject.GetComponent<RawImage>();
-                image.texture = previews[index];
-                image.raycastTarget = false;
-
-                KeyboardEditButton button = itemObject.GetComponent<KeyboardEditButton>();
-                button.targetGraphic = image;
-                button.navigation = new Navigation { mode = Navigation.Mode.None };
-
-                GameObject indicatorObject = new GameObject("SelectedIndicator", typeof(RectTransform), typeof(Image));
-                RectTransform indicatorRect = indicatorObject.GetComponent<RectTransform>();
-                indicatorRect.SetParent(itemRect, false);
-                indicatorRect.anchorMin = new Vector2(0.5f, 0f);
-                indicatorRect.anchorMax = new Vector2(0.5f, 0f);
-                indicatorRect.pivot = new Vector2(0.5f, 0f);
-                indicatorRect.anchoredPosition = new Vector2(0f, 2f);
-                indicatorRect.sizeDelta = new Vector2(48f, 3f);
-                Image indicator = indicatorObject.GetComponent<Image>();
-                indicator.color = new Color(0.36f, 0.82f, 1f, 1f);
-                indicator.raycastTarget = false;
-                indicator.enabled = false;
+                PlateType type = _plateTypes[index];
+                KeyboardEditButton button = CreatePickerItemButton(
+                    content,
+                    "PlateMaterial_" + type,
+                    _platePreviewButtons.Count,
+                    type.ToString(),
+                    out Image cardBackground,
+                    out Text selectionIndicator);
+                CreateMaterialPreviewImage(
+                    button.transform,
+                    "PlatePreviewImage",
+                    previews[index],
+                    new Vector2(PICKER_PREVIEW_WIDTH, PICKER_PREVIEW_HEIGHT),
+                    14f);
+                selectionIndicator.transform.SetAsLastSibling();
 
                 _platePreviewButtons.Add(button);
-                _platePreviewTypes.Add(_plateTypes[index]);
-                _plateSelectionIndicators.Add(indicator);
+                _plateCardBackgrounds.Add(cardBackground);
+                _platePreviewTypes.Add(type);
+                _plateSelectionIndicators.Add(selectionIndicator);
             }
         }
 
@@ -1106,12 +1390,18 @@ namespace Game.Player
 
         /// <summary>
         /// 선택한 편집 항목에 해당하는 목록만 표시한다.
-        /// mode와 각 viewport를 사용하며 표시할 목록의 종류와 활성 상태를 변경한다.
+        /// mode와 각 viewport를 사용하며 목록의 활성 상태와 좌측 버튼의 선택 강조를 변경한다.
         /// </summary>
         private void SetPickerMode(PickerMode mode)
         {
             PickerMode previous = _pickerMode;
             _pickerMode = mode == PickerMode.Keycap && _viewport == null ? PickerMode.None : mode;
+            _keycapButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Keycap);
+            _switchAxisButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.SwitchSound);
+            _ledButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Led);
+            _caseButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.CaseMaterial);
+            _plateButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Plate);
+            _customButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Photo);
             if (_viewport != null)
             {
                 _viewport.gameObject.SetActive(_pickerMode == PickerMode.Keycap);

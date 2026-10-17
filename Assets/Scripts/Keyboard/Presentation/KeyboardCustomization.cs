@@ -137,11 +137,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
         if (Application.IsPlaying(gameObject))
         {
-            /*
             DisableKeycaps();
             DisableSwitches();
             SetLEDEnabled(false);
-            */
         }
     }
 
@@ -486,7 +484,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             _imageCustomization = GetComponent<KeyboardImageCustomization>();
             if (_imageCustomization == null) _imageCustomization = gameObject.AddComponent<KeyboardImageCustomization>();
         }
-        _imageCustomization.Initialize(_caseRenderers, _keycapRenderers, _photoMaterialTemplate);
+        _imageCustomization.Initialize(_caseRenderers, _keycapRenderers, _photoMaterialTemplate, HasSwitchForKeycap);
         return _imageCustomization;
     }
 
@@ -583,6 +581,16 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #region 키캡
 
     /// <summary>
+    /// keycapIndex와 같은 인덱스에 축이 설치되어 있는지 확인한다.
+    /// 유효한 축 GameObject의 activeSelf가 true일 때만 true를 반환한다.
+    /// </summary>
+    public bool HasSwitchForKeycap(int keycapIndex)
+    {
+        return keycapIndex >= 0 && keycapIndex < _switches.Length &&
+            _switches[keycapIndex] != null && _switches[keycapIndex].gameObject.activeSelf;
+    }
+
+    /// <summary>
     /// keycapIndex 키캡을 활성화하며 음수 입력은 전체 키캡을 대상으로 한다.
     /// 반환값 없이 꺼진 루트만 켜고 축과 다른 키의 활성 상태는 유지한다.
     /// </summary>
@@ -592,6 +600,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         for (int index = 0; index < _keycaps.Length; index++)
         {
             if (keycapIndex >= 0 && index != keycapIndex) continue;
+            if (!HasSwitchForKeycap(index)) continue;
             Transform keycap = _keycaps[index];
             if (keycap != null && !keycap.gameObject.activeSelf) keycap.gameObject.SetActive(true);
         }
@@ -617,7 +626,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public bool SetKeycapMaterial(int keycapIndex, Material material)
     {
         if (_keycaps == null) CacheKeycaps();
-        if (material == null || keycapIndex < 0 || keycapIndex >= _keycaps.Length)
+        if (material == null || keycapIndex < 0 || keycapIndex >= _keycaps.Length || !HasSwitchForKeycap(keycapIndex))
         {
             return false;
         }
@@ -673,10 +682,12 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         _keycapMaterial = material;
         _keycapMaterialIndex = Array.IndexOf(_materials, material);
-        _keycapMaterialOverrides.Clear();
-        ClearKeycapImage();
-        ApplyKeycapMaterial();
-        EnableKeycaps();
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (!HasSwitchForKeycap(index)) continue;
+            SetKeycapMaterial(index, material);
+        }
     }
 
     /// <summary>
@@ -690,11 +701,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             return;
         }
 
-        _keycapMaterialIndex = index;
-        _keycapMaterialOverrides.Clear();
-        ClearKeycapImage();
-        ApplySelectedKeycapMaterial();
-        if (_keycapMaterial != null) EnableKeycaps();
+        SetKeycapMaterial(_materials[index]);
     }
 
     /// <summary>
@@ -724,20 +731,15 @@ public sealed class KeyboardCustomization : MonoBehaviour
             return;
         }
 
-        foreach (MeshRenderer renderer in _keycapRenderers)
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
         {
-            if (renderer != null && (_imageCustomization == null || !_imageCustomization.HasImage(renderer)))
-            {
-                renderer.sharedMaterial = _keycapMaterial;
-            }
-        }
-
-        foreach (var pair in _keycapMaterialOverrides)
-        {
-            if (pair.Key == null) continue;
+            Transform keycap = _keycaps[index];
+            if (keycap == null || !HasSwitchForKeycap(index)) continue;
+            Material material = _keycapMaterialOverrides.TryGetValue(keycap, out Material selected) ? selected : _keycapMaterial;
             foreach (MeshRenderer renderer in _keycapRenderers)
-                if (renderer != null && renderer.transform.IsChildOf(pair.Key) &&
-                    (_imageCustomization == null || !_imageCustomization.HasImage(renderer))) renderer.sharedMaterial = pair.Value;
+                if (renderer != null && renderer.transform.IsChildOf(keycap) &&
+                    (_imageCustomization == null || !_imageCustomization.HasImage(renderer))) renderer.sharedMaterial = material;
         }
     }
 

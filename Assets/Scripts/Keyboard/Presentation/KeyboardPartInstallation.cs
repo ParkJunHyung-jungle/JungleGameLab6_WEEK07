@@ -165,6 +165,15 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
 
     void OnDisable()
     {
+        CancelAll();
+    }
+
+    /// <summary>
+    /// 입력 없이 모든 설치 연출을 취소하고 임시 이동과 분리 상태를 정리한다.
+    /// 반환값 없이 원래 위치를 복원해 저장 상태 적용 후 연출이 파츠를 다시 켜지 않도록 한다.
+    /// </summary>
+    public void CancelAll()
+    {
         StopAllCoroutines();
         foreach (var pair in _installations)
             if (pair.Key != null) RestorePosition(pair.Key, pair.Value);

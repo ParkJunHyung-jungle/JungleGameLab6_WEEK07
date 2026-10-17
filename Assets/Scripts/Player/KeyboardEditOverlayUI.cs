@@ -6,6 +6,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 
+using Game.Tournament;
+
 namespace Game.Player
 {
     public sealed class KeyboardEditOverlayUI : MonoBehaviour, IPointerDownHandler
@@ -54,6 +56,7 @@ namespace Game.Player
         [Header("Keycap Material Picker")]
         [SerializeField] private GameObject _previewKeycapPrefab;
         [SerializeField] private Material[] _keycapMaterials = new Material[0];
+        [SerializeField] private KeycapDefinition[] _keycapDefinitions = new KeycapDefinition[0];
         [SerializeField, Min(1f)] private float _viewportWidth = 860f;
         [SerializeField, Min(1f)] private float _itemWidth = 116f;
         [SerializeField, Min(0f)] private float _itemSpacing = 11f;
@@ -70,7 +73,9 @@ namespace Game.Player
         private readonly List<Image> _previewCardBackgrounds = new List<Image>();
         private readonly List<Text> _selectionIndicators = new List<Text>();
         private readonly List<Texture2D> _previewTextures = new List<Texture2D>();
+        private readonly List<KeycapDefinition> _previewDefinitions = new List<KeycapDefinition>();
         private Material _selectedMaterial;
+        private KeycapDefinition _selectedKeycapDefinition;
 
         [Header("Switch Sound Picker")]
         private RectTransform _switchSoundViewport;
@@ -291,6 +296,7 @@ namespace Game.Player
         public void SetSelectedMaterial(Material material)
         {
             _selectedMaterial = material;
+            _selectedKeycapDefinition = null;
             RefreshSelectionIndicators();
         }
 
@@ -402,7 +408,7 @@ namespace Game.Player
                 else
                 {
                     _hasActiveKeycapMaterialPreview = customization.PreviewKeycapMaterial(
-                        _selectedMaterial, allKeys, keycapIndex);
+                        _selectedMaterial, allKeys, keycapIndex, _selectedKeycapDefinition);
                     _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
                 }
                 _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
@@ -415,6 +421,7 @@ namespace Game.Player
             _selectedMaterial = allKeys
                 ? customization.KeycapMaterial
                 : customization.GetKeycapMaterial(keycapIndex);
+            _selectedKeycapDefinition = customization.GetKeycapDefinition(allKeys ? -1 : keycapIndex);
             RefreshSelectionIndicators();
         }
 
@@ -460,7 +467,7 @@ namespace Game.Player
 
             KeyboardCustomization customization = _photoStorage.Customization;
             Material previousMaterial = customization.GetCommittedKeycapMaterial(allKeys, keycapIndex);
-            if (!customization.CommitKeycapMaterialPreview(_selectedMaterial, allKeys, keycapIndex))
+            if (!customization.CommitKeycapMaterialPreview(_selectedMaterial, allKeys, keycapIndex, _selectedKeycapDefinition))
             {
                 CancelKeycapMaterialPreview();
                 RefreshKeycapMaterialSelection();
@@ -471,7 +478,8 @@ namespace Game.Player
             _hasPendingKeycapMaterial = retainMaterialSelection;
             _hasActiveKeycapMaterialPreview = false;
             _keycapUI.SetCanApply(false, _hasPendingKeycapMaterial);
-            RefreshKeycapMaterialSelection();
+            if (retainMaterialSelection) RefreshSelectionIndicators();
+            else RefreshKeycapMaterialSelection();
         }
 
         /// <summary>
@@ -502,10 +510,12 @@ namespace Game.Player
                 _selectedMaterial = allKeys
                     ? _photoStorage.Customization.KeycapMaterial
                     : _photoStorage.Customization.GetKeycapMaterial(keycapIndex);
+                _selectedKeycapDefinition = _photoStorage.Customization.GetKeycapDefinition(allKeys ? -1 : keycapIndex);
             }
             else
             {
                 _selectedMaterial = _photoStorage.Customization.KeycapMaterial;
+                _selectedKeycapDefinition = _photoStorage.Customization.GetKeycapDefinition(-1);
             }
 
             RefreshSelectionIndicators();
@@ -524,6 +534,7 @@ namespace Game.Player
             if (!customization.HasAnyInstalledKeycaps() && _previewMaterials.Count > 0)
             {
                 _selectedMaterial = _previewMaterials[0];
+                _selectedKeycapDefinition = _previewDefinitions[0];
                 RefreshSelectionIndicators();
             }
 
@@ -533,7 +544,8 @@ namespace Game.Player
             _hasActiveKeycapMaterialPreview = customization.PreviewKeycapMaterial(
                 _selectedMaterial,
                 true,
-                -1);
+                -1,
+                _selectedKeycapDefinition);
             _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
             _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
         }
@@ -721,7 +733,7 @@ namespace Game.Player
 
         /// <summary>
         /// 편집 패널에 재질 미리보기와 이름이 있는 가로 선택 목록을 만든다.
-        /// 프리팹 메시와 재질 배열을 사용하며 키캡 버튼과 미리보기 텍스처를 구성한다.
+        /// 프리팹 메시, 재질 배열과 등록된 키캡 SO를 사용하며 모델을 포함한 선택 목록과 미리보기 텍스처를 구성한다.
         /// </summary>
         private void CreateMaterialPicker()
         {
@@ -738,9 +750,33 @@ namespace Game.Player
                 return;
             }
 
-            Texture2D[] previews = CreateMaterialPreviewTextures(shellMeshFilter.sharedMesh);
-            CreateViewport();
-            CreatePreviewItems(previews);
+            var materials = new List<Material>();
+            var definitions = new List<KeycapDefinition>();
+            foreach (Material material in _keycapMaterials)
+            {
+                KeycapDefinition matched = null;
+                foreach (KeycapDefinition definition in _keycapDefinitions)
+                {
+                    if (definition != null && definition.ShellMesh == null && definition.Material == material)
+                    {
+                        if (matched != null && matched != definition)
+                            throw new InvalidOperationException("Material-only keycap choices must have a unique definition.");
+                        matched = definition;
+                    }
+                }
+                materials.Add(material);
+                definitions.Add(matched);
+            }
+            foreach (KeycapDefinition definition in _keycapDefinitions)
+            {
+                if (definition == null || definition.ShellMesh == null || definitions.Contains(definition)) continue;
+                materials.Add(definition.Material);
+                definitions.Add(definition);
+            }
+            Texture2D[] previews = CreateMaterialPreviewTextures(shellMeshFilter.sharedMesh,
+                materials, _previewTextures, "Keycap", definitions);
+            CreateViewport(materials.Count);
+            CreatePreviewItems(previews, materials, definitions);
             RefreshSelectionIndicators();
         }
 
@@ -763,23 +799,15 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 각 재질을 공통 키캡 메시로 오프스크린 렌더링해 UI용 텍스처를 만든다.
-        /// keycapMesh와 _keycapMaterials를 사용하며 배열 순서를 유지한 Texture2D 목록을 반환한다.
-        /// </summary>
-        private Texture2D[] CreateMaterialPreviewTextures(Mesh keycapMesh)
-        {
-            return CreateMaterialPreviewTextures(keycapMesh, _keycapMaterials, _previewTextures, "Keycap");
-        }
-
-        /// <summary>
         /// 미리보기 메시와 재질 목록을 오프스크린 렌더링해 텍스처 배열을 만든다.
-        /// previewMesh, materials, previewName을 사용하며 생성한 텍스처를 textures에 기록하고 반환한다.
+        /// previewMesh, materials, previewName과 선택적 definitions의 모델을 사용하며 생성한 텍스처를 textures에 기록하고 반환한다.
         /// </summary>
         private Texture2D[] CreateMaterialPreviewTextures(
             Mesh previewMesh,
             IReadOnlyList<Material> materials,
             List<Texture2D> textures,
-            string previewName)
+            string previewName,
+            IReadOnlyList<KeycapDefinition> definitions = null)
         {
             Texture2D[] previews = new Texture2D[materials.Count];
             GameObject previewStage = new GameObject(previewName + "MaterialPreviewStage");
@@ -850,7 +878,21 @@ namespace Game.Player
                         continue;
                     }
 
-                    meshRenderer.sharedMaterial = CreatePreviewMaterial(material, previewMaterials);
+                    KeycapDefinition definition = definitions != null ? definitions[index] : null;
+                    meshFilter.sharedMesh = definition != null && definition.ShellMesh != null ? definition.ShellMesh : previewMesh;
+                    Material[] sourceMaterials = definition != null && definition.ShellMesh != null
+                        ? definition.ModelMaterials : new[] { material };
+                    var modelMaterials = new Material[sourceMaterials.Length];
+                    for (int slot = 0; slot < sourceMaterials.Length; slot++)
+                        modelMaterials[slot] = CreatePreviewMaterial(sourceMaterials[slot], previewMaterials);
+                    meshRenderer.sharedMaterials = modelMaterials;
+                    bounds = meshRenderer.bounds;
+                    radius = bounds.extents.magnitude;
+                    cameraDistance = Mathf.Max(3f, radius * 3f);
+                    previewCamera.farClipPlane = Mathf.Max(10f, cameraDistance + radius * 2f);
+                    previewCamera.transform.position = bounds.center + viewDirection * cameraDistance;
+                    previewCamera.transform.LookAt(bounds.center, Vector3.up);
+                    previewCamera.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 1.8f;
                     KeyboardToonSurface.ApplyBounds(meshRenderer);
                     previewCamera.Render();
                     RenderTexture.active = renderTexture;
@@ -923,11 +965,11 @@ namespace Game.Player
 
         /// <summary>
         /// 화면 상단에 잘리는 투명 viewport와 그 안의 가로 콘텐츠 영역을 만든다.
-        /// overlay 크기를 사용하며 이후 목록 스크롤이 적용될 RectTransform을 저장한다.
+        /// overlay 크기와 itemCount를 사용하며 이후 목록 스크롤이 적용될 RectTransform을 저장한다.
         /// </summary>
-        private void CreateViewport()
+        private void CreateViewport(int itemCount)
         {
-            _viewport = CreateScrollViewport("KeycapMaterial", _keycapMaterials.Length, out _content);
+            _viewport = CreateScrollViewport("KeycapMaterial", itemCount, out _content);
         }
 
         /// <summary>
@@ -1337,9 +1379,10 @@ namespace Game.Player
 
         /// <summary>
         /// 텍스처가 생성된 재질마다 이름과 미리보기가 있는 선택 버튼을 추가한다.
-        /// previews와 _keycapMaterials 순서를 사용하며 버튼과 선택 시각 요소를 저장한다.
+        /// previews, materials와 definitions의 대응 순서로 이름, 부품 SO와 선택 시각 요소를 저장한다.
         /// </summary>
-        private void CreatePreviewItems(Texture2D[] previews)
+        private void CreatePreviewItems(Texture2D[] previews, IReadOnlyList<Material> materials,
+            IReadOnlyList<KeycapDefinition> definitions)
         {
             if (_content == null)
             {
@@ -1348,17 +1391,19 @@ namespace Game.Player
 
             for (int index = 0; index < previews.Length; index++)
             {
-                if (previews[index] == null || _keycapMaterials[index] == null)
+                if (previews[index] == null || materials[index] == null)
                 {
                     continue;
                 }
 
-                Material material = _keycapMaterials[index];
+                Material material = materials[index];
+                KeycapDefinition definition = definitions[index];
+                string label = definition != null ? definition.DisplayName : material.name;
                 KeyboardEditButton previewButton = CreatePickerItemButton(
                     _content,
-                    "KeycapMaterial_" + material.name,
+                    "KeycapMaterial_" + (definition != null ? definition.Id : material.name),
                     _previewButtons.Count,
-                    material.name,
+                    label,
                     out Image cardBackground,
                     out Text selectionIndicator);
                 CreateMaterialPreviewImage(
@@ -1371,6 +1416,7 @@ namespace Game.Player
 
                 _previewButtons.Add(previewButton);
                 _previewMaterials.Add(material);
+                _previewDefinitions.Add(definition);
                 _previewCardBackgrounds.Add(cardBackground);
                 _selectionIndicators.Add(selectionIndicator);
             }
@@ -1378,7 +1424,7 @@ namespace Game.Player
 
         /// <summary>
         /// index 재질을 선택 표시와 현재 키캡 범위의 키보드 미리보기에 반영한다.
-        /// 유효한 재질과 패널 대상 상태를 사용하며 적용 전 변경으로 보관한다.
+        /// 유효한 재질, 대응하는 키캡 SO와 패널 대상을 사용하며 모델을 포함한 적용 전 변경으로 보관한다.
         /// </summary>
         private void SelectMaterial(int index)
         {
@@ -1388,6 +1434,7 @@ namespace Game.Player
             }
 
             _selectedMaterial = _previewMaterials[index];
+            _selectedKeycapDefinition = _previewDefinitions[index];
             RefreshSelectionIndicators();
             if (_pickerMode != PickerMode.Keycap)
                 return;
@@ -1404,7 +1451,8 @@ namespace Game.Player
                 _hasActiveKeycapMaterialPreview = _photoStorage.Customization.PreviewKeycapMaterial(
                     _selectedMaterial,
                     allKeys,
-                    keycapIndex);
+                    keycapIndex,
+                    _selectedKeycapDefinition);
                 _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
             }
             _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
@@ -1412,7 +1460,7 @@ namespace Game.Player
 
         /// <summary>
         /// 저장된 재질과 각 미리보기 재질을 비교해 카드 선택 상태를 갱신한다.
-        /// _selectedMaterial과 목록을 사용하며 일치하는 버튼의 배경과 체크를 켠다.
+        /// 선택된 SO를 우선 비교하고 SO가 없는 기존 구성은 일반 재질로 비교해 버튼의 배경과 체크를 켠다.
         /// </summary>
         private void RefreshSelectionIndicators()
         {
@@ -1422,7 +1470,10 @@ namespace Game.Player
                     _previewButtons[index],
                     _previewCardBackgrounds[index],
                     _selectionIndicators[index],
-                    _previewMaterials[index] == _selectedMaterial);
+                    _selectedKeycapDefinition != null
+                        ? _previewDefinitions[index] == _selectedKeycapDefinition
+                        : (_previewDefinitions[index] == null || _previewDefinitions[index].ShellMesh == null)
+                            && _previewMaterials[index] == _selectedMaterial);
             }
         }
 

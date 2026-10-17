@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 [CreateAssetMenu(menuName = "Keyboard/Material Catalog")]
 public sealed class KeyboardMaterialCatalog : ScriptableObject
@@ -25,7 +25,7 @@ public sealed class KeyboardMaterialCatalog : ScriptableObject
     public KeyboardCustomizationState CaptureForBattle(KeyboardCustomization keyboard)
     {
         return keyboard.CaptureBattleState(_materials, _ids,
-            GetDefaultState());
+            GetDefaultState(), _keycapDefinitions);
     }
 
     /// <summary>
@@ -34,7 +34,7 @@ public sealed class KeyboardMaterialCatalog : ScriptableObject
     /// </summary>
     public KeyboardCustomizationState Capture(KeyboardCustomization keyboard)
     {
-        return keyboard.CaptureState(_materials, _ids);
+        return keyboard.CaptureState(_materials, _ids, _keycapDefinitions);
     }
 
     /// <summary>

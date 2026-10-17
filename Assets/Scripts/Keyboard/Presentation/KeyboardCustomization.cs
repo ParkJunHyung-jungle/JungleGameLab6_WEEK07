@@ -79,6 +79,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
     private KeycapMaterialPreviewSnapshot _keycapMaterialPreviewSnapshot;
     private readonly Dictionary<Transform, KeycapModelAppearance> _keycapModels = new Dictionary<Transform, KeycapModelAppearance>();
+    private readonly Dictionary<Transform, Game.Tournament.KeycapDefinition> _keycapPartDefinitions = new Dictionary<Transform, Game.Tournament.KeycapDefinition>();
     private readonly Dictionary<Transform, Game.Tournament.KeycapDefinition> _keycapModelDefinitions = new Dictionary<Transform, Game.Tournament.KeycapDefinition>();
 
     public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
@@ -275,31 +276,73 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// catalog와 materialIds로 구성을 복사하고 미설치 부품만 defaults의 값으로 채운다.
     /// 전투용 상태를 반환하며 작업실 키보드의 재질과 설치 여부는 유지한다.
     /// </summary>
-    public KeyboardCustomizationState CaptureBattleState(Material[] catalog, string[] materialIds, KeyboardCustomizationState defaults)
+    public KeyboardCustomizationState CaptureBattleState(Material[] catalog, string[] materialIds, KeyboardCustomizationState defaults,
+        IReadOnlyList<Game.Tournament.KeycapDefinition> keycapDefinitions = null)
     {
-        KeyboardCustomizationState state = CaptureState(catalog, materialIds);
+        KeyboardCustomizationState state = CaptureState(catalog, materialIds, keycapDefinitions);
         MeshRenderer[] renderers = GetCustomizationRenderers();
+        var counts = (int[])state.SlotCounts.Clone();
+        var materials = new List<int>();
+        var defaultOffsets = new Dictionary<string, int>();
+        int offset = 0;
+        for (int index = 0; index < defaults.RendererPaths.Length; index++)
+        {
+            defaultOffsets.Add(defaults.RendererPaths[index], offset);
+            offset += defaults.SlotCounts[index];
+        }
         int slot = 0;
         for (int index = 0; index < renderers.Length; index++)
         {
-            bool missing = false;
+            int missingKey = -1;
             for (int key = 0; key < _keycaps.Length; key++)
-            {
-                if (renderers[index].transform.IsChildOf(_keycaps[key]) &&
-                    !_keycaps[key].gameObject.activeSelf)
+                if (renderers[index].transform.IsChildOf(_keycaps[key]) && !_keycaps[key].gameObject.activeSelf)
                 {
-                    missing = true;
-                    state.ImageState.KeycapImages[key] = -1;
-                    state.ImageState.IndividualImages[key] = false;
+                    missingKey = key;
                     break;
                 }
+            if (missingKey >= 0)
+            {
+                state.ImageState.KeycapImages[missingKey] = -1;
+                state.ImageState.IndividualImages[missingKey] = false;
+                int defaultIndex = Array.IndexOf(defaults.RendererPaths, state.RendererPaths[index]);
+                counts[index] = defaults.SlotCounts[defaultIndex];
+                int start = defaultOffsets[state.RendererPaths[index]];
+                for (int material = 0; material < counts[index]; material++)
+                {
+                    int oldIndex = defaults.MaterialIndices[start + material];
+                    materials.Add(oldIndex < 0 ? -1 : Array.IndexOf(state.CatalogIds, defaults.CatalogIds[oldIndex]));
+                }
+                if (state.HasKeycapDefinitions && renderers[index].name == "PBT_SculptedShell")
+                {
+                    var layout = GetComponent<KeyboardInputController>().GetKeycapLayout();
+                    for (int key = 0; key < state.KeycapKeys.Length; key++)
+                        if (layout[state.KeycapKeys[key]].transform == _keycaps[missingKey])
+                        {
+                            if (defaults.HasKeycapDefinitions)
+                                state.KeycapDefinitionIds[key] = defaults.KeycapDefinitionIds[Array.IndexOf(defaults.KeycapKeys, state.KeycapKeys[key])];
+                            else
+                            {
+                                int material = defaults.MaterialIndices[start];
+                                int registered = material < 0 ? -1 : Array.IndexOf(materialIds, defaults.CatalogIds[material]);
+                                var part = registered < 0 ? null : FindLegacyKeycapDefinition(catalog[registered], keycapDefinitions);
+                                state.KeycapDefinitionIds[key] = part != null ? part.Id : "";
+                            }
+                            break;
+                        }
+                }
             }
-            for (int material = 0; material < state.SlotCounts[index]; material++, slot++)
-                if (missing) state.MaterialIndices[slot] = defaults.MaterialIndices[slot];
+            else
+                for (int material = 0; material < counts[index]; material++) materials.Add(state.MaterialIndices[slot + material]);
+            slot += state.SlotCounts[index];
         }
         for (int index = 0; index < _switches.Length; index++)
             if (!_switches[index].gameObject.activeSelf) state.SwitchTypes[index] = defaults.SwitchTypes[index];
-        return state;
+        for (int index = 0; index < state.KeycapInstalled.Length; index++) state.KeycapInstalled[index] = true;
+        for (int index = 0; index < state.SwitchInstalled.Length; index++) state.SwitchInstalled[index] = true;
+        return new KeyboardCustomizationState(state.LedEnabled, state.LedColor, state.LedIntensity, state.Selection,
+            state.CatalogIds, state.RendererPaths, counts, materials.ToArray(), state.SwitchTypes, state.PlateType,
+            state.LedPattern, state.LedSpeed, state.ImageState, state.PlateMaterialId, state.PlateEffect,
+            state.KeycapInstalled, state.SwitchInstalled, state.KeycapKeys, state.KeycapDefinitionIds);
     }
 
     /// <summary>
@@ -335,6 +378,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     void OnValidate()
     {
 #if UNITY_EDITOR
+        if (PrefabUtility.IsPartOfPrefabAsset(this)) return;
         EditorApplication.delayCall -= ApplyCaseEditorPreview;
         EditorApplication.delayCall += ApplyCaseEditorPreview;
 #endif
@@ -357,7 +401,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public void ApplyCaseEditorPreview()
     {
-        if (this == null)
+        if (this == null || PrefabUtility.IsPartOfPrefabAsset(this))
         {
             return;
         }
@@ -421,11 +465,13 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #region 저장 및 불러오기
 
     /// <summary>
-    /// catalog와 materialIds로 현재 렌더러 재질을 식별하고 LED 및 파츠 선택 상태를 수집한다.
-    /// 개별 키캡 변경을 포함하는 저장 데이터를 반환하며 등록되지 않은 재질은 예외로 알린다.
+    /// catalog와 materialIds로 렌더러 상태를 수집하고 keycapDefinitions로 키별 SO ID를 기록한다.
+    /// 카탈로그가 있으면 버전 5 상태를 반환하며 등록되지 않은 재질이나 모호한 이전 부품 식별은 예외로 알린다.
     /// </summary>
-    public KeyboardCustomizationState CaptureState(Material[] catalog, string[] materialIds)
+    public KeyboardCustomizationState CaptureState(Material[] catalog, string[] materialIds,
+        IReadOnlyList<Game.Tournament.KeycapDefinition> keycapDefinitions = null)
     {
+        if (_keycaps == null) CacheKeycaps();
         ApplySelectedPlateSettings();
         if (catalog.Length != materialIds.Length) throw new InvalidOperationException("Material registry is invalid.");
         MeshRenderer[] renderers = GetCustomizationRenderers();
@@ -443,9 +489,36 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         var switchTypes = new SwitchType[_switches.Length];
+        var switchInstalled = new bool[_switches.Length];
         for (int index = 0; index < _switches.Length; index++)
         {
             switchTypes[index] = _switches[index].CurrentData != null ? _switches[index].CurrentData.Type : _switchType;
+            switchInstalled[index] = _switches[index].gameObject.activeSelf;
+        }
+        var keycapInstalled = new bool[_keycaps.Length];
+        for (int index = 0; index < _keycaps.Length; index++)
+            keycapInstalled[index] = _keycaps[index] != null && _keycaps[index].gameObject.activeSelf;
+
+        UnityEngine.InputSystem.Key[] keycapKeys = null;
+        string[] keycapIds = null;
+        if (keycapDefinitions != null)
+        {
+            var layout = GetComponent<KeyboardInputController>().GetKeycapLayout();
+            var keys = new List<UnityEngine.InputSystem.Key>(layout.Keys);
+            keys.Sort();
+            keycapKeys = keys.ToArray();
+            keycapIds = new string[keycapKeys.Length];
+            for (int index = 0; index < keycapKeys.Length; index++)
+            {
+                Transform keycap = layout[keycapKeys[index]].transform;
+                if (!_keycapPartDefinitions.TryGetValue(keycap, out Game.Tournament.KeycapDefinition part))
+                {
+                    MeshRenderer shell = keycap.Find("PBT_SculptedShell").GetComponent<MeshRenderer>();
+                    Material[] materials = GetImageCustomization().GetMaterialsForStorage(shell);
+                    part = FindLegacyKeycapDefinition(materials[0], keycapDefinitions);
+                }
+                keycapIds[index] = part != null ? part.Id : "";
+            }
         }
 
         int plateMaterialIndex = GetMaterialIndex(_plateMaterial, catalog);
@@ -454,21 +527,26 @@ public sealed class KeyboardCustomization : MonoBehaviour
             (string[])materialIds.Clone(), paths, counts, indices.ToArray(), switchTypes,
             _plateType, _ledPattern, _ledSpeed,
             GetImageCustomization().CaptureState(),
-            plateMaterialIndex >= 0 ? materialIds[plateMaterialIndex] : null, _plateEffect);
+            plateMaterialIndex >= 0 ? materialIds[plateMaterialIndex] : null, _plateEffect,
+            keycapInstalled, switchInstalled, keycapKeys, keycapIds);
     }
 
     /// <summary>
-    /// state와 현재 Material 카탈로그를 검증한 뒤 LED, 실제 재질, 축 및 Plate 선택을 복원한다.
+    /// state의 키별 SO ID와 Material 카탈로그를 검증한 뒤 LED, 모델, 재질과 나머지 부품을 복원한다.
     /// 반환값 없이 현재 인스턴스만 변경하며 호환되지 않는 데이터는 적용 전에 예외로 알린다.
     /// </summary>
     public void ApplyState(KeyboardCustomizationState state, Material[] catalog, string[] materialIds,
         IReadOnlyList<Game.Tournament.KeycapDefinition> keycapDefinitions = null)
     {
         if (_keycaps == null) CacheKeycaps();
-        if (state == null || (state.Version < 1 || state.Version > 4) || state.Selection == null || state.Selection.Length != 4 ||
+        if (state == null || (state.Version < 1 || state.Version > 6) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
             throw new InvalidOperationException("Save data is invalid or unsupported.");
+
+        if (state.HasInstallationState && (state.KeycapInstalled == null || state.SwitchInstalled == null ||
+            state.KeycapInstalled.Length != _keycaps.Length || state.SwitchInstalled.Length != _switches.Length))
+            throw new InvalidOperationException("Saved part installation layout is incompatible.");
 
         var remap = new int[state.CatalogIds.Length];
         for (int index = 0; index < remap.Length; index++)
@@ -485,23 +563,21 @@ public sealed class KeyboardCustomization : MonoBehaviour
             float.IsNaN(state.LedSpeed) || float.IsInfinity(state.LedSpeed))
             throw new InvalidOperationException("The saved keyboard layout or settings are incompatible.");
 
+        foreach (int index in state.MaterialIndices) ValidateSavedMaterialIndex(index, remap.Length);
+        Dictionary<Transform, Game.Tournament.KeycapDefinition> savedParts = ResolveSavedKeycaps(state, renderers,
+            catalog, remap, keycapDefinitions);
+
         int totalSlots = 0;
         for (int index = 0; index < renderers.Length; index++)
         {
             int expectedSlots = renderers[index] != null ? renderers[index].sharedMaterials.Length : 0;
             if (renderers[index] != null && renderers[index].name == "PBT_SculptedShell")
             {
-                Game.Tournament.KeycapDefinition model = null;
-                if (totalSlots < state.MaterialIndices.Length)
-                {
-                    int savedMaterial = state.MaterialIndices[totalSlots];
-                    if (savedMaterial >= 0 && savedMaterial < remap.Length)
-                        model = FindKeycapModel(catalog[remap[savedMaterial]], keycapDefinitions);
-                }
+                savedParts.TryGetValue(renderers[index].transform.parent, out Game.Tournament.KeycapDefinition model);
                 KeycapModelAppearance appearance = _keycapModels[renderers[index].transform.parent];
                 if (model != null && model.OneUnitOnly && !appearance.IsOneUnit)
                     throw new InvalidOperationException("A saved keycap model requires a 1u slot.");
-                expectedSlots = model != null ? model.ModelMaterials.Length : appearance.OriginalMaterialCount;
+                expectedSlots = model != null && model.ShellMesh != null ? model.ModelMaterials.Length : appearance.OriginalMaterialCount;
             }
             if (renderers[index] == null || state.RendererPaths[index] != GetRendererPath(renderers[index].transform) ||
                 state.SlotCounts[index] != expectedSlots)
@@ -541,6 +617,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         KeyboardImageCustomization images = GetImageCustomization();
         Texture2D[] preparedImages = images.PrepareState(state.ImageState);
+        if (_partInstallation != null) _partInstallation.CancelAll();
         images.ClearKeycapImage();
         images.ClearCaseImage();
 
@@ -571,14 +648,24 @@ public sealed class KeyboardCustomization : MonoBehaviour
             renderers[index].sharedMaterials = materials;
             if (renderers[index].name == "PBT_SculptedShell")
             {
-                Game.Tournament.KeycapDefinition model = FindKeycapModel(materials[0], keycapDefinitions);
-                if (model != null) SetKeycapModel(renderers[index].transform.parent, model);
+                savedParts.TryGetValue(renderers[index].transform.parent, out Game.Tournament.KeycapDefinition part);
+                SetKeycapModel(renderers[index].transform.parent, part);
+                if (part == null || part.ShellMesh == null)
+                {
+                    if (part != null) materials[0] = part.Material;
+                    renderers[index].sharedMaterials = materials;
+                }
             }
             KeyboardToonSurface.ApplyBounds(renderers[index]);
         }
 
         RememberKeycapMaterialOverrides();
         images.RestoreState(state.ImageState, preparedImages);
+
+        for (int index = 0; index < _switches.Length; index++)
+            _switches[index].gameObject.SetActive(!state.HasInstallationState || state.SwitchInstalled[index]);
+        for (int index = 0; index < _keycaps.Length; index++)
+            if (_keycaps[index] != null) _keycaps[index].gameObject.SetActive(!state.HasInstallationState || state.KeycapInstalled[index]);
 
         _ledEnabled = state.LedEnabled;
         _ledColor = state.LedColor;
@@ -1140,7 +1227,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// 축이 설치된 keycapIndex 키캡에 material을 적용하고 기존 설치 연출을 재생한다.
+    /// 축이 설치된 keycapIndex 키캡의 사진과 모델을 해제하고 material을 적용해 설치 연출을 재생한다.
+    /// 파손된 키캡은 체력과 외피 표시를 복구한다.
     /// material과 인덱스를 사용하며 축 미설치, 잘못된 인덱스 또는 렌더러 누락은 false를 반환한다.
     /// </summary>
     public bool SetKeycapMaterial(int keycapIndex, Material material)
@@ -1154,23 +1242,29 @@ public sealed class KeyboardCustomization : MonoBehaviour
         Transform keycap = _keycaps[keycapIndex];
         if (keycap == null) return false;
 
-        ClearKeycapImage(keycapIndex);
-        SetKeycapModel(keycap, null);
-        _keycapMaterialOverrides[keycap] = material;
+        return ApplyKeycapMaterialToKey(keycapIndex, material, true);
+    }
 
-        bool applied = false;
-        foreach (MeshRenderer renderer in _keycapRenderers)
+    /// <summary>
+    /// keycapIndex 위치의 장착 SO를 반환한다. 음수 인덱스는 설치된 키 전체가 같은 SO일 때만 반환하며 혼합 구성이나 미등록 재질은 null이다.
+    /// </summary>
+    public Game.Tournament.KeycapDefinition GetKeycapDefinition(int keycapIndex)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (keycapIndex >= 0)
+            return keycapIndex < _keycaps.Length && _keycapPartDefinitions.TryGetValue(_keycaps[keycapIndex], out var part) ? part : null;
+
+        Game.Tournament.KeycapDefinition common = null;
+        bool found = false;
+        foreach (Transform keycap in _keycaps)
         {
-            if (renderer != null && renderer.transform.IsChildOf(keycap))
-            {
-                renderer.sharedMaterial = material;
-                KeyboardToonSurface.ApplyBounds(renderer);
-                applied = true;
-            }
+            if (!keycap.gameObject.activeSelf) continue;
+            _keycapPartDefinitions.TryGetValue(keycap, out var part);
+            if (found && common != part) return null;
+            common = part;
+            found = true;
         }
-
-        if (applied) EnableKeycaps(keycapIndex);
-        return applied;
+        return common;
     }
 
     /// <summary>
@@ -1207,24 +1301,87 @@ public sealed class KeyboardCustomization : MonoBehaviour
             _keycapModelDefinitions[keycap] = definition;
         }
         else _keycapModelDefinitions.Remove(keycap);
+        if (definition != null) _keycapPartDefinitions[keycap] = definition;
+        else _keycapPartDefinitions.Remove(keycap);
         appearance.Apply(definition);
     }
 
     /// <summary>캐시된 키캡의 원본 메시와 표시 범위를 복원한다. 현재 모델 연결을 비우며 입력과 체력 컴포넌트는 유지한다.</summary>
     private void ResetKeycapModels()
     {
+        _keycapPartDefinitions.Clear();
         _keycapModelDefinitions.Clear();
         foreach (KeycapModelAppearance appearance in _keycapModels.Values) appearance.Apply(null);
     }
 
-    /// <summary>material과 definitions를 비교해 등록된 모델 부품을 반환한다. 모델이 없거나 기존 재질 전용 부품이면 null을 반환한다.</summary>
-    private Game.Tournament.KeycapDefinition FindKeycapModel(Material material,
+    /// <summary>이전 저장 형식이나 Material UI의 material을 definitions에서 한 번 해석한다. 여러 부품이 같은 재질을 쓰면 임의 선택하지 않고 오류를 알린다.</summary>
+    private Game.Tournament.KeycapDefinition FindLegacyKeycapDefinition(Material material,
         IReadOnlyList<Game.Tournament.KeycapDefinition> definitions)
     {
         if (definitions == null) return null;
+        Game.Tournament.KeycapDefinition found = null;
         foreach (Game.Tournament.KeycapDefinition definition in definitions)
-            if (definition.Material == material && definition.ShellMesh != null) return definition;
-        return null;
+            if (definition.Material == material)
+            {
+                if (found != null && found != definition)
+                    throw new InvalidOperationException("Material matches multiple keycaps. Select the keycap by definition ID.");
+                found = definition;
+            }
+        return found;
+    }
+
+    /// <summary>id에 해당하는 SO를 definitions에서 반환한다. 빈 ID는 외형 전용 키캡이며 누락되거나 중복된 ID는 오류로 알린다.</summary>
+    private Game.Tournament.KeycapDefinition FindKeycapById(string id,
+        IReadOnlyList<Game.Tournament.KeycapDefinition> definitions)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        Game.Tournament.KeycapDefinition found = null;
+        if (definitions != null)
+            foreach (Game.Tournament.KeycapDefinition definition in definitions)
+                if (definition.Id == id)
+                {
+                    if (found != null && found != definition) throw new InvalidOperationException("Duplicate keycap definition ID: " + id);
+                    found = definition;
+                }
+        if (found == null) throw new InvalidOperationException("Saved keycap definition is unavailable: " + id);
+        return found;
+    }
+
+    /// <summary>state의 실제 키와 SO ID를 검증해 키캡 루트별 정의를 반환한다. 키캡 SO ID가 없는 이전 저장만 원본 재질로 해석하며 현재 키보드는 변경하지 않는다.</summary>
+    private Dictionary<Transform, Game.Tournament.KeycapDefinition> ResolveSavedKeycaps(KeyboardCustomizationState state,
+        MeshRenderer[] renderers, Material[] catalog, int[] remap,
+        IReadOnlyList<Game.Tournament.KeycapDefinition> definitions)
+    {
+        var result = new Dictionary<Transform, Game.Tournament.KeycapDefinition>();
+        if (state.HasKeycapDefinitions)
+        {
+            var layout = GetComponent<KeyboardInputController>().GetKeycapLayout();
+            if (state.KeycapKeys == null || state.KeycapDefinitionIds == null || state.KeycapKeys.Length != layout.Count
+                || state.KeycapDefinitionIds.Length != state.KeycapKeys.Length)
+                throw new InvalidOperationException("Saved keycap identity layout is incomplete.");
+            for (int index = 0; index < state.KeycapKeys.Length; index++)
+            {
+                if (!layout.TryGetValue(state.KeycapKeys[index], out KeycapHealth health) || result.ContainsKey(health.transform))
+                    throw new InvalidOperationException("Saved keycap key is missing or duplicated.");
+                result.Add(health.transform, FindKeycapById(state.KeycapDefinitionIds[index], definitions));
+            }
+            return result;
+        }
+        int slot = 0;
+        for (int index = 0; index < renderers.Length; index++)
+        {
+            int count = state.SlotCounts[index];
+            if (count < 1 || slot > state.MaterialIndices.Length - count)
+                throw new InvalidOperationException("Saved material slots are incomplete.");
+            if (renderers[index] != null && renderers[index].name == "PBT_SculptedShell")
+            {
+                int material = state.MaterialIndices[slot];
+                result.Add(renderers[index].transform.parent, material < 0 ? null
+                    : FindLegacyKeycapDefinition(catalog[remap[material]], definitions));
+            }
+            slot += count;
+        }
+        return result;
     }
 
     /// <summary>
@@ -1253,9 +1410,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// 축이 설치된 적용 대상에만 키캡 재질 미리보기를 표시하고 이전 상태를 보관한다.
-    /// material, allKeycaps, keycapIndex를 사용하며 대상에 축이 없으면 false를 반환한다.
+    /// material, allKeycaps, keycapIndex와 선택적 definition을 사용하며 축과 모델 크기 조건을 만족하는 대상이 없으면 false를 반환한다.
     /// </summary>
-    public bool PreviewKeycapMaterial(Material material, bool allKeycaps, int keycapIndex)
+    public bool PreviewKeycapMaterial(Material material, bool allKeycaps, int keycapIndex,
+        Game.Tournament.KeycapDefinition definition = null)
     {
         if (material == null)
             return false;
@@ -1281,18 +1439,20 @@ public sealed class KeyboardCustomization : MonoBehaviour
         bool applied = false;
         if (allKeycaps)
         {
-            _keycapMaterial = material;
-            _keycapMaterialIndex = Array.IndexOf(_materials, material);
+            if (definition == null || !definition.OneUnitOnly)
+            {
+                _keycapMaterial = material;
+                _keycapMaterialIndex = Array.IndexOf(_materials, material);
+            }
             if (_keycaps == null) CacheKeycaps();
-            _keycapMaterialOverrides.Clear();
             for (int index = 0; index < _keycaps.Length; index++)
             {
-                applied |= ApplyKeycapMaterialToKey(index, material, false);
+                applied |= ApplyKeycapMaterialToKey(index, material, false, definition);
             }
         }
         else
         {
-            applied = ApplyKeycapMaterialToKey(keycapIndex, material, false);
+            applied = ApplyKeycapMaterialToKey(keycapIndex, material, false, definition);
         }
 
         if (applied)
@@ -1304,7 +1464,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// 진행 중인 키캡 재질 미리보기를 취소하고 저장한 재질 및 이미지 상태를 복원한다.
-    /// 입력과 반환값 없이 미리보기 전의 공통 재질, 개별 재질, 키캡 사진을 되돌린다.
+    /// 입력과 반환값 없이 미리보기 전의 공통 재질, 개별 재질, 장착 SO와 모델 및 키캡 사진을 되돌린다.
     /// </summary>
     public void CancelKeycapMaterialPreview()
     {
@@ -1317,9 +1477,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// 축이 설치된 미리보기 대상을 기존 전체 또는 개별 적용 함수로 확정한다.
-    /// material, allKeycaps, keycapIndex를 사용하며 대상에 축이 없으면 false를 반환한다.
+    /// material, allKeycaps, keycapIndex와 선택적 definition을 사용하며 축과 모델 크기 조건을 만족하는 대상이 없으면 false를 반환한다.
     /// </summary>
-    public bool CommitKeycapMaterialPreview(Material material, bool allKeycaps, int keycapIndex)
+    public bool CommitKeycapMaterialPreview(Material material, bool allKeycaps, int keycapIndex,
+        Game.Tournament.KeycapDefinition definition = null)
     {
         if (_keycapMaterialPreviewSnapshot == null || material == null)
             return false;
@@ -1338,12 +1499,18 @@ public sealed class KeyboardCustomization : MonoBehaviour
         bool applied;
         if (allKeycaps)
         {
-            SetKeycapMaterial(material);
-            applied = true;
+            if (definition == null || !definition.OneUnitOnly)
+            {
+                _keycapMaterial = material;
+                _keycapMaterialIndex = Array.IndexOf(_materials, material);
+            }
+            applied = false;
+            for (int index = 0; index < _keycaps.Length; index++)
+                applied |= ApplyKeycapMaterialToKey(index, material, true, definition);
         }
         else
         {
-            applied = SetKeycapMaterial(keycapIndex, material);
+            applied = ApplyKeycapMaterialToKey(keycapIndex, material, true, definition);
         }
 
         if (!applied)
@@ -1354,7 +1521,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// 공통 재질, 개별 재질, 렌더러 슬롯과 이미지 상태를 미리보기 스냅샷으로 수집한다.
+    /// 공통 재질, 개별 재질, 장착 SO, 렌더러 슬롯과 이미지 상태를 미리보기 스냅샷으로 수집한다.
     /// 반환된 스냅샷은 미리보기 취소 때 현재 키보드 외형을 정확히 복구하는 데 사용한다.
     /// </summary>
     private KeycapMaterialPreviewSnapshot CaptureKeycapMaterialPreviewSnapshot()
@@ -1383,6 +1550,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             _keycapMaterial,
             _keycapMaterialIndex,
             new Dictionary<Transform, Material>(_keycapMaterialOverrides),
+            new Dictionary<Transform, Game.Tournament.KeycapDefinition>(_keycapPartDefinitions),
             keycaps,
             keycapActiveStates,
             rendererMaterials,
@@ -1392,13 +1560,16 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// snapshot의 키캡 재질, 렌더러 슬롯과 사진 배치를 현재 키보드에 복원한다.
+    /// snapshot의 장착 SO와 모델, 키캡 재질, 렌더러 슬롯과 사진 배치를 현재 키보드에 복원한다.
     /// snapshot의 참조 상태를 사용하며 반환값 없이 기존 외형과 사용자 지정 데이터를 되돌린다.
     /// </summary>
     private void RestoreKeycapMaterialPreviewSnapshot(KeycapMaterialPreviewSnapshot snapshot)
     {
         KeyboardImageCustomization images = GetImageCustomization();
         images.ClearKeycapImage();
+        ResetKeycapModels();
+        foreach (var part in snapshot.PartDefinitions)
+            SetKeycapModel(part.Key, part.Value);
         _keycapMaterial = snapshot.KeycapMaterial;
         _keycapMaterialIndex = snapshot.KeycapMaterialIndex;
         _keycapMaterialOverrides.Clear();
@@ -1428,10 +1599,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// 축이 설치된 keycapIndex 키캡에 material을 반영하고 필요하면 설치 연출을 재생한다.
-    /// playInstallation이 true면 기존 연출과 파손 키캡 복구를 실행하며 축이 없거나 렌더러가 없으면 false를 반환한다.
+    /// playInstallation이 true면 설치 연출과 파손 복구를 실행한다. definition의 SO와 모델을 적용하며 축이나 모델 크기가 맞지 않으면 false를 반환한다.
     /// 유효한 입력은 개별 재질과 사진 상태를 갱신한다.
     /// </summary>
-    private bool ApplyKeycapMaterialToKey(int keycapIndex, Material material, bool playInstallation)
+    private bool ApplyKeycapMaterialToKey(int keycapIndex, Material material, bool playInstallation,
+        Game.Tournament.KeycapDefinition definition = null)
     {
         if (_keycaps == null) CacheKeycaps();
         if (material == null
@@ -1443,7 +1615,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
         Transform keycap = _keycaps[keycapIndex];
         if (keycap == null) return false;
 
+        if (definition != null && definition.OneUnitOnly && !_keycapModels[keycap].IsOneUnit)
+            return false;
+
         ClearKeycapImage(keycapIndex);
+        SetKeycapModel(keycap, definition);
         _keycapMaterialOverrides[keycap] = material;
 
         bool applied = false;
@@ -1453,9 +1629,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (!playInstallation)
             {
                 renderer.gameObject.SetActive(true);
-                renderer.enabled = true;
+                renderer.enabled = !(_keycapModelDefinitions.ContainsKey(keycap) && KeycapModelAppearance.IsOriginalDetail(renderer));
             }
-            renderer.sharedMaterial = material;
+            if (renderer.name != "PBT_SculptedShell" || definition == null || definition.ShellMesh == null)
+                renderer.sharedMaterial = material;
             KeyboardToonSurface.ApplyBounds(renderer);
             applied = true;
         }
@@ -1483,6 +1660,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         public Material KeycapMaterial { get; }
         public int KeycapMaterialIndex { get; }
         public Dictionary<Transform, Material> MaterialOverrides { get; }
+        public Dictionary<Transform, Game.Tournament.KeycapDefinition> PartDefinitions { get; }
         public Transform[] Keycaps { get; }
         public bool[] KeycapActiveStates { get; }
         public Material[][] RendererMaterials { get; }
@@ -1491,13 +1669,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
         public KeyboardImageState ImageState { get; }
 
         /// <summary>
-        /// 미리보기 전 키캡 루트, 재질, 렌더러와 이미지 상태를 보관한다.
-        /// 생성 인수의 표시 상태와 외형 데이터는 미리보기 취소와 확정 전 복원에 사용한다.
+        /// 미리보기 전 키캡 루트, 재질, 장착 SO, 렌더러와 이미지 상태를 보관한다.
+        /// partDefinitions를 포함한 생성 인수는 미리보기 취소와 확정 전 모델 및 외형 복원에 사용한다.
         /// </summary>
         public KeycapMaterialPreviewSnapshot(
             Material keycapMaterial,
             int keycapMaterialIndex,
             Dictionary<Transform, Material> materialOverrides,
+            Dictionary<Transform, Game.Tournament.KeycapDefinition> partDefinitions,
             Transform[] keycaps,
             bool[] keycapActiveStates,
             Material[][] rendererMaterials,
@@ -1508,6 +1687,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             KeycapMaterial = keycapMaterial;
             KeycapMaterialIndex = keycapMaterialIndex;
             MaterialOverrides = materialOverrides;
+            PartDefinitions = partDefinitions;
             Keycaps = keycaps;
             KeycapActiveStates = keycapActiveStates;
             RendererMaterials = rendererMaterials;

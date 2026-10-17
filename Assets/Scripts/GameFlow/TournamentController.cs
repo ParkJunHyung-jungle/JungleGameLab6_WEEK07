@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 using KeyboardModeling;
 
@@ -10,6 +12,8 @@ namespace Game.Tournament
     [DisallowMultipleComponent]
     public sealed class TournamentController : MonoBehaviour
     {
+        private const string WORKSHOP_SCENE_PATH = "Assets/Scenes/WorkShop2.unity";
+
         public static event Action<TournamentController, bool, string> PlaytestShopStateChanged;
         public static event Action<TournamentController, string> PlaytestInventorySnapshotRequested;
         public static event Action<TournamentController, TournamentShopObservation> PlaytestShopAction;
@@ -36,6 +40,7 @@ namespace Game.Tournament
         private bool _suddenDeath;
         private string _message;
         private long _enemyCurrency;
+        private KeycapDefinition _selectedKeycap;
 
         public TournamentPhase Phase { get; private set; }
         public string PlaytestRunId { get; private set; }
@@ -46,6 +51,7 @@ namespace Game.Tournament
         public TournamentResult Result { get; private set; }
         public bool IsBattleActive => Phase == TournamentPhase.Battle && _manager.IsTimerRunning;
         public TournamentInventory Inventory => _inventory;
+        public KeycapDefinition SelectedKeycap => _selectedKeycap;
         public TournamentInventory PlaytestEnemyInventory => _enemyInventory;
         public TournamentSettings Settings => _settings;
         public string Message => _message;
@@ -63,6 +69,7 @@ namespace Game.Tournament
             _manager.TournamentKeyboardCreated += ConfigureKeyboard;
             _manager.TournamentBattleFinished += HandleBattleFinished;
             GameManager.PlaytestRoundStarted += HandleRoundStarted;
+            _workspace.KeyPressed += HandleShopKeyPressed;
             _initialized = true;
             _view.Bind(this);
         }
@@ -91,6 +98,7 @@ namespace Game.Tournament
         /// <summary>suddenDeath에 따라 대전 시간과 로봇 속도를 준비한다. 현재 구매 부품의 대미지를 로봇에 합산한다.</summary>
         private void BeginBattle(bool suddenDeath)
         {
+            _selectedKeycap = null;
             _workspace.Hide();
             _suddenDeath = suddenDeath;
             Phase = TournamentPhase.Preparing;
@@ -152,12 +160,6 @@ namespace Game.Tournament
                 Result = new TournamentResult(rank, _settings.GetGold(rank), playerScore, enemyScore);
                 Phase = TournamentPhase.Finished;
                 _message += $"\n토너먼트 종료 · {rank}위 · 작업실 보상 {Result.Gold}골드";
-                PlaytestInventorySnapshotRequested?.Invoke(this, "BeforeTournamentReset");
-                Currency = 0;
-                _enemyCurrency = 0;
-                _inventory = new TournamentInventory(_settings.Capacity);
-                _enemyInventory = new TournamentInventory(_settings.Capacity);
-                TournamentKeyboardSession.UpdateCurrent(_keyboardStorage.GetDefaultCustomization());
                 Completed?.Invoke(Result);
             }
             Changed?.Invoke();
@@ -180,19 +182,33 @@ namespace Game.Tournament
             }
             else if (Phase == TournamentPhase.Finished)
             {
-                if (WorkshopReturnRequested != null) WorkshopReturnRequested.Invoke(Result);
-                else { _message = "작업실 복귀 연결 대기 · 보상은 결과에 보관됩니다."; Changed?.Invoke(); }
+                ReturnToWorkshop();
             }
+        }
+
+        /// <summary>종료된 토너먼트의 재고와 임시 구성을 비우고 Workshop2로 복귀한다. Result는 복귀 이벤트에 전달한다.</summary>
+        private void ReturnToWorkshop()
+        {
+            PlaytestInventorySnapshotRequested?.Invoke(this, "BeforeTournamentReset");
+            Currency = 0;
+            _enemyCurrency = 0;
+            _inventory = new TournamentInventory(_settings.Capacity);
+            _enemyInventory = new TournamentInventory(_settings.Capacity);
+            _selectedKeycap = null;
+            TournamentKeyboardSession.UpdateCurrent(_keyboardStorage.GetDefaultCustomization());
+            if (WorkshopReturnRequested != null) WorkshopReturnRequested.Invoke(Result);
+            else SceneManager.LoadScene(WORKSHOP_SCENE_PATH);
         }
 
         /// <summary>플레이어와 로봇에게 독립된 3개 상품을 추첨한다. 로봇은 제시된 순서에서 살 수 있는 상품만 구매한다.</summary>
         private void OpenShop()
         {
             Phase = TournamentPhase.Shop;
+            _selectedKeycap = null;
             _rerollsUsed = 0;
             _offerGeneration = 0;
             PlaytestShopStateChanged?.Invoke(this, true, "ShopOpened");
-            _message = "구매한 부품은 작업대에 즉시 적용됩니다.";
+            _message = "구매한 부품은 오른쪽 인벤토리에서 장착할 수 있습니다.";
             RollOffers();
             for (int i = 0; i < _offers.Length; i++)
             {
@@ -244,21 +260,62 @@ namespace Game.Tournament
         public bool CanBuy(int index)
         {
             return Phase == TournamentPhase.Shop && index >= 0 && index < _offers.Length && !_purchased[index]
-                && _offers[index] != null && Currency >= _offers[index].Price && _inventory.CanAdd(_offers[index]);
+                && _offers[index] != null && Currency >= _offers[index].Price && _inventory.CanPurchase(_offers[index], _keyLayout);
         }
 
-        /// <summary>index 상품을 구매하고 작업대의 같은 키보드에 즉시 반영한다. 잔액과 수량을 검사한 후에만 변경한다.</summary>
+        /// <summary>index 상품을 구매 재고에 보관한다. 잔액과 수량을 검사하고 장착 상태는 유지한다.</summary>
         public void Buy(int index)
         {
             if (!CanBuy(index)) return;
             KeyboardPartDefinition part = _offers[index];
-            if (!_inventory.TryAdd(part, _keyLayout)) return;
+            if (!_inventory.TryPurchase(part, _keyLayout)) return;
             long before = Currency;
             Currency -= part.Price;
             _purchased[index] = true;
-            _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
             Observe("PurchaseConfirmed", index, part, before, true, false);
-            _message = "구매 완료 · 작업대에 적용했습니다.";
+            _message = "구매 완료 · 인벤토리에 보관했습니다.";
+            Changed?.Invoke();
+        }
+
+        /// <summary>part 인벤토리 아이템의 좌클릭을 처리한다. 키캡은 선택 상태를 바꾸고 다른 부품은 장착 상태를 갱신한다.</summary>
+        public void ActivateInventoryItem(KeyboardPartDefinition part)
+        {
+            if (Phase != TournamentPhase.Shop || part == null || _inventory.GetCount(part) == 0) return;
+            if (part is KeycapDefinition keycap)
+            {
+                _selectedKeycap = _selectedKeycap == keycap || _inventory.GetAvailableCount(keycap) == 0 ? null : keycap;
+                _message = _selectedKeycap != null ? "키캡을 장착할 키를 누르세요." : "키캡 선택을 해제했습니다.";
+            }
+            else
+            {
+                if (!_inventory.TryEquipPart(part)) return;
+                _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
+                _message = "부품을 장착했습니다.";
+            }
+            Changed?.Invoke();
+        }
+
+        /// <summary>part 인벤토리 아이템의 우클릭을 처리한다. 키캡은 마지막 배치를, 다른 부품은 해당 슬롯을 해제한다.</summary>
+        public void UnequipInventoryItem(KeyboardPartDefinition part)
+        {
+            if (Phase != TournamentPhase.Shop || part == null) return;
+            bool removed = part is KeycapDefinition keycap
+                ? _inventory.TryUnequipLatestKeycap(keycap, out Key _)
+                : _inventory.TryUnequipPart(part);
+            if (!removed) return;
+            _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
+            _message = "부품을 해제하고 인벤토리로 돌려놓았습니다.";
+            Changed?.Invoke();
+        }
+
+        /// <summary>상점 키보드의 key 입력에 선택된 키캡을 장착한다. 남은 수량이 없으면 선택을 해제하고 작업대 외형을 갱신한다.</summary>
+        private void HandleShopKeyPressed(Key key)
+        {
+            if (Phase != TournamentPhase.Shop || _selectedKeycap == null
+                || !_inventory.TryEquipKeycap(_selectedKeycap, key, _keyLayout)) return;
+            _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
+            if (_inventory.GetAvailableCount(_selectedKeycap) == 0) _selectedKeycap = null;
+            _message = _selectedKeycap != null ? "키캡을 장착할 다음 키를 누르세요." : "키캡 장착을 완료했습니다.";
             Changed?.Invoke();
         }
 
@@ -281,6 +338,7 @@ namespace Game.Tournament
             _manager.TournamentKeyboardCreated -= ConfigureKeyboard;
             _manager.TournamentBattleFinished -= HandleBattleFinished;
             GameManager.PlaytestRoundStarted -= HandleRoundStarted;
+            _workspace.KeyPressed -= HandleShopKeyPressed;
         }
 
         /// <summary>새 플레이 실행에서 정적 로그 이벤트를 초기화한다. 이전 실행의 관찰자 참조를 제거한다.</summary>

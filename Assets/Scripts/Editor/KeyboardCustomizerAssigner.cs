@@ -8,7 +8,6 @@ using UnityEditor;
 
 namespace KeyboardCustomizationTools.Editor
 {
-    [InitializeOnLoad]
     public static class KeyboardCustomizerAssigner
     {
         private const string PREFAB_PATH = "Assets/Resource/Prefabs/SeperateKeyboard/Keyboard_Customize.prefab";
@@ -16,45 +15,6 @@ namespace KeyboardCustomizationTools.Editor
         private const string MATERIAL_PATH = "Assets/Resource/Materials/KeyboardCustomizeLED.mat";
         private const float WIDE_KEY_THRESHOLD = 1.35f;
         private const float WIDE_KEY_LED_WIDTH = 1.8f;
-
-        /// <summary>
-        /// 입력 없이 스크립트 로드 후 초기 구성 확인을 예약한다.
-        /// 반환값 없이 에디터 지연 콜백에 설정 확인 메서드를 등록한다.
-        /// </summary>
-        static KeyboardCustomizerAssigner()
-        {
-            EditorApplication.delayCall += SetupIfMissing;
-        }
-
-        /// <summary>
-        /// 대상 프리팹을 확인해 LED 또는 하우징 참조가 없을 때 최초 구성을 실행한다.
-        /// 입력과 반환값 없이 대상 프리팹의 커스터마이즈 구성을 저장한다.
-        /// </summary>
-        private static void SetupIfMissing()
-        {
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PREFAB_PATH);
-            if (prefab != null && prefab.GetComponent<KeyboardCustomization>() == null)
-            {
-                ExecuteSetup();
-                SetupHousing();
-                SetupKeycaps();
-                return;
-            }
-
-            if (prefab != null)
-            {
-                var serialized = new SerializedObject(prefab.GetComponent<KeyboardCustomization>());
-                if (serialized.FindProperty("_caseRenderers").arraySize == 0)
-                {
-                    SetupHousing();
-                }
-
-                if (serialized.FindProperty("_keycapRenderers").arraySize == 0)
-                {
-                    SetupKeycaps();
-                }
-            }
-        }
 
         /// <summary>
         /// 대상 프리팹의 키캡 아래에서 각인을 제외한 외형 렌더러를 수집한다.

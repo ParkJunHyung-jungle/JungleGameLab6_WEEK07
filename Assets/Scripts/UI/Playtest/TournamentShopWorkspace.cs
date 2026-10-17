@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 
+using UnityEngine.InputSystem;
+
 using KeyboardModeling;
 
 namespace Game.Tournament
@@ -11,13 +13,17 @@ namespace Game.Tournament
         [SerializeField] private KeyboardCustomization _keyboard;
         [SerializeField] private Canvas[] _battleCanvases;
         private KeyboardCustomizationStorage _storage;
+        private KeyboardInputController _input;
         private bool[] _canvasStates;
         private bool _visible;
+        public event System.Action<Key> KeyPressed;
 
         void Awake()
         {
             _canvasStates = new bool[_battleCanvases.Length];
             _keyboard.GetComponent<TournamentKeyboardEffects>().enabled = false;
+            _input = _keyboard.GetComponent<KeyboardInputController>();
+            _input.KeyPressed += HandleKeyPressed;
             _room.SetActive(false);
         }
 
@@ -35,14 +41,14 @@ namespace Game.Tournament
             _keyboard.PrepareForBattle();
             storage.ApplyCustomization(TournamentKeyboardSession.GetCurrent(), _keyboard);
             RefreshParts(inventory, defaultKeycap);
-            KeyboardInputController input = _keyboard.GetComponent<KeyboardInputController>();
-            input.SetAttackEnabled(false);
-            input.SetInputEnabled(false);
+            _input.SetAttackEnabled(false);
+            _input.SetInputEnabled(true);
         }
 
         /// <summary>inventory와 defaultKeycap으로 현재 미리보기를 갱신한다. 새 키보드를 생성하지 않고 같은 인스턴스의 부품만 변경한다.</summary>
         public void RefreshParts(TournamentInventory inventory, KeycapDefinition defaultKeycap)
         {
+            _storage.ApplyDefaultCustomization(_keyboard);
             _keyboard.ApplyTournamentParts(inventory, defaultKeycap);
         }
 
@@ -55,7 +61,19 @@ namespace Game.Tournament
             if (_visible)
                 for (int i = 0; i < _battleCanvases.Length; i++) _battleCanvases[i].enabled = _canvasStates[i];
             _visible = false;
+            _input.SetInputEnabled(false);
             _room.SetActive(false);
+        }
+
+        /// <summary>작업대 키보드의 key 입력을 상점 단계에만 전달한다. 장착 상태는 구독자가 갱신한다.</summary>
+        private void HandleKeyPressed(Key key)
+        {
+            if (_visible) KeyPressed?.Invoke(key);
+        }
+
+        void OnDestroy()
+        {
+            _input.KeyPressed -= HandleKeyPressed;
         }
     }
 }

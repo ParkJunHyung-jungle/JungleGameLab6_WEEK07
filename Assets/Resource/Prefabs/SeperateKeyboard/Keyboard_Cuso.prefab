@@ -28461,6 +28461,7 @@ GameObject:
   - component: {fileID: 3852333600888127988}
   - component: {fileID: 1556073846386759358}
   - component: {fileID: 4484957135179497554}
+  - component: {fileID: 5559830459687724637}
   m_Layer: 0
   m_Name: Keyboard_Cuso
   m_TagString: Untagged
@@ -28681,6 +28682,7 @@ MonoBehaviour:
   _logInput: 0
   _audioSource: {fileID: 2644093605205143613}
   _pressSound: {fileID: 8300000, guid: 5871cb8f54e12774ebe12e9c708bd284, type: 3}
+  _fmodSwitchSound: 0
 --- !u!54 &5218247408755053347
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -28836,10 +28838,7 @@ MonoBehaviour:
   _feedbackManager: {fileID: 1556073846386759358}
   _gameSession: {fileID: 0}
   _feverController: {fileID: 0}
-  _scoreCombo: {fileID: 0}
   _baseDamage: 1
-  _comboFistDamage: 1
-  _comboHammerDamage: 1
 --- !u!114 &1556073846386759358
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -28922,6 +28921,23 @@ MonoBehaviour:
   _pushDelay: 1
   _backwardSpeed: 8
   _lifetimeAfterPush: 5
+--- !u!114 &5559830459687724637
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648102524883158503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fe699182f42ab9459654bc9b651eeed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCollisionAudio
+  _minimumImpactSpeed: 2
+  _minimumPlayInterval: 0.2
+  _surfaceLayers:
+    serializedVersion: 2
+    m_Bits: 1
 --- !u!1 &5689495446983780148
 GameObject:
   m_ObjectHideFlags: 0

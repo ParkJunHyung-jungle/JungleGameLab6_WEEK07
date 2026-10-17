@@ -28,12 +28,6 @@ namespace Game.Tournament
             return GetAvailable(layout, occupied, oneUnitOnly).Count;
         }
 
-        /// <summary>layout의 key가 장착 가능한 빈 위치인지 반환한다. occupied와 oneUnitOnly 제한을 적용하며 배치는 변경하지 않는다.</summary>
-        public static bool CanPlace(TournamentKeyLayout layout, Key key, ICollection<Key> occupied, bool oneUnitOnly)
-        {
-            return GetAvailable(layout, occupied, oneUnitOnly).Contains(key);
-        }
-
         /// <summary>layout에서 occupied와 시스템 키 및 크기 제한을 제외한 후보를 반환한다. 구매 판정과 무작위 선택이 같은 조건을 사용하게 한다.</summary>
         private static List<Key> GetAvailable(TournamentKeyLayout layout, ICollection<Key> occupied, bool oneUnitOnly)
         {

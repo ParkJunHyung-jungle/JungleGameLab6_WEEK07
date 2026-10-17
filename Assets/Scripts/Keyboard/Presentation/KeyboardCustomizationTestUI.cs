@@ -647,7 +647,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void RefreshCropEditor()
     {
-        if (_cropFrame == null) return;
+        if (_cropFrame == null || _storage == null || _storage.Customization == null) return;
 
         bool caseImage = _selectedTarget == ImageTarget.Case;
         int keyIndex = -1;

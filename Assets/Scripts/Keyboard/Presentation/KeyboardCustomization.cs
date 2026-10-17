@@ -85,6 +85,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
     [Header("Photo Customization")]
     [SerializeField] private Material _photoMaterialTemplate;
 
+    [Header("Part Installation")]
+    [SerializeField] private KeyboardPartInstallation _partInstallation;
+
     [Header("Switches")]
     [SerializeField] private KeyboardSwitch[] _switches = new KeyboardSwitch[0];
     [SerializeField] private SwitchType _switchType = SwitchType.Red;
@@ -565,10 +568,21 @@ public sealed class KeyboardCustomization : MonoBehaviour
             }
         }
 
-        foreach (KeyboardSwitch keyboardSwitch in _switches)
+        if (activate && Application.IsPlaying(gameObject)) PreparePartInstallation();
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _switches.Length; index++)
         {
-            keyboardSwitch.ChangeSwitch(type);
-            if (activate && !keyboardSwitch.gameObject.activeSelf) keyboardSwitch.gameObject.SetActive(true);
+            KeyboardSwitch keyboardSwitch = _switches[index];
+            if (activate && Application.IsPlaying(gameObject))
+            {
+                Transform keycap = index < _keycaps.Length ? _keycaps[index] : null;
+                _partInstallation.ReplaceSwitch(keyboardSwitch.transform, keycap, () => keyboardSwitch.ChangeSwitch(type));
+            }
+            else
+            {
+                keyboardSwitch.ChangeSwitch(type);
+                if (activate) keyboardSwitch.gameObject.SetActive(true);
+            }
         }
 
         _switchType = type;
@@ -579,6 +593,34 @@ public sealed class KeyboardCustomization : MonoBehaviour
     #endregion
 
     #region 키캡
+
+    /// <summary>
+    /// part의 설치 연출 컴포넌트를 준비하고 위에서 내려오는 움직임을 재생한다.
+    /// 편집 모드에서는 활성화만 수행하고 런타임에서는 기존 파츠도 다시 설치한다.
+    /// </summary>
+    private void PlayPartInstallation(Transform part)
+    {
+        if (!Application.IsPlaying(gameObject))
+        {
+            part.gameObject.SetActive(true);
+            return;
+        }
+        PreparePartInstallation();
+        _partInstallation.Play(part);
+    }
+
+    /// <summary>
+    /// 입력 없이 같은 키보드의 설치 연출 컴포넌트를 조회하거나 추가한다.
+    /// 반환값 없이 _partInstallation 참조를 준비한다.
+    /// </summary>
+    private void PreparePartInstallation()
+    {
+        if (_partInstallation == null)
+        {
+            _partInstallation = GetComponent<KeyboardPartInstallation>();
+            if (_partInstallation == null) _partInstallation = gameObject.AddComponent<KeyboardPartInstallation>();
+        }
+    }
 
     /// <summary>
     /// keycapIndex와 같은 인덱스에 축이 설치되어 있는지 확인한다.
@@ -602,7 +644,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (keycapIndex >= 0 && index != keycapIndex) continue;
             if (!HasSwitchForKeycap(index)) continue;
             Transform keycap = _keycaps[index];
-            if (keycap != null && !keycap.gameObject.activeSelf) keycap.gameObject.SetActive(true);
+            if (keycap != null) PlayPartInstallation(keycap);
         }
     }
 

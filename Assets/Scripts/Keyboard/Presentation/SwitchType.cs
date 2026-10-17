@@ -5,5 +5,7 @@ public enum SwitchType
     Brown = 2,
     Sans = 3,
     Pop = 4,
-    Typewriter = 5
+    Typewriter = 5,
+    FireWorks = 6,
+    Animal = 7,
 }

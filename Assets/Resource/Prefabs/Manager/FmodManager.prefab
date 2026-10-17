@@ -45,9 +45,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e354989f9e4aaf43afea243816c81d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioManager
+  _initialKeyboard: {fileID: 0}
   _reverbOffOn: {x: 0, y: 1}
   _delayOffOn: {x: 0, y: 1}
   _pitchOffOn: {x: 0, y: 1}
+  _temporaryKeyboardPitch: 1.2
 --- !u!114 &5644101937113968702
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -102,6 +104,20 @@ MonoBehaviour:
       Data3: 1665637543
       Data4: -1561119682
     Path: event:/SFX/KeyBoard/Switch/TypewriterSwitch
+  <FireWorksSwitch>k__BackingField:
+    Guid:
+      Data1: -856896894
+      Data2: 1171141174
+      Data3: 772051638
+      Data4: 1967501989
+    Path: event:/SFX/KeyBoard/Switch/FireWorksSwitch
+  <AnimalSwitch>k__BackingField:
+    Guid:
+      Data1: 174062438
+      Data2: 1074783029
+      Data3: 1696850583
+      Data4: 396219504
+    Path: event:/SFX/KeyBoard/Switch/AnimalSwitch
   <BreakKeyCap>k__BackingField:
     Guid:
       Data1: -715810010

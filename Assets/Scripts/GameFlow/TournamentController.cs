@@ -244,7 +244,7 @@ namespace Game.Tournament
         public bool CanBuy(int index)
         {
             return Phase == TournamentPhase.Shop && index >= 0 && index < _offers.Length && !_purchased[index]
-                && _offers[index] != null && Currency >= _offers[index].Price && _inventory.CanAdd(_offers[index]);
+                && _offers[index] != null && Currency >= _offers[index].Price && _inventory.CanAdd(_offers[index], _keyLayout);
         }
 
         /// <summary>index 상품을 구매하고 작업대의 같은 키보드에 즉시 반영한다. 잔액과 수량을 검사한 후에만 변경한다.</summary>

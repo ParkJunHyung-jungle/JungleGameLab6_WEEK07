@@ -21,11 +21,12 @@ namespace Game.Tournament
         /// <summary>capacity를 키캡 한도로 사용하는 빈 장착 상태를 생성한다. 기본 부품은 구매 수량에 포함하지 않는다.</summary>
         public TournamentInventory(int capacity) { _capacity = capacity; }
 
-        /// <summary>part의 수량과 부품별 한도를 검사해 구매 가능 여부를 반환한다. 보유 및 배치 상태는 변경하지 않는다.</summary>
-        public bool CanAdd(KeyboardPartDefinition part)
+        /// <summary>part의 수량과 부품별 한도 및 layout의 실제 빈 배치 공간을 검사해 구매 가능 여부를 반환한다. 보유 및 배치 상태는 변경하지 않는다.</summary>
+        public bool CanAdd(KeyboardPartDefinition part, TournamentKeyLayout layout)
         {
             if (part == null) return false;
-            if (part is KeycapDefinition) return Total + part.Quantity <= _capacity;
+            if (part is KeycapDefinition keycap) return Total + part.Quantity <= _capacity
+                && RandomKeycapPlacement.CountAvailable(layout, _keycaps.Keys, keycap.OneUnitOnly) >= part.Quantity;
             if (part is SwitchDefinition) return Switch == null;
             if (part is PlateDefinition) return Plate == null;
             return part is HousingDefinition && Housing == null;
@@ -34,7 +35,7 @@ namespace Game.Tournament
         /// <summary>part를 layout의 빈 위치 또는 전체 부품 슬롯에 장착하고 성공 여부를 반환한다. 키캡 무작위 배치는 이 구매 시점에만 결정한다.</summary>
         public bool TryAdd(KeyboardPartDefinition part, TournamentKeyLayout layout)
         {
-            if (!CanAdd(part)) return false;
+            if (!CanAdd(part, layout)) return false;
             if (part is KeycapDefinition keycap)
             {
                 List<Key> slots = RandomKeycapPlacement.Select(layout, _keycaps.Keys, part.Quantity, keycap.OneUnitOnly);

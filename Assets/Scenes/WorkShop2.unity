@@ -4372,6 +4372,21 @@ MonoBehaviour:
   _keyboardEditMinFieldOfView: 40
   _keyboardEditMaxFieldOfView: 100
   _keyboardEditFieldOfViewStep: 2
+--- !u!114 &7500000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1379226030}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0ee1e74d58fc76428efd094a330fe3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerFootstepController
+  _stepDistance: 2.2
+  _minimumWalkingSpeed: 0.1
+  _minimumStepInterval: 0.3
 --- !u!1 &9900990001
 GameObject:
   m_ObjectHideFlags: 0
@@ -9113,3 +9128,4 @@ SceneRoots:
   - {fileID: 1711265684}
   - {fileID: 1770770338}
   - {fileID: 1191349679}
+  - {fileID: 1070504516}

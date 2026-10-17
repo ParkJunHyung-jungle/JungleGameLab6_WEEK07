@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -299,6 +299,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
         for (int index = 0; index < _switches.Length; index++)
             if (!_switches[index].gameObject.activeSelf) state.SwitchTypes[index] = defaults.SwitchTypes[index];
+        for (int index = 0; index < state.KeycapInstalled.Length; index++) state.KeycapInstalled[index] = true;
+        for (int index = 0; index < state.SwitchInstalled.Length; index++) state.SwitchInstalled[index] = true;
         return state;
     }
 
@@ -335,6 +337,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     void OnValidate()
     {
 #if UNITY_EDITOR
+        if (PrefabUtility.IsPartOfPrefabAsset(this)) return;
         EditorApplication.delayCall -= ApplyCaseEditorPreview;
         EditorApplication.delayCall += ApplyCaseEditorPreview;
 #endif
@@ -357,7 +360,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public void ApplyCaseEditorPreview()
     {
-        if (this == null)
+        if (this == null || PrefabUtility.IsPartOfPrefabAsset(this))
         {
             return;
         }
@@ -426,6 +429,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public KeyboardCustomizationState CaptureState(Material[] catalog, string[] materialIds)
     {
+        if (_keycaps == null) CacheKeycaps();
         ApplySelectedPlateSettings();
         if (catalog.Length != materialIds.Length) throw new InvalidOperationException("Material registry is invalid.");
         MeshRenderer[] renderers = GetCustomizationRenderers();
@@ -443,10 +447,15 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
 
         var switchTypes = new SwitchType[_switches.Length];
+        var switchInstalled = new bool[_switches.Length];
         for (int index = 0; index < _switches.Length; index++)
         {
             switchTypes[index] = _switches[index].CurrentData != null ? _switches[index].CurrentData.Type : _switchType;
+            switchInstalled[index] = _switches[index].gameObject.activeSelf;
         }
+        var keycapInstalled = new bool[_keycaps.Length];
+        for (int index = 0; index < _keycaps.Length; index++)
+            keycapInstalled[index] = _keycaps[index] != null && _keycaps[index].gameObject.activeSelf;
 
         int plateMaterialIndex = GetMaterialIndex(_plateMaterial, catalog);
         return new KeyboardCustomizationState(_ledEnabled, _ledColor, _ledIntensity,
@@ -454,7 +463,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
             (string[])materialIds.Clone(), paths, counts, indices.ToArray(), switchTypes,
             _plateType, _ledPattern, _ledSpeed,
             GetImageCustomization().CaptureState(),
-            plateMaterialIndex >= 0 ? materialIds[plateMaterialIndex] : null, _plateEffect);
+            plateMaterialIndex >= 0 ? materialIds[plateMaterialIndex] : null, _plateEffect,
+            keycapInstalled, switchInstalled);
     }
 
     /// <summary>
@@ -465,10 +475,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
         IReadOnlyList<Game.Tournament.KeycapDefinition> keycapDefinitions = null)
     {
         if (_keycaps == null) CacheKeycaps();
-        if (state == null || (state.Version < 1 || state.Version > 4) || state.Selection == null || state.Selection.Length != 4 ||
+        if (state == null || (state.Version < 1 || state.Version > 5) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
             throw new InvalidOperationException("Save data is invalid or unsupported.");
+
+        if (state.Version >= 5 && (state.KeycapInstalled == null || state.SwitchInstalled == null ||
+            state.KeycapInstalled.Length != _keycaps.Length || state.SwitchInstalled.Length != _switches.Length))
+            throw new InvalidOperationException("Saved part installation layout is incompatible.");
 
         var remap = new int[state.CatalogIds.Length];
         for (int index = 0; index < remap.Length; index++)
@@ -541,6 +555,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         KeyboardImageCustomization images = GetImageCustomization();
         Texture2D[] preparedImages = images.PrepareState(state.ImageState);
+        if (_partInstallation != null) _partInstallation.CancelAll();
         images.ClearKeycapImage();
         images.ClearCaseImage();
 
@@ -579,6 +594,11 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         RememberKeycapMaterialOverrides();
         images.RestoreState(state.ImageState, preparedImages);
+
+        for (int index = 0; index < _switches.Length; index++)
+            _switches[index].gameObject.SetActive(state.Version < 5 || state.SwitchInstalled[index]);
+        for (int index = 0; index < _keycaps.Length; index++)
+            if (_keycaps[index] != null) _keycaps[index].gameObject.SetActive(state.Version < 5 || state.KeycapInstalled[index]);
 
         _ledEnabled = state.LedEnabled;
         _ledColor = state.LedColor;
@@ -1140,7 +1160,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     }
 
     /// <summary>
-    /// 축이 설치된 keycapIndex 키캡에 material을 적용하고 기존 설치 연출을 재생한다.
+    /// 축이 설치된 keycapIndex 키캡의 사진과 모델을 해제하고 material을 적용해 설치 연출을 재생한다.
+    /// 파손된 키캡은 체력과 외피 표시를 복구한다.
     /// material과 인덱스를 사용하며 축 미설치, 잘못된 인덱스 또는 렌더러 누락은 false를 반환한다.
     /// </summary>
     public bool SetKeycapMaterial(int keycapIndex, Material material)
@@ -1154,23 +1175,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         Transform keycap = _keycaps[keycapIndex];
         if (keycap == null) return false;
 
-        ClearKeycapImage(keycapIndex);
         SetKeycapModel(keycap, null);
-        _keycapMaterialOverrides[keycap] = material;
-
-        bool applied = false;
-        foreach (MeshRenderer renderer in _keycapRenderers)
-        {
-            if (renderer != null && renderer.transform.IsChildOf(keycap))
-            {
-                renderer.sharedMaterial = material;
-                KeyboardToonSurface.ApplyBounds(renderer);
-                applied = true;
-            }
-        }
-
-        if (applied) EnableKeycaps(keycapIndex);
-        return applied;
+        return ApplyKeycapMaterialToKey(keycapIndex, material, true);
     }
 
     /// <summary>

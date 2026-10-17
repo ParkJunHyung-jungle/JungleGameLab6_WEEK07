@@ -62,6 +62,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8108d07f7d92284386603c2b5c86b01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FMODEvents
+  <IndoorAmbient>k__BackingField:
+    Guid:
+      Data1: -2047491160
+      Data2: 1150371445
+      Data3: 245133704
+      Data4: -171718166
+    Path: event:/Ambient/IndoorAmbient
   <BlueSwitch>k__BackingField:
     Guid:
       Data1: 714337182
@@ -125,3 +132,24 @@ MonoBehaviour:
       Data3: -1633832268
       Data4: -29979577
     Path: event:/SFX/KeyBoard/KeyCaps/BreakKeyCap
+  <FootSteps>k__BackingField:
+    Guid:
+      Data1: -1283923980
+      Data2: 1246508104
+      Data3: 1676953496
+      Data4: -686253831
+    Path: event:/SFX/Player/FootSteps
+  <VendingMachineThud>k__BackingField:
+    Guid:
+      Data1: -1735314096
+      Data2: 1200576674
+      Data3: 680881561
+      Data4: -507872415
+    Path: event:/SFX/VendingMachine/VendingMachineThud
+  <ThumpKeyBoard>k__BackingField:
+    Guid:
+      Data1: -327434940
+      Data2: 1340308468
+      Data3: -1073541248
+      Data4: -637734744
+    Path: event:/SFX/KeyBoard/Thump/Thump

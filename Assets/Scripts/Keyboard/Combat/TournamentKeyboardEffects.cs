@@ -12,6 +12,8 @@ namespace Game.Tournament
     public sealed class TournamentKeyboardEffects : MonoBehaviour
     {
         public static event Action<TournamentKeyboardEffects, Key, KeycapDefinition, string, string, string> PlaytestEffectObserved;
+        public static event Action<TournamentKeyboardEffects, Key, int, int, int, int, int> PlaytestPassiveDamageObserved;
+        public static event Action<TournamentKeyboardEffects> PlaytestPassiveLayoutChanged;
 
         private struct Activation
         {
@@ -33,6 +35,7 @@ namespace Game.Tournament
         private KeycapDefinition[] _parts;
         private int[] _levels;
         private int[] _passiveBonuses;
+        private ArtisanPassiveLayout _passiveLayout;
         private KeyboardPassiveIndicator _passiveIndicator;
         private bool _workshopWasActive;
         private bool _workshopDirty = true;
@@ -50,6 +53,19 @@ namespace Game.Tournament
 
         public KeyboardInputController PlaytestKeyboard => _keyboard;
         public TournamentController PlaytestTournament => _tournament;
+        public ArtisanPassiveLayout PlaytestPassiveLayout => _passiveLayout;
+
+        /// <summary>index에 바인딩된 실제 입력 키를 반환한다. 패시브 제공 위치와 대상 위치의 로그 연결에 사용한다.</summary>
+        public Key GetPlaytestKey(int index) { return _keys[index]; }
+
+        /// <summary>index에 확정된 파츠 정의를 반환한다. 외형과 능력 유무를 별도로 기록하며 정의가 없으면 null이다.</summary>
+        public KeycapDefinition GetPlaytestPart(int index) { return _parts[index]; }
+
+        /// <summary>index의 현재 능력 단계를 반환한다. 초기화된 전투 상태만 읽으며 능력이나 재고를 변경하지 않는다.</summary>
+        public int GetPlaytestLevel(int index) { return _levels[index]; }
+
+        /// <summary>health의 실제 바인딩 인덱스를 반환한다. 입력 로그를 현재 전투 구성과 연결한다.</summary>
+        public int GetPlaytestIndex(KeycapHealth health) { return _indices[health]; }
 
         /// <summary>
         /// tournament와 inventory, score 및 layout으로 새 키보드의 체력, 특수 유형과 행열을 구성한다.
@@ -114,6 +130,7 @@ namespace Game.Tournament
                 {
                     keycap.Broken -= HandleBroken;
                     keycap.HitReceived -= HandleHit;
+                    keycap.PassiveDamageObserved -= HandlePassiveDamage;
                 }
                 _indices.Clear();
             }
@@ -136,6 +153,7 @@ namespace Game.Tournament
                 _positions[index] = new Vector2(position.x, position.z);
                 binding.Value.Broken += HandleBroken;
                 binding.Value.HitReceived += HandleHit;
+                binding.Value.PassiveDamageObserved += HandlePassiveDamage;
                 _indices.Add(binding.Value, index++);
             }
         }
@@ -191,10 +209,19 @@ namespace Game.Tournament
                 halfSizes[index] = new Vector2(Mathf.Abs(x.x), Mathf.Abs(z.z));
             }
             ArtisanPassiveLayout layout = ArtisanPassiveLayout.Build(_parts, _levels, _coordinates, _positions, installed, halfSizes);
+            _passiveLayout = layout;
             _passiveBonuses = layout.Bonuses;
             for (int index = 0; index < _keycaps.Length; index++) _keycaps[index].ConfigurePassiveDamage(_passiveBonuses[index]);
             _passiveIndicator.Configure(layout, _keycaps);
             _passiveIndicator.SetVisible(IsExecutionActive);
+            if (_tournament != null) PlaytestPassiveLayoutChanged?.Invoke(this);
+        }
+
+        /// <summary>health에 실제 적용된 패시브 피해 관찰값을 전투 로거로 전달한다. 계산값과 HP 감소 및 패시브 제외 차이를 분리하며 게임 상태는 변경하지 않는다.</summary>
+        private void HandlePassiveDamage(KeycapHealth health, int bonus, int calculated, int applied, int calculatedExtra, int appliedExtra)
+        {
+            if (_tournament != null)
+                PlaytestPassiveDamageObserved?.Invoke(this, _keys[_indices[health]], bonus, calculated, applied, calculatedExtra, appliedExtra);
         }
 
         /// <summary>keycap 파괴를 받아 장착 능력을 예약한다. 복구 후에도 같은 구독으로 재발동하며 실행별 관찰 ID를 생성한다.</summary>
@@ -399,7 +426,7 @@ namespace Game.Tournament
         /// 입력값 없이 이전 플레이 실행의 정적 구독을 제거한다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetPlaytestObservers() { PlaytestEffectObserved = null; }
+        private static void ResetPlaytestObservers() { PlaytestEffectObserved = null; PlaytestPassiveDamageObserved = null; PlaytestPassiveLayoutChanged = null; }
 
         /// <summary>reason을 기록하며 모든 대기·실행 능력과 상태 및 연출을 정리한다. 키캡 체력과 장착 구성은 유지한다.</summary>
         private void ClearExecution(string reason)
@@ -435,6 +462,7 @@ namespace Game.Tournament
                 {
                     keycap.Broken -= HandleBroken;
                     keycap.HitReceived -= HandleHit;
+                    keycap.PassiveDamageObserved -= HandlePassiveDamage;
                 }
         }
     }

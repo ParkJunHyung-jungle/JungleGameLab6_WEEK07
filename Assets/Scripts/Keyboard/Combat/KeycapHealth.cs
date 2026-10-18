@@ -24,6 +24,7 @@ public sealed class KeycapHealth : MonoBehaviour
     public event Action<KeycapHealth> Broken;
     public event Action<KeycapDamage> Damaged;
     public event Action<KeycapHealth> DamageApplied;
+    public event Action<KeycapHealth, int, int, int, int, int> PassiveDamageObserved;
 
     [Header("Status Effects")]
     private KeycapStatusEffects _statusEffects;
@@ -171,10 +172,14 @@ public sealed class KeycapHealth : MonoBehaviour
     public void TakeDamage(int damage, KeycapHitKind kind)
     {
         if (_broken || _currentHP <= 0 || damage <= 0) return;
-        damage = _statusEffects.ResolveDamage(damage + (kind == KeycapHitKind.Direct ? _passiveDirectDamageBonus : 0), kind);
+        int passiveBonus = kind == KeycapHitKind.Direct ? _passiveDirectDamageBonus : 0;
+        damage = _statusEffects.ResolveDamage(damage + passiveBonus, kind, damage, out int baselineDamage);
         int previousHP = _currentHP;
         _currentHP = Mathf.Max(0, _currentHP - damage);
         UpdateDamageDecal();
+        if (passiveBonus > 0)
+            PassiveDamageObserved?.Invoke(this, passiveBonus, damage, previousHP - _currentHP,
+                Mathf.Max(0, damage - baselineDamage), Mathf.Max(0, previousHP - _currentHP - Mathf.Min(previousHP, baselineDamage)));
         if (_currentHP < previousHP) DamageApplied?.Invoke(this);
         HitReceived?.Invoke(this, kind);
         if (_currentHP == 0) Break();

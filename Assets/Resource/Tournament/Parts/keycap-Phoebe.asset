@@ -30,4 +30,4 @@ MonoBehaviour:
   - {fileID: 2100000, guid: bec8a379c5a165945b6f7c2e85ff4186, type: 2}
   - {fileID: 2100000, guid: 7cf7a4aa31a38d647936247030f50308, type: 2}
   _oneUnitOnly: 1
-  _ability: {fileID: 11400000, guid: 4df71996b99c4802b4478ede094e1b4d, type: 2}
+  _ability: {fileID: 0}

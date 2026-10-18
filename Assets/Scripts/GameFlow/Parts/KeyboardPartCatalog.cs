@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -70,7 +70,7 @@ namespace Game.Tournament
                     || part is PlateDefinition plate && plate.MaterialId == state.PlateMaterialId;
                 if (part is SwitchDefinition axis)
                     foreach (SwitchType type in state.SwitchTypes) used |= axis.Data.Type == type;
-                if (used) result.Add(part);
+                if (used && (!(part is KeycapDefinition candidate) || candidate.Ability != null)) result.Add(part);
             }
             return result;
         }

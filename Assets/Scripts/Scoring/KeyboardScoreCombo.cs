@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -12,7 +12,6 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 {
     private const int BASE_SCORE = 10;
     private const int KEYCAP_BREAK_SCORE = 10;
-    private const int KEYBOARD_BREAK_SCORE = 100;
 
     [Header("Input")]
     [SerializeField] private KeyboardInputController _keyboard;
@@ -20,6 +19,9 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     private KeyboardInputController _boundKeyboard;
     private KeycapHealth[] _keycaps = Array.Empty<KeycapHealth>();
     private IReadOnlyDictionary<Key, KeycapHealth> _keycapLayout;
+    private readonly HashSet<KeycapHealth> _scoredKeycaps = new HashSet<KeycapHealth>();
+    private KeyboardInputController _scoredKeyboard;
+    private bool _keyboardBreakSettled;
 
     [Header("Runtime State")]
     private long _score;
@@ -138,12 +140,13 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
         ResetCombo();
     }
 
-    /// <summary>점수 수집 중 키보드 파괴 보상 100점을 배율 없이 추가하고 화면에 변경 상태를 알린다.</summary>
+    /// <summary>완파된 현재 키보드의 미정산 키캡을 일반 파괴와 동일한 점수·콤보로 한 번 정산한다. 실제 체력과 파괴 이벤트는 변경하지 않아 능력은 추가 발동하지 않는다.</summary>
     public void AddKeyboardBreakScore()
     {
-        if (!_isTracking || !isActiveAndEnabled) return;
-        _score += KEYBOARD_BREAK_SCORE;
-        StateChanged?.Invoke();
+        if (!_isTracking || !isActiveAndEnabled || _boundKeyboard == null || _keyboardBreakSettled) return;
+        _keyboardBreakSettled = true;
+        foreach (KeycapHealth keycap in _keycaps)
+            if (keycap != null && keycap.gameObject.activeSelf) HandleKeycapBroken(keycap);
     }
 
     /// <summary>duration초 동안 점수 2배를 적용하며 효과 중 재발동하면 남은 시간을 갱신한다.</summary>
@@ -167,6 +170,12 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     {
         if (!isActiveAndEnabled || !_isTracking || _keyboard == null || _boundKeyboard != null)
             return;
+        if (_scoredKeyboard != _keyboard)
+        {
+            _scoredKeyboard = _keyboard;
+            _scoredKeycaps.Clear();
+            _keyboardBreakSettled = false;
+        }
         _boundKeyboard = _keyboard;
         _keycaps = _keyboard.GetComponentsInChildren<KeycapHealth>(true);
         _keycapLayout = _keyboard.GetKeycapLayout();
@@ -234,13 +243,13 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
     }
 
     /// <summary>
-    /// 실제 파괴된 keycap의 이벤트 구독을 해제하고 파괴 직전 콤보 배율로 파괴 점수를 한 번 지급한다.
-    /// KEYCAP_BREAK_SCORE와 Multiplier로 점수를 더하고 콤보 및 유지시간을 갱신한 뒤 변경 상태를 알린다.
+    /// keycap의 실제 파괴 또는 완파 정산을 받아 중복 없이 현재 콤보 배율의 파괴 점수를 지급한다.
+    /// KEYCAP_BREAK_SCORE와 Multiplier로 점수·콤보·유지시간을 갱신하며 완파를 유발한 키의 이벤트 순서에도 중복 정산하지 않는다.
     /// </summary>
     private void HandleKeycapBroken(KeycapHealth keycap)
     {
         keycap.Broken -= HandleKeycapBroken;
-        if (!_isTracking || !isActiveAndEnabled)
+        if (!_isTracking || !isActiveAndEnabled || !_scoredKeycaps.Add(keycap))
             return;
         _score += (int)(KEYCAP_BREAK_SCORE * Multiplier) * (_bonusRemaining > 0f ? 2 : 1);
         _combo++;

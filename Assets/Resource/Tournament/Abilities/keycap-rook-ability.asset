@@ -21,6 +21,12 @@ MonoBehaviour:
   - _kind: 0
     _damage: 3
     _status: {fileID: 0}
+  _artisanKind: 1
+  _passiveDamageBonus: 2
+  _passiveSideCount: 7
+  _passiveTargetCount: 10
+  _passiveSpacing: 2
+  _passiveOriginCount: 2
   _propagation: 0
   _repeatCount: 1
   _repeatInterval: 0.1

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -12,6 +12,7 @@ public sealed class KeycapStatusEffects
         public float RemainingTime;
         public int RemainingHits;
         public int Stacks;
+        public int Strength;
         public GameObject Marker;
     }
 
@@ -23,7 +24,7 @@ public sealed class KeycapStatusEffects
     public KeycapStatusEffects(Transform owner) { _owner = owner; }
 
     /// <summary>definition의 상태를 부여하거나 재부여 규칙으로 갱신한다. SO는 변경하지 않으며 키캡별 시간, 횟수, 중첩과 표시를 관리한다.</summary>
-    public void Apply(KeycapStatusEffectDefinition definition)
+    public void Apply(KeycapStatusEffectDefinition definition, int strength = 1)
     {
         Entry entry = _entries.Find(item => item.Definition == definition);
         if (entry != null && definition.Reapply == KeycapStatusReapply.Ignore) return;
@@ -48,6 +49,7 @@ public sealed class KeycapStatusEffects
         }
         else if (definition.Reapply == KeycapStatusReapply.Stack)
             entry.Stacks = Mathf.Min(entry.Stacks + 1, definition.MaxStacks);
+        entry.Strength = Mathf.Max(1, strength);
         entry.RemainingTime = definition.Duration ?? 0f;
         entry.RemainingHits = definition.HitCount;
         _entries.Remove(entry);
@@ -77,8 +79,8 @@ public sealed class KeycapStatusEffects
             Entry entry = _entries[index];
             if (entry.Definition.Duration.HasValue && entry.RemainingTime <= 0f) { RemoveAt(index); continue; }
             if (entry.Definition.DirectHitsOnly && kind != KeycapHitKind.Direct) continue;
-            bonus += entry.Definition.BonusDamage * entry.Stacks;
-            multiplier *= Mathf.Pow(entry.Definition.DamageMultiplier, entry.Stacks);
+            bonus += entry.Definition.BonusDamage * entry.Stacks * entry.Strength;
+            multiplier *= Mathf.Pow(entry.Definition.DamageMultiplier == 1f ? 1f : entry.Definition.DamageMultiplier * entry.Strength, entry.Stacks);
             if (!entry.Definition.Duration.HasValue && --entry.RemainingHits <= 0) RemoveAt(index);
         }
         return Mathf.Max(0, Mathf.CeilToInt((damage + bonus) * multiplier));

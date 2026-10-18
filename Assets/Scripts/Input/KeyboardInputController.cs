@@ -43,6 +43,7 @@ namespace KeyboardModeling
 
         public event Action<Key> KeyPressed;
         public event Action KeycapsRestored;
+        public event Action<bool> AttackModeChanged;
         public event Action<KeycapHealth> AttackRequested;
         public event Action<Transform> KeycapPressed;
         public event Action<Transform> ManualKeycapHit;
@@ -444,7 +445,9 @@ namespace KeyboardModeling
         /// </summary>
         public void SetAttackEnabled(bool attackEnabled)
         {
+            if (_attackEnabled == attackEnabled) return;
             _attackEnabled = attackEnabled;
+            AttackModeChanged?.Invoke(attackEnabled);
         }
 
         /// <summary>

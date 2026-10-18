@@ -82,6 +82,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     private readonly Dictionary<Transform, Game.Tournament.KeycapDefinition> _keycapPartDefinitions = new Dictionary<Transform, Game.Tournament.KeycapDefinition>();
     private readonly Dictionary<Transform, Game.Tournament.KeycapDefinition> _keycapModelDefinitions = new Dictionary<Transform, Game.Tournament.KeycapDefinition>();
 
+    public event Action KeycapDefinitionChanged;
+
     public string ImageError => _imageCustomization != null ? _imageCustomization.LastError : "";
     public int PhotoKeycapCount => GetImageCustomization().KeycapCount;
     public int KeycapCount
@@ -1268,6 +1270,22 @@ public sealed class KeyboardCustomization : MonoBehaviour
         return common;
     }
 
+    /// <summary>definition을 적용할 대상과 기존 아티산 수를 검사한다. 같은 종류도 각각 세어 최대 3개 장착만 허용하며 외형은 변경하지 않는다.</summary>
+    private bool CanApplyArtisan(Game.Tournament.KeycapDefinition definition, bool allKeycaps, int keycapIndex)
+    {
+        if (definition == null || !definition.IsArtisan) return true;
+        if (_keycaps == null) CacheKeycaps();
+        int count = 0;
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            Transform keycap = _keycaps[index];
+            bool target = allKeycaps || index == keycapIndex;
+            if (target && HasSwitchForKeycap(index) && (!definition.OneUnitOnly || _keycapModels[keycap].IsOneUnit)) count++;
+            else if (keycap.gameObject.activeSelf && _keycapPartDefinitions.TryGetValue(keycap, out var part) && part.IsArtisan) count++;
+        }
+        return count <= 3;
+    }
+
     /// <summary>keycap 루트에 장착된 SO를 반환한다. 사진용 재질과 무관하게 실제 부품 정의를 읽으며 구성은 변경하지 않는다.</summary>
     public Game.Tournament.KeycapDefinition GetKeycapDefinition(Transform keycap)
     {
@@ -1311,6 +1329,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         if (definition != null) _keycapPartDefinitions[keycap] = definition;
         else _keycapPartDefinitions.Remove(keycap);
         appearance.Apply(definition);
+        KeycapDefinitionChanged?.Invoke();
     }
 
     /// <summary>캐시된 키캡의 원본 메시와 표시 범위를 복원한다. 현재 모델 연결을 비우며 입력과 체력 컴포넌트는 유지한다.</summary>
@@ -1422,6 +1441,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public bool PreviewKeycapMaterial(Material material, bool allKeycaps, int keycapIndex,
         Game.Tournament.KeycapDefinition definition = null)
     {
+        if (!CanApplyArtisan(definition, allKeycaps, keycapIndex)) return false;
         if (material == null)
             return false;
 
@@ -1489,6 +1509,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public bool CommitKeycapMaterialPreview(Material material, bool allKeycaps, int keycapIndex,
         Game.Tournament.KeycapDefinition definition = null)
     {
+        if (!CanApplyArtisan(definition, allKeycaps, keycapIndex)) return false;
         if (_keycapMaterialPreviewSnapshot == null || material == null)
             return false;
 

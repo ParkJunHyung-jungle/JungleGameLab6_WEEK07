@@ -10,6 +10,7 @@ namespace Game.Tournament
     public sealed class ArtisanPassivePlacement
     {
         public ArtisanPassiveKind Kind { get; }
+        public int SourceIndex { get; internal set; } = -1;
         public int[] Origins { get; }
         public int[] Targets { get; }
         public IReadOnlyList<int[]> Rays { get; }
@@ -51,6 +52,7 @@ namespace Game.Tournament
                 KeycapAbilityDefinition ability = part.Ability;
                 if (ability.ArtisanKind == ArtisanPassiveKind.None) continue;
                 ArtisanPassivePlacement placement = Select(ability, available, coordinates, positions, halfSizes);
+                placement.SourceIndex = source;
                 result._placements.Add(placement);
                 int kind = (int)ability.ArtisanKind - 1;
                 foreach (int target in placement.Targets)

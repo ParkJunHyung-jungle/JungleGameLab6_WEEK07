@@ -26,6 +26,7 @@ namespace Game.Logging
         private readonly HashSet<Key> _blocked = new HashSet<Key>();
         private readonly Dictionary<KeyboardInputController, KeyboardState> _keyboards = new Dictionary<KeyboardInputController, KeyboardState>();
         private readonly ConditionalWeakTable<KeyboardInputController, KeyboardState> _effectContexts = new ConditionalWeakTable<KeyboardInputController, KeyboardState>();
+        private readonly ConditionalWeakTable<KeyboardInputController, List<(ArtisanPassiveKind Kind, int Source, int Target, int Bonus, bool Tied)>> _passiveSources = new ConditionalWeakTable<KeyboardInputController, List<(ArtisanPassiveKind, int, int, int, bool)>>();
         private KeyboardInputController _processingKeyboard;
         private GameManager _battleSource;
         private int _playerSpawnIndex;
@@ -96,6 +97,8 @@ namespace Game.Logging
             TournamentController.PlaytestInventorySnapshotRequested += HandleInventorySnapshot;
             TournamentController.PlaytestShopAction += HandleShopAction;
             TournamentKeyboardEffects.PlaytestEffectObserved += HandleSpecialEffect;
+            TournamentKeyboardEffects.PlaytestPassiveDamageObserved += HandlePassiveDamage;
+            TournamentKeyboardEffects.PlaytestPassiveLayoutChanged += HandlePassiveLayout;
             KeyboardInputController.PlaytestKeyProcessing += HandleKeyProcessing;
             InputSystem.onDeviceChange += HandleDeviceChange;
             _writer.Flush();
@@ -351,7 +354,7 @@ namespace Game.Logging
             state.AddContext(row);
             _writer.Write(row);
             TournamentKeyboardEffects effects = keyboard.GetComponent<TournamentKeyboardEffects>();
-            if (effects != null) WriteKeyboardLayout(state, effects);
+            if (effects != null) { WriteKeyboardLayout(state, effects); WritePassiveLayout(state, effects); }
             _writer.Flush();
         }
 
@@ -373,6 +376,7 @@ namespace Game.Logging
                 row.Set(PlaytestColumn.SpecialType, effects.GetPlaytestType(binding.Value).ToString());
                 row.Set(PlaytestColumn.LayoutRow, coordinate.x);
                 row.Set(PlaytestColumn.LayoutColumn, coordinate.y);
+                AddAbilityState(row, effects, binding.Value);
                 _writer.Write(row);
             }
         }
@@ -390,45 +394,78 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// inventory의 기본 및 기믹별 수량을 owner와 reason 및 snapshotId로 묶어 기록한다.
-        /// source의 실제 재화와 용량을 복사하며 보유 상태를 변경하지 않는다.
+        /// inventory의 구매 수량과 미사용 횟수 및 키별 능력 단계를 owner와 reason 및 snapshotId로 기록한다.
+        /// source의 실제 재화와 장착 파츠를 읽으며 보유 및 전투 상태는 변경하지 않는다.
         /// </summary>
         private void WriteInventory(TournamentController source, TournamentInventory inventory, string owner,
             string reason, string snapshotId)
         {
             double now = Time.realtimeSinceStartupAsDouble;
-            foreach (var item in inventory.Counts)
+            _writer.Write(CreateShopSnapshot(source, inventory, owner, reason, snapshotId, "InventorySummary", now));
+            var parts = new HashSet<KeyboardPartDefinition>(inventory.Counts.Keys);
+            foreach (var installed in inventory.InstalledKeycaps) parts.Add(installed.Value);
+            if (inventory.Switch != null) parts.Add(inventory.Switch);
+            if (inventory.Plate != null) parts.Add(inventory.Plate);
+            if (inventory.Housing != null) parts.Add(inventory.Housing);
+            foreach (KeyboardPartDefinition part in parts)
             {
-                PlaytestRecord row = new PlaytestRecord("InventorySnapshot", now);
-                if (reason == "BattleStart") _stages.AddStageContext(row);
-                PlaytestStageRecorder.AddTournamentContext(row, source);
-                row.Set(PlaytestColumn.SnapshotId, snapshotId);
-                row.Set(PlaytestColumn.Action, reason);
-                row.Set(PlaytestColumn.Owner, owner);
-                row.Set(PlaytestColumn.SpecialType, item.Key.Id);
-                row.Set(PlaytestColumn.Quantity, item.Value);
-                row.Set(PlaytestColumn.InventoryCapacity, inventory.Capacity);
-                row.Set(PlaytestColumn.InventoryTotal, inventory.Total);
-                row.Set(PlaytestColumn.CurrencyAfter, owner == "Enemy" ? source.EnemyCurrency : source.Currency);
-                if (ReferenceEquals(source, _shopSource)) row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
+                if (part == null) continue;
+                PlaytestRecord row = CreateShopSnapshot(source, inventory, owner, reason, snapshotId, "InventorySnapshot", now);
+                SetPartContext(row, part);
+                row.Set(PlaytestColumn.Quantity, inventory.GetCount(part));
+                row.Set(PlaytestColumn.UsedQuantity, inventory.GetEquippedCount(part));
+                row.Set(PlaytestColumn.AvailableAfter, inventory.GetAvailableCount(part));
+                if (!(part is KeycapDefinition)) row.Set(PlaytestColumn.LevelAfter, inventory.GetPartLevel(part));
                 _writer.Write(row);
             }
-            PlaytestRecord basic = new PlaytestRecord("InventorySnapshot", now);
-            PlaytestStageRecorder.AddTournamentContext(basic, source);
-            if (reason == "BattleStart") _stages.AddStageContext(basic);
-            basic.Set(PlaytestColumn.SnapshotId, snapshotId);
-            basic.Set(PlaytestColumn.Action, reason);
-            basic.Set(PlaytestColumn.Owner, owner);
-            basic.Set(PlaytestColumn.SpecialType, "keycap-aluminum");
-            basic.Set(PlaytestColumn.Quantity, 87 - inventory.Total);
-            basic.Set(PlaytestColumn.InventoryTotal, inventory.Total);
-            basic.Set(PlaytestColumn.CurrencyAfter, owner == "Enemy" ? source.EnemyCurrency : source.Currency);
-            _writer.Write(basic);
+            foreach (var installed in inventory.InstalledKeycaps)
+            {
+                PlaytestRecord row = CreateShopSnapshot(source, inventory, owner, reason, snapshotId, "AbilitySnapshot", now);
+                SetPartContext(row, installed.Value);
+                row.Set(PlaytestColumn.Key, installed.Key.ToString());
+                row.Set(PlaytestColumn.LevelAfter, inventory.GetKeycapLevel(installed.Key));
+                row.Set(PlaytestColumn.HasAbility, installed.Value != null && installed.Value.Ability != null);
+                _writer.Write(row);
+            }
         }
 
         /// <summary>
-        /// source의 확정된 상점 관찰값 observation을 슬롯과 거래 식별자로 기록한다.
-        /// 구매 확정에만 최종 보유 스냅샷을 연결하고 선택과 취소는 재화 지출로 계산하지 않는다.
+        /// source와 inventory 및 소유자와 계기를 사용해 type 스냅샷의 공통 문맥을 반환한다.
+        /// snapshotId와 now를 기록하며 보유 상태는 변경하지 않는다.
+        /// </summary>
+        private PlaytestRecord CreateShopSnapshot(TournamentController source, TournamentInventory inventory,
+            string owner, string reason, string snapshotId, string type, double now)
+        {
+            PlaytestRecord row = new PlaytestRecord(type, now);
+            if (reason == "BattleStart") _stages.AddStageContext(row);
+            PlaytestStageRecorder.AddTournamentContext(row, source);
+            row.Set(PlaytestColumn.SnapshotId, snapshotId);
+            row.Set(PlaytestColumn.Action, reason);
+            row.Set(PlaytestColumn.Owner, owner);
+            row.Set(PlaytestColumn.InventoryCapacity, inventory.Capacity);
+            row.Set(PlaytestColumn.InventoryTotal, inventory.Total);
+            row.Set(PlaytestColumn.CurrencyAfter, owner == "Enemy" ? source.EnemyCurrency : source.Currency);
+            if (ReferenceEquals(source, _shopSource)) row.Set(PlaytestColumn.ShopVisitId, _shopVisitId);
+            return row;
+        }
+
+        /// <summary>
+        /// part의 고유 ID와 부품 종류 및 키캡 분류를 row에 설정한다.
+        /// 파츠가 없으면 문맥을 비워 두며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        private static void SetPartContext(PlaytestRecord row, KeyboardPartDefinition part)
+        {
+            if (part == null) return;
+            row.Set(PlaytestColumn.SpecialType, part.Id);
+            row.Set(PlaytestColumn.PartKind, part is KeycapDefinition ? "Keycap" : part is SwitchDefinition ? "Switch"
+                : part is PlateDefinition ? "Plate" : part is HousingDefinition ? "Case" : "Unknown");
+            if (part is KeycapDefinition keycap)
+                row.Set(PlaytestColumn.KeycapKind, keycap.IsArtisan ? "Artisan" : "Regular");
+        }
+
+        /// <summary>
+        /// source의 상점 관찰값 observation을 슬롯과 거래 식별자 및 대상 키와 능력 단계로 기록한다.
+        /// 구매와 능력 변경 성공에 직후 상태 스냅샷을 연결하며 실제 재화나 능력은 변경하지 않는다.
         /// </summary>
         private void HandleShopAction(TournamentController source, TournamentShopObservation observation)
         {
@@ -447,10 +484,21 @@ namespace Game.Logging
             row.Set(PlaytestColumn.CurrencyBefore, observation.CurrencyBefore);
             row.Set(PlaytestColumn.CurrencyAfter, observation.CurrencyAfter);
             row.Set(PlaytestColumn.IsConfirmed, observation.Confirmed);
-            string snapshotId = observation.Action == "PurchaseConfirmed" ? Guid.NewGuid().ToString("N") : null;
+            SetPartContext(row, observation.Part);
+            if (observation.Success.HasValue) row.Set(PlaytestColumn.ActionSuccess, observation.Success.Value);
+            row.Set(PlaytestColumn.EndReason, observation.Reason);
+            if (observation.Key != Key.None) row.Set(PlaytestColumn.Key, observation.Key.ToString());
+            if (observation.LevelBefore >= 0) row.Set(PlaytestColumn.LevelBefore, observation.LevelBefore);
+            if (observation.LevelAfter >= 0) row.Set(PlaytestColumn.LevelAfter, observation.LevelAfter);
+            if (observation.AvailableBefore >= 0) row.Set(PlaytestColumn.AvailableBefore, observation.AvailableBefore);
+            if (observation.AvailableAfter >= 0) row.Set(PlaytestColumn.AvailableAfter, observation.AvailableAfter);
+            bool stateChanged = observation.Action == "PurchaseConfirmed" || observation.Action == "AbilityUnlocked"
+                || observation.Action == "AbilityUpgraded" || observation.Action == "UpgradeCancelled";
+            string snapshotId = stateChanged ? Guid.NewGuid().ToString("N") : null;
             if (snapshotId != null) row.Set(PlaytestColumn.SnapshotId, snapshotId);
             _writer.Write(row);
-            if (snapshotId != null) WriteInventory(source, observation.IsEnemy ? source.PlaytestEnemyInventory : source.Inventory, observation.IsEnemy ? "Enemy" : "Player", "PurchaseConfirmed", snapshotId);
+            if (snapshotId != null) WriteInventory(source, observation.IsEnemy ? source.PlaytestEnemyInventory : source.Inventory,
+                observation.IsEnemy ? "Enemy" : "Player", observation.Action, snapshotId);
             _writer.Flush();
         }
 
@@ -505,6 +553,8 @@ namespace Game.Logging
                 row.Set(PlaytestColumn.InputState, "Unmapped");
             else
             {
+                TournamentKeyboardEffects effects = input.GetComponent<TournamentKeyboardEffects>();
+                if (effects != null) AddAbilityState(row, effects, health);
                 bool broken = health.CurrentHP <= 0;
                 row.Set(PlaytestColumn.InputState, broken ? "Broken" : "Alive");
                 row.Set(PlaytestColumn.WasBroken, broken);
@@ -640,10 +690,106 @@ namespace Game.Logging
             TournamentController.PlaytestInventorySnapshotRequested -= HandleInventorySnapshot;
             TournamentController.PlaytestShopAction -= HandleShopAction;
             TournamentKeyboardEffects.PlaytestEffectObserved -= HandleSpecialEffect;
+            TournamentKeyboardEffects.PlaytestPassiveDamageObserved -= HandlePassiveDamage;
+            TournamentKeyboardEffects.PlaytestPassiveLayoutChanged -= HandlePassiveLayout;
             KeyboardInputController.PlaytestKeyProcessing -= HandleKeyProcessing;
             InputSystem.onDeviceChange -= HandleDeviceChange;
             _stages.MenuInputSamplingRequested -= SampleMenuKeys;
             _writer.Close();
+        }
+
+        /// <summary>effects의 health에 실제 저장된 외형·능력 단계·정의 유무를 row에 기록한다. 키캡 설정과 피해는 변경하지 않는다.</summary>
+        private static void AddAbilityState(PlaytestRecord row, TournamentKeyboardEffects effects, KeycapHealth health)
+        {
+            int index = effects.GetPlaytestIndex(health);
+            KeycapDefinition part = effects.GetPlaytestPart(index);
+            row.Set(PlaytestColumn.LevelAfter, effects.GetPlaytestLevel(index));
+            row.Set(PlaytestColumn.HasAbility, part != null && part.Ability != null);
+            if (part != null)
+            {
+                row.Set(PlaytestColumn.SpecialType, part.Id);
+                row.Set(PlaytestColumn.KeycapKind, part.IsArtisan ? "Artisan" : "Regular");
+            }
+        }
+
+        /// <summary>effects가 실제 확정한 패시브 배치에서 종류·대상별 최대 기여 제공자를 반환한다. 동률은 대표 제공자임을 표시하며 난수나 피해 계산을 실행하지 않는다.</summary>
+        private static List<(ArtisanPassiveKind Kind, int Source, int Target, int Bonus, bool Tied)> PassiveSources(TournamentKeyboardEffects effects)
+        {
+            var sources = new Dictionary<string, (ArtisanPassiveKind Kind, int Source, int Target, int Bonus, bool Tied)>();
+            ArtisanPassiveLayout layout = effects.PlaytestPassiveLayout;
+            if (layout == null) return new List<(ArtisanPassiveKind, int, int, int, bool)>();
+            foreach (ArtisanPassivePlacement placement in layout.Placements)
+            {
+                KeycapDefinition part = effects.GetPlaytestPart(placement.SourceIndex);
+                int bonus = part.Ability.PassiveDamageBonus * effects.GetPlaytestLevel(placement.SourceIndex);
+                foreach (int target in placement.Targets)
+                {
+                    string id = placement.Kind + ":" + target;
+                    if (!sources.TryGetValue(id, out var previous) || bonus > previous.Bonus)
+                        sources[id] = (placement.Kind, placement.SourceIndex, target, bonus, false);
+                    else if (bonus == previous.Bonus && previous.Source != placement.SourceIndex)
+                        sources[id] = (previous.Kind, previous.Source, target, previous.Bonus, true);
+                }
+            }
+            return new List<(ArtisanPassiveKind, int, int, int, bool)>(sources.Values);
+        }
+
+        /// <summary>source의 전투 중 패시브 재배치를 현재 키보드 문맥으로 기록한다. 아직 입장하지 않은 키보드는 입장 완료 시 별도로 수집한다.</summary>
+        private void HandlePassiveLayout(TournamentKeyboardEffects source)
+        {
+            if (!_closed && _effectContexts.TryGetValue(source.PlaytestKeyboard, out KeyboardState state)) WritePassiveLayout(state, source);
+        }
+
+        /// <summary>state와 effects의 종류별 최대 패시브 제공 위치·대상·단계·추가 수치를 기록한다. 같은 종류 최대·다른 종류 합산 규칙과 동률 대표 여부를 보존한다.</summary>
+        private void WritePassiveLayout(KeyboardState state, TournamentKeyboardEffects effects)
+        {
+            string snapshotId = Guid.NewGuid().ToString("N");
+            var sources = PassiveSources(effects);
+            _passiveSources.Remove(effects.PlaytestKeyboard);
+            _passiveSources.Add(effects.PlaytestKeyboard, sources);
+            foreach (var source in sources)
+            {
+                PlaytestRecord row = new PlaytestRecord("ArtisanPassiveLayout", Time.realtimeSinceStartupAsDouble);
+                state.AddBattleContext(row);
+                row.Set(PlaytestColumn.SnapshotId, snapshotId);
+                row.Set(PlaytestColumn.Key, effects.GetPlaytestKey(source.Target).ToString());
+                SetPassiveSource(row, effects, source.Kind, source.Source, source.Tied);
+                row.Set(PlaytestColumn.PassiveBonus, source.Bonus);
+                _writer.Write(row);
+            }
+        }
+
+        /// <summary>row에 kind 패시브의 대표 제공 키·파츠·단계와 귀속 제한을 저장한다. 동률이면 단일 원인으로 단정하지 않는다.</summary>
+        private static void SetPassiveSource(PlaytestRecord row, TournamentKeyboardEffects effects, ArtisanPassiveKind kind, int source, bool tied)
+        {
+            row.Set(PlaytestColumn.PassiveKind, kind.ToString());
+            row.Set(PlaytestColumn.SourceKey, effects.GetPlaytestKey(source).ToString());
+            row.Set(PlaytestColumn.SourcePartId, effects.GetPlaytestPart(source).Id);
+            row.Set(PlaytestColumn.SourceLevel, effects.GetPlaytestLevel(source));
+            row.Set(PlaytestColumn.Attribution, tied ? "SameKindMaxTiedRepresentative" : "SameKindMax");
+        }
+
+        /// <summary>source의 key에 적용된 실제 패시브 타격을 계산값·HP 감소·추가 기여로 분리해 기록한다. 여러 종류가 중첩되면 합산 기여로 남기며 점수는 추정하지 않는다.</summary>
+        private void HandlePassiveDamage(TournamentKeyboardEffects source, Key key, int bonus, int calculated, int applied, int calculatedExtra, int appliedExtra)
+        {
+            if (_closed || !_effectContexts.TryGetValue(source.PlaytestKeyboard, out KeyboardState state)) return;
+            PlaytestRecord row = new PlaytestRecord("ArtisanPassiveContribution", Time.realtimeSinceStartupAsDouble);
+            state.AddBattleContext(row);
+            row.Set(PlaytestColumn.Key, key.ToString());
+            row.Set(PlaytestColumn.ContributionId, Guid.NewGuid().ToString("N"));
+            row.Set(PlaytestColumn.PassiveBonus, bonus);
+            row.Set(PlaytestColumn.CalculatedDamage, calculated);
+            row.Set(PlaytestColumn.AppliedDamage, applied);
+            row.Set(PlaytestColumn.CalculatedExtraDamage, calculatedExtra);
+            row.Set(PlaytestColumn.AppliedExtraDamage, appliedExtra);
+            var sources = _passiveSources.TryGetValue(source.PlaytestKeyboard, out var cached) ? cached.FindAll(item => source.GetPlaytestKey(item.Target) == key && item.Bonus > 0) : new List<(ArtisanPassiveKind Kind, int Source, int Target, int Bonus, bool Tied)>();
+            if (sources.Count == 1) SetPassiveSource(row, source, sources[0].Kind, sources[0].Source, sources[0].Tied);
+            else
+            {
+                row.Set(PlaytestColumn.PassiveKind, "Aggregate");
+                row.Set(PlaytestColumn.Attribution, "DifferentKindsSummed_NoPerKindDamageSplit");
+            }
+            _writer.Write(row);
         }
 
         private sealed class KeyboardState

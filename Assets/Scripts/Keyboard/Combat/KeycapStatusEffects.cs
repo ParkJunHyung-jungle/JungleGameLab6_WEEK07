@@ -72,6 +72,12 @@ public sealed class KeycapStatusEffects
     /// <summary>damage와 kind에 반응하는 상태의 추가 피해와 배율을 합산해 최종 피해를 반환한다. 시간 제한 없는 상태는 이 타격에서 한 횟수를 소모하며 별도 피해 호출은 발생시키지 않는다.</summary>
     public int ResolveDamage(int damage, KeycapHitKind kind)
     {
+        return ResolveDamage(damage, kind, damage, out _);
+    }
+
+    /// <summary>damage와 baselineDamage에 동일한 상태 보정치를 적용해 두 계산값을 반환한다. kind에 따른 상태 소모는 한 번만 수행하며 baselineResolved에 패시브 제외 피해를 저장한다.</summary>
+    public int ResolveDamage(int damage, KeycapHitKind kind, int baselineDamage, out int baselineResolved)
+    {
         float bonus = 0f;
         float multiplier = 1f;
         for (int index = _entries.Count - 1; index >= 0; index--)
@@ -83,6 +89,7 @@ public sealed class KeycapStatusEffects
             multiplier *= Mathf.Pow(entry.Definition.DamageMultiplier == 1f ? 1f : entry.Definition.DamageMultiplier * entry.Strength, entry.Stacks);
             if (!entry.Definition.Duration.HasValue && --entry.RemainingHits <= 0) RemoveAt(index);
         }
+        baselineResolved = Mathf.Max(0, Mathf.CeilToInt((baselineDamage + bonus) * multiplier));
         return Mathf.Max(0, Mathf.CeilToInt((damage + bonus) * multiplier));
     }
 

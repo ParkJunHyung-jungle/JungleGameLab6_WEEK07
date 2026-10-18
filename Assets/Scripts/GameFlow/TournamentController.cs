@@ -176,6 +176,7 @@ namespace Game.Tournament
             else if (Phase == TournamentPhase.Shop)
             {
                 TournamentKeyboardSession.UpdateCurrent(_workspace.Capture());
+                PlaytestInventorySnapshotRequested?.Invoke(this, "ShopExit");
                 PlaytestShopStateChanged?.Invoke(this, false, "NextBattle");
                 Round++;
                 BeginBattle(false);
@@ -208,6 +209,7 @@ namespace Game.Tournament
             _rerollsUsed = 0;
             _offerGeneration = 0;
             PlaytestShopStateChanged?.Invoke(this, true, "ShopOpened");
+            PlaytestInventorySnapshotRequested?.Invoke(this, "ShopOpened");
             _message = "키캡 구매 후 같은 부품의 키를 눌러 해금·강화하세요. 최대 3단계입니다.";
             RollOffers();
             var enemyShown = new HashSet<KeyboardPartDefinition>();
@@ -215,11 +217,14 @@ namespace Game.Tournament
             {
                 KeyboardPartDefinition part = DrawOffer(_enemyInventory, enemyShown);
                 long before = _enemyCurrency;
+                int levelBefore = part == null || part is KeycapDefinition ? -1 : _enemyInventory.GetPartLevel(part);
+                int availableBefore = part != null ? _enemyInventory.GetAvailableCount(part) : -1;
                 Observe("OfferShown", i, part, before, false, true);
                 if (part != null && _enemyCurrency >= part.Price && _enemyInventory.TryAdd(part, _keyLayout))
                 {
                     _enemyCurrency -= part.Price;
-                    Observe("PurchaseConfirmed", i, part, before, true, true);
+                    Observe("PurchaseConfirmed", i, part, before, true, true,
+                        levelBefore: levelBefore, availableBefore: availableBefore);
                 }
             }
             _workspace.Show(_keyboardStorage, _inventory, _partCatalog.DefaultKeycap);
@@ -257,7 +262,12 @@ namespace Game.Tournament
         /// <summary>설정된 비용을 차감해 상품을 다시 추첨한다. 보유 재화와 남은 리롤 횟수가 부족하면 유지한다.</summary>
         public void Reroll()
         {
-            if (!CanReroll) return;
+            if (!CanReroll)
+            {
+                Observe("RerollFailed", -1, null, Currency, false, false,
+                    reason: Phase != TournamentPhase.Shop ? "NotInShop" : RerollsRemaining <= 0 ? "RerollLimit" : "InsufficientCurrency");
+                return;
+            }
             long before = Currency;
             Currency -= _settings.RerollCost;
             _rerollsUsed++;
@@ -280,13 +290,28 @@ namespace Game.Tournament
         /// <summary>index 상품을 구매 재고에 보관한다. 잔액과 수량을 검사하고 장착 상태는 유지한다.</summary>
         public void Buy(int index)
         {
-            if (!CanBuy(index)) return;
+            if (!CanBuy(index))
+            {
+                KeyboardPartDefinition offer = index >= 0 && index < _offers.Length ? _offers[index] : null;
+                string reason = Phase != TournamentPhase.Shop ? "NotInShop" : index < 0 || index >= _offers.Length ? "InvalidSlot"
+                    : _purchased[index] ? "AlreadyPurchased" : offer == null ? "EmptyOffer"
+                    : Currency < offer.Price ? "InsufficientCurrency" : "PurchaseNotAllowed";
+                Observe("PurchaseFailed", index, offer, Currency, false, false, reason: reason);
+                return;
+            }
             KeyboardPartDefinition part = _offers[index];
-            if (!_inventory.TryPurchase(part, _keyLayout)) return;
+            int levelBefore = part is KeycapDefinition ? -1 : _inventory.GetPartLevel(part);
+            int availableBefore = _inventory.GetAvailableCount(part);
+            if (!_inventory.TryPurchase(part, _keyLayout))
+            {
+                Observe("PurchaseFailed", index, part, Currency, false, false, reason: "PurchaseNotAllowed");
+                return;
+            }
             long before = Currency;
             Currency -= part.Price;
             _purchased[index] = true;
-            Observe("PurchaseConfirmed", index, part, before, true, false);
+            Observe("PurchaseConfirmed", index, part, before, true, false,
+                levelBefore: levelBefore, availableBefore: availableBefore);
             _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
             _message = part is KeycapDefinition ? "구매 완료 · 3개 위치에 한 번씩 해금·강화할 수 있습니다."
                 : $"{part.DisplayName} 능력 {_inventory.GetPartLevel(part)} / 3단계";
@@ -299,12 +324,20 @@ namespace Game.Tournament
             if (Phase != TournamentPhase.Shop || part == null || _inventory.GetCount(part) == 0) return;
             if (part is KeycapDefinition keycap)
             {
+                KeycapDefinition previous = _selectedKeycap;
                 _selectedKeycap = _selectedKeycap == keycap || !_inventory.CanApplyKeycap(keycap) ? null : keycap;
+                if (previous != null && previous != _selectedKeycap)
+                    Observe("InventoryDeselected", -1, previous, Currency, false, false, success: true, reason: "SelectionChanged");
+                Observe(_selectedKeycap != null ? "InventorySelected" : "InventorySelectionCleared", -1, part,
+                    Currency, false, false, success: _selectedKeycap != null || previous == keycap,
+                    reason: _selectedKeycap != null || previous == keycap ? "" : "NoApplicableTarget");
                 _message = _selectedKeycap != null ? "동일한 키캡 위치를 눌러 능력을 해금·강화하세요." : "키캡 선택을 해제했습니다.";
             }
             else
             {
-                if (!_inventory.TryEquipPart(part)) return;
+                bool applied = _inventory.TryEquipPart(part);
+                Observe("InventoryInspected", -1, part, Currency, false, false, success: applied);
+                if (!applied) return;
                 _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
                 _message = "부품 능력이 적용되어 있습니다.";
             }
@@ -315,9 +348,15 @@ namespace Game.Tournament
         public void UnequipInventoryItem(KeyboardPartDefinition part)
         {
             if (Phase != TournamentPhase.Shop || part == null) return;
+            Key removedKey = Key.None;
+            int availableBefore = _inventory.GetAvailableCount(part);
             bool removed = part is KeycapDefinition keycap
-                ? _inventory.TryUnequipLatestKeycap(keycap, out Key _)
+                ? _inventory.TryUnequipLatestKeycap(keycap, out removedKey)
                 : _inventory.TryUnequipPart(part);
+            int levelAfter = removedKey != Key.None ? _inventory.GetKeycapLevel(removedKey) : _inventory.GetPartLevel(part);
+            Observe(removed ? "UpgradeCancelled" : "UpgradeCancelFailed", -1, part, Currency, false, false,
+                success: removed, reason: removed ? "" : "NoCancellableUpgrade", key: removedKey,
+                levelBefore: removed ? levelAfter + 1 : -1, availableBefore: availableBefore);
             if (!removed) return;
             _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
             _message = "마지막 능력 단계를 취소하고 사용 횟수를 돌려놓았습니다.";
@@ -328,14 +367,32 @@ namespace Game.Tournament
         private void HandleShopKeyPressed(Key key)
         {
             if (Phase != TournamentPhase.Shop || _selectedKeycap == null) return;
-            if (!_inventory.TryEquipKeycap(_selectedKeycap, key, _keyLayout))
+            KeycapDefinition selected = _selectedKeycap;
+            int levelBefore = _inventory.GetKeycapLevel(key);
+            int availableBefore = _inventory.GetAvailableCount(selected);
+            bool applied = _inventory.TryEquipKeycap(selected, key, _keyLayout);
+            string reason = "";
+            if (!applied)
+            {
+                reason = !_inventory.InstalledKeycaps.TryGetValue(key, out var installed) ? "MissingTarget"
+                    : installed != selected ? "PartMismatch" : levelBefore >= TournamentInventory.MaxLevel ? "MaxLevel"
+                    : availableBefore <= 0 ? "NoRemainingUses" : "BundleTargetAlreadyUsed";
+            }
+            Observe(applied ? (levelBefore == 0 ? "AbilityUnlocked" : "AbilityUpgraded") : "AbilityApplyFailed",
+                -1, selected, Currency, false, false, success: applied, reason: reason, key: key,
+                levelBefore: levelBefore, availableBefore: availableBefore);
+            if (!applied)
             {
                 _message = "동일한 부품의 위치만 선택할 수 있습니다. 한 묶음은 같은 키에 한 번만 적용됩니다. 최대 3단계입니다.";
                 Changed?.Invoke();
                 return;
             }
             _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
-            if (!_inventory.CanApplyKeycap(_selectedKeycap)) _selectedKeycap = null;
+            if (!_inventory.CanApplyKeycap(_selectedKeycap))
+            {
+                _selectedKeycap = null;
+                Observe("InventoryDeselected", -1, selected, Currency, false, false, success: true, reason: "NoApplicableTarget");
+            }
             _message = $"{key} · {_inventory.GetKeycapLevel(key)} / 3단계"
                 + (_selectedKeycap != null ? " · 같은 부품의 다음 키를 선택하세요." : " · 해금·강화 완료");
             Changed?.Invoke();
@@ -344,13 +401,24 @@ namespace Game.Tournament
         /// <summary>최종 결과 화면에서만 씬을 재시작한다. 작업실 선택 원본과 저장 파일은 유지한다.</summary>
         public void Restart() { if (Phase == TournamentPhase.Finished) _manager.RestartGame(); }
 
-        /// <summary>action과 slot의 part 거래를 소유자별 재화로 기록한다. 실제 구매 및 추첨 상태는 변경하지 않는다.</summary>
-        private void Observe(string action, int slot, KeyboardPartDefinition part, long before, bool confirmed, bool enemy)
+        /// <summary>
+        /// action과 slot의 part 동작을 소유자별 재화와 성공 여부 및 reason으로 전달한다.
+        /// key와 levelBefore 및 availableBefore를 현재 상태와 함께 보관하며 구매 및 능력 상태는 변경하지 않는다.
+        /// </summary>
+        private void Observe(string action, int slot, KeyboardPartDefinition part, long before, bool confirmed, bool enemy,
+            bool? success = null, string reason = "", Key key = Key.None, int levelBefore = -1, int availableBefore = -1)
         {
+            TournamentInventory inventory = enemy ? _enemyInventory : _inventory;
+            int levelAfter = inventory == null || part == null ? -1 : key != Key.None ? inventory.GetKeycapLevel(key)
+                : part is KeycapDefinition ? -1 : inventory.GetPartLevel(part);
             PlaytestShopAction?.Invoke(this, new TournamentShopObservation(action, slot, _offerGeneration,
                 part != null ? part.Id : "", part != null ? part.Quantity : 0,
-                part != null ? part.Price : action == "Reroll" ? _settings.RerollCost : 0,
-                before, enemy ? _enemyCurrency : Currency, confirmed, Guid.NewGuid().ToString("N"), enemy));
+                action == "Reroll" || action == "RerollFailed" ? _settings.RerollCost
+                    : part != null && (action == "OfferShown" || action == "PurchaseConfirmed" || action == "PurchaseFailed") ? part.Price : 0,
+                before, enemy ? _enemyCurrency : Currency, confirmed, Guid.NewGuid().ToString("N"), enemy,
+                part, success ?? (confirmed ? (bool?)true : action.EndsWith("Failed") ? false : (bool?)null),
+                reason, key, levelBefore, levelAfter, availableBefore,
+                inventory != null && part != null ? inventory.GetAvailableCount(part) : -1));
         }
 
         void OnDestroy()
@@ -386,13 +454,29 @@ namespace Game.Tournament
         public bool Confirmed { get; }
         public string TransactionId { get; }
         public bool IsEnemy { get; }
-        /// <summary>action과 slot의 상품 및 재화 스냅샷을 생성한다. enemy와 transactionId로 거래 소유자와 식별자를 보관한다.</summary>
+        public KeyboardPartDefinition Part { get; }
+        public bool? Success { get; }
+        public string Reason { get; }
+        public Key Key { get; }
+        public int LevelBefore { get; }
+        public int LevelAfter { get; }
+        public int AvailableBefore { get; }
+        public int AvailableAfter { get; }
+        /// <summary>
+        /// action과 slot 및 part의 상품과 재화 관찰값을 생성한다.
+        /// enemy와 transactionId 및 success, reason, key, 단계와 잔여 횟수 입력을 불변 상태로 보관한다.
+        /// </summary>
         public TournamentShopObservation(string action, int slot, int generation, string type, int quantity,
-            long price, long before, long after, bool confirmed, string transactionId, bool enemy)
+            long price, long before, long after, bool confirmed, string transactionId, bool enemy,
+            KeyboardPartDefinition part = null, bool? success = null, string reason = "", Key key = Key.None,
+            int levelBefore = -1, int levelAfter = -1, int availableBefore = -1, int availableAfter = -1)
         {
             Action = action; Slot = slot; Generation = generation; Type = type; Quantity = quantity;
             Price = price; CurrencyBefore = before; CurrencyAfter = after; Confirmed = confirmed;
             TransactionId = transactionId; IsEnemy = enemy;
+            Part = part; Success = success; Reason = reason; Key = key;
+            LevelBefore = levelBefore; LevelAfter = levelAfter;
+            AvailableBefore = availableBefore; AvailableAfter = availableAfter;
         }
     }
 }

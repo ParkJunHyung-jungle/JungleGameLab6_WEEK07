@@ -171,7 +171,8 @@ namespace Game.Logging
 
         /// <summary>
         /// observation의 실제 UI 이벤트를 열린 회차에 기록한다.
-        /// 진입, 항목 이동, 선택 및 이미지 동작을 분리하고 다른 키보드의 이벤트는 제외한다.
+        /// 진입, 항목 이동, 선택 및 이미지 동작을 분리하고 전투 진입 시 열린 편집 회차를 정상 마감한다.
+        /// 전투 진입 이외에는 다른 키보드의 이벤트를 제외한다.
         /// </summary>
         private void Observe(CustomizationObservation observation)
         {
@@ -191,7 +192,10 @@ namespace Game.Logging
                 Write("CustomizationStart");
                 Snapshot("Initial");
             }
-            else if (_runId == null || !ReferenceEquals(_target, observation.Target)) return;
+            else if (_runId == null) return;
+            else if (observation.Type == "CustomizationEnd" && observation.Success && observation.Details == "NextScene")
+                EndRun("NextScene", true);
+            else if (!ReferenceEquals(_target, observation.Target)) return;
             else if (observation.Type == "CustomizationEnd") EndRun(observation.Details, observation.Success);
             else if (observation.Type == "PartChanged")
             {

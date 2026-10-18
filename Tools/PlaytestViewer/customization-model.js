@@ -44,9 +44,11 @@ const Customization = (() => {
   function Describe(values) {
     const known = values.filter(Number.isFinite).slice().sort((a, b) => a - b);
     const middle = Math.floor(known.length / 2);
-    return { mean: known.length ? Sum(known) / known.length : null,
+    return {
+      mean: known.length ? Sum(known) / known.length : null,
       median: !known.length ? null : known.length % 2 ? known[middle] : (known[middle - 1] + known[middle]) / 2,
-      count: known.length, missing: values.length - known.length };
+      count: known.length, missing: values.length - known.length
+    };
   }
   /** 실제 대상에 성공 적용한 이미지 행을 판정하고 미리보기와 취소를 제외한다. */
   function IsImageApply(row) { return row.record_type === "ImageAction" && ["Apply", "Replace"].includes(row.element_id) && row.apply_success === true; }
@@ -56,11 +58,13 @@ const Customization = (() => {
     const selected = rows.filter(row => row.record_type === "ElementSelected");
     const successKnown = selected.every(row => typeof row.apply_success === "boolean");
     const changeKnown = selected.every(row => row.apply_success === false || (row.apply_success === true && typeof row.value_changed === "boolean"));
-    return { attempts: selected.length,
+    return {
+      attempts: selected.length,
       success: successKnown ? selected.filter(row => row.apply_success === true).length : null,
       failed: successKnown ? selected.filter(row => row.apply_success === false).length : null,
       changed: changeKnown ? selected.filter(row => row.apply_success === true && row.value_changed === true).length : null,
-      reselected: changeKnown ? selected.filter(row => row.apply_success === true && row.value_changed === false).length : null };
+      reselected: changeKnown ? selected.filter(row => row.apply_success === true && row.value_changed === false).length : null
+    };
   }
 
   /** CSV 원본과 독립된 플레이어·세션·편집 회차·항목 방문 모델을 구성한다. */
@@ -79,7 +83,6 @@ const Customization = (() => {
     const missing = ["tester_id", "keyboard_id", "part", "part_visit_id", "apply_success", "value_changed", "focused_duration_seconds", "is_complete"].filter(field => !header.includes(field));
     if (missing.length) warnings.push("미기록 열: " + missing.join(", "));
     if (rows.some(row => row.schema_version !== null && row.schema_version !== undefined && row.schema_version !== 1)) warnings.push("커스터마이징 v1 이외의 스키마 버전 포함 · 알려진 열만 해석");
-    if (!header.includes("tester_id")) warnings.push("플레이어 식별자 미기록 · 사람 수로 해석할 수 없습니다.");
     const events = rows.slice().sort(Playtest.Order);
     const runs = [...Playtest.Group(events.filter(row => row.customization_run_id), row => JSON.stringify([row.session_id, row.customization_run_id])).entries()].map(([key, entries], index) => {
       const start = entries.find(row => row.record_type === "CustomizationStart") || null;
@@ -105,13 +108,17 @@ const Customization = (() => {
       const visits = [...Playtest.Group(entries.filter(row => ["PartVisitStart", "PartVisitEnd"].includes(row.record_type)), row => row.part_visit_id || "unidentified-" + row.sourceIndex).values()].map(visitRows => {
         const visitStart = visitRows.find(row => row.record_type === "PartVisitStart") || null;
         const visitEnd = visitRows.findLast(row => row.record_type === "PartVisitEnd") || null;
-        return { id: (visitStart || visitEnd).part_visit_id, part: (visitStart || visitEnd).part, start: visitStart, end: visitEnd,
-          duration: visitEnd?.duration_seconds ?? null, focused: visitEnd?.focused_duration_seconds ?? null };
+        return {
+          id: (visitStart || visitEnd).part_visit_id, part: (visitStart || visitEnd).part, start: visitStart, end: visitEnd,
+          duration: visitEnd?.duration_seconds ?? null, focused: visitEnd?.focused_duration_seconds ?? null
+        };
       });
-      const run = { key: id + ":" + key, id: context.customization_run_id, index: index + 1, fileId: id, fileName: name,
-        tester: context.tester_id, session: context.session_id, keyboard: context.keyboard_id, build: context.build_version,
+      const run = {
+        key: id + ":" + key, id: context.customization_run_id, index: index + 1, fileId: id, fileName: name,
+        tester: id, rawTester: context.tester_id, session: context.session_id, keyboard: context.keyboard_id, build: context.build_version,
         start, end, rows: entries, snapshots, snapshotBatches, visits, duration: end?.duration_seconds ?? null, focused: end?.focused_duration_seconds ?? null,
-        complete: end?.is_complete === true && ["RightClickExit", "NextScene"].includes(end.end_reason) };
+        complete: end?.is_complete === true && ["RightClickExit", "NextScene"].includes(end.end_reason)
+      };
       run.selected = entries.filter(row => row.record_type === "ElementSelected");
       run.imageApplies = entries.filter(IsImageApply);
       run.options = entries.filter(row => row.record_type === "AvailableOption");
@@ -123,9 +130,9 @@ const Customization = (() => {
     return { id, name, rawText: text, header, rows, events, warnings, runs };
   }
 
-  /** 회차 최종 이미지 스냅샷을 집계하고 미기록과 명시적인 이미지 없음을 구분한다. */
-  function Images(run) {
-    const snapshot = run.complete ? run.snapshots.get("Final") : null;
+  /** 회차와 스냅샷 단계로 이미지 상태를 집계하며 미기록과 명시적인 이미지 없음을 구분한다. */
+  function Images(run, phase = 'Final') {
+    const snapshot = phase === 'Initial' || run.complete ? run.snapshots.get(phase) : null;
     const rows = [...(snapshot?.values() || [])].filter(row => row.part?.startsWith("Image:"));
     const caseRow = rows.find(row => row.part === "Image:CaseWhole");
     const keycaps = rows.filter(row => row.part.startsWith("Image:Keycap:"));
@@ -136,9 +143,81 @@ const Customization = (() => {
     const withImage = keycaps.filter(row => row.element_id !== null && row.element_id !== "None");
     const caseRetained = !caseRow || caseRow.element_id === null ? null : caseRow.element_id !== "None";
     const capCount = !coverage || keycaps.some(row => row.element_id === null) ? null : withImage.length;
-    return { caseRetained, keycaps: capCount, canvas: withImage.filter(row => row.element_id.startsWith("Canvas:")).length,
+    return {
+      caseRetained, keycapRetained: withImage.length > 0 ? true : capCount === null ? null : false, keycaps: capCount, canvas: withImage.filter(row => row.element_id.startsWith("Canvas:")).length,
       individual: withImage.filter(row => row.element_id.startsWith("Individual:")).length,
-      retained: caseRetained === true || (capCount !== null && capCount > 0) ? true : caseRetained === false && capCount !== null ? false : null };
+      retained: caseRetained === true || withImage.length > 0 ? true : caseRetained === false && capCount !== null ? false : null
+    };
+  }
+
+  /** 회차와 이미지 범위의 적용·교체·제거를 집계하며 성공 동작 전후 상태로 값 변경 횟수를 반환한다. */
+  function ImageSelections(run, scope) {
+    const matches = part => scope === '케이스' ? part === 'Image:CaseWhole' : part?.startsWith('Image:Keycap:');
+    const actions = run.rows.filter(row => row.record_type === 'ImageAction' && ['Apply', 'Replace', 'Remove'].includes(row.element_id)
+      && (scope === '케이스' ? row.target_scope === 'CaseWhole' : ['SingleKeycap', 'AllKeycapsCanvas'].includes(row.target_scope)));
+    let changed = 0, known = true;
+    actions.forEach(row => {
+      if (row.apply_success === false) return;
+      if (row.apply_success !== true) { known = false; return; }
+      const before = run.snapshotBatches.findLast(batch => batch.rows.at(-1).sequence < row.sequence);
+      const after = run.snapshotBatches.find(batch => batch.preceding === row);
+      if (!before?.reliable || !after?.reliable) { known = false; return; }
+      const continuous = run.rows.filter(item => item.sequence >= before.rows.at(-1).sequence && item.sequence <= row.sequence);
+      if (!continuous.length || continuous.some((item, i, items) => !Number.isFinite(item.sequence) || i && item.sequence !== items[i - 1].sequence + 1)) { known = false; return; }
+      const keys = row.target_scope === 'SingleKeycap' && Number.isInteger(row.keycap_index) && row.keycap_index >= 0
+        ? ['Image:Keycap:' + row.keycap_index] : [...new Set([...before.values.keys(), ...after.values.keys()].filter(matches))];
+      if (row.target_scope === 'SingleKeycap' && (!Number.isInteger(row.keycap_index) || row.keycap_index < 0)) { known = false; return; }
+      const pairs = keys.map(part => [before.values.get(part)?.element_id, after.values.get(part)?.element_id]);
+      if (pairs.some(([a, b]) => a != null && b != null && a !== b)) changed++;
+      else if (!pairs.length || pairs.some(([a, b]) => a == null || b == null)) known = false;
+    });
+    return { attempts: actions.length, success: actions.every(row => typeof row.apply_success === 'boolean') ? actions.filter(row => row.apply_success).length : null, changed: known ? changed : null };
+  }
+
+  /** 성공한 복원 직전·직후의 연속 스냅샷을 비교해 실제 값이 달라진 파츠 식별자 집합을 반환한다. */
+  function LoadChanges(run) {
+    const changed = new Set();
+    run.rows.filter(row => row.record_type === 'Load' && row.apply_success === true).forEach(row => {
+      const previous = run.snapshotBatches.findLast(batch => batch.rows.at(-1).sequence < row.sequence);
+      const restored = run.snapshotBatches.find(batch => batch.preceding === row && batch.reason === 'Load:' + (row.element_id ?? ''));
+      if (!previous?.reliable || !restored?.reliable) return;
+      const between = run.rows.filter(item => item.sequence >= previous.rows.at(-1).sequence && item.sequence <= row.sequence);
+      if (!between.length || between.some((item, i, rows) => !Number.isFinite(item.sequence) || i && item.sequence !== rows[i - 1].sequence + 1)) return;
+      restored.values.forEach((value, part) => {
+        const before = previous.values.get(part)?.element_id, after = value.element_id;
+        if (before != null && after != null && before !== after) changed.add(part);
+      });
+    });
+    return changed;
+  }
+
+  /** 회차의 이미지 식별자·배치 스냅샷과 성공 동작을 연결해 키캡·케이스의 결과 상태를 반환한다. */
+  function ImageResults(run) {
+    const initial = run.snapshots.get('Initial'), final = run.complete ? run.snapshots.get('Final') : null;
+    const beforeUsage = Images(run, 'Initial'), afterUsage = Images(run);
+    const loadChanges = LoadChanges(run);
+    return [['키캡', 'keycapRetained'], ['케이스', 'caseRetained']].map(([scope, field]) => {
+      const matches = part => scope === '케이스' ? part === 'Image:CaseWhole' : part?.startsWith('Image:Keycap:');
+      const keys = new Set(run.snapshotBatches.flatMap(batch => [...batch.values.keys()].filter(matches)));
+      if (scope === '케이스') keys.add('Image:CaseWhole');
+      const complete = snapshot => keys.size > 0 && [...keys].every(part => snapshot?.get(part)?.element_id != null);
+      const equal = snapshot => [...keys].every(part => snapshot?.get(part)?.element_id === initial?.get(part)?.element_id);
+      const before = beforeUsage[field], after = afterUsage[field];
+      const loadChanged = [...keys].some(part => loadChanges.has(part));
+      const result = { scope, before, after, loadChanged, ...ImageSelections(run, scope) };
+      if (!complete(initial) || !complete(final) || before === null || after === null)
+        return { ...result, status: '판정 불가', reason: '초기·최종 이미지 대상의 상태가 미기록이거나 일부만 확인됩니다.' };
+      if (!equal(final)) return { ...result, status: '변경 유지', reason: '' };
+      const actions = run.rows.filter(row => row.record_type === 'Load' || row.record_type === 'ImageAction' && ['Apply', 'Replace', 'Remove'].includes(row.element_id)
+        && (scope === '케이스' ? row.target_scope === 'CaseWhole' : ['SingleKeycap', 'AllKeycapsCanvas'].includes(row.target_scope)));
+      const continuous = !!run.start && !!run.end && run.rows.every((row, i, rows) => Number.isFinite(row.sequence) && (!i || row.sequence === rows[i - 1].sequence + 1));
+      const tracked = actions.every(row => row.apply_success === false || row.apply_success === true && run.snapshotBatches.some(batch => batch.preceding === row && batch.reliable && complete(batch.values)));
+      const unknownScope = run.rows.some(row => row.record_type === 'ImageAction' && ['Apply', 'Replace', 'Remove'].includes(row.element_id) && row.apply_success !== false && !['CaseWhole', 'SingleKeycap', 'AllKeycapsCanvas'].includes(row.target_scope));
+      if (!continuous || !tracked || unknownScope)
+        return { ...result, status: '판정 불가', reason: '이미지 변경·복원 기록이나 직후 스냅샷이 불완전하여 초기 유지와 원복을 구분할 수 없습니다.' };
+      const away = run.snapshotBatches.some(batch => batch.reliable && complete(batch.values) && !equal(batch.values));
+      return { ...result, status: away ? '원복' : '초기 유지', reason: '' };
+    });
   }
 
   /** 선택 범위 회차의 여섯 항목별 클릭·방문·체류·접근률을 계산해 반환한다. */
@@ -154,13 +233,15 @@ const Customization = (() => {
         if (!items.length && !run.partOffered.has(part)) return null;
         return items.some(visit => !visit.end) ? null : Sum(items.map(visit => visit.focused));
       });
-      return { part, open: events.filter(row => row.record_type === "PartAccess" && row.element_id === "Open").length,
+      return {
+        part, open: events.filter(row => row.record_type === "PartAccess" && row.element_id === "Open").length,
         close: events.filter(row => row.record_type === "PartAccess" && row.element_id === "Close").length,
         visits: visits.filter(visit => visit.start).length, unclosed: visits.filter(visit => !visit.end).length,
         duration: visits.length && !ended.length ? null : Sum(ended.map(visit => visit.duration)), focused: visits.length && !ended.length ? null : Sum(ended.map(visit => visit.focused)),
         offered: offered.length, accessed: accessed.length, rate: offered.length ? accessed.length / offered.length : null,
         revisits: runs.reduce((sum, run) => sum + Math.max(0, run.visits.filter(visit => visit.part === part && visit.start).length - 1), 0),
-        selected: events.filter(row => row.record_type === "ElementSelected").length, distribution: Describe(perRun) };
+        selected: events.filter(row => row.record_type === "ElementSelected").length, distribution: Describe(perRun)
+      };
     });
   }
 
@@ -177,10 +258,12 @@ const Customization = (() => {
       const denominator = all.filter(row => row.record_type === "ElementSelected" && row.build_version === build).length;
       const testers = new Set(buildRuns.flatMap(run => run.selected.filter(row => SameElementPart(row.part, part) && row.element_id === element).map(() => run.tester)).filter(Boolean));
       const offeredTesters = new Set(offered.map(run => run.tester).filter(Boolean));
-      return { element, build, ...Selections(selected),
+      return {
+        element, build, ...Selections(selected),
         share: denominator ? selected.length / denominator : null, denominator,
         offered: offered.length, eligible: eligible.length, retained: retained.length, finalRate: eligible.length ? retained.length / eligible.length : null,
-        selectedTesters: testers.size, offeredTesters: offeredTesters.size };
+        selectedTesters: testers.size, offeredTesters: offeredTesters.size
+      };
     });
   }
 
@@ -190,18 +273,27 @@ const Customization = (() => {
     const used = offered.filter(run => run.imageApplies.length);
     const completedUsed = runs.filter(run => run.complete && run.imageApplies.length);
     const known = completedUsed.filter(run => Images(run).retained !== null);
-    return { offered: offered.length, used: used.length, usage: offered.length ? used.length / offered.length : null,
+    return {
+      offered: offered.length, used: used.length, usage: offered.length ? used.length / offered.length : null,
       completedUsed: completedUsed.length, known: known.length, retained: known.filter(run => Images(run).retained).length,
-      retention: completedUsed.length && known.length === completedUsed.length ? known.filter(run => Images(run).retained).length / completedUsed.length : null };
+      retention: completedUsed.length && known.length === completedUsed.length ? known.filter(run => Images(run).retained).length / completedUsed.length : null
+    };
   }
 
   const FINAL_PARTS = ['Keycap', 'Switch', 'Case', 'Plate', 'PlateEffect', 'LED', 'LEDColor', 'LEDEnabled'];
   /** 회차의 순서 연속성과 성공 선택의 이전값 연결을 확인하여 파츠별 초기·최종 판정을 반환한다. */
   function FinalParts(run) {
+    const loadChanges = LoadChanges(run);
     const initial = run.snapshots.get('Initial'), final = run.complete ? run.snapshots.get('Final') : null;
     const continuous = !!run.start && !!run.end && run.rows.every((row, i, rows) => row.status.apply_success !== 'missing' && row.status.value_changed !== 'missing' && Number.isFinite(row.sequence) && (!i || row.sequence === rows[i - 1].sequence + 1));
     return FINAL_PARTS.map(part => {
       const before = initial?.get(part)?.element_id ?? null, after = final?.get(part)?.element_id ?? null;
+      const reasons = [];
+      if (before === null) reasons.push('초기 상태가 미기록이거나 스냅샷 묶음을 확정할 수 없습니다.');
+      if (after === null) reasons.push('최종 상태가 미기록이거나 스냅샷 묶음을 확정할 수 없습니다.');
+      if (!run.start || !run.end) reasons.push('편집 시작 또는 종료 기록이 없습니다.');
+      if (run.rows.some(row => row.status.apply_success === 'missing' || row.status.value_changed === 'missing')) reasons.push('선택 성공·값 변경 여부를 확인할 열이 없습니다.');
+      if (run.rows.some((row, i, rows) => !Number.isFinite(row.sequence) || (i && row.sequence !== rows[i - 1].sequence + 1))) reasons.push('이벤트 순번(sequence)이 누락되거나 연속적이지 않습니다.');
       const actions = run.rows.filter(row => part === 'LEDColor' || part === 'LEDEnabled'
         ? row.record_type === 'Adjustment' && row.part === 'LED' && row.element_id === (part === 'LEDColor' ? 'Color' : 'Power')
         : row.record_type === 'ElementSelected' && SameElementPart(row.part, part));
@@ -209,20 +301,20 @@ const Customization = (() => {
       actions.forEach(row => {
         if (row.apply_success === false) return;
         const value = part === 'LEDColor' || part === 'LEDEnabled' ? row.details : row.element_id;
-        if (row.apply_success !== true || value == null || typeof row.value_changed !== 'boolean') { reliable = false; return; }
+        if (row.apply_success !== true || value == null || typeof row.value_changed !== 'boolean') { reasons.push('선택·조절의 성공 여부, 적용값 또는 변경 여부가 미기록입니다.'); reliable = false; return; }
         const previousValue = part === 'LEDEnabled' && row.previous_element_id == null && ['true', 'false'].includes(current) && value === (current === 'true' ? 'false' : 'true') ? current : row.previous_element_id;
-        if (previousValue !== current || row.value_changed !== (current !== value)) reliable = false;
+        if (previousValue !== current || row.value_changed !== (current !== value)) { reasons.push('이전값과 다음 선택값의 연결 또는 변경 표시가 일치하지 않습니다.'); reliable = false; }
         if (row.value_changed && value !== before) away = true;
         current = value;
       });
-      if (run.rows.some(row => row.record_type === 'Load' && row.apply_success !== false)) reliable = false;
-      if (current !== after) reliable = false;
+      if (run.rows.some(row => row.record_type === 'Load' && row.apply_success !== false)) { reasons.push('복원(Load) 기록이 있어 선택 기록만으로 변경 경로를 확정할 수 없습니다.'); reliable = false; }
+      if (current !== after) { reasons.push('선택·조절 기록으로 추적한 마지막 값이 Final 상태와 다릅니다.'); reliable = false; }
       const counts = (part === 'LEDColor' || part === 'LEDEnabled') ? {
         attempts: actions.length, success: actions.every(row => typeof row.apply_success === 'boolean') ? actions.filter(row => row.apply_success).length : null,
         changed: actions.every(row => row.apply_success === false || typeof row.value_changed === 'boolean') ? actions.filter(row => row.apply_success === true && row.value_changed).length : null,
         reselected: actions.every(row => row.apply_success === false || typeof row.value_changed === 'boolean') ? actions.filter(row => row.apply_success === true && row.value_changed === false).length : null
       } : Selections(actions);
-      return { part, before, after, ...counts, status: before === null || after === null ? '판정 불가' : before !== after ? '변경 유지' : !reliable ? '판정 불가' : away ? '원복' : '초기 유지' };
+      return { part, before, after, loadChanged: loadChanges.has(part), ...counts, reason: [...new Set(reasons)].join(' '), status: before === null || after === null ? '판정 불가' : before !== after ? '변경 유지' : !reliable ? '판정 불가' : away ? '원복' : '초기 유지' };
     });
   }
   /** 이미지 식별자와 적용 방식을 별도로 읽으며 명시적 None과 미기록을 보존한다. */
@@ -253,8 +345,10 @@ const Customization = (() => {
     if (![...keys].some(part => part.startsWith('Image:Keycap:'))) keys.add('Image:Keycap:미기록');
     const different = [], unknown = [];
     keys.forEach(part => { const a = saved?.get(part)?.element_id, b = final?.get(part)?.element_id; if (a == null || b == null) unknown.push(part); else if (a !== b) different.push(part); });
-    return { save: stats('Save'), load: stats('Load'), last, different, unknown,
-      status: !last ? stats('Save').attempts ? '성공 저장 기록 없음' : '저장 기록 없음' : !saved || !final ? '저장 성공, 상태 비교 불가' : different.length ? '저장 후 추가 변경 있음' : unknown.length ? '저장 성공, 상태 비교 불가' : '저장 후 변경 없음' };
+    return {
+      save: stats('Save'), load: stats('Load'), last, different, unknown,
+      status: !last ? stats('Save').attempts ? '성공 저장 기록 없음' : '저장 기록 없음' : !saved || !final ? '저장 성공, 상태 비교 불가' : different.length ? '저장 후 추가 변경 있음' : unknown.length ? '저장 성공, 상태 비교 불가' : '저장 후 변경 없음'
+    };
   }
   /** 완료 회차의 빌드별 탐색과 최종 구성을 집계하고 각 비율의 독립 분모를 반환한다. */
   function FinalElements(runs) {
@@ -267,10 +361,12 @@ const Customization = (() => {
           const matching = run => run.selected.filter(row => SameElementPart(row.part, part) && row.element_id === element);
           const selected = items.filter(run => matching(run).length), successful = items.filter(run => matching(run).some(row => row.apply_success === true));
           const selectedKnown = successful.filter(run => known.includes(run)), retained = known.filter(run => run.snapshots.get('Final').get(part).element_id === element);
-          result.push({ part, build, element, ...Selections(selected.flatMap(matching)), testers: new Set(selected.map(run => run.tester).filter(Boolean)).size, selected: selected.length,
+          result.push({
+            part, build, element, ...Selections(selected.flatMap(matching)), testers: new Set(selected.map(run => run.tester).filter(Boolean)).size, selected: selected.length,
             denominator: known.length, retained: retained.length, selectedKnown: selectedKnown.length, direct: retained.filter(run => successful.includes(run)).length,
             initial: retained.filter(run => FinalParts(run).find(item => item.part === part).status === '초기 유지').length,
-            finalChanged: retained.filter(run => { const before = run.snapshots.get('Initial')?.get(part)?.element_id; return before != null && before !== element; }).length });
+            finalChanged: retained.filter(run => { const before = run.snapshots.get('Initial')?.get(part)?.element_id; return before != null && before !== element; }).length
+          });
         });
       }
     }
@@ -292,5 +388,5 @@ const Customization = (() => {
     return { basic: group(basic), image: group(image), excluded };
   }
 
-  return { PARTS, ELEMENT_PARTS, COLORS, SameElementPart, SameTabPart, Decode, Sum, Describe, Build, Images, Parts, Elements, IsImageApply, ImageMetrics, Selections, FINAL_PARTS, FinalParts, ImageChanges, Storage, FinalElements, Combinations };
+  return { PARTS, ELEMENT_PARTS, COLORS, SameElementPart, SameTabPart, Decode, Sum, Describe, Build, Images, ImageResults, Parts, Elements, IsImageApply, ImageMetrics, Selections, FINAL_PARTS, FinalParts, ImageChanges, Storage, FinalElements, Combinations };
 })();

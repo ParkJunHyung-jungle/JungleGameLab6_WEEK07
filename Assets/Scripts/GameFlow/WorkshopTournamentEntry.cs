@@ -52,10 +52,12 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
             KeyboardCustomization keyboard = _holder.KeyboardBody.GetComponent<KeyboardCustomization>();
             KeyboardCustomizationState state = _storage.CaptureForBattle(keyboard);
             TournamentKeyboardSession.Select(state);
-            CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
 #if UNITY_EDITOR
             if (!Application.CanStreamedLevelBeLoaded(_battleScenePath))
             {
+                if (UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.SceneAsset>(_battleScenePath) == null)
+                    throw new InvalidOperationException("전투 씬을 찾을 수 없습니다.");
+                CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
                 UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(_battleScenePath,
                     new LoadSceneParameters(LoadSceneMode.Single));
                 return;
@@ -63,6 +65,7 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
 #endif
             if (!Application.CanStreamedLevelBeLoaded(_battleScenePath))
                 throw new InvalidOperationException("전투 씬이 빌드 목록에 없습니다.");
+            CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
             SceneManager.LoadScene(_battleScenePath);
         }
         catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)

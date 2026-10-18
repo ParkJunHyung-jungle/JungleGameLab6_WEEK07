@@ -18,6 +18,7 @@ namespace Game.Tournament
             public int Index;
             public string Id;
             public KeycapAbilityDefinition Ability;
+            public int Level;
         }
 
         [Header("Workshop Preview")]
@@ -30,6 +31,11 @@ namespace Game.Tournament
         private TournamentController _tournament;
         private KeyboardCustomization _workshopCustomization;
         private KeycapDefinition[] _parts;
+        private int[] _levels;
+        private int[] _passiveBonuses;
+        private KeyboardPassiveIndicator _passiveIndicator;
+        private bool _workshopWasActive;
+        private bool _workshopDirty = true;
         private KeyboardInputController _keyboard;
         private KeyboardDestruction _destruction;
         private KeycapHealth[] _keycaps;
@@ -47,11 +53,16 @@ namespace Game.Tournament
 
         /// <summary>
         /// tournament와 inventory, score 및 layout으로 새 키보드의 체력, 특수 유형과 행열을 구성한다.
-        /// 구매 때 확정된 키별 SO 배치를 읽어 파괴 이벤트를 등록하며 배치와 보유 수량은 변경하지 않는다.
+        /// 장착 SO와 위치별 해금 단계를 읽어 이벤트와 패시브를 구성하며 외형과 구매 재고는 유지한다.
         /// </summary>
         public void Initialize(TournamentController tournament, TournamentInventory inventory, KeyboardScoreCombo score, TournamentKeyLayout layout, int health)
         {
-            if (_keyboard != null) _keyboard.KeycapsRestored -= HandleKeycapsRestored;
+            if (_keyboard != null)
+            {
+                _keyboard.KeycapsRestored -= HandleKeycapsRestored;
+                _keyboard.AttackModeChanged -= HandleWorkshopAttackMode;
+            }
+            if (_workshopCustomization != null) _workshopCustomization.KeycapDefinitionChanged -= HandleWorkshopDefinitionChanged;
             _workshopCustomization = null;
             _tournament = tournament;
 
@@ -63,12 +74,15 @@ namespace Game.Tournament
             for (int index = 0; index < _keycaps.Length; index++)
             {
                 _keycaps[index].ConfigureTournamentHealth(health);
-                if (inventory.Keycaps.TryGetValue(_keys[index], out KeycapDefinition part))
+                if (inventory.InstalledKeycaps.TryGetValue(_keys[index], out KeycapDefinition part))
                 {
                     _parts[index] = part;
                     _abilities[index] = part.Ability;
+                    _levels[index] = inventory.GetKeycapLevel(_keys[index]);
                 }
             }
+            ApplyPassives();
+            GetComponent<KeyboardAbilityOutline>().ConfigureInventory(inventory);
         }
 
         void Start()
@@ -85,11 +99,14 @@ namespace Game.Tournament
             _workshopCustomization = GetComponent<KeyboardCustomization>();
             InitializeBindings(_workshopLayout);
             _keyboard.KeycapsRestored += HandleKeycapsRestored;
+            _keyboard.AttackModeChanged += HandleWorkshopAttackMode;
+            _workshopCustomization.KeycapDefinitionChanged += HandleWorkshopDefinitionChanged;
         }
 
         /// <summary>layout의 키별 행열과 입력 바인딩을 캐시하고 피해·파괴 이벤트를 연결한다. 체력과 장착 부품은 변경하지 않는다.</summary>
         private void InitializeBindings(TournamentKeyLayout layout)
         {
+            _passiveIndicator = GetComponent<KeyboardPassiveIndicator>();
             if (_keycaps != null)
             {
                 ClearExecution("Reinitialized");
@@ -108,6 +125,7 @@ namespace Game.Tournament
             _coordinates = new Vector2Int[bindings.Count];
             _positions = new Vector2[bindings.Count];
             _parts = new KeycapDefinition[bindings.Count];
+            _levels = new int[bindings.Count];
             int index = 0;
             foreach (KeyValuePair<Key, KeycapHealth> binding in bindings)
             {
@@ -126,6 +144,57 @@ namespace Game.Tournament
         private void HandleKeycapsRestored()
         {
             ClearExecution("KeycapsRestored");
+            _workshopDirty = true;
+            if (IsExecutionActive) RefreshWorkshopAbilities();
+        }
+
+        /// <summary>작업실의 키캡 SO 변경을 받아 최대 단계 패시브를 갱신 대상으로 표시한다. 입력 구성과 저장 데이터는 변경하지 않는다.</summary>
+        private void HandleWorkshopDefinitionChanged() { _workshopDirty = true; }
+
+        /// <summary>작업실 공격 모드 active에 따라 최대 단계 시연을 준비하거나 효과와 패시브를 정리한다. 원본 부품 단계는 저장하지 않는다.</summary>
+        private void HandleWorkshopAttackMode(bool active)
+        {
+            if (active) RefreshWorkshopAbilities();
+            else
+            {
+                ClearExecution("PreviewEnded");
+            }
+            _workshopWasActive = active;
+            GetComponent<KeyboardAbilityOutline>().SetPreview(active);
+        }
+
+        /// <summary>작업실의 현재 장착 SO를 읽어 능력을 최대 단계로 구성한다. 무작위 패시브 기준과 직접 피해를 갱신하며 외형은 유지한다.</summary>
+        private void RefreshWorkshopAbilities()
+        {
+            for (int index = 0; index < _keycaps.Length; index++)
+            {
+                _parts[index] = _keycaps[index].gameObject.activeInHierarchy
+                    ? _workshopCustomization.GetKeycapDefinition(_keycaps[index].transform) : null;
+                _abilities[index] = _parts[index] != null ? _parts[index].Ability : null;
+                _levels[index] = _abilities[index] != null ? TournamentInventory.MaxLevel : 0;
+            }
+            ApplyPassives();
+            _workshopDirty = false;
+        }
+
+        /// <summary>장착·해금된 아티산의 단계별 패시브를 키보드에 합산한다. 무작위 기준은 이 초기화마다 다시 선정하며 아티산이 파괴되어도 보충 전까지 유지한다.</summary>
+        private void ApplyPassives()
+        {
+            var installed = new bool[_keycaps.Length];
+            for (int index = 0; index < installed.Length; index++) installed[index] = _keycaps[index].gameObject.activeInHierarchy;
+            var halfSizes = new Vector2[_keycaps.Length];
+            for (int index = 0; index < _keycaps.Length; index++)
+            {
+                BoxCollider collider = _keycaps[index].GetComponent<BoxCollider>();
+                Vector3 x = transform.InverseTransformVector(collider.transform.TransformVector(Vector3.right * collider.size.x * 0.5f));
+                Vector3 z = transform.InverseTransformVector(collider.transform.TransformVector(Vector3.forward * collider.size.z * 0.5f));
+                halfSizes[index] = new Vector2(Mathf.Abs(x.x), Mathf.Abs(z.z));
+            }
+            ArtisanPassiveLayout layout = ArtisanPassiveLayout.Build(_parts, _levels, _coordinates, _positions, installed, halfSizes);
+            _passiveBonuses = layout.Bonuses;
+            for (int index = 0; index < _keycaps.Length; index++) _keycaps[index].ConfigurePassiveDamage(_passiveBonuses[index]);
+            _passiveIndicator.Configure(layout, _keycaps);
+            _passiveIndicator.SetVisible(IsExecutionActive);
         }
 
         /// <summary>keycap 파괴를 받아 장착 능력을 예약한다. 복구 후에도 같은 구독으로 재발동하며 실행별 관찰 ID를 생성한다.</summary>
@@ -147,11 +216,13 @@ namespace Game.Tournament
             {
                 _parts[index] = _workshopCustomization.GetKeycapDefinition(_keycaps[index].transform);
                 _abilities[index] = _parts[index] != null ? _parts[index].Ability : null;
+                _levels[index] = TournamentInventory.MaxLevel;
             }
+            if (_levels[index] <= 0 || (_parts[index] != null && _parts[index].IsArtisan)) return;
             KeycapAbilityDefinition ability = _abilities[index];
             if (ability == null || ability.Target == KeycapTargetPattern.None
                 || (ability.Trigger == KeycapAbilityTrigger.Broken) != (trigger == "Broken")) return;
-            var activation = new Activation { Index = index, Id = Guid.NewGuid().ToString("N"), Ability = ability };
+            var activation = new Activation { Index = index, Id = Guid.NewGuid().ToString("N"), Ability = ability, Level = _levels[index] };
             ObserveEffect(activation, trigger, "");
             if (!IsExecutionActive) { ObserveEffect(activation, "Skipped", "BattleInactive"); return; }
             _statusesCleared = false;
@@ -162,11 +233,21 @@ namespace Game.Tournament
         void LateUpdate()
         {
             if (_keycaps == null) return;
+            if (_workshopCustomization != null)
+            {
+                bool active = IsExecutionActive;
+                if (active && (!_workshopWasActive || _workshopDirty)) RefreshWorkshopAbilities();
+                _workshopWasActive = active;
+                GetComponent<KeyboardAbilityOutline>().SetPreview(active);
+            }
             if (!IsExecutionActive || _destruction.IsBroken)
             {
                 if (!_statusesCleared) ClearExecution(!IsExecutionActive ? "BattleInactive" : "KeyboardBroken");
                 return;
             }
+            if (_statusesCleared && _passiveBonuses != null)
+                for (int index = 0; index < _keycaps.Length; index++) _keycaps[index].ConfigurePassiveDamage(_passiveBonuses[index]);
+            _passiveIndicator.SetVisible(true);
             _statusesCleared = false;
             int starts = 0;
             while (_pending.Count > 0 && !_destruction.IsBroken && starts++ < 8)
@@ -216,7 +297,7 @@ namespace Game.Tournament
                             Vector3 destination = GetSurfacePosition(target);
                             KeycapAbilityVfx.Play(ability.ImpactEffectPrefab, transform, source, destination,
                                 ability.ImpactLifetime, keyboard: _keyboard, keycap: _keycaps[target].transform);
-                            ApplyEffects(target, ability);
+                            ApplyEffects(target, ability, activation.Level);
                         }
                         previous = target;
                         if (!CanContinue(activation)) yield break;
@@ -265,14 +346,14 @@ namespace Game.Tournament
         }
 
         /// <summary>살아 있는 index 키캡에 ability의 피해 또는 상태 효과 목록을 순서대로 적용한다. 능력 피해로 구분해 추가 피해의 재귀 호출과 피격 능력 재발동을 방지한다.</summary>
-        private void ApplyEffects(int index, KeycapAbilityDefinition ability)
+        private void ApplyEffects(int index, KeycapAbilityDefinition ability, int level)
         {
             if (!IsExecutionActive || _destruction.IsBroken || !_keycaps[index].gameObject.activeInHierarchy || _keycaps[index].CurrentHP <= 0) return;
             foreach (KeycapAbilityEffect effect in ability.Effects)
             {
                 if (_destruction.IsBroken || _keycaps[index].CurrentHP <= 0) break;
-                if (effect.Kind == KeycapEffectKind.Damage) _keycaps[index].TakeDamage(effect.Damage, KeycapHitKind.Ability);
-                else _keycaps[index].ApplyStatus(effect.Status);
+                if (effect.Kind == KeycapEffectKind.Damage) _keycaps[index].TakeDamage(effect.Damage * level, KeycapHitKind.Ability);
+                else _keycaps[index].ApplyStatus(effect.Status, level);
             }
         }
 
@@ -329,8 +410,9 @@ namespace Game.Tournament
             _delayedEffects.Clear();
             StopAllCoroutines();
             KeycapAbilityVfx.CancelFor(transform);
+            if (_passiveIndicator != null) _passiveIndicator.SetVisible(false);
             foreach (KeycapHealth keycap in _indices.Keys)
-                if (keycap != null) keycap.ClearStatuses();
+                if (keycap != null) { keycap.ClearStatuses(); keycap.ConfigurePassiveDamage(0); }
             _statusesCleared = true;
         }
 
@@ -342,7 +424,12 @@ namespace Game.Tournament
         void OnDestroy()
         {
             ClearExecution("KeyboardDestroyed");
-            if (_keyboard != null) _keyboard.KeycapsRestored -= HandleKeycapsRestored;
+            if (_keyboard != null)
+            {
+                _keyboard.KeycapsRestored -= HandleKeycapsRestored;
+                _keyboard.AttackModeChanged -= HandleWorkshopAttackMode;
+            }
+            if (_workshopCustomization != null) _workshopCustomization.KeycapDefinitionChanged -= HandleWorkshopDefinitionChanged;
             foreach (KeycapHealth keycap in _indices.Keys)
                 if (keycap != null)
                 {

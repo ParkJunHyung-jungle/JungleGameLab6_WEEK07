@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -90,7 +90,7 @@ namespace Game.Tournament
             if (selection == null) selection = _keyboardStorage.GetDefaultCustomization();
             _catalog = _partCatalog.CreatePool(selection);
             TournamentKeyboardSession.Begin();
-            TournamentKeyboardSession.UpdateCurrent(_keyboardStorage.GetDefaultCustomization());
+            TournamentKeyboardSession.UpdateCurrent(selection);
             PlaytestInventorySnapshotRequested?.Invoke(this, "TournamentStart");
             BeginBattle(false);
         }
@@ -124,9 +124,9 @@ namespace Game.Tournament
             TournamentInventory inventory = isEnemy ? _enemyInventory : _inventory;
             KeyboardCustomization custom = keyboard.GetComponent<KeyboardCustomization>();
             custom.PrepareForBattle();
-            if (isEnemy) _keyboardStorage.ApplyDefaultCustomization(custom);
-            else _keyboardStorage.ApplyCustomization(TournamentKeyboardSession.GetCurrent(), custom);
-            custom.ApplyTournamentParts(inventory, _partCatalog.DefaultKeycap);
+            _keyboardStorage.ApplyCustomization(TournamentKeyboardSession.GetCurrent(), custom);
+            custom.PrepareForBattle();
+            inventory.ConfigureLayout(custom, _catalog, _partCatalog.DefaultKeycap);
             keyboard.GetComponent<KeyboardAttackController>().ConfigurePartDamage(inventory.DamageBonus);
             keyboard.GetComponent<TournamentKeyboardEffects>().Initialize(this, inventory,
                 isEnemy ? _manager.PlaytestEnemyScore : _manager.PlaytestPlayerScore, _keyLayout, _settings.KeycapHealth);
@@ -208,7 +208,7 @@ namespace Game.Tournament
             _rerollsUsed = 0;
             _offerGeneration = 0;
             PlaytestShopStateChanged?.Invoke(this, true, "ShopOpened");
-            _message = "구매한 부품은 오른쪽 인벤토리에서 장착할 수 있습니다.";
+            _message = "키캡 구매 후 같은 부품의 키를 눌러 해금·강화하세요. 최대 3단계입니다.";
             RollOffers();
             var enemyShown = new HashSet<KeyboardPartDefinition>();
             for (int i = 0; i < _offers.Length; i++)
@@ -232,7 +232,7 @@ namespace Game.Tournament
             var candidates = new List<KeyboardPartDefinition>();
             foreach (KeyboardPartDefinition part in _catalog)
             {
-                if (!(part is KeycapDefinition) && (inventory.GetCount(part) > 0 || shown.Contains(part))) continue;
+                if (!inventory.CanPurchase(part, _keyLayout) || (!(part is KeycapDefinition) && shown.Contains(part))) continue;
                 candidates.Add(part);
             }
             if (candidates.Count == 0) return null;
@@ -287,7 +287,9 @@ namespace Game.Tournament
             Currency -= part.Price;
             _purchased[index] = true;
             Observe("PurchaseConfirmed", index, part, before, true, false);
-            _message = "구매 완료 · 인벤토리에 보관했습니다.";
+            _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
+            _message = part is KeycapDefinition ? "구매 완료 · 3개 위치에 한 번씩 해금·강화할 수 있습니다."
+                : $"{part.DisplayName} 능력 {_inventory.GetPartLevel(part)} / 3단계";
             Changed?.Invoke();
         }
 
@@ -297,14 +299,14 @@ namespace Game.Tournament
             if (Phase != TournamentPhase.Shop || part == null || _inventory.GetCount(part) == 0) return;
             if (part is KeycapDefinition keycap)
             {
-                _selectedKeycap = _selectedKeycap == keycap || _inventory.GetAvailableCount(keycap) == 0 ? null : keycap;
-                _message = _selectedKeycap != null ? "키캡을 장착할 키를 누르세요." : "키캡 선택을 해제했습니다.";
+                _selectedKeycap = _selectedKeycap == keycap || !_inventory.CanApplyKeycap(keycap) ? null : keycap;
+                _message = _selectedKeycap != null ? "동일한 키캡 위치를 눌러 능력을 해금·강화하세요." : "키캡 선택을 해제했습니다.";
             }
             else
             {
                 if (!_inventory.TryEquipPart(part)) return;
                 _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
-                _message = "부품을 장착했습니다.";
+                _message = "부품 능력이 적용되어 있습니다.";
             }
             Changed?.Invoke();
         }
@@ -318,18 +320,24 @@ namespace Game.Tournament
                 : _inventory.TryUnequipPart(part);
             if (!removed) return;
             _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
-            _message = "부품을 해제하고 인벤토리로 돌려놓았습니다.";
+            _message = "마지막 능력 단계를 취소하고 사용 횟수를 돌려놓았습니다.";
             Changed?.Invoke();
         }
 
         /// <summary>상점 키보드의 key 입력에 선택된 키캡을 장착한다. 남은 수량이 없으면 선택을 해제하고 작업대 외형을 갱신한다.</summary>
         private void HandleShopKeyPressed(Key key)
         {
-            if (Phase != TournamentPhase.Shop || _selectedKeycap == null
-                || !_inventory.TryEquipKeycap(_selectedKeycap, key, _keyLayout)) return;
+            if (Phase != TournamentPhase.Shop || _selectedKeycap == null) return;
+            if (!_inventory.TryEquipKeycap(_selectedKeycap, key, _keyLayout))
+            {
+                _message = "동일한 부품의 위치만 선택할 수 있습니다. 한 묶음은 같은 키에 한 번만 적용됩니다. 최대 3단계입니다.";
+                Changed?.Invoke();
+                return;
+            }
             _workspace.RefreshParts(_inventory, _partCatalog.DefaultKeycap);
-            if (_inventory.GetAvailableCount(_selectedKeycap) == 0) _selectedKeycap = null;
-            _message = _selectedKeycap != null ? "키캡을 장착할 다음 키를 누르세요." : "키캡 장착을 완료했습니다.";
+            if (!_inventory.CanApplyKeycap(_selectedKeycap)) _selectedKeycap = null;
+            _message = $"{key} · {_inventory.GetKeycapLevel(key)} / 3단계"
+                + (_selectedKeycap != null ? " · 같은 부품의 다음 키를 선택하세요." : " · 해금·강화 완료");
             Changed?.Invoke();
         }
 

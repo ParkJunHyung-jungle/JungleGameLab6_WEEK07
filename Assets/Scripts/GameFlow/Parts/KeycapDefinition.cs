@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Game.Tournament
 {
@@ -17,8 +17,11 @@ namespace Game.Tournament
         public string MaterialId => _materialId;
         public Mesh ShellMesh => _shellMesh;
         public Material[] ModelMaterials => _modelMaterials;
+        public bool IsArtisan => _shellMesh != null;
         public bool OneUnitOnly => _oneUnitOnly;
         public KeycapAbilityDefinition Ability => _ability;
-        public override string Description => _ability != null ? _ability.Description : "추가 능력 없음";
+        public override string Description => IsArtisan && _ability != null
+            ? _ability.PassiveDescription
+            : _ability != null ? _ability.Description + " · 효과 수치 × 단계" : "추가 능력 없음";
     }
 }

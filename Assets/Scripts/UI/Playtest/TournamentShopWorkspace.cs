@@ -48,8 +48,7 @@ namespace Game.Tournament
         /// <summary>inventory와 defaultKeycap으로 현재 미리보기를 갱신한다. 새 키보드를 생성하지 않고 같은 인스턴스의 부품만 변경한다.</summary>
         public void RefreshParts(TournamentInventory inventory, KeycapDefinition defaultKeycap)
         {
-            _storage.ApplyDefaultCustomization(_keyboard);
-            _keyboard.ApplyTournamentParts(inventory, defaultKeycap);
+            _keyboard.GetComponent<KeyboardAbilityOutline>().ConfigureInventory(inventory);
         }
 
         /// <summary>현재 작업대 키보드를 독립된 저장 상태로 반환한다. 부품 능력은 별도의 장착 SO 상태에 유지한다.</summary>

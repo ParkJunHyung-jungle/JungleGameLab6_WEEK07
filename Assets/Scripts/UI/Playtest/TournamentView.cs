@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 
 using UnityEngine;
@@ -117,11 +117,11 @@ namespace Game.Tournament
             _shopHint.text = _controller.Message;
             _inventory.gameObject.SetActive(!shop);
             _inventory.color = new Color(0.25f, 0.2f, 0.18f);
-            StringBuilder summary = new StringBuilder($"키캡 {_controller.Inventory.Total} / {_controller.Settings.Capacity} · 직접 타격 +{_controller.Inventory.DamageBonus}\n");
+            StringBuilder summary = new StringBuilder($"해금 키캡 {_controller.Inventory.Total} / {_controller.Settings.Capacity} · 직접 타격 +{_controller.Inventory.DamageBonus}\n");
             foreach (KeyValuePair<KeyboardPartDefinition, int> item in _controller.Inventory.Counts)
                 summary.Append($"{item.Key.DisplayName} ×{item.Value}  ");
             _inventory.text = summary.ToString();
-            _inventorySummary.text = $"키캡 {_controller.Inventory.Total} / {_controller.Settings.Capacity}\n직접 타격 +{_controller.Inventory.DamageBonus}";
+            _inventorySummary.text = $"해금 키캡 {_controller.Inventory.Total} / {_controller.Settings.Capacity}\n직접 타격 +{_controller.Inventory.DamageBonus}";
             _continueButton.gameObject.SetActive(!shop);
             _continueButton.SetState(phase == TournamentPhase.Finished ? "작업실로" : "계속", true);
             _shopContinueButton.gameObject.SetActive(shop);

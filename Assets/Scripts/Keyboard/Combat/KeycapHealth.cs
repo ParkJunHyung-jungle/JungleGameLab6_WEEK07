@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -27,6 +27,8 @@ public sealed class KeycapHealth : MonoBehaviour
 
     [Header("Status Effects")]
     private KeycapStatusEffects _statusEffects;
+    private int _passiveDirectDamageBonus;
+    public int PassiveDirectDamageBonus => _passiveDirectDamageBonus;
     public int ActiveStatusCount => _statusEffects.Count;
     public event Action<KeycapHealth, KeycapHitKind> HitReceived;
 
@@ -169,7 +171,7 @@ public sealed class KeycapHealth : MonoBehaviour
     public void TakeDamage(int damage, KeycapHitKind kind)
     {
         if (_broken || _currentHP <= 0 || damage <= 0) return;
-        damage = _statusEffects.ResolveDamage(damage, kind);
+        damage = _statusEffects.ResolveDamage(damage + (kind == KeycapHitKind.Direct ? _passiveDirectDamageBonus : 0), kind);
         int previousHP = _currentHP;
         _currentHP = Mathf.Max(0, _currentHP - damage);
         UpdateDamageDecal();
@@ -179,10 +181,13 @@ public sealed class KeycapHealth : MonoBehaviour
     }
 
     /// <summary>살아 있는 키캡에 definition의 상태를 부여한다. 유효한 SO를 사용하며 파괴된 키캡은 무시한다.</summary>
-    public void ApplyStatus(KeycapStatusEffectDefinition definition)
+    public void ApplyStatus(KeycapStatusEffectDefinition definition, int strength = 1)
     {
-        if (!_broken && _currentHP > 0 && definition != null) _statusEffects.Apply(definition);
+        if (!_broken && _currentHP > 0 && definition != null) _statusEffects.Apply(definition, strength);
     }
+
+    /// <summary>bonus를 이 키캡의 직접 피격 추가 피해로 저장한다. 능력 피해에는 적용하지 않으며 음수는 0으로 제한한다.</summary>
+    public void ConfigurePassiveDamage(int bonus) { _passiveDirectDamageBonus = Mathf.Max(0, bonus); }
 
     /// <summary>입력 없이 현재 상태와 표시를 모두 초기화한다. 체력과 장착된 키캡 SO는 유지한다.</summary>
     public void ClearStatuses() { _statusEffects.Clear(); }

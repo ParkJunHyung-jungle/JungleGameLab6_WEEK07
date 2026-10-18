@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -40,8 +40,8 @@ namespace Game.Tournament
             _thumbnail.gameObject.SetActive(thumbnail != null);
             _fallback.gameObject.SetActive(thumbnail == null);
             _fallback.text = part is KeycapDefinition ? "KEY" : part is SwitchDefinition ? "SW" : part is PlateDefinition ? "PL" : "CASE";
-            _count.text = equipped > 0 ? $"{owned - equipped}/{owned}" : owned.ToString();
-            _status.text = selected ? "선택 중" : equipped > 0 ? $"사용 중 {equipped}" : "";
+            _count.text = part is KeycapDefinition ? $"×{owned - equipped}" : $"Lv.{equipped}/3";
+            _status.text = selected ? "선택 중" : equipped > 0 ? $"적용 {equipped}" : "";
             _background.color = selected ? new Color32(34, 57, 111, 255)
                 : equipped > 0 ? new Color32(13, 28, 66, 255) : new Color32(1, 7, 54, 255);
         }

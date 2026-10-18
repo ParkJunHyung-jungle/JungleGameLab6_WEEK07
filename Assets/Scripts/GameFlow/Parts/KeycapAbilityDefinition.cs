@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -33,6 +33,21 @@ namespace Game.Tournament
         [SerializeField, Min(0.01f)] private float _waveDuration = 0.45f;
         [SerializeField] private KeycapAbilityEffect[] _effects = new KeycapAbilityEffect[0];
 
+        [Header("Artisan Passive")]
+        [SerializeField] private ArtisanPassiveKind _artisanKind;
+        [SerializeField, Min(1)] private int _passiveDamageBonus = 1;
+        [SerializeField, Min(1)] private int _passiveSideCount = 7;
+        [SerializeField, Min(1)] private int _passiveTargetCount = 10;
+        [SerializeField, Min(2)] private int _passiveSpacing = 2;
+        [SerializeField, Range(1, 2)] private int _passiveOriginCount = 2;
+        public ArtisanPassiveKind ArtisanKind => _artisanKind;
+        public int PassiveDamageBonus => _passiveDamageBonus;
+        public int PassiveSideCount => _passiveSideCount;
+        public int PassiveTargetCount => _passiveTargetCount;
+        public int PassiveSpacing => _passiveSpacing;
+        public int PassiveOriginCount => _passiveOriginCount;
+        public string PassiveDescription => BuildPassiveDescription();
+
         [Header("Sequence")]
         [SerializeField] private KeycapPropagation _propagation;
         [SerializeField, Range(1, 6)] private int _repeatCount = 1;
@@ -65,6 +80,18 @@ namespace Game.Tournament
         public float EffectScale => _effectScale;
         public float EffectLifetime => _effectLifetime;
         public string Description => BuildDescription();
+
+        /// <summary>패시브의 기준 위치와 범위를 한국어 상품 설명으로 반환한다. 수치와 무작위 기준 설정을 읽으며 에셋은 변경하지 않는다.</summary>
+        private string BuildPassiveDescription()
+        {
+            string target = _artisanKind == ArtisanPassiveKind.Rook ? "무작위 기준의 같은 행·열"
+                : _artisanKind == ArtisanPassiveKind.Bishop ? "무작위 기준의 대각선"
+                : _artisanKind == ArtisanPassiveKind.BongoCat ? $"무작위 기준의 좌우 {_passiveSideCount}키씩"
+                : _artisanKind == ArtisanPassiveKind.Cheese ? $"최소 {_passiveSpacing}칸 간격의 무작위 {_passiveTargetCount}키"
+                : _artisanKind == ArtisanPassiveKind.Takodachi ? $"무작위 {_passiveOriginCount}곳의 가로·세로·대각선" : "";
+            return _artisanKind == ArtisanPassiveKind.None ? "추가 능력 없음"
+                : $"패시브 · {target} 직접 피해 +{_passiveDamageBonus} × 단계 · 같은 종류 중복 없음";
+        }
 
         /// <summary>발동 조건과 범위 및 효과 목록을 읽어 상품 설명을 반환한다. 상태 부여는 연결된 상태 에셋 이름으로 표시한다.</summary>
         private string BuildDescription()

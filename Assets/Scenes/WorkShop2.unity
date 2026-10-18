@@ -1103,6 +1103,79 @@ MonoBehaviour:
   m_EditorClassIdentifier: FMODUnity::FMODUnity.StudioListener
   nonRigidbodyVelocity: 0
   attenuationObject: {fileID: 0}
+--- !u!1001 &361321565
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 600000000000000001, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_Name
+      value: WorkshopDoroFigure
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 6.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -1.666481
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 2.0146456
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.69457364
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.7194216
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -92.014
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 600000000000000002, guid: c0d070fac0000000c0d070fac0000001, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: c0d070fac0000000c0d070fac0000001, type: 3}
 --- !u!1 &420863323
 GameObject:
   m_ObjectHideFlags: 0
@@ -9195,3 +9268,4 @@ SceneRoots:
   - {fileID: 1191349679}
   - {fileID: 1070504516}
   - {fileID: 13243591}
+  - {fileID: 361321565}

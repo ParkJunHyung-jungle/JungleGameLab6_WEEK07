@@ -378,6 +378,31 @@ public sealed class KeyboardCustomization : MonoBehaviour
         images.RestoreState(photos, prepared);
     }
 
+    /// <summary>
+    /// inventory의 구매 장착만 현재 온라인 커스텀 위에 적용한다.
+    /// 교체 위치의 사진과 모델만 변경하고 나머지 외형과 원본 저장 상태는 유지한다.
+    /// </summary>
+    public void ApplyOnlineParts(Game.Tournament.TournamentInventory inventory)
+    {
+        PrepareForBattle();
+        if (inventory.Switch != null) ApplySwitchType(inventory.Switch.Data.Type, false);
+        if (inventory.Plate != null) SetPlateMaterial(inventory.Plate.Data.Material);
+        if (inventory.Housing != null)
+        {
+            ClearCaseImage();
+            SetCaseMaterial(inventory.Housing.Material);
+        }
+        foreach (var binding in GetComponent<KeyboardInputController>().GetKeycapLayout())
+        {
+            if (!inventory.Keycaps.TryGetValue(binding.Key, out Game.Tournament.KeycapDefinition part)) continue;
+            int index = Array.IndexOf(_keycaps, binding.Value.transform);
+            ClearKeycapImage(index);
+            _keycapMaterialOverrides[binding.Value.transform] = part.Material;
+            SetKeycapModel(binding.Value.transform, part);
+        }
+        ApplyKeycapMaterial();
+    }
+
     void OnValidate()
     {
 #if UNITY_EDITOR

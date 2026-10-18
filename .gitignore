@@ -58,6 +58,8 @@ ExportedObj/
 sysinfo.txt
 
 # Builds
+/output/OnlinePractice/
+/output/OnlineValidation/
 *.apk
 *.aab
 *.unitypackage

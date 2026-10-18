@@ -85,6 +85,19 @@ namespace Game.Tournament
             GetComponent<KeyboardAbilityOutline>().ConfigureInventory(inventory);
         }
 
+        /// <summary>layout과 health로 온라인 키보드의 기존 장착 능력과 체력을 준비한다. 토너먼트 진행 및 보상 흐름은 연결하지 않는다.</summary>
+        public void InitializeOnline(TournamentKeyLayout layout, int health)
+        {
+            _keyboard = GetComponent<KeyboardInputController>();
+            _keyboard.UseAllDestructionKeys();
+            _destruction = GetComponent<KeyboardDestruction>();
+            _workshopCustomization = GetComponent<KeyboardCustomization>();
+            InitializeBindings(layout);
+            foreach (KeycapHealth keycap in _keycaps) keycap.ConfigureTournamentHealth(health);
+            _keyboard.KeycapsRestored -= HandleKeycapsRestored;
+            _keyboard.KeycapsRestored += HandleKeycapsRestored;
+        }
+
         void Start()
         {
             InitializeWorkshop();

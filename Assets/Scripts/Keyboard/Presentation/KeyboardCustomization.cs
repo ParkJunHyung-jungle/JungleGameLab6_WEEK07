@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -225,7 +225,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public IEnumerable<string[]> GetCustomizationLogValues()
     {
-        yield return new[] { "Keycap", _keycapMaterial != null ? _keycapMaterial.name : "" };
+        Material committedMaterial = GetCommittedKeycapMaterial(true, -1);
+        yield return new[] { "Keycap", committedMaterial != null ? committedMaterial.name : "" };
+        foreach (string[] value in GetKeycapLogValues()) yield return value;
         yield return new[] { "Case", _caseMaterial != null ? _caseMaterial.name : "" };
         yield return new[] { "Switch", _switchType.ToString() };
         yield return new[] { "Plate", _plateMaterial != null ? _plateMaterial.name : "" };
@@ -235,6 +237,30 @@ public sealed class KeyboardCustomization : MonoBehaviour
         yield return new[] { "LEDEnabled", _ledEnabled ? "true" : "false" };
         KeyboardImageCustomization images = GetImageCustomization();
         foreach (string[] value in images.GetLogValues()) yield return value;
+    }
+
+    /// <summary>
+    /// 현재 키캡과 미리보기 이전 상태를 읽어 키별 확정 장착 정보를 반환한다.
+    /// 입력 없이 파츠 ID, 인덱스, 종류, 재질 및 장착 여부를 열거하며 상태는 변경하지 않는다.
+    /// </summary>
+    public IEnumerable<string[]> GetKeycapLogValues()
+    {
+        if (_keycaps == null) CacheKeycaps();
+        KeycapMaterialPreviewSnapshot preview = _keycapMaterialPreviewSnapshot;
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            Transform keycap = _keycaps[index];
+            var definitions = preview != null ? preview.PartDefinitions : _keycapPartDefinitions;
+            Game.Tournament.KeycapDefinition definition = null;
+            if (keycap != null) definitions.TryGetValue(keycap, out definition);
+            bool installed = preview != null ? preview.KeycapActiveStates[index] : IsKeycapInstalled(index);
+            Material material = GetCommittedKeycapMaterial(false, index);
+            yield return new[] { "Keycap:" + index, Game.Logging.CustomizationTelemetry.GetKeycapElementId(definition, material),
+                index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Game.Logging.CustomizationTelemetry.GetKeycapKind(definition, material),
+                definition != null ? definition.MaterialId : material != null ? material.name : "",
+                installed ? "true" : "false" };
+        }
     }
 
     void OnEnable()
@@ -1941,4 +1967,5 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     #endregion
 }
+
 

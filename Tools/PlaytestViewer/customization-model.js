@@ -5,7 +5,7 @@ const Customization = (() => {
   const ELEMENT_PARTS = { Keycap: "키캡", Switch: "축", LED: "LED", Case: "케이스", Plate: "보강판 재질", PlateEffect: "보강판 효과", PlateMaterial: "보강판 재질", CustomImage: "커스텀 이미지" };
   const COLORS = { Keycap: "#38a9ff", Switch: "#ffad32", LED: "#b5a0f2", Case: "#67d7aa", Plate: "#f18eb6", PlateEffect: "#f18eb6", PlateMaterial: "#f18eb6", CustomImage: "#e6d36f" };
   const NUMBERS = new Set(["schema_version", "sequence", "elapsed_seconds", "keycap_index", "start_elapsed_seconds", "end_elapsed_seconds", "duration_seconds", "focused_duration_seconds"]);
-  const BOOLS = new Set(["apply_success", "value_changed", "is_complete"]);
+  const BOOLS = new Set(["apply_success", "value_changed", "is_complete", "is_installed"]);
 
   /** 보강판 재질(Plate·PlateMaterial)의 기록 열 이름을 동일 파츠로 매칭한다. */
   function SameElementPart(rowPart, part) {
@@ -33,6 +33,8 @@ const Customization = (() => {
       } else if (BOOLS.has(field)) {
         row[field] = text.toLowerCase() === "true" ? true : text.toLowerCase() === "false" ? false : null;
         if (row[field] === null) row.status[field] = "invalid";
+      } else if (field === 'keycap_kind' && !['Regular', 'Artisan'].includes(text)) {
+        row[field] = null; row.status[field] = 'invalid';
       }
     });
     return row;
@@ -55,7 +57,7 @@ const Customization = (() => {
 
   /** 선택 결과 플래그가 알려진 경우에만 성공·실제 변경·재선택 횟수를 반환한다. */
   function Selections(rows) {
-    const selected = rows.filter(row => row.record_type === "ElementSelected");
+    const selected = rows.filter(row => ["ElementSelected", "KeycapApply"].includes(row.record_type));
     const successKnown = selected.every(row => typeof row.apply_success === "boolean");
     const changeKnown = selected.every(row => row.apply_success === false || (row.apply_success === true && typeof row.value_changed === "boolean"));
     return {
@@ -82,16 +84,38 @@ const Customization = (() => {
     if (invalid) warnings.push("잘못된 숫자·불리언 " + invalid + "행 · 해당 값은 미기록 처리");
     const missing = ["tester_id", "keyboard_id", "part", "part_visit_id", "apply_success", "value_changed", "focused_duration_seconds", "is_complete"].filter(field => !header.includes(field));
     if (missing.length) warnings.push("미기록 열: " + missing.join(", "));
-    if (rows.some(row => row.schema_version !== null && row.schema_version !== undefined && row.schema_version !== 1)) warnings.push("커스터마이징 v1 이외의 스키마 버전 포함 · 알려진 열만 해석");
+    if (rows.some(row => row.schema_version != null && ![1, 2].includes(row.schema_version))) warnings.push("지원 범위 v1/v2 이외 스키마 포함 · 알려진 열만 해석");
+    if (rows.some(row => row.schema_version === 2)) {
+      const absent = ['keycap_kind', 'material_id', 'snapshot_id', 'is_installed'].filter(field => !header.includes(field));
+      if (absent.length) warnings.push('v2 미기록 열: ' + absent.join(', '));
+    }
     const events = rows.slice().sort(Playtest.Order);
     const runs = [...Playtest.Group(events.filter(row => row.customization_run_id), row => JSON.stringify([row.session_id, row.customization_run_id])).entries()].map(([key, entries], index) => {
       const start = entries.find(row => row.record_type === "CustomizationStart") || null;
       const end = entries.findLast(row => row.record_type === "CustomizationEnd") || null;
       const context = start || entries[0];
       const snapshotBatches = [];
+      const identifiedBatches = new Map();
       let batch = null, previous = null;
       entries.forEach(row => {
         if (row.record_type !== "CustomizationSnapshot") { batch = null; previous = row; return; }
+        if (row.schema_version === 2) {
+          const id = row.snapshot_id;
+          if (!id) {
+            snapshotBatches.push({ id: null, reason: row.end_reason, values: new Map(), rows: [row], preceding: previous, reliable: false });
+            previous = row; batch = null; return;
+          }
+          let identified = identifiedBatches.get(id);
+          if (!identified) {
+            identified = { id, reason: row.end_reason, values: new Map(), rows: [], preceding: previous, reliable: true };
+            identifiedBatches.set(id, identified); snapshotBatches.push(identified);
+          }
+          const index = KeyIndex(row), part = index !== null ? 'Keycap:' + index : row.part;
+          if (row.part?.startsWith('Keycap:') && index === null || identified.rows.length && previous?.snapshot_id !== id) identified.reliable = false;
+          if (!part || identified.values.has(part) || identified.reason !== row.end_reason) identified.reliable = false;
+          if (!Number.isFinite(row.sequence) || !Number.isFinite(previous?.sequence) || row.sequence !== previous.sequence + 1) identified.reliable = false;
+          identified.values.set(part, row); identified.rows.push(row); previous = row; batch = null; return;
+        }
         if (batch?.reason === row.end_reason && batch.values.has(row.part)) batch.reliable = false;
         if (!batch || batch.reason !== row.end_reason || batch.values.has(row.part)) {
           batch = { reason: row.end_reason, values: new Map(), rows: [], preceding: previous, reliable: previous?.record_type !== 'CustomizationSnapshot' };
@@ -103,7 +127,7 @@ const Customization = (() => {
       const snapshots = new Map();
       Playtest.Group(snapshotBatches, item => item.reason).forEach((items, reason) => {
         if (items.length === 1 && items[0].reliable) snapshots.set(reason, items[0].values);
-        else warnings.push("편집 " + (index + 1) + "회차: " + reason + " 스냅샷 " + items.length + "묶음 · 합쳐서 해석하지 않음");
+        else if (!items.every(item => item.id && item.reliable) || ['Initial', 'Final', 'Interrupted'].includes(reason)) warnings.push("편집 " + (index + 1) + "회차: " + reason + " 스냅샷 " + items.length + "묶음 · 합쳐서 해석하지 않음");
       });
       const visits = [...Playtest.Group(entries.filter(row => ["PartVisitStart", "PartVisitEnd"].includes(row.record_type)), row => row.part_visit_id || "unidentified-" + row.sourceIndex).values()].map(visitRows => {
         const visitStart = visitRows.find(row => row.record_type === "PartVisitStart") || null;
@@ -116,10 +140,12 @@ const Customization = (() => {
       const run = {
         key: id + ":" + key, id: context.customization_run_id, index: index + 1, fileId: id, fileName: name,
         tester: id, rawTester: context.tester_id, session: context.session_id, keyboard: context.keyboard_id, build: context.build_version,
+        version: entries.some(row => row.schema_version === 2) ? 2 : 1,
         start, end, rows: entries, snapshots, snapshotBatches, visits, duration: end?.duration_seconds ?? null, focused: end?.focused_duration_seconds ?? null,
         complete: end?.is_complete === true && ["RightClickExit", "NextScene"].includes(end.end_reason)
       };
-      run.selected = entries.filter(row => row.record_type === "ElementSelected");
+      run.selected = entries.filter(row => row.record_type === 'KeycapApply' && row.schema_version === 2 || row.record_type === 'ElementSelected' && !(row.part === 'Keycap' && row.schema_version === 2));
+      run.picked = entries.filter(row => row.record_type === 'ElementPicked' && row.part === 'Keycap' && row.schema_version === 2);
       run.imageApplies = entries.filter(IsImageApply);
       run.options = entries.filter(row => row.record_type === "AvailableOption");
       run.partOffered = new Set(run.options.map(row => row.part === "PlateMaterial" || row.part === "PlateEffect" ? "Plate" : row.part));
@@ -185,7 +211,10 @@ const Customization = (() => {
       if (!between.length || between.some((item, i, rows) => !Number.isFinite(item.sequence) || i && item.sequence !== rows[i - 1].sequence + 1)) return;
       restored.values.forEach((value, part) => {
         const before = previous.values.get(part)?.element_id, after = value.element_id;
-        if (before != null && after != null && before !== after) changed.add(part);
+        if (part.startsWith('Keycap:')) {
+          const beforeKey = previous.values.get(part);
+          if (beforeKey && ['is_installed', 'element_id', 'keycap_kind', 'material_id'].some(field => beforeKey[field] != null && value[field] != null && beforeKey[field] !== value[field])) changed.add(part);
+        } else if (before != null && after != null && before !== after) changed.add(part);
       });
     });
     return changed;
@@ -240,13 +269,14 @@ const Customization = (() => {
         duration: visits.length && !ended.length ? null : Sum(ended.map(visit => visit.duration)), focused: visits.length && !ended.length ? null : Sum(ended.map(visit => visit.focused)),
         offered: offered.length, accessed: accessed.length, rate: offered.length ? accessed.length / offered.length : null,
         revisits: runs.reduce((sum, run) => sum + Math.max(0, run.visits.filter(visit => visit.part === part && visit.start).length - 1), 0),
-        selected: events.filter(row => row.record_type === "ElementSelected").length, distribution: Describe(perRun)
+        selected: runs.reduce((sum, run) => sum + run.selected.filter(row => SameTabPart(row.part, part)).length, 0), distribution: Describe(perRun)
       };
     });
   }
 
   /** 제공 요소와 선택을 빌드·항목별로 연결하고 선택 비중과 최종 유지 분모를 반환한다. */
   function Elements(runs, part) {
+    if (part === 'Keycap') runs = runs.filter(run => run.version !== 2);
     const all = runs.flatMap(run => run.rows.filter(row => SameElementPart(row.part, part) && ["AvailableOption", "ElementSelected"].includes(row.record_type)));
     return [...Playtest.Group(all, row => JSON.stringify([row.build_version, row.element_id])).values()].map(rows => {
       const element = rows[0].element_id, build = rows[0].build_version;
@@ -287,6 +317,7 @@ const Customization = (() => {
     const initial = run.snapshots.get('Initial'), final = run.complete ? run.snapshots.get('Final') : null;
     const continuous = !!run.start && !!run.end && run.rows.every((row, i, rows) => row.status.apply_success !== 'missing' && row.status.value_changed !== 'missing' && Number.isFinite(row.sequence) && (!i || row.sequence === rows[i - 1].sequence + 1));
     return FINAL_PARTS.map(part => {
+      if (part === 'Keycap' && run.version === 2) return KeycapResult(run);
       const before = initial?.get(part)?.element_id ?? null, after = final?.get(part)?.element_id ?? null;
       const reasons = [];
       if (before === null) reasons.push('초기 상태가 미기록이거나 스냅샷 묶음을 확정할 수 없습니다.');
@@ -341,10 +372,16 @@ const Customization = (() => {
     const batches = run.snapshotBatches.filter(batch => batch.preceding === last && batch.reason === 'Save:' + (last?.element_id ?? '') && batch.reliable);
     const final = run.complete ? run.snapshots.get('Final') : null;
     const saved = batches.length === 1 ? batches[0].values : null;
-    const keys = new Set([...FINAL_PARTS, ...[...(saved?.keys() || []), ...(final?.keys() || [])].filter(part => part.startsWith('Image:')), 'Image:CaseWhole']);
+    const keys = new Set([...FINAL_PARTS.filter(part => run.version !== 2 || part !== 'Keycap'), ...[...(saved?.keys() || []), ...(final?.keys() || [])].filter(part => part.startsWith('Image:') || run.version === 2 && part.startsWith('Keycap:')), 'Image:CaseWhole']);
+    if (run.version === 2 && ![...keys].some(part => part.startsWith('Keycap:'))) keys.add('Keycap:미기록');
     if (![...keys].some(part => part.startsWith('Image:Keycap:'))) keys.add('Image:Keycap:미기록');
     const different = [], unknown = [];
-    keys.forEach(part => { const a = saved?.get(part)?.element_id, b = final?.get(part)?.element_id; if (a == null || b == null) unknown.push(part); else if (a !== b) different.push(part); });
+    keys.forEach(part => {
+      const a = saved?.get(part), b = final?.get(part);
+      if (run.version === 2 && part.startsWith('Keycap:')) {
+        if (!KeyKnown(a) || !KeyKnown(b)) unknown.push(part); else if (KeySignature(a) !== KeySignature(b)) different.push(part);
+      } else if (a?.element_id == null || b?.element_id == null) unknown.push(part); else if (a.element_id !== b.element_id) different.push(part);
+    });
     return {
       save: stats('Save'), load: stats('Load'), last, different, unknown,
       status: !last ? stats('Save').attempts ? '성공 저장 기록 없음' : '저장 기록 없음' : !saved || !final ? '저장 성공, 상태 비교 불가' : different.length ? '저장 후 추가 변경 있음' : unknown.length ? '저장 성공, 상태 비교 불가' : '저장 후 변경 없음'
@@ -354,7 +391,7 @@ const Customization = (() => {
   function FinalElements(runs) {
     const completed = runs.filter(run => run.complete), result = [];
     for (const part of FINAL_PARTS.slice(0, 6)) {
-      for (const [build, items] of Playtest.Group(completed, run => run.build)) {
+      for (const [build, items] of Playtest.Group(completed.filter(run => part !== 'Keycap' || run.version !== 2), run => run.build)) {
         const known = items.filter(run => run.snapshots.get('Final')?.get(part)?.element_id != null);
         const values = new Set(items.flatMap(run => [...run.options.filter(row => SameElementPart(row.part, part)).map(row => row.element_id), ...run.selected.filter(row => SameElementPart(row.part, part)).map(row => row.element_id), run.snapshots.get('Final')?.get(part)?.element_id]).filter(value => value != null));
         values.forEach(element => {
@@ -378,15 +415,109 @@ const Customization = (() => {
     const baseParts = ['Keycap', 'Switch', 'Case', 'Plate', 'LED'];
     let excluded = 0;
     completed.forEach(run => {
-      const values = baseParts.map(part => run.snapshots.get('Final')?.get(part)?.element_id);
-      if (values.some(value => value == null)) excluded++; else basic.push({ run, value: values.join(' + '), build: run.build });
+      const values = baseParts.map(part => part === 'Keycap' && run.version === 2 ? KeycapComposition(run, 'Final', true) : run.snapshots.get('Final')?.get(part)?.element_id);
+      const displayValues = values.slice();
+      if (run.version === 2 && values[0] != null) displayValues[0] = 'v2 개별 키: ' + JSON.stringify(JSON.parse(values[0]).map(tuple => tuple.map((value, index) => index === 2 ? KeycapName(value) : value)));
+      else if (values[0] != null) displayValues[0] = 'v1 공통 재질: ' + values[0];
+      if (values[0] != null) values[0] = (run.version === 2 ? 'v2 개별 키: ' : 'v1 공통 재질: ') + values[0];
+      if (values.some(value => value == null)) excluded++; else basic.push({ run, value: values.join(' + '), display: displayValues.join(' + '), build: run.build });
       const state = Images(run);
       const type = state.caseRetained === null || state.keycaps === null ? '판정 불가' : state.caseRetained ? state.keycaps > 0 ? '케이스와 키캡' : '케이스만' : state.keycaps > 0 ? '키캡만' : '없음';
       image.push({ run, value: type, build: run.build });
     });
-    const group = rows => [...Playtest.Group(rows, row => JSON.stringify([row.build, row.value])).values()].map(items => ({ value: items[0].value, build: items[0].build, count: items.length, testers: new Set(items.map(item => item.run.tester).filter(Boolean)).size, denominator: rows.filter(row => row.build === items[0].build).length })).sort((a, b) => b.count - a.count);
+    const group = rows => [...Playtest.Group(rows, row => JSON.stringify([row.build, row.value])).values()].map(items => ({ value: items[0].value, display: items[0].display ?? items[0].value, build: items[0].build, count: items.length, testers: new Set(items.map(item => item.run.tester).filter(Boolean)).size, denominator: rows.filter(row => row.build === items[0].build).length })).sort((a, b) => b.count - a.count);
     return { basic: group(basic), image: group(image), excluded };
   }
 
-  return { PARTS, ELEMENT_PARTS, COLORS, SameElementPart, SameTabPart, Decode, Sum, Describe, Build, Images, ImageResults, Parts, Elements, IsImageApply, ImageMetrics, Selections, FINAL_PARTS, FinalParts, ImageChanges, Storage, FinalElements, Combinations };
+  /** 개요 범위의 종류별 키캡 선택·적용과 정상 종료 장착 수 및 미수집 회차를 분리해 반환한다. */
+  function KeycapOverview(runs) {
+    const modern = runs.filter(run => run.version === 2), completed = modern.filter(run => run.complete);
+    const states = completed.map(run => KeyStates(run));
+    const known = states.filter(items => [...items.values()].some(row => typeof row.is_installed === 'boolean'));
+    const installed = known.flatMap(items => [...items.values()].filter(row => row.is_installed === true));
+    const actions = modern.flatMap(run => run.rows.filter(row => row.schema_version === 2 && row.part === 'Keycap'));
+    const kinds = ['Regular', 'Artisan', null].map(kind => {
+      const picked = actions.filter(row => row.record_type === 'ElementPicked' && (row.keycap_kind ?? null) === kind);
+      const applies = actions.filter(row => row.record_type === 'KeycapApply' && (row.keycap_kind ?? null) === kind);
+      return { kind, picked: modern.length ? picked.length : null, attempts: modern.length ? applies.length : null,
+        success: modern.length && applies.every(row => typeof row.apply_success === 'boolean') ? applies.filter(row => row.apply_success).length : null,
+        installed: known.length ? installed.filter(row => (row.keycap_kind ?? null) === kind).length : null };
+    });
+    return { kinds, modern: modern.length, legacy: runs.length - modern.length, finalKnown: known.length, finalMissing: completed.length - known.length,
+      unknownInstalled: states.reduce((sum, items) => sum + [...items.values()].filter(row => typeof row.is_installed !== 'boolean').length, 0) };
+  }
+
+  /** 재질 기반 키캡 ID의 표시 이름만 디코딩하며 집계용 원본 ID와 파츠 ID는 변경하지 않는다. */
+  function KeycapName(id) {
+    if (typeof id !== 'string' || !id.startsWith('material:')) return id;
+    const name = id.slice('material:'.length);
+    try { return decodeURIComponent(name); } catch { return name; }
+  }
+
+  /** 개별 키 스냅샷의 part와 숫자 인덱스를 대조하여 실제 키 인덱스 또는 null을 반환한다. */
+  function KeyIndex(row) {
+    const match = /^Keycap:(\d+)$/.exec(row.part || '');
+    const fromPart = match ? Number(match[1]) : null;
+    const fromColumn = Number.isInteger(row.keycap_index) && row.keycap_index >= 0 ? row.keycap_index : null;
+    if (fromPart !== null && fromColumn !== null && fromPart !== fromColumn) return null;
+    return fromPart ?? ((row.part === 'Keycap' || row.part?.startsWith('Keycap:')) ? fromColumn : null);
+  }
+  /** v2 회차의 지정 스냅샷에서 개별 키를 인덱스로 연결하고 Final의 중단 대체를 금지한다. */
+  function KeyStates(run, phase = 'Final') {
+    const snapshot = run.version === 2 && (phase !== 'Final' || run.complete) ? run.snapshots.get(phase) : null;
+    return new Map([...(snapshot?.entries() || [])].filter(([part]) => /^Keycap:\d+$/.test(part)).map(([part, row]) => [Number(part.slice(7)), row]));
+  }
+  /** 개별 키의 장착 여부와 장착 파츠의 필수 정의가 확인되는지 반환한다. */
+  function KeyKnown(row) { return typeof row?.is_installed === 'boolean' && (row.is_installed === false || row.element_id != null && row.keycap_kind != null && row.material_id != null); }
+  /** 개별 키의 원본 파츠·종류·재질·장착 여부를 비교용 문자열로 반환한다. */
+  function KeySignature(row) { return JSON.stringify([row?.element_id ?? null, row?.keycap_kind ?? null, row?.material_id ?? null, row?.is_installed ?? null]); }
+  /** 모든 스냅샷에서 관찰된 키 범위에 비추어 지정 시점의 완전한 개별 키 구성을 반환한다. */
+  function KeycapComposition(run, phase = 'Final', strict = false) {
+    const states = KeyStates(run, phase);
+    const expected = new Set(run.snapshotBatches.flatMap(batch => [...batch.values.keys()].filter(part => /^Keycap:\d+$/.test(part))));
+    if (!states.size || states.size !== expected.size || [...states.values()].some(row => typeof row.is_installed !== 'boolean')) return null;
+    const rows = [...states].sort((a, b) => a[0] - b[0]);
+    if (strict) return rows.some(([, row]) => !KeyKnown(row)) ? null : JSON.stringify(rows.map(([index, row]) => [index, row.is_installed, ...(row.is_installed ? [row.element_id, row.keycap_kind, row.material_id] : [])]));
+    const installed = rows.filter(([, row]) => row.is_installed);
+    return installed.length + '개 장착 / Regular ' + installed.filter(([, row]) => row.keycap_kind === 'Regular').length + ' / Artisan ' + installed.filter(([, row]) => row.keycap_kind === 'Artisan').length + ' / 종류 미기록 ' + installed.filter(([, row]) => row.keycap_kind == null).length + ' · 관찰 ' + states.size + '키';
+  }
+  /** v2의 키캡 최종 결과를 공통 재질 대신 개별 키 구성과 적용 조작으로 판정한다. */
+  function KeycapResult(run) {
+    const before = KeycapComposition(run, 'Initial'), after = KeycapComposition(run);
+    const a = KeycapComposition(run, 'Initial', true), b = KeycapComposition(run, 'Final', true);
+    const applies = run.selected.filter(row => row.record_type === 'KeycapApply');
+    const continuous = !!run.start && !!run.end && run.rows.every((row, i, rows) => Number.isFinite(row.sequence) && (!i || row.sequence === rows[i - 1].sequence + 1));
+    const initialKeys = KeyStates(run, 'Initial');
+    const finalKeys = KeyStates(run);
+    const confirmedChange = [...initialKeys].some(([index, row]) => {
+      const final = finalKeys.get(index);
+      return final && ['is_installed', 'element_id', 'keycap_kind', 'material_id'].some(field => row[field] != null && final[field] != null && row[field] !== final[field]);
+    });
+    const changedAway = run.snapshotBatches.some(batch => [...initialKeys].some(([index, row]) => {
+      const current = batch.values.get('Keycap:' + index); return batch.reliable && KeyKnown(current) && KeySignature(current) !== KeySignature(row);
+    }));
+    const tracked = run.rows.filter(row => row.record_type === 'KeycapApply' || row.record_type === 'Load').every(row => row.apply_success === false || row.apply_success === true && run.snapshotBatches.some(batch => batch.preceding === row && batch.reliable && [...initialKeys.keys()].every(index => KeyKnown(batch.values.get('Keycap:' + index)))));
+    const status = confirmedChange ? '변경 유지' : a === null || b === null ? '판정 불가' : a !== b ? '변경 유지' : !continuous || !tracked ? '판정 불가' : changedAway ? '원복' : '초기 유지';
+    return { part: 'Keycap', before, after, ...Selections(applies), status, reason: status === '판정 불가' ? '개별 키 스냅샷·정의·장착 여부 또는 적용/복원 연결이 부족합니다. 공통 재질 요약으로 대신 판정하지 않습니다.' : '', loadChanged: [...LoadChanges(run)].some(part => part.startsWith('Keycap:')), finalDifferent: confirmedChange ? true : a !== null && b !== null ? a !== b : null };
+  }
+  /** v2의 종류·파츠 ID·빌드별 버튼 선택, 적용 조작, 완료 Final 장착과 고유 플레이어를 따로 집계한다. */
+  function KeycapStats(runs) {
+    const modern = runs.filter(run => run.version === 2);
+    const rows = modern.flatMap(run => [
+      ...run.rows.filter(row => row.schema_version === 2 && row.part === 'Keycap' && ['AvailableOption', 'ElementPicked', 'KeycapApply'].includes(row.record_type)).map(row => ({ run, row, final: false })),
+      ...[...KeyStates(run).values()].filter(row => row.is_installed === true).map(row => ({ run, row, final: true }))
+    ]);
+    return [...Playtest.Group(rows, item => JSON.stringify([item.run.build, item.row.keycap_kind ?? null, item.row.element_id ?? null])).values()].map(items => {
+      const { run, row } = items[0], picked = items.filter(item => !item.final && item.row.record_type === 'ElementPicked'), applies = items.filter(item => !item.final && item.row.record_type === 'KeycapApply');
+      const final = items.filter(item => item.final), known = modern.filter(item => item.build === run.build && item.complete && [...KeyStates(item).values()].some(value => typeof value.is_installed === 'boolean'));
+      return { build: run.build, kind: row.keycap_kind ?? null, element: row.element_id ?? null, picked: picked.length, attempts: applies.length,
+        success: applies.every(item => typeof item.row.apply_success === 'boolean') ? applies.filter(item => item.row.apply_success).length : null,
+        failed: applies.every(item => typeof item.row.apply_success === 'boolean') ? applies.filter(item => item.row.apply_success === false).length : null,
+        players: new Set(picked.map(item => item.run.fileId)).size, runs: new Set(picked.map(item => item.run.key)).size,
+        installed: known.length ? final.length : null, installedPlayers: known.length ? new Set(final.map(item => item.run.fileId)).size : null,
+        installedRuns: known.length ? new Set(final.map(item => item.run.key)).size : null, finalKnown: known.length };
+    });
+  }
+
+  return { PARTS, ELEMENT_PARTS, COLORS, SameElementPart, SameTabPart, Decode, Sum, Describe, Build, Images, ImageResults, Parts, Elements, IsImageApply, ImageMetrics, Selections, FINAL_PARTS, FinalParts, ImageChanges, Storage, FinalElements, Combinations, KeycapOverview, KeycapName, KeyIndex, KeyStates, KeyKnown, KeySignature, KeycapComposition, KeycapStats };
 })();

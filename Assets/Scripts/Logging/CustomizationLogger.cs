@@ -14,15 +14,33 @@ namespace Game.Logging
         public static event Action<CustomizationObservation> Observed;
 
         /// <summary>
+        /// definition의 파츠 ID 또는 기존 일반 material의 이름 기반 ID를 반환한다.
+        /// 두 입력이 모두 없으면 빈값을 반환하며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        public static string GetKeycapElementId(Game.Tournament.KeycapDefinition definition, Material material)
+        {
+            return definition != null ? definition.Id : material != null ? "material:" + Uri.EscapeDataString(material.name) : "";
+        }
+
+        /// <summary>
+        /// definition의 모델 여부와 기존 일반 material을 사용하여 키캡 종류를 반환한다.
+        /// 파츠와 재질 모두 없으면 빈값을 반환하며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        public static string GetKeycapKind(Game.Tournament.KeycapDefinition definition, Material material)
+        {
+            return definition != null ? (definition.IsArtisan ? "Artisan" : "Regular") : material != null ? "Regular" : "";
+        }
+
+        /// <summary>
         /// target의 실제 UI 동작과 part, element, previous 및 적용 결과를 관찰자에게 전달한다.
         /// scope와 key 및 details는 추가 문맥이며 게임 설정과 저장 상태는 변경하지 않는다.
         /// </summary>
         public static void Emit(KeyboardCustomization target, string type, string part = "", string element = "",
-            string previous = "", bool success = true, bool changed = false, string scope = "", string key = "", string details = "")
+            string previous = "", bool success = true, bool changed = false, string scope = "", string key = "", string details = "", string keycapKind = "", string materialId = "")
         {
             if (!Application.isPlaying) return;
             CustomizationLogger.EnsureLogger();
-            Observed?.Invoke(new CustomizationObservation(target, type, part, element, previous, success, changed, scope, key, details));
+            Observed?.Invoke(new CustomizationObservation(target, type, part, element, previous, success, changed, scope, key, details, keycapKind, materialId));
         }
 
         /// <summary>
@@ -45,23 +63,26 @@ namespace Game.Logging
         public string Scope { get; }
         public string Key { get; }
         public string Details { get; }
+        public string KeycapKind { get; }
+        public string MaterialId { get; }
 
         /// <summary>
         /// 대상과 동작, 요소 및 적용 결과를 불변 관찰값으로 보관한다.
         /// 전달된 scope, key와 details를 포함하며 게임 상태는 변경하지 않는다.
         /// </summary>
         public CustomizationObservation(KeyboardCustomization target, string type, string part, string element,
-            string previous, bool success, bool changed, string scope, string key, string details)
+            string previous, bool success, bool changed, string scope, string key, string details, string keycapKind = "", string materialId = "")
         {
             Target = target; Type = type; Part = part; Element = element; Previous = previous;
             Success = success; Changed = changed; Scope = scope; Key = key; Details = details;
+            KeycapKind = keycapKind; MaterialId = materialId;
         }
     }
 
     [DisallowMultipleComponent]
     public sealed class CustomizationLogger : MonoBehaviour
     {
-        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details";
+        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed";
         private static CustomizationLogger _instance;
 
         [Header("Tester")]
@@ -218,8 +239,9 @@ namespace Game.Logging
                 row[12] = observation.Element; row[13] = observation.Previous;
                 row[14] = Bool(observation.Success); row[15] = Bool(observation.Changed);
                 row[16] = observation.Scope; row[17] = observation.Key; row[24] = observation.Details;
+                row[25] = observation.KeycapKind; row[26] = observation.MaterialId;
                 WriteRow(row);
-                if (observation.Success && (observation.Type == "Save" || observation.Type == "Load"
+                if (observation.Success && (observation.Type == "Save" || observation.Type == "Load" || observation.Type == "KeycapApply"
                     || observation.Type == "ImageAction" && (observation.Element == "Apply" || observation.Element == "Replace" || observation.Element == "Remove")))
                     Snapshot(observation.Type + ":" + observation.Element);
             }
@@ -233,10 +255,17 @@ namespace Game.Logging
         private void Snapshot(string reason)
         {
             if (_target == null) return;
+            string snapshotId = Guid.NewGuid().ToString("N");
             foreach (string[] value in _target.GetCustomizationLogValues())
             {
                 string[] row = CreateRow("CustomizationSnapshot");
                 row[10] = value[0]; row[12] = value[1]; row[22] = reason;
+                row[27] = snapshotId;
+                if (value.Length > 2)
+                {
+                    row[17] = value[2]; row[25] = value[3]; row[26] = value[4]; row[28] = value[5];
+                    row[16] = "SingleKeycap";
+                }
                 WriteRow(row);
             }
         }
@@ -318,8 +347,8 @@ namespace Game.Logging
         /// </summary>
         private string[] CreateRow(string type)
         {
-            string[] row = new string[25];
-            row[0] = "1"; row[1] = Application.version; row[2] = _testerId; row[3] = _sessionId;
+            string[] row = new string[29];
+            row[0] = "2"; row[1] = Application.version; row[2] = _testerId; row[3] = _sessionId;
             row[4] = _runId; row[5] = _keyboardId; row[6] = _scenePath;
             row[7] = (++_sequence).ToString(CultureInfo.InvariantCulture); row[8] = type;
             row[9] = Number(Time.realtimeSinceStartupAsDouble); row[10] = _part; row[11] = _visitId;
@@ -392,3 +421,4 @@ namespace Game.Logging
         private sealed class KeyboardIdentity { public string Id { get; } = Guid.NewGuid().ToString("N"); }
     }
 }
+

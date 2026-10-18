@@ -400,7 +400,7 @@ function RenderModeShell() {
   document.getElementById('welcomeTitle').textContent = custom ? '편집의 흐름에서, 유지한 선택까지.' : '한 번의 실행부터, 하나의 키까지.';
   document.getElementById('welcomeDescription').textContent = custom ? '커스터마이징 CSV를 선택하거나 놓으세요. 플레이어별 접근·체류·요소 선택·이미지 적용과 최종 상태를 확인합니다. 행동만으로 재미를 단정하지 않습니다.' : '플레이테스트 CSV를 선택하거나 놓으세요. 여러 파일의 대전, 키보드, 기믹과 상점 기록을 비교합니다.';
   document.getElementById('welcomeSteps').innerHTML = custom ? '<span><b>01</b> 플레이어·회차 선택</span><span><b>02</b> 항목·요소 탐색</span><span><b>03</b> 종료 직전 유지 상태 비교</span>' : '<span><b>01</b> 실행의 진행 확인</span><span><b>02</b> 대전과 키보드 탐색</span><span><b>03</b> 다른 실행과 비교</span>';
-  document.getElementById('welcomeFine').textContent = custom ? '커스터마이징 전용 schema v1 · 25열 / UTF-8 CSV / 외부 전송 없음' : '플레이테스트 29 · 43 · 59열 / UTF-8 CSV / 원본 파일 변경 없음';
+  document.getElementById('welcomeFine').textContent = custom ? '커스터마이징 schema v1/v2 · 25/29열 / UTF-8 CSV / 외부 전송 없음' : '플레이테스트 29 · 43 · 59열 / UTF-8 CSV / 원본 파일 변경 없음';
   document.getElementById('analysisFooter').textContent = custom ? '선택 횟수 ≠ 최종 선호 ≠ 재미·만족. Final은 저장 완료가 아닙니다. 미기록 상태를 추정하지 않습니다.' : '기록된 사실을 집계합니다. 입력 ≠ 타격 성공 ≠ 기믹 발동. 미수집 데이터를 추정하지 않습니다.';
   document.getElementById('loadStatus').textContent = '플레이테스트 ' + state.files.length + '개 / 커스터마이징 ' + CustomUI.Count() + '개 · 메모리에만 보관';
 }

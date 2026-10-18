@@ -467,7 +467,19 @@ namespace Game.Player
 
             KeyboardCustomization customization = _photoStorage.Customization;
             Material previousMaterial = customization.GetCommittedKeycapMaterial(allKeys, keycapIndex);
-            if (!customization.CommitKeycapMaterialPreview(_selectedMaterial, allKeys, keycapIndex, _selectedKeycapDefinition))
+            var before = new List<string[]>(customization.GetKeycapLogValues());
+            bool success = customization.CommitKeycapMaterialPreview(_selectedMaterial, allKeys, keycapIndex, _selectedKeycapDefinition);
+            bool changed = false;
+            if (success)
+            {
+                var after = new List<string[]>(customization.GetKeycapLogValues());
+                for (int index = 0; index < before.Count; index++)
+                    if ((allKeys || index == keycapIndex) && (before[index][1] != after[index][1]
+                        || before[index][4] != after[index][4] || before[index][5] != after[index][5])) changed = true;
+            }
+            string previous = !allKeys && keycapIndex >= 0 && keycapIndex < before.Count ? before[keycapIndex][1] : "";
+            ObserveKeycap("KeycapApply", _selectedKeycapDefinition, _selectedMaterial, allKeys, keycapIndex, success, previous, changed);
+            if (!success)
             {
                 CancelKeycapMaterialPreview();
                 RefreshKeycapMaterialSelection();
@@ -666,7 +678,10 @@ namespace Game.Player
         /// </summary>
         private void HandlePreviewClicked(KeyboardEditButton button)
         {
-            SelectMaterial(_previewButtons.IndexOf(button));
+            int index = _previewButtons.IndexOf(button);
+            if (index >= 0 && index < _previewDefinitions.Count)
+                ObserveKeycap("ElementPicked", _previewDefinitions[index], _previewMaterials[index]);
+            SelectMaterial(index);
         }
 
         /// <summary>
@@ -2080,8 +2095,8 @@ namespace Game.Player
         /// </summary>
         public void ObserveAvailableOptions()
         {
-            foreach (Material material in _previewMaterials)
-                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Keycap", material.name);
+            for (int index = 0; index < _previewMaterials.Count; index++)
+                ObserveKeycap("AvailableOption", _previewDefinitions[index], _previewMaterials[index]);
             foreach (SwitchType type in _switchSoundTypes)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Switch", type.ToString());
             foreach (int index in _caseMaterialIndices)
@@ -2112,5 +2127,21 @@ namespace Game.Player
                 : null;
             return RectTransformUtility.RectangleContainsScreenPoint(rect, screenPosition, eventCamera);
         }
+
+        /// <summary>
+        /// type과 definition 및 material을 키캡 파츠 관찰값으로 전달한다.
+        /// 적용 범위와 이전 파츠 및 성공 여부를 기록하며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        private void ObserveKeycap(string type, KeycapDefinition definition, Material material,
+            bool allKeys = false, int keycapIndex = -1, bool success = true, string previous = "", bool changed = false)
+        {
+            Game.Logging.CustomizationTelemetry.Emit(_photoStorage.Customization, type, "Keycap",
+                Game.Logging.CustomizationTelemetry.GetKeycapElementId(definition, material), previous, success, changed,
+                keycapIndex >= 0 || allKeys ? (allKeys ? "AllKeycaps" : "SingleKeycap") : "",
+                !allKeys && keycapIndex >= 0 ? keycapIndex.ToString() : "",
+                keycapKind: Game.Logging.CustomizationTelemetry.GetKeycapKind(definition, material),
+                materialId: definition != null ? definition.MaterialId : material != null ? material.name : "");
+        }
     }
 }
+

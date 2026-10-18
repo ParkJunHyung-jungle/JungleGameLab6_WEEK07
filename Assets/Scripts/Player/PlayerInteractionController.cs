@@ -259,13 +259,23 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 손에 든 키보드를 던지거나 중앙 광선에 맞은 대상을 동작시킨다.
-        /// interactionDistance와 interactionLayers를 사용하며 실행 성공 여부를 반환한다.
+        /// 쓰레기통을 조준하면 손에 든 키보드를 삭제하고, 그 외에는 던지거나 조준 대상을 동작시킨다.
+        /// interactionDistance, interactionLayers와 보유 키보드를 사용하며 실행 성공 여부를 반환한다.
         /// </summary>
         private bool TryInteract()
         {
             if (_heldKeyboardBody != null)
             {
+                if (TryGetInteractionHit(out RaycastHit trashHit))
+                {
+                    KeyboardTrashCan trashCan = trashHit.collider.GetComponentInParent<KeyboardTrashCan>();
+                    if (trashCan != null && trashCan.TryDispose(_heldKeyboardBody))
+                    {
+                        _heldKeyboardBody = null;
+                        return true;
+                    }
+                }
+
                 ThrowHeldKeyboard();
                 return true;
             }
@@ -331,7 +341,10 @@ namespace Game.Player
             }
             else if (_heldKeyboardBody != null)
             {
-                prompt = _heldKeyboardBody.GetComponentInChildren<KeyboardProtectionCover>() == null
+                if (TryGetInteractionHit(out RaycastHit trashHit)
+                    && trashHit.collider.GetComponentInParent<KeyboardTrashCan>() != null)
+                    prompt = "좌클릭으로 키보드 버리기";
+                else prompt = _heldKeyboardBody.GetComponentInChildren<KeyboardProtectionCover>() == null
                     ? "좌클릭 던지기 / 우클릭 커버 덮기"
                     : "좌클릭 던지기 / 우클릭 커버 벗기기";
             }
@@ -924,7 +937,7 @@ namespace Game.Player
 
         /// <summary>
         /// 화면 중앙에서 상호작용 거리 안의 콜라이더나 작업대 키보드 보관함을 찾는다.
-        /// 카메라와 상호작용 거리 및 레이어를 사용하고 가장 가까운 유효 RaycastHit을 반환한다.
+        /// 카메라와 상호작용 거리 및 레이어를 사용하며 손에 든 키보드를 제외한 가장 가까운 유효 RaycastHit을 반환한다.
         /// </summary>
         private bool TryGetInteractionHit(out RaycastHit hit)
         {
@@ -941,6 +954,9 @@ namespace Game.Player
             for (int i = 0; i < hitCount; i++)
             {
                 Collider candidate = _interactionHits[i].collider;
+                if (_heldKeyboardBody != null && candidate.transform.IsChildOf(_heldKeyboardBody.transform))
+                    continue;
+
                 if (candidate.GetComponentInParent<WorkbenchKeyboardHolder>() != null)
                 {
                     if (holderHitIndex < 0 || _interactionHits[i].distance < _interactionHits[holderHitIndex].distance)

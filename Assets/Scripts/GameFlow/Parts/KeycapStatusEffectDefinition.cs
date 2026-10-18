@@ -8,6 +8,9 @@ namespace Game.Tournament
     [CreateAssetMenu(menuName = "Keyboard/Abilities/Status Effect")]
     public sealed class KeycapStatusEffectDefinition : ScriptableObject
     {
+        [Header("Identity")]
+        [SerializeField] private string _displayName;
+
         [Header("Lifetime")]
         [Tooltip("끄면 지속 시간은 null이며, 적용 가능한 타격을 받을 때 Hit Count를 소모합니다.")]
         [SerializeField] private bool _usesDuration = true;
@@ -24,9 +27,11 @@ namespace Game.Tournament
 
         [Header("Marker")]
         [SerializeField] private GameObject _markerPrefab;
+        [SerializeField] private bool _attachToSurface = true;
         [SerializeField] private Vector3 _markerOffset = new Vector3(0f, 0.5f, 0f);
         [SerializeField, Min(0.01f)] private float _markerScale = 1f;
 
+        public string DisplayName => string.IsNullOrEmpty(_displayName) ? name : _displayName;
         public float? Duration => _usesDuration ? Mathf.Max(0.01f, _duration) : (float?)null;
         public int HitCount => Mathf.Max(1, _hitCount);
         public KeycapStatusReapply Reapply => _reapply;
@@ -34,6 +39,7 @@ namespace Game.Tournament
         public int BonusDamage => _bonusDamage;
         public float DamageMultiplier => _damageMultiplier;
         public bool DirectHitsOnly => _directHitsOnly;
+        public bool AttachToSurface => _attachToSurface;
         public GameObject MarkerPrefab => _markerPrefab;
         public Vector3 MarkerOffset => _markerOffset;
         public float MarkerScale => _markerScale;

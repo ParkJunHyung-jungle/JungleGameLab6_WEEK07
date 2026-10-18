@@ -33,7 +33,14 @@ public sealed class KeycapStatusEffects
             if (definition.MarkerPrefab != null)
             {
                 entry.Marker = Object.Instantiate(definition.MarkerPrefab, _owner);
-                entry.Marker.transform.localPosition = definition.MarkerOffset;
+                Vector3 offset = definition.MarkerOffset;
+                if (definition.AttachToSurface)
+                {
+                    Transform shell = _owner.Find("PBT_SculptedShell");
+                    Bounds bounds = shell.GetComponent<MeshFilter>().sharedMesh.bounds;
+                    offset += _owner.InverseTransformPoint(shell.TransformPoint(new Vector3(bounds.center.x, bounds.max.y, bounds.center.z)));
+                }
+                entry.Marker.transform.localPosition = offset;
                 entry.Marker.transform.localRotation = Quaternion.identity;
                 entry.Marker.transform.localScale *= definition.MarkerScale;
             }
@@ -43,6 +50,9 @@ public sealed class KeycapStatusEffects
             entry.Stacks = Mathf.Min(entry.Stacks + 1, definition.MaxStacks);
         entry.RemainingTime = definition.Duration ?? 0f;
         entry.RemainingHits = definition.HitCount;
+        _entries.Remove(entry);
+        _entries.Add(entry);
+        RefreshMarkerVisibility();
     }
 
     /// <summary>deltaTime만큼 유효 시간을 감소시키고 만료된 상태와 표시를 제거한다. 지속 시간이 null인 상태는 시간 경과로 소모하지 않는다.</summary>
@@ -89,5 +99,17 @@ public sealed class KeycapStatusEffects
             Object.Destroy(_entries[index].Marker);
         }
         _entries.RemoveAt(index);
+        RefreshMarkerVisibility();
+    }
+
+    /// <summary>겹친 상태 중 가장 최근의 표식 하나만 표시한다. 상태 계산은 모두 유지하고 사진과 각인을 가리는 중복 연출만 줄인다.</summary>
+    private void RefreshMarkerVisibility()
+    {
+        GameObject latest = null;
+        for (int index = _entries.Count - 1; index >= 0; index--)
+            if (_entries[index].Marker != null) { latest = _entries[index].Marker; break; }
+        foreach (Entry entry in _entries)
+            if (entry.Marker != null && entry.Marker.activeSelf != (entry.Marker == latest))
+                entry.Marker.SetActive(entry.Marker == latest);
     }
 }

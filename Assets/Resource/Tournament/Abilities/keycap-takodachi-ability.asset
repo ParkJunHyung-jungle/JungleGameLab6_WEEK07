@@ -13,14 +13,21 @@ MonoBehaviour:
   m_Name: keycap-takodachi-ability
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapAbilityDefinition
   _trigger: 0
-  _target: 2
-  _neighborCount: 12
+  _target: 1
+  _neighborCount: 4
   _delay: 0
-  _waveDuration: 0.45
+  _waveDuration: 0.6
   _effects:
   - _kind: 0
     _damage: 3
     _status: {fileID: 0}
-  _activationEffectPrefab: {fileID: 0}
+  _propagation: 2
+  _repeatCount: 1
+  _repeatInterval: 0.1
+  _alternateDirection: 0
+  _activationEffectPrefab: {fileID: 470251071865453178, guid: dc86bb41363a93f44962caa3aa717945, type: 3}
   _effectScale: 1
-  _effectLifetime: 3
+  _effectLifetime: 0.6
+  _windupEffectPrefab: {fileID: 0}
+  _impactEffectPrefab: {fileID: 2887038295190830418, guid: 57d07f6b8a8844240a03e1c2580c0337, type: 3}
+  _impactLifetime: 0.5

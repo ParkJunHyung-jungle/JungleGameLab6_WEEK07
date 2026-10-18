@@ -7,7 +7,8 @@ using UnityEngine;
 namespace Game.Tournament
 {
     public enum KeycapAbilityTrigger { Broken, Hit }
-    public enum KeycapTargetPattern { None, Neighbors, Row, Column, All, Self }
+    public enum KeycapTargetPattern { None, Neighbors, Row, Column, All, Self, Diagonal, Cross }
+    public enum KeycapPropagation { Distance, LeftToRight, NearestChain }
     public enum KeycapEffectKind { Damage, ApplyStatus }
 
     [Serializable]
@@ -32,11 +33,28 @@ namespace Game.Tournament
         [SerializeField, Min(0.01f)] private float _waveDuration = 0.45f;
         [SerializeField] private KeycapAbilityEffect[] _effects = new KeycapAbilityEffect[0];
 
+        [Header("Sequence")]
+        [SerializeField] private KeycapPropagation _propagation;
+        [SerializeField, Range(1, 6)] private int _repeatCount = 1;
+        [SerializeField, Min(0f)] private float _repeatInterval = 0.15f;
+        [SerializeField] private bool _alternateDirection;
+
         [Header("Presentation")]
         [SerializeField] private GameObject _activationEffectPrefab;
         [SerializeField, Min(0.01f)] private float _effectScale = 1f;
         [SerializeField, Min(0.01f)] private float _effectLifetime = 3f;
 
+        [SerializeField] private GameObject _windupEffectPrefab;
+        [SerializeField] private GameObject _impactEffectPrefab;
+        [SerializeField, Min(0.01f)] private float _impactLifetime = 0.45f;
+
+        public KeycapPropagation Propagation => _propagation;
+        public int RepeatCount => Mathf.Clamp(_repeatCount, 1, 6);
+        public float RepeatInterval => _repeatInterval;
+        public bool AlternateDirection => _alternateDirection;
+        public GameObject WindupEffectPrefab => _windupEffectPrefab;
+        public GameObject ImpactEffectPrefab => _impactEffectPrefab;
+        public float ImpactLifetime => _impactLifetime;
         public KeycapAbilityTrigger Trigger => _trigger;
         public KeycapTargetPattern Target => _target;
         public int NeighborCount => _neighborCount;
@@ -53,13 +71,15 @@ namespace Game.Tournament
         {
             if (_target == KeycapTargetPattern.None || _effects.Length == 0) return "추가 능력 없음";
             string target = _target == KeycapTargetPattern.All ? "전체" : _target == KeycapTargetPattern.Row ? "같은 행"
-                : _target == KeycapTargetPattern.Column ? "같은 열" : _target == KeycapTargetPattern.Self ? "자신" : "주변 " + _neighborCount + "키";
+                : _target == KeycapTargetPattern.Column ? "같은 열" : _target == KeycapTargetPattern.Self ? "자신"
+                : _target == KeycapTargetPattern.Diagonal ? "대각선" : _target == KeycapTargetPattern.Cross ? "십자" : "주변 " + _neighborCount + "키";
             var text = new StringBuilder(($"{(_trigger == KeycapAbilityTrigger.Broken ? "파괴" : "직접 피격")} 시 {target}"));
             foreach (KeycapAbilityEffect effect in _effects)
             {
                 if (effect.Kind == KeycapEffectKind.Damage) text.Append($" 피해 {effect.Damage}");
-                else if (effect.Status != null) text.Append($" · {effect.Status.name} 부여");
+                else if (effect.Status != null) text.Append($" · {effect.Status.DisplayName} 부여");
             }
+            if (RepeatCount > 1) text.Append($" · {RepeatCount}회 반복");
             return text.ToString();
         }
     }

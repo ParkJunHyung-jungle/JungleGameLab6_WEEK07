@@ -15,7 +15,4 @@ MonoBehaviour:
   _type: 6
   _topHousingMaterial: {fileID: 2100000, guid: ea89b2db33fa46548baccf9021c579f6, type: 2}
   _bottomHousingMaterial: {fileID: 2100000, guid: c4da2edb164328841934d091e98ee3a2, type: 2}
-  _stemMaterial: {fileID: 0}
-  _keyDownSound: {fileID: 0}
-  _keyUpSound: {fileID: 0}
-  _volume: 1
+  _stemMaterial: {fileID: 2100000, guid: 7a179cd1650f4554ca3d983f528383c3, type: 2}

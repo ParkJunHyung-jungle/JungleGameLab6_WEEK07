@@ -34743,6 +34743,7 @@ GameObject:
   - component: {fileID: 16919128326509319}
   - component: {fileID: 16919128326509320}
   - component: {fileID: 3233378293799950656}
+  - component: {fileID: 1910322758245911101}
   m_Layer: 0
   m_Name: Keyboard_Customize
   m_TagString: Untagged
@@ -36446,6 +36447,19 @@ MonoBehaviour:
   _surfaceLayers:
     serializedVersion: 2
     m_Bits: 1
+--- !u!114 &1910322758245911101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648102524883158503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec22780f40440004087fed6efbbf361a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.TournamentKeyboardEffects
+  _workshopLayout: {fileID: 11400000, guid: 798199fc0c626b34c932ace9e3d0cc0a, type: 2}
 --- !u!1 &5689495446983780148
 GameObject:
   m_ObjectHideFlags: 0

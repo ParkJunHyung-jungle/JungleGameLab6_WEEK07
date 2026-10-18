@@ -13,14 +13,21 @@ MonoBehaviour:
   m_Name: keycap-Bishop-ability
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapAbilityDefinition
   _trigger: 0
-  _target: 3
-  _neighborCount: 12
+  _target: 6
+  _neighborCount: 8
   _delay: 0
-  _waveDuration: 0.45
+  _waveDuration: 0.5
   _effects:
   - _kind: 0
     _damage: 3
     _status: {fileID: 0}
-  _activationEffectPrefab: {fileID: 0}
+  _propagation: 0
+  _repeatCount: 1
+  _repeatInterval: 0.1
+  _alternateDirection: 0
+  _activationEffectPrefab: {fileID: 5568108210182659090, guid: ca3b4c9509b08af4783ca4e7a07b8220, type: 3}
   _effectScale: 1
-  _effectLifetime: 3
+  _effectLifetime: 0.6
+  _windupEffectPrefab: {fileID: 0}
+  _impactEffectPrefab: {fileID: 5674904051496483455, guid: a3cf395d9e619dc4ba003f220b41554f, type: 3}
+  _impactLifetime: 0.32

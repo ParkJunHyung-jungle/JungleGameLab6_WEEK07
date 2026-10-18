@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -42,6 +42,7 @@ namespace KeyboardModeling
         private KeyboardSpawnProfile _spawnProfile;
 
         public event Action<Key> KeyPressed;
+        public event Action KeycapsRestored;
         public event Action<KeycapHealth> AttackRequested;
         public event Action<Transform> KeycapPressed;
         public event Action<Transform> ManualKeycapHit;
@@ -448,7 +449,7 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 전체 바인딩의 키캡 체력과 표시를 복원하고 눌림 상태를 초기화한다.
-        /// 캐시된 키캡들을 사용하며 위치와 스위치 축을 되돌리고 완파 추적 수량을 갱신한다.
+        /// 캐시된 키캡들을 사용하며 위치와 스위치 축 및 완파 추적 수량을 갱신한 뒤 KeycapsRestored를 알린다.
         /// </summary>
         public void RestoreKeycaps()
         {
@@ -462,6 +463,7 @@ namespace KeyboardModeling
             KeyboardDestruction destruction = GetComponent<KeyboardDestruction>();
             if (destruction != null)
                 destruction.RefreshKeycapTracking();
+            KeycapsRestored?.Invoke();
         }
 
         /// <summary>

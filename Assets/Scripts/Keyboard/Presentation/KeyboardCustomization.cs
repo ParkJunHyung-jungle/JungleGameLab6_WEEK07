@@ -1267,6 +1267,12 @@ public sealed class KeyboardCustomization : MonoBehaviour
         return common;
     }
 
+    /// <summary>keycap 루트에 장착된 SO를 반환한다. 사진용 재질과 무관하게 실제 부품 정의를 읽으며 구성은 변경하지 않는다.</summary>
+    public Game.Tournament.KeycapDefinition GetKeycapDefinition(Transform keycap)
+    {
+        return _keycapPartDefinitions.TryGetValue(keycap, out var part) ? part : null;
+    }
+
     /// <summary>
     /// 등록된 렌더러 배열의 PBT_SculptedShell을 사용해 키캡별 루트를 순서대로 저장한다.
     /// 입력과 반환값 없이 키캡 인덱스를 고정해 파괴 이후에도 다른 키의 인덱스를 유지한다.

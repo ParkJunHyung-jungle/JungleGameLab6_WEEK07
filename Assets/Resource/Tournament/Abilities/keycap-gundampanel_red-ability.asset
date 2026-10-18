@@ -14,13 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapAbilityDefinition
   _trigger: 0
   _target: 1
-  _neighborCount: 12
-  _delay: 0.25
-  _waveDuration: 0.35
+  _neighborCount: 8
+  _delay: 0.12
+  _waveDuration: 0.3
   _effects:
   - _kind: 0
-    _damage: 4
+    _damage: 3
     _status: {fileID: 0}
-  _activationEffectPrefab: {fileID: 0}
+  _propagation: 0
+  _repeatCount: 1
+  _repeatInterval: 0.1
+  _alternateDirection: 0
+  _activationEffectPrefab: {fileID: 2082350006224820587, guid: f19f7b3a85c32004392b18e6b077f9fa, type: 3}
   _effectScale: 1
-  _effectLifetime: 3
+  _effectLifetime: 0.6
+  _windupEffectPrefab: {fileID: 0}
+  _impactEffectPrefab: {fileID: 4032721107313521059, guid: eb56ed97f1cb17b478cd4297b9259936, type: 3}
+  _impactLifetime: 0.32

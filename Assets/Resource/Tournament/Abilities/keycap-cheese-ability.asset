@@ -13,14 +13,21 @@ MonoBehaviour:
   m_Name: keycap-cheese-ability
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapAbilityDefinition
   _trigger: 0
-  _target: 2
-  _neighborCount: 12
+  _target: 1
+  _neighborCount: 6
   _delay: 0
-  _waveDuration: 0.45
+  _waveDuration: 0.38
   _effects:
-  - _kind: 0
-    _damage: 3
-    _status: {fileID: 0}
-  _activationEffectPrefab: {fileID: 0}
+  - _kind: 1
+    _damage: 0
+    _status: {fileID: 11400000, guid: 173c91e35f6db7242949fbe486815278, type: 2}
+  _propagation: 0
+  _repeatCount: 1
+  _repeatInterval: 0.1
+  _alternateDirection: 0
+  _activationEffectPrefab: {fileID: 371329327673349811, guid: 315c93a13495c3b4183e359f2075e787, type: 3}
   _effectScale: 1
-  _effectLifetime: 3
+  _effectLifetime: 0.6
+  _windupEffectPrefab: {fileID: 0}
+  _impactEffectPrefab: {fileID: 7692794894562191428, guid: 5e6152119419a8b46a692378ada6c9a4, type: 3}
+  _impactLifetime: 0.32

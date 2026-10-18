@@ -27,7 +27,7 @@ public sealed class KeycapHealth : MonoBehaviour
 
     [Header("Status Effects")]
     private KeycapStatusEffects _statusEffects;
-    public int ActiveStatusCount => _statusEffects.Count;
+    public int ActiveStatusCount => _statusEffects?.Count ?? 0;
     public event Action<KeycapHealth, KeycapHitKind> HitReceived;
 
     [Header("Runtime Rarity")]
@@ -184,12 +184,15 @@ public sealed class KeycapHealth : MonoBehaviour
         if (!_broken && _currentHP > 0 && definition != null) _statusEffects.Apply(definition);
     }
 
-    /// <summary>입력 없이 현재 상태와 표시를 모두 초기화한다. 체력과 장착된 키캡 SO는 유지한다.</summary>
-    public void ClearStatuses() { _statusEffects.Clear(); }
+    /// <summary>
+    /// 입력 없이 현재 상태와 표시를 모두 초기화하며 체력과 장착된 키캡 SO는 유지한다.
+    /// Awake 전의 비활성 키캡은 생성된 상태가 없으므로 변경 없이 종료한다.
+    /// </summary>
+    public void ClearStatuses() { _statusEffects?.Clear(); }
 
     void Update() { _statusEffects.Tick(Time.deltaTime); }
-    void OnDisable() { _statusEffects.Clear(); }
-    void OnDestroy() { _statusEffects.Clear(); }
+    void OnDisable() { ClearStatuses(); }
+    void OnDestroy() { ClearStatuses(); }
 
     /// <summary>현재 체력 비율과 세 단계 균열 재질을 사용해 데칼을 갱신하고, 체력이 충분하거나 소진되면 데칼을 숨긴다.</summary>
     private void UpdateDamageDecal()

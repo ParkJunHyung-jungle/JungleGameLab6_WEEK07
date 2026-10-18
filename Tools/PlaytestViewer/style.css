@@ -15,6 +15,9 @@ pre{max-height:320px;overflow:auto;white-space:pre-wrap;font-size:10px}.key-deta
 .comparison-group-heading details p { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
 .comparison-group .stack-row { margin-bottom: 0; }
 .image-load-note { display: block; margin-top: 6px; font-size: 11px; color: var(--muted); cursor: help; }
+.custom-overview-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width:1350px) { .custom-overview-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width:720px) { .custom-overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* 데이터 유형별 탐색과 커스터마이징 차트의 공통 표현이다. */
 .mode-switch { display: grid; gap: 6px; margin-top: 24px; }

@@ -81,28 +81,4 @@ public sealed class KeyboardSwitch : MonoBehaviour
 
         return true;
     }
-
-    /// <summary>
-    /// 현재 축 데이터의 KeyDown 클립과 볼륨으로 눌림음을 재생한다.
-    /// 입력과 반환값 없이 AudioSource에서 중첩 재생하며 미지정 클립은 건너뛴다.
-    /// </summary>
-    public void PlayKeyDown()
-    {
-        if (_currentData != null && _currentData.KeyDownSound != null)
-        {
-            _audioSource.PlayOneShot(_currentData.KeyDownSound, _currentData.Volume);
-        }
-    }
-
-    /// <summary>
-    /// 현재 축 데이터의 KeyUp 클립과 볼륨으로 복귀음을 재생한다.
-    /// 입력과 반환값 없이 AudioSource에서 중첩 재생하며 미지정 클립은 건너뛴다.
-    /// </summary>
-    public void PlayKeyUp()
-    {
-        if (_currentData != null && _currentData.KeyUpSound != null)
-        {
-            _audioSource.PlayOneShot(_currentData.KeyUpSound, _currentData.Volume);
-        }
-    }
 }

@@ -13,9 +13,6 @@ MonoBehaviour:
   m_Name: Switch_Animal
   m_EditorClassIdentifier: Assembly-CSharp::SwitchData
   _type: 7
-  _topHousingMaterial: {fileID: 2100000, guid: 4a0a69a01cf224a46928ca01abe1b600, type: 2}
-  _bottomHousingMaterial: {fileID: 2100000, guid: 4b6116a45a1fbe74fb5fb5c2d334a50f, type: 2}
-  _stemMaterial: {fileID: 0}
-  _keyDownSound: {fileID: 0}
-  _keyUpSound: {fileID: 0}
-  _volume: 1
+  _topHousingMaterial: {fileID: 2100000, guid: 4b6116a45a1fbe74fb5fb5c2d334a50f, type: 2}
+  _bottomHousingMaterial: {fileID: 2100000, guid: 794f0db3eb283b546b2d078b8b6ba4b3, type: 2}
+  _stemMaterial: {fileID: 2100000, guid: e5a3715893a354b4e8bd24d3e2f69ded, type: 2}

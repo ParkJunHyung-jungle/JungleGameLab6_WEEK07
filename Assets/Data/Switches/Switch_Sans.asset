@@ -13,9 +13,6 @@ MonoBehaviour:
   m_Name: Switch_Sans
   m_EditorClassIdentifier: Assembly-CSharp::SwitchData
   _type: 3
-  _topHousingMaterial: {fileID: 2100000, guid: 794f0db3eb283b546b2d078b8b6ba4b3, type: 2}
+  _topHousingMaterial: {fileID: 2100000, guid: 2b249ebec45930c4ea061694fd5d261e, type: 2}
   _bottomHousingMaterial: {fileID: 2100000, guid: 71a7ea23368f8774d83fa7b13e4cdcfe, type: 2}
   _stemMaterial: {fileID: 2100000, guid: 45c99e743c20bef4ba2fb0838653720d, type: 2}
-  _keyDownSound: {fileID: 0}
-  _keyUpSound: {fileID: 0}
-  _volume: 1

@@ -9080,7 +9080,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2b4bf6c9b6624d645abe04719ef9cc0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorkshopTournamentEntry
-  _holder: {fileID: 0}
+  _holder: {fileID: 9911000310}
   _storage: {fileID: 9911000150}
   _startButton: {fileID: 9911000304}
   _message: {fileID: 9911000308}
@@ -9285,6 +9285,17 @@ MonoBehaviour:
   _waitAfterThrow: 1
   _throwFlightDuration: 1.2
   _spinSpeed: 5
+--- !u!114 &9911000310 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3821287447738897894, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
+  m_PrefabInstance: {fileID: 150765017}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8e5837573b94378970ade02a350c20f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkbenchKeyboardHolder
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

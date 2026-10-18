@@ -560,11 +560,12 @@ namespace Game.Player
 
         /// <summary>
         /// 편집 모드 진입 전에 저장한 렌즈 시야각과 키보드·이동 입력 및 커서 상태를 복원한다.
-        /// 키보드 입력과 공격 설정을 저장 상태로 되돌리고 편집 중인 키보드 참조를 비운다.
+        /// 살아 있는 카메라의 설정과 키보드 입력을 저장 상태로 되돌리고 편집 중인 키보드 참조를 비운다.
         /// </summary>
         private void RestoreKeyboardEditInput()
         {
-            SetEditingCameraFieldOfView(_savedCameraFieldOfView);
+            if (_editingCinemachineCamera != null)
+                SetEditingCameraFieldOfView(_savedCameraFieldOfView);
 
             if (_editingKeyboard != null)
             {
@@ -584,12 +585,13 @@ namespace Game.Player
 
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
-            _cameraInputAxisController.enabled = _cameraInputWasEnabled;
+            if (_cameraInputAxisController != null)
+                _cameraInputAxisController.enabled = _cameraInputWasEnabled;
         }
 
         /// <summary>
         /// 비활성화 시 진행 중인 전환을 정리하고 플레이어 위치와 입력 및 카메라 상태를 복원한다.
-        /// 편집 상태나 전환 코루틴을 확인하고 카메라를 저장한 방향으로 즉시 되돌린다.
+        /// 편집 상태나 전환 코루틴을 정리하고 아직 파괴되지 않은 카메라만 저장한 방향으로 되돌린다.
         /// </summary>
         private void ResetKeyboardEditMode()
         {
@@ -613,7 +615,8 @@ namespace Game.Player
 
             _isKeyboardEditMode = false;
             transform.position = _savedPlayerPosition;
-            _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _savedCameraRotation);
+            if (_camera != null && _cameraPanTilt != null)
+                _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _savedCameraRotation);
             RestoreKeyboardEditInput();
         }
 

@@ -218,7 +218,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// 실제 적용된 파츠 설정을 로그용 식별자 목록으로 반환한다.
-    /// 현재 재질과 축, 보강판 및 LED 값을 읽으며 이미지 바이트나 경로는 포함하지 않는다.
+    /// 현재 재질과 축, 보강판 및 LED 값을 읽고 이미지 상태 수집에 필요한 참조를 준비한다.
+    /// 미사용 이미지도 None으로 반환하며 이미지 바이트나 경로는 포함하지 않는다.
     /// </summary>
     public IEnumerable<string[]> GetCustomizationLogValues()
     {
@@ -230,8 +231,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         yield return new[] { "LED", _ledPattern.ToString() };
         yield return new[] { "LEDColor", ColorUtility.ToHtmlStringRGBA(_ledColor) };
         yield return new[] { "LEDEnabled", _ledEnabled ? "true" : "false" };
-        if (_imageCustomization != null)
-            foreach (string[] value in _imageCustomization.GetLogValues()) yield return value;
+        KeyboardImageCustomization images = GetImageCustomization();
+        foreach (string[] value in images.GetLogValues()) yield return value;
     }
 
     void OnEnable()

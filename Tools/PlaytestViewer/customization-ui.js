@@ -12,16 +12,18 @@ const CustomUI = (() => {
       .filter(run => (c.tester === "ALL" || (run.tester || "미기록") === c.tester) &&
         (c.session === "ALL" || (run.session || "미기록") === c.session) && (ignoreRun || c.run === "ALL" || run.key === c.run) &&
         (!c.completedOnly || run.complete) && (!c.excludeEmpty || run.selected.length > 0 || run.imageApplies.length > 0));
-    return [...new Map(selected.map(run => [JSON.stringify([run.session || run.fileId, run.id]), run])).values()];
+    return [...new Map(selected.map(run => [JSON.stringify([run.fileId, run.session, run.id]), run])).values()];
   }
   /** 미기록과 수집된 숫자를 구분하여 커스터마이징 화면용 문자열을 반환한다. */
   function V(value, digits = 3) { return value === null || value === undefined ? "미기록" : typeof value === 'boolean' ? value ? '예' : '아니오' : F(value, typeof value === 'number' && value !== 0 && Math.abs(value) < .0005 ? 6 : digits); }
   /** 원본값 상태를 사용하여 잘못된 값과 미기록을 구분한다. */
   function Value(row, field, digits = 3) { return row?.status[field] === "invalid" ? "잘못된 값: " + E(row.raw[field]) : V(row?.[field], digits); }
+  /** 파일 식별자를 받아 불러온 순서에 따른 플레이어 표시 이름을 반환한다. */
+  function PlayerLabel(id) { return '플레이어 ' + (c.files.findIndex(file => file.id === id) + 1); }
   /** 플레이어와 회차 번호로 긴 원본 ID를 대체할 짧은 표시 이름을 반환한다. */
   function Label(run) {
     const sessions = [...new Set(c.files.flatMap(file => file.runs.map(item => item.session)))];
-    return "플레이어 " + (run.tester || "미기록") + (sessions.length > 1 ? " · 세션 " + (sessions.indexOf(run.session) + 1) : "") + " · " + run.index + "회차";
+    return PlayerLabel(run.fileId) + (sessions.length > 1 ? " · 세션 " + (sessions.indexOf(run.session) + 1) : "") + " · " + run.index + "회차";
   }
   /** 분자와 분모를 함께 표시한 비율 문자열을 반환한다. */
   function Rate(numerator, denominator) { return denominator ? F(numerator / denominator * 100, 1) + "% (" + numerator + "/" + denominator + ")" : "계산 불가 (분모 0)"; }
@@ -42,7 +44,7 @@ const CustomUI = (() => {
   function Sync() {
     c.file = Fill("customFileSelect", [["ALL", "모든 커스터마이징 파일"], ...c.files.map(file => [file.id, file.name])], c.file);
     const fileRuns = c.files.filter(file => c.file === "ALL" || file.id === c.file).flatMap(file => file.runs);
-    c.tester = Fill("testerSelect", [["ALL", "모든 플레이어"], ...[...new Set(fileRuns.map(run => run.tester || "미기록"))].map(tester => [tester, "플레이어 " + tester])], c.tester);
+    c.tester = Fill("testerSelect", [["ALL", "모든 플레이어"], ...c.files.filter(file => c.file === 'ALL' || file.id === c.file).map(file => [file.id, PlayerLabel(file.id) + ' · ' + file.name])], c.tester);
     const testerRuns = fileRuns.filter(run => c.tester === "ALL" || (run.tester || "미기록") === c.tester);
     c.session = Fill("customSessionSelect", [["ALL", "모든 세션"], ...[...new Set(testerRuns.map(run => run.session))].map((session, index) => [session || "미기록", "세션 " + (index + 1) + " · " + (session?.slice(0, 8) || "미기록")])], c.session);
     c.run = Fill("customRunSelect", [["ALL", "모든 편집 회차"], ...Runs(true).map(run => [run.key, Label(run) + " · " + (run.complete ? "정상 종료" : "미완료")])], c.run);
@@ -54,7 +56,7 @@ const CustomUI = (() => {
     const rows = runs.flatMap(run => run.rows), parts = Customization.Parts(runs);
     const selections = runs.flatMap(run => run.selected);
     const testers = new Set(runs.map(run => run.tester).filter(Boolean));
-    let html = '<div class="metrics">' + Metric('플레이어 / 편집 회차', testers.size + ' / ' + runs.length, 'tester_id 기준 · 미기록 식별자 제외') + Metric('전체 / 포커스 시간', V(Customization.Sum(runs.map(run => run.duration))) + ' / ' + V(Customization.Sum(runs.map(run => run.focused))), '초 · CustomizationEnd만 집계') + Metric('요소 선택 / 편집 중 값 변경 횟수', selections.length + ' / ' + V(Customization.Selections(selections).changed, 0), 'Adjustment·자동 복원·스냅샷 제외') + Metric('정상 종료 / 미완료', runs.filter(run => run.complete).length + ' / ' + runs.filter(run => !run.complete).length, 'RightClickExit·NextScene과 is_complete=true') + '</div>';
+    let html = '<div class="metrics">' + Metric('플레이어 / 편집 회차', testers.size + ' / ' + runs.length, '파일 1개 = 플레이어 1명') + Metric('전체 / 포커스 시간', V(Customization.Sum(runs.map(run => run.duration))) + ' / ' + V(Customization.Sum(runs.map(run => run.focused))), '초 · CustomizationEnd만 집계') + Metric('요소 선택 / 편집 중 값 변경 횟수', selections.length + ' / ' + V(Customization.Selections(selections).changed, 0), 'Adjustment·자동 복원·스냅샷 제외') + Metric('정상 종료 / 미완료', runs.filter(run => run.complete).length + ' / ' + runs.filter(run => !run.complete).length, 'RightClickExit·NextScene과 is_complete=true') + '</div>';
     html += Panel('항목 버튼 클릭 · 열기와 닫기', Bars(parts.map(part => ({ label: Customization.PARTS[part.part], color: Customization.COLORS[part.part], segments: [{ label: '열기', value: part.open }, { label: '닫기', value: part.close, dim: true }], note: '실제 방문 ' + part.visits + '회' })), '회'), 'PartAccess 클릭과 PartVisitStart 방문은 별개입니다. 닫기 클릭은 새 방문이 아닙니다.');
     html += Panel('항목별 체류 시간', Bars(parts.map(part => ({ label: Customization.PARTS[part.part], color: Customization.COLORS[part.part], segments: [{ label: '포커스', value: part.focused }, { label: '포커스 제외', value: part.duration === null || part.focused === null ? null : part.duration - part.focused, dim: true }], note: '미종료 방문 ' + part.unclosed + '회' })), '초') + '<p class="hint">종료된 방문의 포커스 체류 합계 ' + V(Customization.Sum(parts.map(part => part.focused)), 6) + '초. 회차 시간과 합산하지 않습니다. 미세한 음수 차이는 원본 수치로 표시하며 막대 폭만 0으로 제한합니다.</p>', 'PartVisitEnd만 합산합니다. 포커스 제외 구간의 정확한 위치는 미기록이므로 타임라인에 배치하지 않습니다.');
     html += Panel('항목 접근률 · 재방문 · 회차별 체류 분포', Table(['항목', '접근률(방문 회차/제공 회차)', '재방문', '요소 선택', '평균 포커스', '중앙값', '알려진 회차 / 미기록'], parts.map(part => [E(Customization.PARTS[part.part]), Rate(part.accessed, part.offered), part.revisits, part.selected, V(part.distribution.mean) + '초', V(part.distribution.median) + '초', part.distribution.count + ' / ' + part.distribution.missing]), 'customParts'), '평균·중앙값은 현재 범위의 회차별 합계이며 무방문 0회차도 포함합니다. 미종료 방문은 0으로 채우지 않습니다.');
@@ -122,7 +124,7 @@ const CustomUI = (() => {
     const filterParts = Object.entries(Customization.ELEMENT_PARTS).filter(([part]) => part !== 'PlateMaterial');
     let html = '<label class="custom-part-filter">항목 <select id="customPartSelect">' + filterParts.map(([part, label]) => '<option value="' + part + '" ' + (c.part === part ? 'selected' : '') + '>' + E(label) + '</option>').join('') + '</select></label>';
     html += Panel('요소 선택 · 변경과 재선택', elements.length ? elements.map(element => '<div class="stack-row"><div><b>' + V(element.element) + '</b><span>선택 시도 ' + element.attempts + '회 · 빌드 ' + V(element.build) + '</span></div><div class="stack"><span style="width:' + element.changed / max * 100 + '%;background:' + Customization.COLORS[c.part] + '"></span><span style="width:' + element.reselected / max * 100 + '%;background:' + Customization.COLORS[c.part] + ';opacity:.3"></span></div><small>편집 중 값 변경 횟수 ' + V(element.changed, 0) + ' / 같은 요소 재선택 ' + V(element.reselected, 0) + ' / 실패 ' + V(element.failed, 0) + '</small></div>').join('') : Empty('제공 목록·요소 선택 미기록. 이미지 동작과 LED 연속 조절은 다른 화면에서 확인하세요.'), '진한 막대는 편집 중 값 변경 횟수, 옅은 막대는 재선택입니다. 제공됐지만 선택 0회인 요소도 포함합니다.');
-    html += Panel('요소별 분모와 최종 유지', Table(['요소 / 빌드', '제공 회차', '선택 시도 / 성공', '선택 비중', '선택 플레이어 / 제공 플레이어', '제공 기준 최종 유지율', '상세'], elements.map(element => [V(element.element) + ' / ' + V(element.build), element.offered || '제공 미기록', element.attempts + ' / ' + V(element.success, 0), Rate(element.attempts, element.denominator), Rate(element.selectedTesters, element.offeredTesters), Rate(element.retained, element.eligible), '<button data-custom-element="' + E(element.element) + '">선택 상세</button>']), 'customElements'), '선택 비중은 같은 파츠·빌드 전체 ElementSelected를 분모로 합니다. 플레이어 비율은 지정 tester_id의 중복을 제거합니다. 최종 비율은 해당 요소가 제공되고 Final 상태가 확인된 완료 회차만 분모로 합니다. 보강판은 외형 변경이며 타건음 변경을 뜻하지 않습니다.');
+    html += Panel('요소별 분모와 최종 유지', Table(['요소 / 빌드', '제공 회차', '선택 시도 / 성공', '선택 비중', '선택 플레이어 / 제공 플레이어', '제공 기준 최종 유지율', '상세'], elements.map(element => [V(element.element) + ' / ' + V(element.build), element.offered || '제공 미기록', element.attempts + ' / ' + V(element.success, 0), Rate(element.attempts, element.denominator), Rate(element.selectedTesters, element.offeredTesters), Rate(element.retained, element.eligible), '<button data-custom-element="' + E(element.element) + '">선택 상세</button>']), 'customElements'), '선택 비중은 같은 파츠·빌드 전체 ElementSelected를 분모로 합니다. 플레이어 비율은 파일 식별자의 중복을 제거합니다. 최종 비율은 해당 요소가 제공되고 Final 상태가 확인된 완료 회차만 분모로 합니다. 보강판은 외형 변경이며 타건음 변경을 뜻하지 않습니다.');
     if (c.element) html += Panel('선택 요소: ' + c.element, Table(['회차', '앱 시각', '이전 → 선택', '적용', '편집 중 값 변경 횟수', 'details'], runs.flatMap(run => run.selected.filter(row => Customization.SameElementPart(row.part, c.part) && row.element_id === c.element).map(row => [E(Label(run)), Value(row, 'elapsed_seconds', 6), V(row.previous_element_id) + ' → ' + V(row.element_id), Value(row, 'apply_success'), Value(row, 'value_changed'), V(row.details)])), 'customElementDetail'));
     const adjustments = runs.flatMap(run => run.rows.filter(row => row.record_type === 'Adjustment'));
     html += Panel('LED 조절 · 요소 버튼과 별도', Table(['조절 종류', '연속 변경 이벤트 수'], [...Playtest.Group(adjustments, row => row.element_id)].map(([kind, rows]) => [V(kind), rows.length]), 'customAdjust'), '예를 들어 Color 122건은 버튼 클릭 122회를 의미하지 않습니다.');
@@ -147,8 +149,8 @@ const CustomUI = (() => {
     const groups = [...Playtest.Group(runs, run => run.tester || '플레이어 미기록')];
     let html = Panel('플레이어별 비교', Table(['플레이어', '회차 / 정상 종료', '회차 전체 평균 / 중앙값', '포커스 평균 / 중앙값', '요소 선택', '성공 이미지 적용', '서로 다른 객체(세션 내)'], groups.map(([tester, items]) => {
       const duration = Customization.Describe(items.map(run => run.duration)), focus = Customization.Describe(items.map(run => run.focused));
-      return [E(tester), items.length + ' / ' + items.filter(run => run.complete).length, V(duration.mean) + ' / ' + V(duration.median) + '초', V(focus.mean) + ' / ' + V(focus.median) + '초', items.reduce((sum, run) => sum + run.selected.length, 0), items.reduce((sum, run) => sum + run.imageApplies.length, 0), new Set(items.map(run => JSON.stringify([run.session, run.keyboard]))).size];
-    }), 'customCompare'), 'tester_id는 지정된 플레이어 식별자입니다. 같은 플레이어의 여러 회차를 여러 사람의 선호로 세지 않습니다. keyboard_id는 실행 간 동일 객체를 보장하지 않습니다.');
+      return [E(PlayerLabel(tester)), items.length + ' / ' + items.filter(run => run.complete).length, V(duration.mean) + ' / ' + V(duration.median) + '초', V(focus.mean) + ' / ' + V(focus.median) + '초', items.reduce((sum, run) => sum + run.selected.length, 0), items.reduce((sum, run) => sum + run.imageApplies.length, 0), new Set(items.map(run => JSON.stringify([run.fileId, run.session, run.keyboard]))).size];
+    }), 'customCompare'), '파일 하나를 플레이어 한 명으로 구분합니다. CSV의 tester_id는 원본 정보로만 보존합니다. 같은 플레이어의 여러 회차를 여러 사람의 선호로 세지 않습니다. keyboard_id는 실행 간 동일 객체를 보장하지 않습니다.');
     const people = groups.filter(([tester]) => tester !== '플레이어 미기록').map(([, items]) => Customization.Describe(items.map(run => run.focused)).mean);
     const all = Customization.Describe(runs.map(run => run.focused));
     html += '<div class="metrics">' + Metric('회차 기준 평균 포커스', V(all.mean) + '초', '알려진 회차 ' + all.count + ' / 미기록 ' + all.missing) + Metric('플레이어 평균의 평균', V(Customization.Describe(people).mean) + '초', '각 플레이어의 회차 평균을 같은 가중치로 비교') + '</div>';
@@ -165,43 +167,43 @@ const CustomUI = (() => {
     const partName = part => names[part] || part;
     const target = part => part === 'Image:CaseWhole' ? '케이스 전체' : part.startsWith('Image:Keycap:') ? '키캡 렌더러 #' + part.slice(13) : partName(part);
     let html = '<div class="metrics">' + Metric('정상 종료 집계', completed.length + '회차', 'Interrupted는 최종 구성 집계 제외')
-      + Metric('플레이어', new Set(completed.map(run => run.tester).filter(Boolean)).size + '명', 'tester_id 확인된 정상 종료 회차')
-      + Metric('키보드', new Set(completed.filter(run => run.keyboard).map(run => JSON.stringify([run.session || run.fileId, run.keyboard]))).size + '대', '세션 내 keyboard_id 중복 제거')
+      + Metric('플레이어', new Set(completed.map(run => run.tester).filter(Boolean)).size + '명', '정상 종료 회차가 있는 파일 수')
+      + Metric('키보드', new Set(completed.filter(run => run.keyboard).map(run => JSON.stringify([run.fileId, run.session, run.keyboard]))).size + '대', '세션 내 keyboard_id 중복 제거')
       + Metric('중단·미완료', interrupted.length + '회차', '현재 공통 필터 범위') + '</div>';
     if (interrupted.length) html += Panel('중단 회차 · 집계 제외', Table(['회차', '종료 사유', '종료 상태'], interrupted.map(run => [E(Label(run)), V(run.end?.end_reason), '미완료 · Interrupted를 Final로 대체하지 않음']), 'resultsInterrupted'));
     const formatPartValue = (part, value) => part === 'LEDColor' && /^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value || '')
       ? '<i class="dot" style="background:#' + E(value.slice(0, 6)) + ';border:1px solid #687486;vertical-align:-1px"></i>' + V(value) : V(value);
-    const statusBadge = status => status === '변경 유지' ? '<span class="badge good">변경 유지</span>'
+    const resultLabels = { changed: '변경' };
+    const isChanged = status => ['변경 유지', '변경'].includes(status);
+    const statusBadge = (status, reason) => isChanged(status) ? '<span class="badge good">' + E(resultLabels.changed) + '</span>'
       : status === '원복' ? '<span class="badge warn">원복</span>'
-      : status === '판정 불가' ? '<span class="badge bad">판정 불가</span>'
+      : status === '판정 불가' ? '<span class="badge bad" tabindex="0" style="cursor:help" title="' + E(reason || '초기·최종 상태 또는 변경 경로를 확인할 기록이 부족합니다.') + '" aria-label="판정 불가: ' + E(reason || '기록 부족') + '">판정 불가 ⓘ</span>'
       : '<span class="muted">' + E(status) + '</span>';
     html += Panel('초기 → 최종 · 파츠별 결과', completed.map(run => {
       const parts = Customization.FinalParts(run), base = parts.slice(0, 6), known = base.filter(item => item.before !== null && item.after !== null);
+      const order = ['Keycap', 'Switch', 'LED', 'LEDColor', 'LEDEnabled', 'Case', 'Plate', 'PlateEffect'];
+      const orderedParts = order.map(part => parts.find(item => item.part === part)).filter(Boolean);
+      const imageValue = (value, scope, phase) => value === null
+        ? '<span tabindex="0" style="cursor:help" title="' + E(phase + ' ' + scope + ' 이미지 상태가 미기록이거나 일부 대상만 확인되어 사용 여부를 확정할 수 없습니다.') + '">판정 불가 ⓘ</span>' : String(value);
+      const imageRows = Customization.ImageResults(run).map(item => {
+        const changed = isChanged(item.status), dim = item.status === '초기 유지';
+        const wrap = (text, highlight = false) => highlight ? '<b style="color:var(--accent)">' + text + '</b>' : dim ? '<span class="muted">' + text + '</span>' : text;
+        const changeCount = item.changed === null ? '<span title="성공 동작 전후 이미지 스냅샷이 부족해 값 변경 횟수를 확정할 수 없습니다.">미기록 ⓘ</span>' : V(item.changed, 0);
+        const loadNote = item.loadChanged ? '<small class="image-load-note" tabindex="0" title="Load로 이미지 상태가 변경되었습니다. 복원은 직접 적용 시도·성공·변경 횟수에 포함하지 않습니다.">복원으로 변경 ⓘ</small>' : '';
+        return [wrap(E('커스텀 이미지 (' + item.scope + ')'), changed), wrap(imageValue(item.before, item.scope, '초기')), wrap(imageValue(item.after, item.scope, '최종'), changed), wrap(item.attempts), wrap(V(item.success, 0)), wrap(changeCount), '—', statusBadge(item.status, item.reason) + loadNote];
+      });
       return '<div class="comparison-group"><h3>' + E(Label(run)) + ' · 빌드 ' + V(run.build) + '</h3><p>초기 대비 최종 변경 파츠 수: ' + known.filter(item => item.before !== item.after).length + ' / 비교 가능 ' + known.length + '개 (기본 6파츠) · LED 색상·켜짐은 아래 별도 비교</p>'
-        + Table(['파츠', '초기값', '최종값', '선택·조절 시도', '성공', '편집 중 값 변경 횟수', '동일값 재선택', '결과 상태'], parts.map(item => {
-          const changed = item.status === '변경 유지', dim = item.status === '초기 유지';
+        + Table(['파츠', '초기값', '최종값', '선택·조절 시도', '성공', '편집 중 값 변경 횟수', '동일값 재선택', '결과 상태'], orderedParts.map(item => {
+          const changed = isChanged(item.status), dim = item.status === '초기 유지';
           const wrap = (text, highlight = false) => highlight ? '<b style="color:var(--accent)">' + text + '</b>' : dim ? '<span class="muted">' + text + '</span>' : text;
-          return [wrap(E(partName(item.part)), changed), wrap(formatPartValue(item.part, item.before)), wrap(formatPartValue(item.part, item.after), changed), wrap(item.attempts), wrap(V(item.success, 0)), wrap(V(item.changed, 0)), wrap(V(item.reselected, 0)), statusBadge(item.status)];
-        }), 'resultsParts' + run.key) + '</div>';
-    }).join('') || Empty('정상 종료 회차 없음'), '초기 유지는 시작·종료, 연속 sequence, 성공 선택의 이전→이후 연결까지 확인한 경우입니다. 같은 최종값이라도 기록이 불완전하면 판정 불가입니다. 원복은 초기와 다른 값으로 성공 변경한 증거가 필요합니다. LED 색상·켜짐 행은 선택 버튼 대신 Adjustment를 집계하며 밝기·속도는 추정하지 않습니다.');
+          const loadNote = item.loadChanged ? '<small class="image-load-note" tabindex="0" title="Load로 이 파츠의 값이 변경되었습니다. 복원은 직접 선택·조절의 시도·성공·변경 횟수에 포함하지 않습니다.">복원으로 변경 ⓘ</small>' : '';
+          return [wrap(E(partName(item.part)), changed), wrap(formatPartValue(item.part, item.before)), wrap(formatPartValue(item.part, item.after), changed), wrap(item.attempts), wrap(V(item.success, 0)), wrap(V(item.changed, 0)), wrap(V(item.reselected, 0)), statusBadge(item.status, item.reason) + loadNote];
+        }).concat(imageRows), 'resultsParts' + run.key) + '</div>';
+    }).join('') || Empty('정상 종료 회차 없음'), '초기 유지는 시작·종료, 연속 sequence, 성공 선택의 이전→이후 연결까지 확인한 경우입니다. 같은 최종값이라도 기록이 불완전하면 판정 불가입니다. 원복은 초기와 다른 값으로 성공 변경한 증거가 필요합니다. LED 색상·켜짐 행은 선택 버튼 대신 Adjustment를 집계하며 밝기·속도는 추정하지 않습니다. 이미지 시도·성공은 Apply/Replace/Remove 동작 수이며, 변경은 전후 상태가 실제로 달라진 동작 수입니다. 전체 키캡 적용도 1회입니다. 미리보기·저장·복원은 이 횟수에서 제외합니다.');
     const elements = Customization.FinalElements(completed);
     const maximum = Math.max(1, ...elements.flatMap(item => [item.attempts, item.retained]));
     html += Panel('탐색 빈도와 최종 유지', elements.map(item => '<div class="result-exploration"><b>' + E(partName(item.part)) + ' · ' + V(item.element) + ' · 빌드 ' + V(item.build) + '</b><div>선택 시도 ' + item.attempts + '회<div class="stack"><span style="width:' + item.attempts / maximum * 100 + '%;background:#38a9ff"></span></div></div><div>Final 유지 ' + item.retained + '회차<div class="stack"><span style="width:' + item.retained / maximum * 100 + '%;background:#ffad32"></span></div></div></div>').join(''), '두 막대는 공통 눈금입니다. 선택 횟수와 회차 수를 합산하지 않습니다. 최종 유지에는 초기 기본값 유지도 포함됩니다.');
-    html += Panel('요소별 탐색 → 최종 구성', Table(['파츠 / 요소 / 빌드', '선택 시도 / 성공(회)', '선택 플레이어 / 회차', 'Final 유지(회차)', '직접 성공 선택 후 유지', '초기부터 변경 없이 유지', '초기와 다른 최종값', '최종 구성 비중', '선택 후 최종 유지율'], elements.map(item => [E(partName(item.part)) + '<br>' + V(item.element) + '<br>빌드 ' + V(item.build), item.attempts + ' / ' + V(item.success, 0), item.testers + '명 / ' + item.selected + '회차', item.retained, item.direct, item.initial, item.finalChanged, Rate(item.retained, item.denominator), Rate(item.direct, item.selectedKnown)]), 'resultsElements'), '정상 종료 회차만 집계합니다. 최종 구성 비중 = 해당 요소 Final 회차 / 같은 파츠 Final 확인 회차. 선택 후 최종 유지율 = 성공 선택 후 같은 요소 Final 회차 / 성공 선택했고 같은 파츠 Final 확인 회차. 빌드별 분모를 사용합니다. 제공 기준 유지율은 기존 요소 선택 탭에 별도로 유지합니다. 플레이어 미기록은 사람 수에서 제외합니다.');
-    html += Panel('최종 이미지 · 확인 범위', completed.map(run => {
-      const initial = run.snapshots.get('Initial'), final = run.snapshots.get('Final'), changes = Customization.ImageChanges(initial, final);
-      const count = snapshot => {
-        const rows = [...(snapshot?.values() || [])].filter(row => row.part?.startsWith('Image:Keycap:'));
-        const known = rows.filter(row => row.element_id != null), applied = known.filter(row => row.element_id !== 'None');
-        return !known.length ? '미기록 · 적용 개수 판정 불가' : '확인된 이미지 ' + applied.length + '개 / 상태 확인 ' + known.length + '대상 · Canvas ' + applied.filter(row => row.element_id.startsWith('Canvas:')).length + ' / Individual ' + applied.filter(row => row.element_id.startsWith('Individual:')).length + ' · 인덱스 ' + rows.map(row => row.part.slice(13)).join(', ');
-      };
-      const caseState = changes.find(item => item.part === 'Image:CaseWhole');
-      const confirmed = changes.filter(item => item.status !== '판정 불가');
-      const changeSummary = confirmed.length ? '확인된 추가 ' + confirmed.filter(item => item.status === '이미지 추가').length + ' / 교체 ' + confirmed.filter(item => item.status === '이미지 교체').length + ' / 제거 ' + confirmed.filter(item => item.status === '이미지 제거').length + '대상' : '추가·교체·제거 개수 판정 불가';
-      return '<div class="comparison-group"><h3>' + E(Label(run)) + '</h3><p>케이스 전체: ' + V(caseState.before.value) + ' → ' + V(caseState.after.value) + ' · ' + E(caseState.status) + '</p><p>키캡 초기: ' + E(count(initial)) + '<br>키캡 최종: ' + E(count(final)) + '</p><p>' + E(changeSummary) + ' · 비교 가능 ' + confirmed.length + ' / 케이스 및 기록된 키캡 대상 ' + changes.length + ' · 판정 불가 ' + (changes.length - confirmed.length) + '</p>'
-        + '<p>기본 재질: 키캡 ' + V(final?.get('Keycap')?.element_id) + ' / 케이스 ' + V(final?.get('Case')?.element_id) + ' · 성공 Apply/Replace ' + run.imageApplies.length + '회</p>'
-        + '<details><summary>대상별 초기 → 최종 상세 (렌더러 인덱스)</summary>' + Table(['대상', '초기 이미지 / 방식', '최종 이미지 / 방식', '이미지 결과', '적용 방식 차이'], changes.map(item => [E(target(item.part)), V(item.before.value) + ' / ' + V(item.before.mode), V(item.after.value) + ' / ' + V(item.after.mode), E(item.status), item.before.value === null || item.after.value === null ? '판정 불가' : item.modeChanged ? '방식 변경' : '같음']), 'resultsImages' + run.key) + '</details></div>';
-    }).join(''), '명시적 None만 이미지 없음입니다. 확인된 개수는 기록된 대상 안의 수치이며 미기록 대상은 0개가 아닙니다. 초기 미기록이면 Final 이미지가 있어도 추가로 단정하지 않습니다. Canvas/Individual 전환은 같은 이미지 ID라도 별도 표시합니다. LoadSucceeded는 미리보기이며 실제 적용에서 제외합니다. 이미지 ID는 실행 중 객체 식별자로 원본 이미지를 복원하지 않습니다.');
+    html += Panel('요소별 탐색 → 최종 구성', Table(['파츠 / 요소 / 빌드', '선택 시도 / 성공(회)', '선택 플레이어 / 회차', 'Final 유지(회차)', '직접 성공 선택 후 유지', '초기부터 변경 없이 유지', '초기와 다른 최종값', '최종 구성 비중', '선택 후 최종 유지율'], elements.map(item => [E(partName(item.part)) + '<br>' + V(item.element) + '<br>빌드 ' + V(item.build), item.attempts + ' / ' + V(item.success, 0), item.testers + '명 / ' + item.selected + '회차', item.retained, item.direct, item.initial, item.finalChanged, Rate(item.retained, item.denominator), Rate(item.direct, item.selectedKnown)]), 'resultsElements'), '정상 종료 회차만 집계합니다. 최종 구성 비중 = 해당 요소 Final 회차 / 같은 파츠 Final 확인 회차. 선택 후 최종 유지율 = 성공 선택 후 같은 요소 Final 회차 / 성공 선택했고 같은 파츠 Final 확인 회차. 빌드별 분모를 사용합니다. 제공 기준 유지율은 기존 요소 선택 탭에 별도로 유지합니다. 같은 파일의 여러 회차는 플레이어 한 명으로 셉니다.');
     html += Panel('저장 상태와 편집 종료 상태', Table(['회차', '저장 시도 / 성공 / 실패 / 미기록', '복원 시도 / 성공 / 실패 / 미기록', '마지막 성공 저장(앱 초)', 'Final 비교', '달라진 대상', '비교 불가 대상'], completed.map(run => {
       const storage = Customization.Storage(run), stats = value => [value.attempts, value.success, value.failed, value.unknown].join(' / ');
       return [E(Label(run)), stats(storage.save), stats(storage.load), V(storage.last?.elapsed_seconds, 6), E(storage.status), storage.different.length ? storage.different.map(part => E(target(part))).join('<br>') : '확인된 차이 없음', storage.last ? storage.unknown.map(part => E(target(part))).join('<br>') : '저장 상태 비교 대상 없음'];
@@ -209,7 +211,6 @@ const CustomUI = (() => {
     const combinations = Customization.Combinations(completed);
     const comboTable = (items, key) => Table(['조합 / 빌드', '회차 수', '고유 플레이어', '비중'], items.map(item => [V(item.value) + '<br>빌드 ' + V(item.build), item.count, item.testers, Rate(item.count, item.denominator)]), key);
     html += Panel('최종 기본 파츠 조합', comboTable(combinations.basic, 'resultsCombinations'), '키캡 + 축 + 케이스 + 보강판 + LED 패턴. 필수값 누락 제외 ' + combinations.excluded + '회차. 비중 분모는 같은 빌드의 완전한 조합 회차입니다. 동일 플레이어 반복 편집도 회차 수에 반영됩니다.');
-    html += Panel('최종 이미지 사용 유형', comboTable(combinations.image, 'resultsImageCombinations'), '비중 분모는 같은 빌드의 전체 정상 종료 회차입니다. 미기록은 판정 불가로 유지하며 이미지 없음에 합치지 않습니다. 기록된 키캡 대상 범위 안의 유형입니다.');
     return html;
   }
 

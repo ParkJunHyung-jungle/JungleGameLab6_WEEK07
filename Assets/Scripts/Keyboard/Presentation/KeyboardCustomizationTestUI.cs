@@ -754,8 +754,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     }
 
     /// <summary>
-    /// previewedとkeyIndexから現在の写真が未適用か適用済みかを表示する。
-    /// 最後に適用した画像、対象と配置を比較し、画像や配置の編集後は未適用表示に戻す。
+    /// previewed와 keyIndex를 사용해 현재 사진의 미리보기 또는 적용 완료 상태를 표시한다.
+    /// 마지막으로 적용한 이미지, 대상과 배치를 비교해 이미지나 배치를 수정하면 미적용 표시로 되돌린다.
     /// </summary>
     private void RefreshImageStateLabel(bool previewed, int keyIndex)
     {

@@ -89,6 +89,20 @@ public sealed class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>
+    /// destination 월드 위치로 플레이어를 즉시 이동하고 누적 낙하 속도를 초기화한다.
+    /// CharacterController의 활성 상태와 시선 방향을 유지하며 이동 관찰자에게 정지 상태를 알린다.
+    /// </summary>
+    public void TeleportTo(Vector3 destination)
+    {
+        bool controllerEnabled = _controller.enabled;
+        _controller.enabled = false;
+        transform.position = destination;
+        _verticalVelocity = 0f;
+        _controller.enabled = controllerEnabled;
+        MovementProcessed?.Invoke(Vector3.zero, transform.position, false);
+    }
+
+    /// <summary>
     /// InputCam의 현재 월드 위치와 Awake에서 저장한 로컬 위치로 Player 위치를 맞춘다.
     /// 카메라의 월드 위치를 유지하면서 로컬 위치를 복원하고 수직 속도를 초기화한다.
     /// </summary>

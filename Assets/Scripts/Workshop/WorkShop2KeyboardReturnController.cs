@@ -29,6 +29,12 @@ namespace Game.Workshop
         [SerializeField, Min(0.1f)] private float _throwFlightDuration = 1.2f;
         [SerializeField, Min(0f)] private float _spinSpeed = 5f;
 
+        [Header("Player Return")]
+        [Tooltip("비워두면 씬 시작 시 플레이어 위치로 복귀합니다.")]
+        [SerializeField] private Transform _playerReturnPoint;
+        private PlayerMovement _playerMovement;
+        private Vector3 _playerStartPosition;
+
         [Header("Runtime")]
         private readonly Queue<Rigidbody> _pendingKeyboards = new Queue<Rigidbody>();
         private readonly HashSet<Rigidbody> _queuedKeyboards = new HashSet<Rigidbody>();
@@ -37,6 +43,11 @@ namespace Game.Workshop
         void Awake()
         {
             _actor.position = _hiddenPosition;
+            foreach (GameObject candidate in GameObject.FindGameObjectsWithTag("Player"))
+            {
+                if (candidate.TryGetComponent(out _playerMovement)) break;
+            }
+            _playerStartPosition = _playerMovement.transform.position;
         }
 
         void OnDisable()
@@ -58,6 +69,12 @@ namespace Game.Workshop
 
         void OnTriggerEnter(Collider other)
         {
+            if (other.CompareTag("Player"))
+            {
+                ReturnPlayer();
+                return;
+            }
+
             Rigidbody keyboard = other.attachedRigidbody;
             if (keyboard == null || keyboard.isKinematic || !IsKeyboard(keyboard)) return;
             if (!_queuedKeyboards.Add(keyboard)) return;
@@ -71,6 +88,16 @@ namespace Game.Workshop
             if (_sequenceRunning) return;
             _sequenceRunning = true;
             StartCoroutine(ReturnKeyboardSequence());
+        }
+
+        /// <summary>
+        /// Player 태그 대상의 복귀 요청으로 플레이어를 방 안의 안전 위치로 이동한다.
+        /// 지정된 복귀 지점 또는 시작 위치를 사용하며 낙하 속도를 초기화하고 시선 방향은 유지한다.
+        /// </summary>
+        private void ReturnPlayer()
+        {
+            Vector3 destination = _playerReturnPoint != null ? _playerReturnPoint.position : _playerStartPosition;
+            _playerMovement.TeleportTo(destination);
         }
 
         /// <summary>

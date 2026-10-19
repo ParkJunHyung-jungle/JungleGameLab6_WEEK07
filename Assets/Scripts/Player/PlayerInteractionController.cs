@@ -57,6 +57,9 @@ namespace Game.Player
         private Vector3 _heldKeyboardCenterOffset;
         private bool _heldKeyboardWasKinematic;
         private bool _heldKeyboardUsedGravity;
+        private Collider[] _playerColliders;
+        private readonly List<(Collider Keyboard, Collider Player, bool WasIgnored)> _heldCollisionStates
+            = new List<(Collider Keyboard, Collider Player, bool WasIgnored)>();
 
         [Header("Keyboard Edit")]
         [SerializeField] private Transform _keyboardEditPosition;
@@ -90,6 +93,7 @@ namespace Game.Player
 
         void Awake()
         {
+            _playerColliders = GetComponentsInChildren<Collider>(true);
             _keyboardResetInput = new InputAction("ResetEditingKeyboard", InputActionType.Button, "<Mouse>/middleButton");
 
             if (_camera == null)
@@ -275,6 +279,7 @@ namespace Game.Player
                     KeyboardTrashCan trashCan = trashHit.collider.GetComponentInParent<KeyboardTrashCan>();
                     if (trashCan != null && trashCan.TryDispose(_heldKeyboardBody))
                     {
+                        RestoreHeldKeyboardCollisions();
                         _heldKeyboardBody = null;
                         return true;
                     }
@@ -1014,6 +1019,7 @@ namespace Game.Player
             _heldKeyboardBody = body;
             _heldKeyboardWasKinematic = body.isKinematic;
             _heldKeyboardUsedGravity = body.useGravity;
+            IgnoreHeldKeyboardCollisions(body);
             KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
             if (pickupTarget == null)
                 pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
@@ -1053,11 +1059,44 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// body의 키보드와 플레이어 사이 기존 충돌 설정을 보관하고 보유 중 충돌을 제외한다.
+        /// 키보드의 모든 Collider와 플레이어 Collider를 사용하며 주변 환경과의 충돌은 유지한다.
+        /// </summary>
+        private void IgnoreHeldKeyboardCollisions(Rigidbody body)
+        {
+            RestoreHeldKeyboardCollisions();
+            foreach (Collider keyboardCollider in body.GetComponentsInChildren<Collider>(true))
+            {
+                foreach (Collider playerCollider in _playerColliders)
+                {
+                    bool wasIgnored = Physics.GetIgnoreCollision(keyboardCollider, playerCollider);
+                    _heldCollisionStates.Add((keyboardCollider, playerCollider, wasIgnored));
+                    Physics.IgnoreCollision(keyboardCollider, playerCollider, true);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 입력 없이 보유 전의 키보드와 플레이어 충돌 설정을 복원한다.
+        /// 이미 삭제된 Collider는 건너뛰고 보관한 충돌 쌍 목록을 비운다.
+        /// </summary>
+        private void RestoreHeldKeyboardCollisions()
+        {
+            foreach (var state in _heldCollisionStates)
+            {
+                if (state.Keyboard != null && state.Player != null)
+                    Physics.IgnoreCollision(state.Keyboard, state.Player, state.WasIgnored);
+            }
+            _heldCollisionStates.Clear();
+        }
+
+        /// <summary>
         /// 손에 든 키보드를 놓고 저장한 물리 설정을 복원한다.
         /// heldKeyboardBody를 비우며 원래 중력과 kinematic 상태를 되돌린다.
         /// </summary>
         private void DropHeldKeyboard()
         {
+            RestoreHeldKeyboardCollisions();
             if (_heldKeyboardBody == null)
                 return;
 
@@ -1079,6 +1118,7 @@ namespace Game.Player
         /// </summary>
         private void ThrowHeldKeyboard()
         {
+            RestoreHeldKeyboardCollisions();
             if (_heldKeyboardBody == null)
                 return;
 

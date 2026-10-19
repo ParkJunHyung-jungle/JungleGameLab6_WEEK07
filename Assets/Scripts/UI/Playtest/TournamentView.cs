@@ -56,6 +56,7 @@ namespace Game.Tournament
         private float _shopOpenX;
         private float _inventoryOpenX;
         private string _runId;
+        private string _repeatOpportunityRunId;
         private bool _shopExpanded = true;
         private bool _inventoryExpanded = true;
 
@@ -128,6 +129,11 @@ namespace Game.Tournament
             _shopContinueButton.SetState("다음 대전", true);
             _restartButton.gameObject.SetActive(phase == TournamentPhase.Finished);
             _restartButton.SetState("다시 시작", true);
+            if (phase == TournamentPhase.Finished && _repeatOpportunityRunId != _controller.PlaytestRunId && _panel.activeInHierarchy)
+            {
+                _repeatOpportunityRunId = _controller.PlaytestRunId;
+                Game.Logging.PlaytestResearchSession.Emit("RepeatOpportunityPresented", "WorkshopReturnOrRestart");
+            }
 
             if (!shop)
             {

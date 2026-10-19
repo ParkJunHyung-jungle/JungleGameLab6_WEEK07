@@ -101,6 +101,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
     void Update()
     {
+        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
         if (_isWaitingForKeyInput)
             CaptureWaitingKeyInput();
 

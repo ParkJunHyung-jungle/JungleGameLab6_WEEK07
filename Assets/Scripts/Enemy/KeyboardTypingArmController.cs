@@ -70,6 +70,7 @@ namespace KeyboardModeling
 
         void LateUpdate()
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (!_isPressing)
                 return;
             if (_diagnosticMotion && !_diagnosticMotionStarted)

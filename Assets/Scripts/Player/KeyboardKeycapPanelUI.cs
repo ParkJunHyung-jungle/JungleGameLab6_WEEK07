@@ -174,6 +174,7 @@ namespace Game.Player
 
         void Update()
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (!_isOpen) return;
 
             if (!_isAllKeys)

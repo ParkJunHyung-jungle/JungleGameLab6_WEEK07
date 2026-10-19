@@ -101,6 +101,7 @@ namespace Game.Logging
             TournamentKeyboardEffects.PlaytestPassiveLayoutChanged += HandlePassiveLayout;
             KeyboardInputController.PlaytestKeyProcessing += HandleKeyProcessing;
             InputSystem.onDeviceChange += HandleDeviceChange;
+            PlaytestResearchSession.Observed += HandleResearchEvent;
             _writer.Flush();
         }
 
@@ -135,6 +136,27 @@ namespace Game.Logging
             if (!_ownsSession) return;
             FinishSession("LoggerDestroyed", false);
             if (_instance == this) _instance = null;
+        }
+
+        /// <summary>type과 reason의 연구 이벤트를 eventId로 기록한다. 현재 제작·순환과 토너먼트를 연결하고 즉시 저장한다.</summary>
+        private void HandleResearchEvent(string type, string reason, string eventId)
+        {
+            if (_closed) return;
+            if (type == "TestEnd")
+            {
+                ReleaseTrackedKeys(reason);
+                _downCounts.Clear();
+                _sampledFrames.Clear();
+            }
+            PlaytestRecord row = new PlaytestRecord(type, Time.realtimeSinceStartupAsDouble);
+            row.Set(PlaytestColumn.ResearchEventId, eventId);
+            row.Set(PlaytestColumn.EndReason, reason);
+            row.Set(PlaytestColumn.TournamentRunId, PlaytestResearchSession.TournamentRunId);
+            row.Set(PlaytestColumn.StageId, UnityEngine.SceneManagement.SceneManager.GetActiveScene().path);
+            if (type == "TournamentFinished" || type == "TournamentInterrupted")
+                row.Set(PlaytestColumn.IsComplete, type == "TournamentFinished");
+            _writer.Write(row);
+            _writer.Flush();
         }
 
         /// <summary>
@@ -528,6 +550,11 @@ namespace Game.Logging
         /// </summary>
         private void AddTargetContext(PlaytestRecord row, Key key)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            {
+                row.Set(PlaytestColumn.InputState, "Tutorial");
+                return;
+            }
             GameManager source = GameManager.Instance;
             if (source == null || source != _battleSource || !_stages.IsActive || !source.IsTimerRunning)
             {
@@ -694,6 +721,7 @@ namespace Game.Logging
             TournamentKeyboardEffects.PlaytestPassiveLayoutChanged -= HandlePassiveLayout;
             KeyboardInputController.PlaytestKeyProcessing -= HandleKeyProcessing;
             InputSystem.onDeviceChange -= HandleDeviceChange;
+            PlaytestResearchSession.Observed -= HandleResearchEvent;
             _stages.MenuInputSamplingRequested -= SampleMenuKeys;
             _writer.Close();
         }
@@ -833,7 +861,10 @@ namespace Game.Logging
                 AddContext(row);
                 foreach (PlaytestColumn column in new[] { PlaytestColumn.StageId, PlaytestColumn.StageRunId,
                     PlaytestColumn.TournamentRunId, PlaytestColumn.RoundIndex, PlaytestColumn.BattleKind,
-                    PlaytestColumn.Phase, PlaytestColumn.Owner })
+                    PlaytestColumn.Phase, PlaytestColumn.Owner, PlaytestColumn.TesterId, PlaytestColumn.TestRunId,
+                    PlaytestColumn.CycleId, PlaytestColumn.CycleIndex, PlaytestColumn.CustomizationRunId,
+                    PlaytestColumn.ConfigurationId, PlaytestColumn.ParentConfigurationId, PlaytestColumn.ConfigurationOrigin,
+                    PlaytestColumn.LinkedTournamentRunId, PlaytestColumn.PreviousTournamentRunId, PlaytestColumn.TournamentIndex })
                     row.Set(column, _battleContext.Values[(int)column]);
             }
         }

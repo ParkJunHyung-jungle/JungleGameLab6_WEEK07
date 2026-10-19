@@ -15,6 +15,7 @@ namespace KeyboardModeling
         [SerializeField, Min(1)] private int _damage = 2;
         private readonly List<KeycapHealth> _targets = new List<KeycapHealth>();
         private KeyboardInputController _keyboard;
+        private KeycapHealth _focusedTarget;
         private float _attackRemaining;
         private bool _isAttacking;
         public bool IsAttacking => _isAttacking;
@@ -46,22 +47,24 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 적의 공격을 중단하고 진행 중인 팔 동작을 취소한다.
-        /// 입력값 없이 공격 실행 상태와 키캡 눌림 표시를 해제한다.
+        /// 입력값 없이 공격 실행 상태와 집중 대상 및 키캡 눌림 표시를 해제한다.
         /// </summary>
         public void StopAttacking()
         {
             _isAttacking = false;
+            _focusedTarget = null;
             _arm.CancelPress();
         }
 
         /// <summary>
         /// keyboard의 완파 대상 키캡을 적의 공격 대상으로 연결한다.
-        /// 이전 팔 동작을 정리하고 새로운 키보드 참조와 공격 대상 목록을 저장한다.
+        /// 이전 팔 동작과 집중 대상을 정리하고 새로운 키보드 참조와 공격 대상 목록을 저장한다.
         /// </summary>
         public void SetKeyboard(KeyboardInputController keyboard)
         {
             _arm.CancelPress();
             _targets.Clear();
+            _focusedTarget = null;
             _keyboard = keyboard;
             _attackRemaining = 1f / _attacksPerSecond;
             if (keyboard == null)
@@ -71,7 +74,7 @@ namespace KeyboardModeling
 
         /// <summary>
         /// 라운드가 전달한 deltaTime만큼 공격 대기를 진행한다.
-        /// 살아 있는 키캡 중 팔이 도달하는 대상을 최대 한 번 타격하고 다음 공격을 예약한다.
+        /// 집중 대상을 파괴할 때까지 최대 한 번 타격하며 대상이 사라지거나 도달할 수 없으면 새로 선택한다.
         /// </summary>
         public void Tick(float deltaTime)
         {
@@ -81,23 +84,34 @@ namespace KeyboardModeling
             if (_attackRemaining > 0f || _arm.IsPressing)
                 return;
             _attackRemaining = 1f / _attacksPerSecond;
-            int first = UnityEngine.Random.Range(0, _targets.Count);
-            for (int offset = 0; offset < _targets.Count; offset++)
+            KeycapHealth target = _focusedTarget;
+            if (target == null || target.CurrentHP <= 0 || !target.gameObject.activeInHierarchy
+                || !_arm.PressKey(target.transform))
             {
-                KeycapHealth target = _targets[(first + offset) % _targets.Count];
-                if (target == null || target.CurrentHP <= 0 || !_arm.PressKey(target.transform))
-                    continue;
-
-                KeyboardInputController keyboard = _keyboard;
-                keyboard.NotifyAutomaticKeycapHit(target.transform);
-                if (!_isAttacking || _keyboard != keyboard)
+                _focusedTarget = null;
+                int first = UnityEngine.Random.Range(0, _targets.Count);
+                for (int offset = 0; offset < _targets.Count; offset++)
                 {
-                    _arm.CancelPress();
-                    return;
+                    target = _targets[(first + offset) % _targets.Count];
+                    if (target == null || target.CurrentHP <= 0 || !target.gameObject.activeInHierarchy
+                        || !_arm.PressKey(target.transform))
+                        continue;
+
+                    _focusedTarget = target;
+                    break;
                 }
-                target.TakeDamage(_damage);
+            }
+            if (_focusedTarget == null)
+                return;
+
+            KeyboardInputController keyboard = _keyboard;
+            keyboard.NotifyAutomaticKeycapHit(target.transform);
+            if (!_isAttacking || _keyboard != keyboard)
+            {
+                _arm.CancelPress();
                 return;
             }
+            target.TakeDamage(_damage);
         }
 
     }

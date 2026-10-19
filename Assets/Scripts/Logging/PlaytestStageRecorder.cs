@@ -122,7 +122,7 @@ namespace Game.Logging
         /// </summary>
         public bool CanCountDown()
         {
-            if (!IsActive || _isClosingMenu) return false;
+            if (!IsActive || _isClosingMenu || Game.Tutorials.FirstEncounterTutorial.IsBlocking) return false;
             foreach (MonitorSettingsAppView menu in _settingsMenus) if (menu != null && menu.IsOpen) return false;
             foreach (ShopView menu in _shops) if (menu != null && menu.IsOpen) return false;
             foreach (KeyboardGoalAppView menu in _goalMenus) if (menu != null && menu.IsOpen) return false;

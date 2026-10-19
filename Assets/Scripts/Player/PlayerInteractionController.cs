@@ -176,6 +176,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             UpdateInteractionPrompt();
             CaptureEditingKeyboardMouseDelta();
             UpdateEditingCameraZoom();
@@ -187,6 +188,7 @@ namespace Game.Player
         /// </summary>
         private void HandleClickStarted(InputAction.CallbackContext context)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (_isKeyboardEditMode)
             {
                 if (_cameraTransition == null)
@@ -218,6 +220,7 @@ namespace Game.Player
         /// </summary>
         private void HandleKeyboardResetStarted(InputAction.CallbackContext context)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (!_isKeyboardEditMode || _cameraTransition != null || _editingKeyboard == null || _editingKeyboardBody == null)
                 return;
 
@@ -236,6 +239,7 @@ namespace Game.Player
         /// </summary>
         private void HandleCoverStarted(InputAction.CallbackContext context)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (_cameraTransition != null)
                 return;
 
@@ -567,6 +571,8 @@ namespace Game.Player
             SetEditingCameraFieldOfView(_savedCameraFieldOfView);
 
             _cameraTransition = null;
+            if (_isKeyboardEditMode)
+                Game.Tutorials.FirstEncounterTutorial.Request(Game.Tutorials.TutorialTopic.EditControls);
             if (!_isKeyboardEditMode)
                 RestoreKeyboardEditInput();
         }
@@ -914,6 +920,8 @@ namespace Game.Player
 
             _editingKeyboard.SetAttackEnabled(attackModeSelected);
             _keyboardEditOverlayUI.SetSelectedAttackMode(attackModeSelected);
+            Game.Logging.CustomizationTelemetry.Emit(_editingKeyboard.GetComponent<KeyboardCustomization>(),
+                "CustomizationTestModeChanged", element: attackModeSelected ? "AttackEnabled" : "TypingOnly");
         }
 
         /// <summary>
@@ -1022,6 +1030,7 @@ namespace Game.Player
 
             body.isKinematic = true;
             body.useGravity = false;
+            Game.Tutorials.FirstEncounterTutorial.Request(Game.Tutorials.TutorialTopic.Workbench);
         }
 
         /// <summary>

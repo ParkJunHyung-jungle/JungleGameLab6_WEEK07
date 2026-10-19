@@ -261,6 +261,7 @@ namespace KeyboardModeling
 
         void Update()
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             bool hasInputFocus = HasInputFocus();
             Keyboard keyboard = Keyboard.current;
             LogInputStatus(hasInputFocus, keyboard != null);

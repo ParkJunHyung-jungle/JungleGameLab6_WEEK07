@@ -47,6 +47,7 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
             _message.text = "작업대에 키보드를 배치해 주세요.";
             return;
         }
+        if (Game.Tutorials.FirstEncounterTutorial.Request(Game.Tutorials.TutorialTopic.TournamentEntry, EnterTournament)) return;
         try
         {
             KeyboardCustomization keyboard = _holder.KeyboardBody.GetComponent<KeyboardCustomization>();
@@ -57,7 +58,7 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
             {
                 if (UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.SceneAsset>(_battleScenePath) == null)
                     throw new InvalidOperationException("전투 씬을 찾을 수 없습니다.");
-                CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
+                RecordTransfer(keyboard, state);
                 UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(_battleScenePath,
                     new LoadSceneParameters(LoadSceneMode.Single));
                 return;
@@ -65,12 +66,20 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
 #endif
             if (!Application.CanStreamedLevelBeLoaded(_battleScenePath))
                 throw new InvalidOperationException("전투 씬이 빌드 목록에 없습니다.");
-            CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
+            RecordTransfer(keyboard, state);
             SceneManager.LoadScene(_battleScenePath);
         }
         catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
         {
             _message.text = "키보드 전달 실패: " + exception.Message;
         }
+    }
+
+    /// <summary>keyboard의 최종 편집을 마감하고 실제 전달할 state의 구성 ID를 기록한다. 기본 부품 보충에 따른 구성 차이도 계보로 유지한다.</summary>
+    private void RecordTransfer(KeyboardCustomization keyboard, KeyboardCustomizationState state)
+    {
+        CustomizationTelemetry.Emit(keyboard, "CustomizationEnd", success: true, details: "NextScene");
+        PlaytestResearchSession.CaptureConfiguration(state, "WorkshopBattleTransfer");
+        PlaytestResearchSession.Emit("ConfigurationTransferred", "WorkshopStartButton");
     }
 }

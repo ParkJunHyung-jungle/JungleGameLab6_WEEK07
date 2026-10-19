@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
+using Game.Logging;
 using KeyboardModeling;
 
 namespace Game.Tournament
@@ -88,6 +89,8 @@ namespace Game.Tournament
             KeyboardCustomizationState selection = TournamentKeyboardSession.GetSelection();
             if (selection == null) _keyboardStorage.TryReadCustomization(out selection);
             if (selection == null) selection = _keyboardStorage.GetDefaultCustomization();
+            PlaytestResearchSession.BeginTournament(PlaytestRunId, selection,
+                TournamentKeyboardSession.HasSelection ? "TournamentSelection" : "TournamentFallback");
             _catalog = _partCatalog.CreatePool(selection);
             TournamentKeyboardSession.Begin();
             TournamentKeyboardSession.UpdateCurrent(selection);
@@ -160,6 +163,7 @@ namespace Game.Tournament
                 Result = new TournamentResult(rank, _settings.GetGold(rank), playerScore, enemyScore);
                 Phase = TournamentPhase.Finished;
                 _message += $"\n토너먼트 종료 · {rank}위 · 작업실 보상 {Result.Gold}골드";
+                PlaytestResearchSession.FinishTournament(outcome > 0 ? "Victory" : "Defeat");
                 Completed?.Invoke(Result);
             }
             Changed?.Invoke();
@@ -175,7 +179,9 @@ namespace Game.Tournament
             }
             else if (Phase == TournamentPhase.Shop)
             {
-                TournamentKeyboardSession.UpdateCurrent(_workspace.Capture());
+                KeyboardCustomizationState confirmed = _workspace.Capture();
+                TournamentKeyboardSession.UpdateCurrent(confirmed);
+                PlaytestResearchSession.CaptureConfiguration(confirmed, "ShopConfirmed");
                 PlaytestInventorySnapshotRequested?.Invoke(this, "ShopExit");
                 PlaytestShopStateChanged?.Invoke(this, false, "NextBattle");
                 Round++;
@@ -190,6 +196,7 @@ namespace Game.Tournament
         /// <summary>종료된 토너먼트의 재고와 임시 구성을 비우고 Workshop2로 복귀한다. Result는 복귀 이벤트에 전달한다.</summary>
         private void ReturnToWorkshop()
         {
+            PlaytestResearchSession.Emit("WorkshopReturnRequested", "ContinueButton");
             PlaytestInventorySnapshotRequested?.Invoke(this, "BeforeTournamentReset");
             Currency = 0;
             _enemyCurrency = 0;
@@ -269,6 +276,7 @@ namespace Game.Tournament
                 return;
             }
             long before = Currency;
+            if (Game.Tutorials.FirstEncounterTutorial.Request(Game.Tutorials.TutorialTopic.Reroll, Reroll)) return;
             Currency -= _settings.RerollCost;
             _rerollsUsed++;
             Observe("Reroll", -1, null, before, true, false);
@@ -399,7 +407,12 @@ namespace Game.Tournament
         }
 
         /// <summary>최종 결과 화면에서만 씬을 재시작한다. 작업실 선택 원본과 저장 파일은 유지한다.</summary>
-        public void Restart() { if (Phase == TournamentPhase.Finished) _manager.RestartGame(); }
+        public void Restart()
+        {
+            if (Phase != TournamentPhase.Finished) return;
+            PlaytestResearchSession.Emit("TournamentRestartRequested", "RestartButton");
+            _manager.RestartGame();
+        }
 
         /// <summary>
         /// action과 slot의 part 동작을 소유자별 재화와 성공 여부 및 reason으로 전달한다.
@@ -425,6 +438,8 @@ namespace Game.Tournament
         {
             PlaytestShopStateChanged?.Invoke(this, false, "SceneExit");
             if (!_initialized) return;
+            if (!string.IsNullOrEmpty(PlaytestRunId) && Phase != TournamentPhase.Finished)
+                PlaytestResearchSession.InterruptTournament("SceneExit");
             _manager.TournamentKeyboardCreated -= ConfigureKeyboard;
             _manager.TournamentBattleFinished -= HandleBattleFinished;
             GameManager.PlaytestRoundStarted -= HandleRoundStarted;

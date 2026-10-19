@@ -136,6 +136,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     void Update()
     {
+        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
         if (_isHitStopped && (!_enableHitStop || Time.unscaledTime >= _hitStopEnd))
         {
             EndHitStop();
@@ -152,6 +153,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     void LateUpdate()
     {
+        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
         UpdateKeyboardBounce();
     }
 

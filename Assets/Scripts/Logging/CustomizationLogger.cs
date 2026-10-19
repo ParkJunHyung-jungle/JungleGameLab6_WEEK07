@@ -82,11 +82,8 @@ namespace Game.Logging
     [DisallowMultipleComponent]
     public sealed class CustomizationLogger : MonoBehaviour
     {
-        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed";
+        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed,test_run_id,cycle_id,cycle_index,configuration_id,parent_configuration_id,configuration_origin,linked_tournament_run_id,previous_tournament_run_id,tournament_index,participation_context,intervention_id,research_event_id";
         private static CustomizationLogger _instance;
-
-        [Header("Tester")]
-        [SerializeField] private string _testerId = "A";
 
         [Header("Runtime")]
         private readonly ConditionalWeakTable<KeyboardCustomization, KeyboardIdentity> _keyboards = new ConditionalWeakTable<KeyboardCustomization, KeyboardIdentity>();
@@ -112,7 +109,7 @@ namespace Game.Logging
         private bool _ownsSession;
 
         public string FilePath { get; private set; }
-        public string TesterId => _testerId;
+        public string TesterId => PlaytestResearchSession.TesterId;
 
         void Awake()
         {
@@ -137,6 +134,7 @@ namespace Game.Logging
             _lastTime = Time.realtimeSinceStartupAsDouble;
             _focused = HasFocus();
             CustomizationTelemetry.Observed += Observe;
+            PlaytestResearchSession.Observed += HandleResearchEvent;
             SceneManager.sceneUnloaded += HandleSceneUnloaded;
             Write("SessionStart");
             Flush();
@@ -151,6 +149,12 @@ namespace Game.Logging
         {
             if (_instance == null)
                 new GameObject("CustomizationLogger").AddComponent<CustomizationLogger>();
+        }
+
+        /// <summary>현재 커스터마이징 CSV의 버퍼를 디스크에 반영한다. 업로드 직전 파일을 읽어도 최신 이벤트가 포함되도록 한다.</summary>
+        public static void FlushForUpload()
+        {
+            if (_instance != null && !_instance._closed) _instance.Flush();
         }
 
         /// <summary>
@@ -180,14 +184,28 @@ namespace Game.Logging
         void OnDestroy() { if (_ownsSession) { Finish("LoggerDestroyed"); if (_instance == this) _instance = null; } }
 
         /// <summary>
-        /// 입력된 testerId를 다음 기록에 사용할 테스터 식별자로 설정한다.
-        /// 진행 중인 회차는 중단 마감하여 서로 다른 테스터의 데이터 혼입을 막는다.
+        /// 작업실의 편집 종료 상태에서 testerId로 새 참여자를 시작한다.
+        /// 두 CSV의 식별자를 함께 변경하며 게임 설정과 저장 파일은 유지한다.
         /// </summary>
         public void SetTesterId(string testerId)
         {
             if (string.IsNullOrWhiteSpace(testerId)) throw new ArgumentException("Tester ID is required.", nameof(testerId));
-            EndRun("TesterChanged", false);
-            _testerId = testerId.Trim();
+            PlaytestResearchSession.StartParticipant(testerId);
+        }
+
+        /// <summary>연구 이벤트를 eventId로 전투 CSV와 연결한다. 참여자 종료 전에 열린 편집을 마감하고 reason을 기록한다.</summary>
+        private void HandleResearchEvent(string type, string reason, string eventId)
+        {
+            if (_closed) return;
+            if (type == "TestEnd") EndRun(reason, false);
+            string[] row = CreateRow(type);
+            row[4] = PlaytestResearchSession.CustomizationRunId;
+            row[6] = SceneManager.GetActiveScene().path;
+            row[22] = reason;
+            row[40] = eventId;
+            if (type == "TournamentFinished" || type == "TournamentInterrupted") row[23] = Bool(type == "TournamentFinished");
+            WriteRow(row);
+            Flush();
         }
 
         /// <summary>
@@ -210,6 +228,7 @@ namespace Game.Logging
                 _runStart = Time.realtimeSinceStartupAsDouble;
                 _runFocused = 0d;
                 _externalDialog = false;
+                PlaytestResearchSession.BeginCustomization(_runId);
                 Write("CustomizationStart");
                 Snapshot("Initial");
             }
@@ -255,12 +274,19 @@ namespace Game.Logging
         private void Snapshot(string reason)
         {
             if (_target == null) return;
+            if (reason == "Initial" || reason == "Final" || reason == "Interrupted") CaptureConfiguration(reason);
             string snapshotId = Guid.NewGuid().ToString("N");
             foreach (string[] value in _target.GetCustomizationLogValues())
             {
                 string[] row = CreateRow("CustomizationSnapshot");
                 row[10] = value[0]; row[12] = value[1]; row[22] = reason;
                 row[27] = snapshotId;
+                if (reason != "Initial" && reason != "Final" && reason != "Interrupted")
+                {
+                    row[32] = null;
+                    row[33] = PlaytestResearchSession.ConfigurationId;
+                    row[34] = "UncommittedWorkshopSnapshot";
+                }
                 if (value.Length > 2)
                 {
                     row[17] = value[2]; row[25] = value[3]; row[26] = value[4]; row[28] = value[5];
@@ -268,6 +294,25 @@ namespace Game.Logging
                 }
                 WriteRow(row);
             }
+        }
+
+        /// <summary>편집 대상에 연결된 storage에서 실제 구성을 읽어 식별자를 갱신한다. 실패는 품질 이벤트로 남기며 편집은 유지한다.</summary>
+        private void CaptureConfiguration(string reason)
+        {
+            foreach (KeyboardCustomizationStorage storage in UnityEngine.Object.FindObjectsByType<KeyboardCustomizationStorage>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (storage.Customization != _target) continue;
+                try
+                {
+                    PlaytestResearchSession.CaptureConfiguration(storage.CaptureCustomization(_target), "Workshop:" + reason);
+                }
+                catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException || exception is FormatException)
+                {
+                    PlaytestResearchSession.Emit("ConfigurationCaptureFailed", "WorkshopCapture");
+                }
+                return;
+            }
+            PlaytestResearchSession.Emit("ConfigurationCaptureFailed", "NoMatchingStorage");
         }
 
         /// <summary>
@@ -302,6 +347,7 @@ namespace Game.Logging
             row[21] = Number(_runFocused); row[22] = reason; row[23] = Bool(complete);
             WriteRow(row);
             _runId = null; _target = null; _keyboardId = null; _externalDialog = false;
+            PlaytestResearchSession.EndCustomization();
             Flush();
         }
 
@@ -347,11 +393,22 @@ namespace Game.Logging
         /// </summary>
         private string[] CreateRow(string type)
         {
-            string[] row = new string[29];
-            row[0] = "2"; row[1] = Application.version; row[2] = _testerId; row[3] = _sessionId;
+            string[] row = new string[41];
+            row[0] = "3"; row[1] = Application.version; row[2] = TesterId; row[3] = _sessionId;
             row[4] = _runId; row[5] = _keyboardId; row[6] = _scenePath;
             row[7] = (++_sequence).ToString(CultureInfo.InvariantCulture); row[8] = type;
             row[9] = Number(Time.realtimeSinceStartupAsDouble); row[10] = _part; row[11] = _visitId;
+            row[29] = PlaytestResearchSession.TestRunId;
+            row[30] = PlaytestResearchSession.CycleId;
+            row[31] = PlaytestResearchSession.CycleIndex.ToString(CultureInfo.InvariantCulture);
+            row[32] = PlaytestResearchSession.ConfigurationId;
+            row[33] = PlaytestResearchSession.ParentConfigurationId;
+            row[34] = PlaytestResearchSession.ConfigurationOrigin;
+            row[35] = PlaytestResearchSession.TournamentRunId;
+            row[36] = PlaytestResearchSession.PreviousTournamentRunId;
+            row[37] = PlaytestResearchSession.TournamentIndex.ToString(CultureInfo.InvariantCulture);
+            row[38] = PlaytestResearchSession.ParticipationContext;
+            row[39] = PlaytestResearchSession.InterventionId;
             return row;
         }
 
@@ -403,6 +460,7 @@ namespace Game.Logging
             EndRun(reason, false);
             Write("SessionEnd"); Flush(); _closed = true;
             CustomizationTelemetry.Observed -= Observe;
+            PlaytestResearchSession.Observed -= HandleResearchEvent;
             SceneManager.sceneUnloaded -= HandleSceneUnloaded;
             try { _writer?.Dispose(); } catch (Exception exception) { Fail(exception); }
             _writer = null;

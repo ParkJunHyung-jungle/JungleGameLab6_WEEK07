@@ -23,7 +23,10 @@ namespace Game.Logging
         PartKind, KeycapKind, ActionSuccess, LevelBefore, LevelAfter,
         AvailableBefore, AvailableAfter, UsedQuantity,
         HasAbility, PassiveKind, SourceKey, SourcePartId, SourceLevel, PassiveBonus,
-        CalculatedDamage, AppliedDamage, CalculatedExtraDamage, AppliedExtraDamage, ContributionId, Attribution
+        CalculatedDamage, AppliedDamage, CalculatedExtraDamage, AppliedExtraDamage, ContributionId, Attribution,
+        TesterId, TestRunId, CycleId, CycleIndex, CustomizationRunId, ConfigurationId, ParentConfigurationId,
+        ConfigurationOrigin, LinkedTournamentRunId, PreviousTournamentRunId, TournamentIndex,
+        ParticipationContext, InterventionId, ResearchEventId
     }
 
     public sealed class PlaytestRecord
@@ -37,9 +40,10 @@ namespace Game.Logging
         /// </summary>
         public PlaytestRecord(string type, double elapsed)
         {
-            Set(PlaytestColumn.SchemaVersion, 5L);
+            Set(PlaytestColumn.SchemaVersion, 6L);
             Set(PlaytestColumn.RecordType, type);
             Set(PlaytestColumn.ElapsedSeconds, elapsed);
+            PlaytestResearchSession.AddContext(this);
         }
 
         /// <summary>
@@ -72,7 +76,7 @@ namespace Game.Logging
 
     public sealed class PlaytestCsvWriter
     {
-        private const string HEADER = "session_id,build_version,sequence,record_type,elapsed_seconds,stage_id,stage_run_id,key,event,press_sequence,held_seconds,end_reason,key_down_count,interval_index,interval_kind,combo,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,down_count,apm,player_score,enemy_score,player_score_start,player_score_end,score_delta,score_per_second,score_per_minute,is_complete,schema_version,tournament_run_id,round_index,battle_kind,phase,owner,keyboard_id,keyboard_spawn_index,spawn_kind,input_state,was_broken,broken_key_down_count,broken_down_count,shop_visit_id,snapshot_id,special_type,quantity,action,offer_slot,offer_generation,price,currency_before,currency_after,layout_row,layout_column,effect_id,is_confirmed,inventory_capacity,inventory_total,shop_transaction_id,part_kind,keycap_kind,action_success,level_before,level_after,available_before,available_after,used_quantity,has_ability,passive_kind,source_key,source_part_id,source_level,passive_bonus,calculated_damage,applied_damage,calculated_extra_damage,applied_extra_damage,contribution_id,attribution";
+        private const string HEADER = "session_id,build_version,sequence,record_type,elapsed_seconds,stage_id,stage_run_id,key,event,press_sequence,held_seconds,end_reason,key_down_count,interval_index,interval_kind,combo,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,down_count,apm,player_score,enemy_score,player_score_start,player_score_end,score_delta,score_per_second,score_per_minute,is_complete,schema_version,tournament_run_id,round_index,battle_kind,phase,owner,keyboard_id,keyboard_spawn_index,spawn_kind,input_state,was_broken,broken_key_down_count,broken_down_count,shop_visit_id,snapshot_id,special_type,quantity,action,offer_slot,offer_generation,price,currency_before,currency_after,layout_row,layout_column,effect_id,is_confirmed,inventory_capacity,inventory_total,shop_transaction_id,part_kind,keycap_kind,action_success,level_before,level_after,available_before,available_after,used_quantity,has_ability,passive_kind,source_key,source_part_id,source_level,passive_bonus,calculated_damage,applied_damage,calculated_extra_damage,applied_extra_damage,contribution_id,attribution,tester_id,test_run_id,cycle_id,cycle_index,customization_run_id,configuration_id,parent_configuration_id,configuration_origin,linked_tournament_run_id,previous_tournament_run_id,tournament_index,participation_context,intervention_id,research_event_id";
         private readonly string _sessionId;
         private readonly string _buildVersion;
         private StreamWriter _writer;

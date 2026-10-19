@@ -57,7 +57,6 @@ namespace Game.Tutorials
         private readonly Queue<PendingCard> _pending = new Queue<PendingCard>();
         private readonly HashSet<TutorialTopic> _scheduled = new HashSet<TutorialTopic>();
         private readonly List<InputAction> _actions = new List<InputAction>();
-        private readonly Dictionary<GameManager, int> _spawnCounts = new Dictionary<GameManager, int>();
         private PendingCard _current;
         private float _savedTimeScale;
         private CursorLockMode _savedCursorLock;
@@ -98,8 +97,6 @@ namespace Game.Tutorials
             _close.Clicked += HandleClose;
             _help.Clicked += HandleHelp;
             CustomizationTelemetry.Observed += HandleCustomization;
-            GameManager.PlaytestRoundStarted += HandleBattle;
-            GameManager.PlaytestKeyboardReady += HandleKeyboard;
             TournamentController.PlaytestShopStateChanged += HandleShop;
             TournamentController.PlaytestShopAction += HandleShopAction;
             PlaytestResearchSession.Observed += HandleResearch;
@@ -108,6 +105,7 @@ namespace Game.Tutorials
         void Start()
         {
             if (SceneManager.GetActiveScene().name == "WorkShop2") Request(TutorialTopic.Welcome);
+            else if (FindFirstObjectByType<TournamentController>() != null) Request(TutorialTopic.Battle);
         }
 
         void Update()
@@ -141,8 +139,6 @@ namespace Game.Tutorials
             _close.Clicked -= HandleClose;
             _help.Clicked -= HandleHelp;
             CustomizationTelemetry.Observed -= HandleCustomization;
-            GameManager.PlaytestRoundStarted -= HandleBattle;
-            GameManager.PlaytestKeyboardReady -= HandleKeyboard;
             TournamentController.PlaytestShopStateChanged -= HandleShop;
             TournamentController.PlaytestShopAction -= HandleShopAction;
             PlaytestResearchSession.Observed -= HandleResearch;
@@ -307,26 +303,6 @@ namespace Game.Tutorials
             if (observation.Type == "PartChanged" && observation.Part == "CustomImage") Request(TutorialTopic.Image);
             if (observation.Type == "CustomizationTestModeChanged" && observation.Element == "AttackEnabled") Request(TutorialTopic.AttackPreview);
             if (observation.Type == "ElementSelected" && observation.KeycapKind == "Artisan") Request(TutorialTopic.Artisan);
-        }
-
-        /// <summary>source의 첫 대전이 실제 시작되면 기본 규칙을 예약한다. 이후 키보드 보충 횟수는 별도로 추적한다.</summary>
-        private void HandleBattle(GameManager source)
-        {
-            _spawnCounts[source] = 0;
-            Request(TutorialTopic.Battle);
-        }
-
-        /// <summary>source의 플레이어 키보드 준비 횟수를 세어 첫 보충을 안내한다. enemy 키보드는 세지 않는다.</summary>
-        private void HandleKeyboard(GameManager source, GameObject keyboard, bool enemy)
-        {
-            if (enemy) return;
-            int count = _spawnCounts.TryGetValue(source, out int previous) ? previous + 1 : 1;
-            _spawnCounts[source] = count;
-            if (count > 1) Request(TutorialTopic.Replenishment);
-            var tournament = source.PlaytestTournament;
-            if (tournament == null) return;
-            foreach (var item in tournament.Inventory.Keycaps)
-                if (item.Value.IsArtisan) { Request(TutorialTopic.Artisan); break; }
         }
 
         /// <summary>source 상점의 open 상태를 받아 첫 상점 진입을 안내한다. 종료 통지는 안내를 만들지 않는다.</summary>

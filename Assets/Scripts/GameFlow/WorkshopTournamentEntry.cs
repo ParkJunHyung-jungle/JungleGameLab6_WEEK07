@@ -47,7 +47,6 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
             _message.text = "작업대에 키보드를 배치해 주세요.";
             return;
         }
-        if (Game.Tutorials.FirstEncounterTutorial.Request(Game.Tutorials.TutorialTopic.TournamentEntry, EnterTournament)) return;
         try
         {
             KeyboardCustomization keyboard = _holder.KeyboardBody.GetComponent<KeyboardCustomization>();

@@ -447,7 +447,8 @@ namespace Game.Player
             if (AudioManager.instance != null)
                 AudioManager.instance.SelectKeyboardEffects(customization);
             _keyboardEditOverlayUI?.SetSelectedMaterial(customization != null ? customization.KeycapMaterial : null);
-            _keyboardEditOverlayUI?.SetSelectedSwitchSound(keyboard.CurrentSwitchSound);
+            _keyboardEditOverlayUI?.SetSelectedSwitchSound(
+                customization != null && !customization.HasAnySwitchForKeycaps() ? null : keyboard.CurrentSwitchSound);
             _keyboardEditOverlayUI?.SetCaseCustomization(customization);
             _keyboardEditOverlayUI?.SetPlateCustomization(customization);
             _keyboardEditOverlayUI?.SetPhotoCustomization(customization);

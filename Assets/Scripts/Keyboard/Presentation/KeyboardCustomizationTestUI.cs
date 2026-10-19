@@ -873,7 +873,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
     /// <summary>
     /// 입력 없이 사진 커스터마이징을 시작한다.
-    /// 반환값 없이 편집 패널을 열고 키보드 파괴 입력을 비활성화한다.
+    /// 반환값 없이 편집 패널을 열고 키보드 타건 입력을 활성 상태로 유지한다.
     /// </summary>
     public void BeginCustomization()
     {
@@ -882,7 +882,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         if (_embedded) _previousInput = _input.InputEnabled;
         _isCustomizing = true;
         EventSystem.current.SetSelectedGameObject(null);
-        _input.InputEnabled = false;
+        _input.InputEnabled = true;
         if (_startPanel != null) _startPanel.SetActive(false);
         _customizationPanel.SetActive(true);
         RefreshEmbeddedPanel();

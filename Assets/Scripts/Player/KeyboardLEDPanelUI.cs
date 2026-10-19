@@ -125,7 +125,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// customization의 현재 LED 값을 읽고 패널을 열며 해당 키보드의 파손 입력을 중지한다.
+        /// customization의 현재 LED 값을 읽고 패널을 열며 키보드 타건 입력을 활성 상태로 유지한다.
         /// 진입 전 입력 상태를 저장하고 UI 동기화 과정에서는 LED 설정 변경 이벤트를 발생시키지 않는다.
         /// </summary>
         public void Open(KeyboardCustomization customization)
@@ -134,7 +134,7 @@ namespace Game.Player
             _customization = customization;
             _input = customization.GetComponent<KeyboardInputController>();
             _previousInput = _input.InputEnabled;
-            _input.SetInputEnabled(false);
+            _input.SetInputEnabled(true);
             _isOpen = true;
             EventSystem.current.SetSelectedGameObject(null);
             _patternMenu.SetActive(false);

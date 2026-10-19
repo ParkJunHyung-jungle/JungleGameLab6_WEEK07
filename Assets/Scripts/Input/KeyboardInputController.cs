@@ -39,6 +39,7 @@ namespace KeyboardModeling
         private Key _lastPressedKey;
         private KeycapButton[] _keycapButtons;
         private KeycapHealth[] _keycapHealths;
+        private MeshRenderer[] _keycapShellRenderers;
         private KeyboardSpawnProfile _spawnProfile;
 
         public event Action<Key> KeyPressed;
@@ -245,6 +246,7 @@ namespace KeyboardModeling
             _previousPressed = new bool[_bindings.Length];
             _keycapButtons = new KeycapButton[_bindings.Length];
             _keycapHealths = new KeycapHealth[_bindings.Length];
+            _keycapShellRenderers = new MeshRenderer[_bindings.Length];
             _lastPressDistance = _pressDistance;
             for (int index = 0; index < _bindings.Length; index++)
             {
@@ -252,6 +254,7 @@ namespace KeyboardModeling
                 _waveBindingIndices[_bindings[index].Keycap] = index;
                 _keycapButtons[index] = _bindings[index].Keycap.GetComponent<KeycapButton>();
                 _keycapHealths[index] = _bindings[index].Keycap.GetComponent<KeycapHealth>();
+                _keycapShellRenderers[index] = _bindings[index].Keycap.Find("PBT_SculptedShell").GetComponent<MeshRenderer>();
                 CacheSwitchStems(index);
                 UpdateSwitchStems(index);
             }
@@ -350,6 +353,15 @@ namespace KeyboardModeling
             }
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
             _audioSource.PlayOneShot(_pressSound, volume);
+        }
+
+        /// <summary>
+        /// 입력 없이 FMOD 축 사운드를 Disabled로 변경한다.
+        /// 설치된 축이 없는 키보드의 사운드 선택값을 null로 표시하게 한다.
+        /// </summary>
+        public void DisableSwitchSound()
+        {
+            _fmodSwitchSound = FmodSwitchSound.Disabled;
         }
 
         /// <summary>
@@ -560,13 +572,15 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// index의 키캡이 파괴되면 현재 눌림량으로 스위치 축을 아래로 이동한다.
-        /// 키캡 체력, 추가 높이, 눌림 거리와 길이 배율을 사용하여 축의 위치와 세로 크기를 갱신한다.
+        /// index의 키캡이 미설치, 비표시 또는 파괴 상태이면 현재 눌림량으로 스위치 축을 아래로 이동한다.
+        /// 외피의 활성 상태와 체력, 추가 높이, 눌림 거리와 길이 배율로 축 위치와 세로 크기를 갱신한다.
         /// </summary>
         private void UpdateSwitchStems(int index)
         {
-            float amount = _keycapHealths[index] != null && _keycapHealths[index].CurrentHP == 0
-                ? _pressAmounts[index] : 0f;
+            MeshRenderer shell = _keycapShellRenderers[index];
+            bool hasVisibleKeycap = shell.gameObject.activeInHierarchy && shell.enabled
+                && (_keycapHealths[index] == null || _keycapHealths[index].CurrentHP > 0);
+            float amount = hasVisibleKeycap ? 0f : _pressAmounts[index];
             Vector3 offset = Vector3.up * (_stemHeightOffset - _stemPressDistance * amount);
             for (int stemIndex = 0; stemIndex < _switchStems[index].Length; stemIndex++)
             {

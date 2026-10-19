@@ -299,6 +299,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public void PrepareForBattle()
     {
         foreach (KeyboardSwitch keyboardSwitch in _switches) keyboardSwitch.gameObject.SetActive(true);
+        GetComponent<KeyboardInputController>().SetSwitchSound(_switchType);
         if (_keycaps == null) CacheKeycaps();
         foreach (Transform keycap in _keycaps) keycap.gameObject.SetActive(true);
     }
@@ -695,6 +696,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
         for (int index = 0; index < _switches.Length; index++)
             _switches[index].gameObject.SetActive(!state.HasInstallationState || state.SwitchInstalled[index]);
+        if (!HasAnySwitchForKeycaps()) GetComponent<KeyboardInputController>().DisableSwitchSound();
         for (int index = 0; index < _keycaps.Length; index++)
             if (_keycaps[index] != null) _keycaps[index].gameObject.SetActive(!state.HasInstallationState || state.KeycapInstalled[index]);
 
@@ -1054,7 +1056,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
 
     /// <summary>
     /// 입력 없이 등록된 모든 축의 GameObject를 비활성화한다.
-    /// 반환값 없이 축만 숨기며 키캡과 선택한 축 데이터는 유지한다.
+    /// 반환값 없이 축을 숨기고 FMOD 타건음을 Disabled로 변경하며 키캡과 축 데이터는 유지한다.
     /// </summary>
     public void DisableSwitches()
     {
@@ -1062,6 +1064,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         {
             if (keyboardSwitch != null) keyboardSwitch.gameObject.SetActive(false);
         }
+        GetComponent<KeyboardInputController>().DisableSwitchSound();
     }
 
     /// <summary>

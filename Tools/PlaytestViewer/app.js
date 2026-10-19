@@ -161,7 +161,7 @@ function Overview() {
     const count = Playtest.Inputs(entries, file, 'all');
     return [F(key), entries.length, F(count.normal) + ' / ' + F(count.special) + ' / ' + F(count.unknown)];
   }), 'rawKeys'), '대전 밖·비활성·배치 없는 키를 포함합니다. Enter와 NumpadEnter 등 원본 키 식별자를 합치지 않습니다.');
-  html += Panel('데이터 진단 · 원본 기록', '<p class="hint">schema ' + E(file.version) + ' · ' + file.header.length + '열 · ' + file.rows.length.toLocaleString() + '행. 원본 문자열과 행별 값을 별도로 보존합니다.</p>' + (file.warnings.length ? '<div class="warning">' + file.warnings.slice(0, 20).map(E).join('<br>') + (file.warnings.length > 20 ? '<br>추가 경고 ' + (file.warnings.length - 20) + '건' : '') + '</div>' : '<p class="hint">파싱 경고 없음</p>') + '<details><summary>원본 이벤트 확인 (페이지당 35행)</summary>' + Table(['원본 레코드', 'sequence', '앱 시각', '종류', 'key / action', '상태', '원본 JSON'], rows.map(row => () => [F(row.sourceIndex), Field(row, 'sequence', 0), Field(row, 'elapsed_seconds', 6), F(row.record_type), F(row.key || row.action), F(row.input_state), '<details><summary>원본</summary><pre>' + E(JSON.stringify(row.raw, null, 2)) + '</pre></details>']), 'raw') + '</details>');
+  html += Panel('데이터 진단 · 원본 기록', '<p class="hint">schema ' + E(file.version) + ' · ' + file.header.length + '열 · ' + file.rows.length.toLocaleString() + '행. 원본 문자열과 행별 값을 별도로 보존합니다.</p>' + (file.warnings.length ? '<div class="warning">' + file.warnings.slice(0, 20).map(E).join('<br>') + (file.warnings.length > 20 ? '<br>추가 경고 ' + (file.warnings.length - 20) + '건' : '') + '</div>' : '<p class="hint">파싱 경고 없음</p>') + '<details><summary>원본 이벤트 확인 (페이지당 35행)</summary>' + Table(['원본 레코드', 'sequence', '앱 시각', '종류', 'key / action', '상태', '원본 JSON'], rows.map(row => () => [F(row.sourceIndex), Field(row, 'sequence', 0), Field(row, 'elapsed_seconds', 3), F(row.record_type), F(row.key || row.action), F(row.input_state), '<details><summary>원본</summary><pre>' + E(JSON.stringify(row.raw, null, 2)) + '</pre></details>']), 'raw') + '</details>');
   return html;
 }
 
@@ -177,7 +177,7 @@ function BattleView() {
   const scorePoints = scores.player, enemyPoints = scores.enemy;
   html += Panel('기록된 점수 추이', Plot([{ label: '플레이어 기록 점수', color: '#b9ec82', points: scorePoints }, { label: '로봇 기록 점수', color: '#b5a0f2', points: enemyPoints }], '점', true) + (enemyPoints.length ? '' : '<p class="hint">로봇 ScoreSnapshot은 미수집입니다. 최종 점수로 추이를 만들지 않습니다.</p>'));
   const buckets = Playtest.Buckets(run, file, state.scope, state.interval);
-  html += Panel('시간 구간별 입력', '<label class="hint">집계 간격 <select id="intervalSelect">' + [1, 2, 5, 10].map(value => '<option ' + (state.interval === value ? 'selected' : '') + '>' + value + '</option>').join('') + '</select> 초</label>' + Plot([{ label: '선택 범위 입력', color: '#65bed4', points: buckets.flatMap(bucket => [{ x: bucket.start, y: bucket.count }, { x: bucket.end, y: bucket.count }]) }], '입력 횟수', true, Playtest.ReplacementMarkers(run)) + Table(['구간(초)', '입력'], buckets.map(bucket => [F(bucket.start, 2) + '–' + F(bucket.end, 2), F(bucket.count)]), 'buckets'), '횟수 분포입니다. 주황 세로 점선은 플레이어 키보드 보충 후 등장 연출이 끝나 실제 입력 가능한 시점입니다. 최초 입장과 로봇 입장은 표시하지 않습니다. 기록 APM과는 별도 지표이며 마지막 구간은 짧을 수 있습니다.');
+  html += Panel('시간 구간별 입력', '<label class="hint">집계 간격 <select id="intervalSelect">' + [1, 2, 5, 10].map(value => '<option ' + (state.interval === value ? 'selected' : '') + '>' + value + '</option>').join('') + '</select> 초</label>' + Plot([{ label: '선택 범위 입력', color: '#65bed4', points: buckets.flatMap(bucket => [{ x: bucket.start, y: bucket.count }, { x: bucket.end, y: bucket.count }]) }], '입력 횟수', true, Playtest.ReplacementMarkers(run)) + Table(['구간(초)', '입력'], buckets.map(bucket => [F(bucket.start, 3) + '–' + F(bucket.end, 3), F(bucket.count)]), 'buckets'), '횟수 분포입니다. 주황 세로 점선은 플레이어 키보드 보충 후 등장 연출이 끝나 실제 입력 가능한 시점입니다. 최초 입장과 로봇 입장은 표시하지 않습니다. 기록 APM과는 별도 지표이며 마지막 구간은 짧을 수 있습니다.');
   html += InputClassificationView(run.rows, file, 'battleInput');
   html += PassiveView(run.rows, file, 'battlePassive');
   html += Panel('입력 범위와 상태', InputStack('현재 범위', input) + Table(['원본 input_state', '입력'], [...all.states].map(([status, entries]) => [E(status), entries.length]), 'states'), '기본은 Alive·Broken. 비활성 포함은 InputDisabled 추가. 원본 전체는 모든 상태를 포함하며 식별할 수 없는 입력은 분류 불가입니다.');
@@ -229,7 +229,7 @@ function KeyboardView() {
   const next = boards[boards.indexOf(board) + 1];
   const gap = Number.isFinite(next?.spawn?.elapsed_seconds) && Number.isFinite(board.spawn?.elapsed_seconds) ? next.spawn.elapsed_seconds - board.spawn.elapsed_seconds : null;
   html += '<div class="metrics">' + Metric('입장', '키보드 ' + Field(board.spawn, 'keyboard_spawn_index', 0), board.spawn?.spawn_kind || '미수집') + Metric('선택 범위 입력', state.owner === 'Enemy' ? '미수집' : F(input.total), '재입력 ' + (state.owner === 'Enemy' ? '미수집' : F(input.broken))) + Metric('기믹 발동', file.header.includes('effect_id') ? F(effects.reduce((sum, item) => sum + item.Activated, 0)) : '미수집', 'effect_id별 Activated') + Metric('다음 입장까지', gap === null ? '해당 없음' : F(gap, 3) + '초', gap === null ? '마지막 관찰 키보드 · 관찰 시간이 짧을 수 있음' : '교체·등장 연출을 포함하는 입장 간격') + '</div>';
-  html += '<p class="hint">ID ' + E(board.id) + ' · 입장 앱 시각 ' + Field(board.spawn, 'elapsed_seconds', 6) + '초. 로봇의 직접 입력량은 미수집입니다. 키보드가 표시하는 일반키 수와 보유 슬롯의 None 수량은 다른 범위입니다.</p>';
+  html += '<p class="hint">ID ' + E(board.id) + ' · 입장 앱 시각 ' + Field(board.spawn, 'elapsed_seconds', 3) + '초. 로봇의 직접 입력량은 미수집입니다. 키보드가 표시하는 일반키 수와 보유 슬롯의 None 수량은 다른 범위입니다.</p>';
 
   html += Panel('이 키보드의 입력 구성', state.owner === 'Enemy' ? Empty('로봇 직접 입력은 미수집입니다.') : InputStack('선택 범위', input), '이 키보드의 선택 범위 입력을 100%로 표시합니다.');
   html += Panel('이 키보드의 기믹 상태', file.header.includes('effect_id') ? Table(['유형', '파괴', '발동', '발동 전 취소', '대기 미종결'], effects.map(item => [E(item.type), item.Broken, item.Activated, item.Cancelled, item.pending]), 'boardEffects') : Empty('기믹 이벤트 미수집'));
@@ -293,6 +293,8 @@ function ShopSpendingChart(rows, modern) {
 /** 상점별 구매 파츠 수량과 실제 능력 단계 변화를 별도 단위로 시각화한다. */
 function ShopFlowChart(shop, modern, file) {
   return '<div class="shop-vgrid">' + ['Player', 'Enemy'].map(owner => {
+    const spending = Playtest.ShopMetrics(shop.actions, owner, modern);
+    const totalSpend = Number.isFinite(spending.purchaseSpend) && Number.isFinite(spending.rerollSpend) ? spending.purchaseSpend + spending.rerollSpend : null;
     const purchases = shop.actions.filter(row => row.owner === owner && row.action === 'PurchaseConfirmed');
     const groups = [...Playtest.Group(purchases, row => JSON.stringify([row.part_kind, row.special_type])).values()];
     const values = groups.map(entries => entries.every(row => Number.isFinite(row.quantity)) ? entries.reduce((sum, row) => sum + row.quantity, 0) : null);
@@ -302,7 +304,9 @@ function ShopFlowChart(shop, modern, file) {
     const states = Playtest.ShopStates(file, shop, owner);
     const keycaps = states.exit?.rows.filter(row => row.part_kind === 'Keycap') || [];
     const remaining = keycaps.length && keycaps.every(row => Number.isFinite(row.available_after)) ? keycaps.reduce((sum, row) => sum + row.available_after, 0) : null;
-    return '<section class="shop-vcard"><h3>' + E(OwnerName(owner)) + ' · 구매 → 사용 → 잔여</h3><h4>구매 파츠별 수량</h4>'
+    return '<section class="shop-vcard"><h3>' + E(OwnerName(owner)) + ' · 구매 → 사용 → 잔여</h3>'
+      + '<div class="metrics">' + Metric('상점 총지출', F(totalSpend), '재화 · 구매 ' + F(spending.purchaseSpend) + ' + 리롤 ' + F(spending.rerollSpend))
+      + Metric('상점 종료 잔액', Field(states.exit?.context, 'currency_after', 0), '재화 · 상점 종료 스냅샷 기준') + '</div><h4>구매 파츠별 수량</h4>'
       + (groups.length ? groups.map((entries, index) => ShopBar(entries[0].special_type || '파츠 미수집', values[index], maxima.get(entries[0].part_kind), entries[0].part_kind === 'Keycap' ? '사용 횟수' : '구매 수량', '#65bed4')).join('') : Empty('확정 구매 기록 없음'))
       + '<p class="hint">같은 부품 종류끼리 공통 눈금 · 키캡 수량은 장착 키 개수가 아닙니다.</p><h4>능력 사용 흐름</h4>'
       + (!modern ? Empty('구버전: 사용 상세 미수집') : owner === 'Enemy' ? '<p class="hint">구매 시 자동 적용 · 아래 최종 상태에서 확인</p>' : changes.length ? '<div class="shop-vsteps">' + changes.map(row => '<div class="shop-vstep"><strong>' + F(row.key || row.part_kind) + '</strong><span>' + F(row.special_type) + '</span><b>' + Field(row, 'level_before', 0) + ' → ' + Field(row, 'level_after', 0) + ' 단계</b><small>' + (row.action === 'UpgradeCancelled' ? '취소 · ' : '') + '잔여 ' + Field(row, 'available_before', 0) + ' → ' + Field(row, 'available_after', 0) + '</small></div>').join('') + '</div>' : Empty('해금·강화·취소 기록 없음'))
@@ -333,9 +337,9 @@ function ShopView() {
   const actionLabel = row => E(actionNames[row.action] || row.action || '동작 미수집');
   const result = row => ['OfferShown', 'OfferPresented'].includes(row.action) ? '해당 없음(상품 제시)' : row.action_success === true ? '성공' : row.action_success === false ? '실패' : modern ? '성공 여부 미수집' : row.is_confirmed === true ? '확정' : '구버전 · 성공 플래그 미수집';
   let html = Panel('보유 · 능력 · 기믹의 단위', '<p class="hint">키캡 구매 수량은 묶음이 제공한 사용 횟수이며 장착 키 개수가 아닙니다. 키캡 사용량은 단계 합계, inventory_total은 v4에서 해금된 키 위치 수입니다. 단계 0은 미해금입니다. 일반/아티산은 전투 효과 유무가 아닙니다. 새 파츠 ID만으로 일반/기믹 입력을 분류하지 않습니다.</p><p class="hint">발동은 Activated만 집계하며 실제 피해·득점·완료를 보장하지 않습니다. KeyboardDestroyed는 사용자 취소가 아닙니다.</p>');
-  if (!file.header.includes('shop_visit_id')) return html + Panel('상점', Empty('상점 방문·거래 미수집'));
+  if (!file.header.includes('shop_visit_id')) return '<div class="shop-readable">' + html + Panel('상점', Empty('상점 방문·거래 미수집')) + '</div>';
   const collected = shops.map(shop => shop.duration).filter(Number.isFinite);
-  html += '<div class="metrics">' + Metric('종료 기록 상점 시간', !shops.length ? '0초' : collected.length ? F(collected.reduce((sum, value) => sum + value, 0), 6) + '초' : '미수집', '시간 확인 ' + collected.length + '/' + shops.length + '방문 · 미완료 ' + shops.filter(shop => !shop.complete).length + '회 · 누락 시간은 합산하지 않음') + '</div>';
+  html += '<div class="metrics">' + Metric('종료 기록 상점 시간', !shops.length ? '0초' : collected.length ? F(collected.reduce((sum, value) => sum + value, 0), 3) + '초' : '미수집', '시간 확인 ' + collected.length + '/' + shops.length + '방문 · 미완료 ' + shops.filter(shop => !shop.complete).length + '회 · 누락 시간은 합산하지 않음') + '</div>';
   html += Panel('구매 · 리롤 지출 비교', ShopSpendingChart(rows, modern), '플레이어와 상대를 분리하며 모든 막대는 같은 재화 눈금입니다.');
   html += '<details><summary>소유자별 상세 집계표</summary>';
   html += Panel('소유자별 구매 · 사용 기록 요약', file.header.includes('owner') ? ShopOwnerTotals(rows, modern, 'shopOwnerTotals') : Empty('소유자 구분 미수집'), '지출은 해당 소유자의 PurchaseConfirmed와 Reroll의 재화 전후 차이만 합산합니다. 실패 사유는 아래 행동 표에서 확인합니다. 선택·해제·자동 해제는 클릭 수로 합산하지 않습니다. 상대 능력은 자동 적용이므로 구매 직후 스냅샷을 확인합니다. 구버전 확장 동작은 0이 아닌 미수집입니다.');
@@ -352,7 +356,7 @@ function ShopView() {
       return [E(OwnerName(row.owner)), Field(row, 'offer_generation', 0), Field(row, 'offer_slot', 0), F(row.special_type), F(row.part_kind) + ' / ' + F(row.keycap_kind), Field(row, 'quantity', 0), Field(row, 'price', 0), purchased.length ? '구매 확정' : '구매 기록 없음', entries.length];
     });
     const abilityActions = shop.actions.filter(row => ['AbilityUnlocked', 'AbilityUpgraded', 'AbilityApplyFailed', 'UpgradeCancelled', 'UpgradeCancelFailed'].includes(row.action));
-    let body = '<p class="hint">' + E(shop.id) + ' · 체류 ' + Field(shop.end, 'duration_seconds', 6) + '초 · 종료 ' + Field(shop.end, 'end_reason') + '</p>'
+    let body = '<p class="hint">' + E(shop.id) + ' · 체류 ' + Field(shop.end, 'duration_seconds', 3) + '초 · 종료 ' + Field(shop.end, 'end_reason') + '</p>'
       + ShopFlowChart(shop, modern, file)
       + '<details><summary>구매·사용 수치 상세표</summary><h3>소유자별 구매 · 리롤 · 능력 사용</h3>' + (file.header.includes('owner') ? ShopOwnerTotals(shop.actions, modern, 'owner-' + shopIndex) : Empty('소유자 미수집'))
       + ShopPurchaseFlow(shop, modern, shopIndex)
@@ -382,7 +386,7 @@ function ShopView() {
   html += Panel('양측 보유 구성 변화', !file.header.includes('snapshot_id') ? Empty('보유 구성 미수집') : Table(['시각', '라운드 / 소유자', '계기', '기록된 파츠별 누적 구매 수량', modern ? '용량 / 해금 키 위치 수' : '용량 / 기록된 inventory_total', '재화', 'snapshot_id'], snapshots.map(snapshot => [Field(snapshot.context, 'elapsed_seconds'), F(snapshot.context.round_index) + 'R / ' + E(OwnerName(snapshot.context.owner)), F(snapshot.context.action), InventoryText(snapshot), Field(snapshot.context, 'inventory_capacity', 0) + ' / ' + Field(snapshot.context, 'inventory_total', 0), Field(snapshot.context, 'currency_after', 0), F(snapshot.context.snapshot_id)]), 'inventory'), '실제 기록된 파츠만 동적으로 표시합니다. v1~v3의 None도 로그에 있을 때만 표시하며 일반 키캡 개수를 역산하지 않습니다. 수량·단계·해금 위치 수는 서로 다른 단위입니다.');
   html += Panel('실패 요청 · 원본 사유', modern ? Table(['시각', '소유자', '동작', '파츠', '키', '사유'], rows.filter(row => row.record_type === 'ShopAction' && (row.action_success === false || row.action?.endsWith('Failed'))).map(row => [Field(row, 'elapsed_seconds'), E(OwnerName(row.owner)), actionLabel(row), F(row.special_type), F(row.key), F(row.end_reason)]), 'failedActions') : Empty('구버전: 실패 요청 상세 미수집'), '상점 밖 요청처럼 shop_visit_id가 없는 실패도 현재 실행 범위에서 표시합니다.');
   html += '</details>';
-  return html;
+  return '<div class="shop-readable">' + html + '</div>';
 }
 
 /** 비교 항목의 짧은 제목과 원본 식별 정보를 표시하고 플레이어별 내용 묶음을 반환한다. */
@@ -402,7 +406,7 @@ function CompareView() {
 
   html += Panel('실행별 입력 구성', comparisons.map(item => ComparisonGroup(item, InputStack('선택 범위 입력', item.input))).join(''), '각 실행의 선택 범위 입력을 100%로 표시합니다. 총 입력 횟수는 아래 실행별 비교 표에서 확인할 수 있습니다.');
   html += Panel('실행별 비교', comparisons.map(item => ComparisonGroup(item, Table(['포함 대전 / 미완료', '키 입력', '기록 시간', '분당 입력', '재입력률', '상점 시간', '마지막 기록 보유'], [[item.runs.length + ' / ' + item.tournament.runs.filter(run => !run.complete).length,
-    F(item.input.total), F(item.duration, 3) + ' 초', F(item.perMinute, 2), item.input.total > 0 && item.input.broken !== null ? F(item.input.broken / item.input.total * 100, 1) + '%' : item.input.total === 0 ? '해당 없음' : '미수집', F(item.shopTime, 6) + ' 초', InventoryText(item.final)]], 'comparisons-' + item.file.id + '-' + item.index))).join(''), '분당 입력 = 선택 범위 입력 × 60 / 기록된 대전 시간. CSV의 구간 APM과 별개의 지표입니다. 상점 종료 시간이 누락되면 총시간을 추정하지 않습니다.');
+    F(item.input.total), F(item.duration, 3) + ' 초', F(item.perMinute, 2), item.input.total > 0 && item.input.broken !== null ? F(item.input.broken / item.input.total * 100, 1) + '%' : item.input.total === 0 ? '해당 없음' : '미수집', F(item.shopTime, 3) + ' 초', InventoryText(item.final)]], 'comparisons-' + item.file.id + '-' + item.index))).join(''), '분당 입력 = 선택 범위 입력 × 60 / 기록된 대전 시간. CSV의 구간 APM과 별개의 지표입니다. 상점 종료 시간이 누락되면 총시간을 추정하지 않습니다.');
   html += Panel('대전별 성과', comparisons.map(item => ComparisonGroup(item, Table(['대전', '완료·승패', '플레이어 / 로봇 점수', '기록 길이(초)', '키 입력'], item.runs.map(run => [E(RunLabel(run)), Badge(run), Field(run.end, 'player_score', 0) + ' / ' + Field(run.end, 'enemy_score', 0), Field(run.end, 'duration_seconds'), F(Playtest.Inputs(run.rows, item.file, state.scope).total)]), 'compareRounds-' + item.file.id + '-' + item.index))).join(''), '같은 R이라도 정규전과 연장전은 별도 대전입니다. 미완료의 점수는 중단 시점 기록이며 정상 완료 점수와 동등한 성과로 해석하지 않습니다.');
   return html;
 }
@@ -437,7 +441,8 @@ async function LoadFiles(files) {
       const text = await file.text();
       const id = file.name + ':' + file.size + ':' + file.lastModified;
       const header = (Playtest.ParseCsv(text)[0] || []).map(field => field.trim().toLowerCase());
-      if (header.includes('customization_run_id')) {
+      const battleLog = ['stage_run_id', 'key', 'event', 'player_score'].every(field => header.includes(field));
+      if (!battleLog && header.includes('customization_run_id')) {
         CustomUI.Add(Customization.Build(text, file.name, id));
         state.mode = 'customization';
         continue;

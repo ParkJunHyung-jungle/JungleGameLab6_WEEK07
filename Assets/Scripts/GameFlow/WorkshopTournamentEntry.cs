@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -7,12 +7,14 @@ using UnityEngine.UI;
 using Game.Logging;
 using Game.Player;
 using Game.Tournament;
+using Game.Workshop;
 
 public sealed class WorkshopTournamentEntry : MonoBehaviour
 {
     [Header("Selection")]
     [SerializeField] private WorkbenchKeyboardHolder _holder;
     [SerializeField] private KeyboardCustomizationStorage _storage;
+    [SerializeField] private WorkshopKeyboardStateController _workshopState;
     [SerializeField] private KeyboardEditButton _startButton;
     [SerializeField] private Text _message;
     [SerializeField] private string _battleScenePath = "Assets/Scenes/TestScenes/TestScene_Battle.unity";
@@ -49,10 +51,24 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
         }
         try
         {
+            if (_workshopState == null)
+            {
+                foreach (WorkshopKeyboardStateController candidate in FindObjectsByType<WorkshopKeyboardStateController>(FindObjectsSortMode.None))
+                {
+                    if (candidate.gameObject.scene != gameObject.scene) continue;
+                    if (_workshopState != null)
+                        throw new InvalidOperationException("작업실 키보드 상태 관리자가 중복되어 있습니다.");
+                    _workshopState = candidate;
+                }
+                if (_workshopState == null)
+                    throw new InvalidOperationException("작업실 키보드 상태 관리자가 연결되지 않았습니다.");
+            }
             KeyboardCustomization keyboard = _holder.KeyboardBody.GetComponent<KeyboardCustomization>();
             KeyboardCustomizationState original = _storage.CaptureCustomization(keyboard);
             KeyboardCustomizationState state = _storage.CaptureForBattle(keyboard);
+            WorkshopKeyboardRecord[] remaining = _workshopState.Capture(_holder.KeyboardBody);
             TournamentKeyboardSession.Select(state, original);
+            WorkshopKeyboardMemory.Select(remaining);
 #if UNITY_EDITOR
             if (!Application.CanStreamedLevelBeLoaded(_battleScenePath))
             {

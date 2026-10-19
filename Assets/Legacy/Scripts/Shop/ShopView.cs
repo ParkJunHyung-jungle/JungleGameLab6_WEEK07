@@ -156,6 +156,8 @@ namespace Game.Shop
         {
             if (!_isInputEnabled)
                 return;
+            if (!(_toggleButton is Game.Player.KeyboardEditButton))
+                AudioManager.instance.PlayButtonSound();
             if (_useWindowCloseButton)
                 SetOpen(false);
             else

@@ -33,6 +33,8 @@ namespace Game.Shop
         /// </summary>
         private void OnRewardClicked()
         {
+            if (!(_rewardButton is Game.Player.KeyboardEditButton))
+                AudioManager.instance.PlayButtonSound();
             _gameSession.Wallet.Add(_rewardAmount);
         }
     }

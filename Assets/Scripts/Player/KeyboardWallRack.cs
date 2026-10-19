@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 
 using UnityEngine;
 
@@ -13,10 +13,14 @@ namespace Game.Player
 
         [Header("Keyboard Display")]
         [SerializeField] private Transform _keyboardMountPoint;
+        [SerializeField] private string _persistentId;
 
         private Rigidbody _keyboardBody;
         private bool _originalIsKinematic;
         private bool _originalUseGravity;
+
+        public string PersistentId => _persistentId;
+        public Rigidbody KeyboardBody => _keyboardBody;
 
         void OnTriggerStay(Collider other)
         {
@@ -33,23 +37,40 @@ namespace Game.Player
             if (pickupTarget == null)
                 return;
 
-            _keyboardBody = body;
-            _originalIsKinematic = body.isKinematic;
-            _originalUseGravity = body.useGravity;
+            TryAttachKeyboard(body);
+        }
 
-            body.linearVelocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
+        /// <summary>
+        /// body를 빈 진열대에 고정하고 점유 참조와 원래 물리를 보관한다.
+        /// immediate가 true인 복원에서는 장착 자세를 즉시 적용하며 꺼낸 뒤 사용할 동적 물리를 지정한다.
+        /// </summary>
+        public bool TryAttachKeyboard(Rigidbody body, bool immediate = false)
+        {
+            if (_keyboardBody != null || body == null) return false;
+            KeyboardPickupTarget pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>(true);
+            if (pickupTarget == null) return false;
+            _keyboardBody = body;
+            _originalIsKinematic = !immediate && body.isKinematic;
+            _originalUseGravity = immediate || body.useGravity;
+            if (!body.isKinematic)
+            {
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+            }
             body.isKinematic = true;
             body.useGravity = false;
+            body.detectCollisions = true;
             body.transform.SetParent(transform, true);
-
             Vector3 localCenterOffset = pickupTarget.GetVisualCenterLocalPosition(body.transform);
+            if (immediate) body.rotation = _keyboardMountPoint.rotation;
             body.position = _keyboardMountPoint.position - body.transform.TransformVector(localCenterOffset);
-            StartCoroutine(RotateKeyboardToDisplay(body, localCenterOffset));
-
-            KeyboardProtectionCover cover = body.GetComponentInChildren<KeyboardProtectionCover>();
-            if (cover != null)
-                cover.RemoveFrom(body.transform);
+            if (!immediate)
+            {
+                StartCoroutine(RotateKeyboardToDisplay(body, localCenterOffset));
+                KeyboardProtectionCover cover = body.GetComponentInChildren<KeyboardProtectionCover>();
+                if (cover != null) cover.RemoveFrom(body.transform);
+            }
+            return true;
         }
 
         /// <summary>

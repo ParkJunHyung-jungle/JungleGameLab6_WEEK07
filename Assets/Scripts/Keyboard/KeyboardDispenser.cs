@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -61,7 +61,9 @@ public sealed class KeyboardDispenser : MonoBehaviour
         if (inputController != null)
             inputController.SetInputEnabled(false);
 
-        keyboardRoot.AddComponent<KeyboardPickupTarget>();
+        KeyboardPickupTarget pickup = keyboardRoot.GetComponent<KeyboardPickupTarget>();
+        if (pickup == null) pickup = keyboardRoot.AddComponent<KeyboardPickupTarget>();
+        pickup.SetSourcePrefab(playablePrefab);
         Rigidbody keyboardBody = keyboardRoot.GetComponent<Rigidbody>();
         if (keyboardBody == null)
             keyboardBody = keyboardRoot.GetComponentInChildren<Rigidbody>();

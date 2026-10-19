@@ -15,7 +15,9 @@ namespace Game.UI
         /// </summary>
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (isActiveAndEnabled && eventData.button == PointerEventData.InputButton.Left) Clicked?.Invoke();
+            if (!isActiveAndEnabled || eventData.button != PointerEventData.InputButton.Left) return;
+            AudioManager.instance.PlayButtonSound();
+            Clicked?.Invoke();
         }
     }
 }

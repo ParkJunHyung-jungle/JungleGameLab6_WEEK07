@@ -31,7 +31,10 @@ namespace Game.Tournament
         public void OnPointerClick(PointerEventData eventData)
         {
             if (_interactable && isActiveAndEnabled && eventData.button == PointerEventData.InputButton.Left)
+            {
+                AudioManager.instance.PlayButtonSound();
                 Clicked?.Invoke(_index);
+            }
         }
     }
 }

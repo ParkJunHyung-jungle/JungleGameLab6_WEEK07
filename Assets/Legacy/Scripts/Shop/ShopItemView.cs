@@ -116,6 +116,8 @@ namespace Game.Shop
         /// </summary>
         private void OnPurchaseClicked()
         {
+            if (!(_purchaseButton is Game.Player.KeyboardEditButton))
+                AudioManager.instance.PlayButtonSound();
             PurchaseRequested?.Invoke(_definition.Id);
         }
     }

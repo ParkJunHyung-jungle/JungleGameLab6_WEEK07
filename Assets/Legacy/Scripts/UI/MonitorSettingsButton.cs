@@ -16,6 +16,9 @@ public sealed class MonitorSettingsButton : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         if (_inputCanvasGroup.interactable && eventData.button == PointerEventData.InputButton.Left)
+        {
+            AudioManager.instance.PlayButtonSound();
             Clicked?.Invoke();
+        }
     }
 }

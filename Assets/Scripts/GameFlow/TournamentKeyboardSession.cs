@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 
+using Game.Workshop;
+
 namespace Game.Tournament
 {
     public static class TournamentKeyboardSession
@@ -19,6 +21,7 @@ namespace Game.Tournament
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSession()
         {
+            WorkshopKeyboardMemory.Reset();
             _initialJson = null;
             _currentJson = null;
             _workshopJson = null;
@@ -32,6 +35,7 @@ namespace Game.Tournament
         /// </summary>
         public static void Select(KeyboardCustomizationState state, KeyboardCustomizationState workshopOriginal)
         {
+            WorkshopKeyboardMemory.Reset();
             _initialJson = JsonUtility.ToJson(state);
             _currentJson = _initialJson;
             _workshopJson = JsonUtility.ToJson(workshopOriginal);
@@ -47,6 +51,7 @@ namespace Game.Tournament
         {
             _returnRequested = !string.IsNullOrEmpty(_workshopJson);
             _initialJson = null;
+            WorkshopKeyboardMemory.RequestReturn(_returnRequested);
         }
 
         /// <summary>
@@ -80,6 +85,7 @@ namespace Game.Tournament
         {
             if (!HasSelection)
             {
+                WorkshopKeyboardMemory.Reset();
                 _workshopJson = null;
                 _returnRequested = false;
                 _returnAttempted = false;

@@ -60,7 +60,7 @@ const CustomUI = (() => {
   function OverviewResults(runs) {
     return Panel('회차별 완성 결과', Table(['편집 회차', '종료 상태', '일반 장착(키)', '아티산 장착(키)', '종류 미기록 장착(키)', '이미지 (키캡 / 케이스)', '최종 분석'], runs.map(run => {
       const overview = Customization.KeycapOverview([run]), images = Customization.Images(run);
-      const count = kind => !run.complete ? '집계 제외' : run.version !== 2 ? '미수집' : V(overview.kinds.find(item => item.kind === kind).installed, 0);
+      const count = kind => !run.complete ? '집계 제외' : run.version < 2 ? '미수집' : V(overview.kinds.find(item => item.kind === kind).installed, 0);
       const image = value => !run.complete ? '집계 제외' : value === null ? '미기록' : String(value);
       return [E(Label(run)), run.complete ? '정상 종료' : '미완료 · ' + Value(run.end, 'end_reason'), count('Regular'), count('Artisan'), count(null), image(images.keycapRetained) + ' / ' + image(images.caseRetained), '<button data-custom-run="' + E(run.key) + '" data-custom-target="results">최종 결과 보기</button>'];
     }), 'customOverviewResults'), '완료 회차의 Final만 사용합니다. v1에는 일반/아티산 장착 정보가 미수집이며, 빈 종류와 누락 상태는 0으로 채우지 않습니다. 동일 키보드를 재편집해도 별도 회차로 표시합니다.');
@@ -142,14 +142,14 @@ const CustomUI = (() => {
     })), 'customVisits'));
     html += Panel('최종 유지 구성 · 정상 종료 직전', Table(['회차', '키캡 구성 (v1은 공통 재질)', '축', '케이스 기본 재질', '보강판', 'LED', '최종 이미지', '저장 / 복원 기록'], runs.map(run => {
       const final = run.complete ? run.snapshots.get('Final') : null, image = Customization.Images(run);
-      return [E(Label(run)) + '<br>' + (run.complete ? '정상 종료' : '미완료 · 선호도 집계 제외'), ...['Keycap', 'Switch', 'Case', 'Plate', 'LED'].map(part => V(part === 'Keycap' && run.version === 2 ? Customization.KeycapComposition(run) : final?.get(part)?.element_id)),
+      return [E(Label(run)) + '<br>' + (run.complete ? '정상 종료' : '미완료 · 선호도 집계 제외'), ...['Keycap', 'Switch', 'Case', 'Plate', 'LED'].map(part => V(part === 'Keycap' && run.version >= 2 ? Customization.KeycapComposition(run) : final?.get(part)?.element_id)),
         '케이스 ' + (image.caseRetained === null ? '상태 미기록' : image.caseRetained ? '유지' : '없음') + '<br>' + (image.keycaps === null ? '키캡 상태 미기록' : '키캡 ' + V(image.keycaps, 0) + '개 (캔버스 ' + image.canvas + ' / 개별 ' + image.individual + ')'),
         run.rows.filter(row => row.record_type === 'Save').length + ' / ' + run.rows.filter(row => row.record_type === 'Load').length];
     }), 'customFinal'), 'Final은 저장 완료를 뜻하지 않습니다. 이미지가 덮인 표면의 재질은 기본 재질 정보입니다. 미완료 회차의 Interrupted 상태를 최종 선호도로 합산하지 않습니다.');
     html += Panel('초기 상태 유지와 편집 중 값 변경 횟수', Table(['회차', '편집 중 값 변경 횟수', '재선택', '초기와 같은 최종 파츠 / 확인된 파츠', 'LED 조절', '정상 종료 사유'], runs.map(run => {
       const initial = run.snapshots.get('Initial'), final = run.complete ? run.snapshots.get('Final') : null;
-      const a = part => part === 'Keycap' && run.version === 2 ? Customization.KeycapComposition(run, 'Initial', true) : initial?.get(part)?.element_id;
-      const b = part => part === 'Keycap' && run.version === 2 ? Customization.KeycapComposition(run, 'Final', true) : final?.get(part)?.element_id;
+      const a = part => part === 'Keycap' && run.version >= 2 ? Customization.KeycapComposition(run, 'Initial', true) : initial?.get(part)?.element_id;
+      const b = part => part === 'Keycap' && run.version >= 2 ? Customization.KeycapComposition(run, 'Final', true) : final?.get(part)?.element_id;
       const eligible = ['Keycap', 'Switch', 'Case', 'Plate', 'LED'].filter(part => a(part) != null && b(part) != null);
       return [E(Label(run)), V(Customization.Selections(run.selected).changed, 0),
         V(Customization.Selections(run.selected).reselected, 0),
@@ -207,7 +207,7 @@ const CustomUI = (() => {
   function MatchesKeycapKind(kind) { return c.keycapKind === 'ALL' || (kind || 'MISSING') === c.keycapKind; }
   /** v2의 키캡 버튼 선택·적용·최종 장착 지표를 종류 필터와 독립 눈금 그래프로 표시한다. */
   function KeycapAnalysis(runs) {
-    const modern = runs.filter(run => run.version === 2), legacy = runs.filter(run => run.version !== 2);
+    const modern = runs.filter(run => run.version >= 2), legacy = runs.filter(run => run.version < 2);
     let html = '<label class="custom-part-filter">키캡 종류 <select id="customKeycapKind">' + [['ALL', '전체'], ['Regular', '일반 (Regular)'], ['Artisan', '아티산 (Artisan)'], ['MISSING', '종류 미기록']].map(([value, label]) => '<option value="' + value + '" ' + (c.keycapKind === value ? 'selected' : '') + '>' + label + '</option>').join('') + '</select></label>';
     if (!modern.length) return html + Panel('키캡 v2 · 선택과 최종 장착', Empty('v2 회차 없음 · v1에는 파츠 종류·버튼 선택·개별 장착 정보가 미수집입니다.'), 'v1 재질 선택을 일반/아티산 선택으로 추정하지 않습니다.');
     const stats = Customization.KeycapStats(modern).filter(item => MatchesKeycapKind(item.kind));
@@ -218,14 +218,14 @@ const CustomUI = (() => {
     html += Panel('키캡 종류별 버튼 선택', Bars(kinds.map(item => ({ label: item.label, color: item.label === 'Artisan' ? '#ffad32' : '#38a9ff', segments: [{ label: '버튼 선택', value: item.picked }] })), '회'), '현재 필터 범위의 완료·중단 회차에서 ElementPicked만 집계합니다. 호환용 ElementSelected와 적용 조작은 합산하지 않습니다.');
     html += Panel('키캡 종류별 최종 장착', Bars(kinds.map(item => ({ label: item.label, color: item.label === 'Artisan' ? '#ffad32' : '#38a9ff', segments: [{ label: 'Final 장착', value: item.installed }] })), '키'), '정상 종료 Final의 is_installed=true인 개별 키만 집계합니다. 선택 횟수와 장착 키 수는 단위가 달라 별도 그래프입니다. 일반/아티산은 전투 효과 구분이 아닙니다.');
     const completed = modern.filter(run => run.complete), known = completed.filter(run => Customization.KeyStates(run).size);
-    html += Panel('v2 파츠 ID별 선택 · 적용 · 최종 장착', Table(['파츠 ID / 종류 / 빌드', '버튼 선택(회)', '적용 시도 / 성공 / 실패(회)', '선택 플레이어 / 회차', '최종 장착(키)', '최종 장착 플레이어 / 회차'], stats.map(item => { const cells = [KeycapValue(item.element) + '<br>' + V(item.kind) + '<br>빌드 ' + V(item.build), item.picked, item.attempts + ' / ' + V(item.success, 0) + ' / ' + V(item.failed, 0), item.players + '명 / ' + item.runs + '회차', V(item.installed, 0), V(item.installedPlayers, 0) + '명 / ' + V(item.installedRuns, 0) + '회차']; return item.picked === 0 && item.attempts === 0 && item.installed === 0 ? cells.map(cell => '<span class="muted">' + cell + '</span>') : cells; }), 'customKeycapV2'), '전체 적용도 조작 1회입니다. 버튼 선택 플레이어는 파일 기준으로 중복 제거합니다. 장착 집계는 완료 회차에서 관찰된 Final 키 범위이며 종료 전 상태나 Interrupted를 합치지 않습니다. 완료 ' + completed.length + '회차 중 개별 Final 확인 ' + known.length + ', Final 미기록 ' + (completed.length - known.length) + ', 중단 ' + (modern.length - completed.length) + ', v1 제외 ' + legacy.length + '회차. 빈 ID·종류·장착 여부는 미기록으로 유지합니다.');
+    html += Panel('v2+ 파츠 ID별 선택 · 적용 · 최종 장착', Table(['파츠 ID / 종류 / 빌드', '버튼 선택(회)', '적용 시도 / 성공 / 실패(회)', '선택 플레이어 / 회차', '최종 장착(키)', '최종 장착 플레이어 / 회차'], stats.map(item => { const cells = [KeycapValue(item.element) + '<br>' + V(item.kind) + '<br>빌드 ' + V(item.build), item.picked, item.attempts + ' / ' + V(item.success, 0) + ' / ' + V(item.failed, 0), item.players + '명 / ' + item.runs + '회차', V(item.installed, 0), V(item.installedPlayers, 0) + '명 / ' + V(item.installedRuns, 0) + '회차']; return item.picked === 0 && item.attempts === 0 && item.installed === 0 ? cells.map(cell => '<span class="muted">' + cell + '</span>') : cells; }), 'customKeycapV2'), '전체 적용도 조작 1회입니다. 버튼 선택 플레이어는 파일 기준으로 중복 제거합니다. 장착 집계는 완료 회차에서 관찰된 Final 키 범위이며 종료 전 상태나 Interrupted를 합치지 않습니다. 완료 ' + completed.length + '회차 중 개별 Final 확인 ' + known.length + ', Final 미기록 ' + (completed.length - known.length) + ', 중단 ' + (modern.length - completed.length) + ', v1 제외 ' + legacy.length + '회차. 빈 ID·종류·장착 여부는 미기록으로 유지합니다.');
     return html;
   }
   /** v2 키 인덱스별 초기·최종 정의와 장착 여부를 원본 상태 그대로 비교한다. */
   function KeycapDetails(runs) {
-    const modern = runs.filter(run => run.version === 2);
+    const modern = runs.filter(run => run.version >= 2);
     if (!modern.length) return '';
-    return Panel('v2 개별 키 · 초기 → 최종', modern.map(run => {
+    return Panel('v2+ 개별 키 · 초기 → 최종', modern.map(run => {
       const initial = Customization.KeyStates(run, 'Initial'), final = Customization.KeyStates(run);
       const keys = [...new Set([...initial.keys(), ...final.keys()])].sort((a, b) => a - b);
       const rows = keys.filter(index => c.keycapKind === 'ALL' || initial.has(index) && MatchesKeycapKind(initial.get(index)?.keycap_kind) || final.has(index) && MatchesKeycapKind(final.get(index)?.keycap_kind)).map(index => () => {
@@ -257,7 +257,7 @@ const CustomUI = (() => {
       : '<span class="muted">' + E(status) + '</span>';
     html += KeycapAnalysis(runs);
     html += Panel('초기 → 최종 · 파츠별 결과', completed.map(run => {
-      const parts = Customization.FinalParts(run), base = parts.slice(0, 6), known = base.filter(item => item.before !== null && item.after !== null && (run.version !== 2 || item.part !== 'Keycap' || item.finalDifferent !== null));
+      const parts = Customization.FinalParts(run), base = parts.slice(0, 6), known = base.filter(item => item.before !== null && item.after !== null && (run.version < 2 || item.part !== 'Keycap' || item.finalDifferent !== null));
       const order = ['Keycap', 'Switch', 'LED', 'LEDColor', 'LEDEnabled', 'Case', 'Plate', 'PlateEffect'];
       const orderedParts = order.map(part => parts.find(item => item.part === part)).filter(Boolean);
       const imageValue = (value, scope, phase) => value === null

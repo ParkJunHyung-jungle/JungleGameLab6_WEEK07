@@ -84,10 +84,10 @@ const Customization = (() => {
     if (invalid) warnings.push("잘못된 숫자·불리언 " + invalid + "행 · 해당 값은 미기록 처리");
     const missing = ["tester_id", "keyboard_id", "part", "part_visit_id", "apply_success", "value_changed", "focused_duration_seconds", "is_complete"].filter(field => !header.includes(field));
     if (missing.length) warnings.push("미기록 열: " + missing.join(", "));
-    if (rows.some(row => row.schema_version != null && ![1, 2].includes(row.schema_version))) warnings.push("지원 범위 v1/v2 이외 스키마 포함 · 알려진 열만 해석");
-    if (rows.some(row => row.schema_version === 2)) {
+    if (rows.some(row => row.schema_version != null && ![1, 2, 3].includes(row.schema_version))) warnings.push("지원 범위 v1/v2/v3 이외 스키마 포함 · 알려진 열만 해석");
+    if (rows.some(row => row.schema_version >= 2)) {
       const absent = ['keycap_kind', 'material_id', 'snapshot_id', 'is_installed'].filter(field => !header.includes(field));
-      if (absent.length) warnings.push('v2 미기록 열: ' + absent.join(', '));
+      if (absent.length) warnings.push('v2+ 미기록 열: ' + absent.join(', '));
     }
     const events = rows.slice().sort(Playtest.Order);
     const runs = [...Playtest.Group(events.filter(row => row.customization_run_id), row => JSON.stringify([row.session_id, row.customization_run_id])).entries()].map(([key, entries], index) => {
@@ -99,7 +99,7 @@ const Customization = (() => {
       let batch = null, previous = null;
       entries.forEach(row => {
         if (row.record_type !== "CustomizationSnapshot") { batch = null; previous = row; return; }
-        if (row.schema_version === 2) {
+        if (row.schema_version >= 2) {
           const id = row.snapshot_id;
           if (!id) {
             snapshotBatches.push({ id: null, reason: row.end_reason, values: new Map(), rows: [row], preceding: previous, reliable: false });
@@ -140,12 +140,12 @@ const Customization = (() => {
       const run = {
         key: id + ":" + key, id: context.customization_run_id, index: index + 1, fileId: id, fileName: name,
         tester: id, rawTester: context.tester_id, session: context.session_id, keyboard: context.keyboard_id, build: context.build_version,
-        version: entries.some(row => row.schema_version === 2) ? 2 : 1,
+        version: Math.max(1, ...entries.map(row => row.schema_version).filter(Number.isFinite)),
         start, end, rows: entries, snapshots, snapshotBatches, visits, duration: end?.duration_seconds ?? null, focused: end?.focused_duration_seconds ?? null,
         complete: end?.is_complete === true && ["RightClickExit", "NextScene"].includes(end.end_reason)
       };
-      run.selected = entries.filter(row => row.record_type === 'KeycapApply' && row.schema_version === 2 || row.record_type === 'ElementSelected' && !(row.part === 'Keycap' && row.schema_version === 2));
-      run.picked = entries.filter(row => row.record_type === 'ElementPicked' && row.part === 'Keycap' && row.schema_version === 2);
+      run.selected = entries.filter(row => row.record_type === 'KeycapApply' && row.schema_version >= 2 || row.record_type === 'ElementSelected' && !(row.part === 'Keycap' && row.schema_version >= 2));
+      run.picked = entries.filter(row => row.record_type === 'ElementPicked' && row.part === 'Keycap' && row.schema_version >= 2);
       run.imageApplies = entries.filter(IsImageApply);
       run.options = entries.filter(row => row.record_type === "AvailableOption");
       run.partOffered = new Set(run.options.map(row => row.part === "PlateMaterial" || row.part === "PlateEffect" ? "Plate" : row.part));
@@ -276,7 +276,7 @@ const Customization = (() => {
 
   /** 제공 요소와 선택을 빌드·항목별로 연결하고 선택 비중과 최종 유지 분모를 반환한다. */
   function Elements(runs, part) {
-    if (part === 'Keycap') runs = runs.filter(run => run.version !== 2);
+    if (part === 'Keycap') runs = runs.filter(run => run.version < 2);
     const all = runs.flatMap(run => run.rows.filter(row => SameElementPart(row.part, part) && ["AvailableOption", "ElementSelected"].includes(row.record_type)));
     return [...Playtest.Group(all, row => JSON.stringify([row.build_version, row.element_id])).values()].map(rows => {
       const element = rows[0].element_id, build = rows[0].build_version;
@@ -317,7 +317,7 @@ const Customization = (() => {
     const initial = run.snapshots.get('Initial'), final = run.complete ? run.snapshots.get('Final') : null;
     const continuous = !!run.start && !!run.end && run.rows.every((row, i, rows) => row.status.apply_success !== 'missing' && row.status.value_changed !== 'missing' && Number.isFinite(row.sequence) && (!i || row.sequence === rows[i - 1].sequence + 1));
     return FINAL_PARTS.map(part => {
-      if (part === 'Keycap' && run.version === 2) return KeycapResult(run);
+      if (part === 'Keycap' && run.version >= 2) return KeycapResult(run);
       const before = initial?.get(part)?.element_id ?? null, after = final?.get(part)?.element_id ?? null;
       const reasons = [];
       if (before === null) reasons.push('초기 상태가 미기록이거나 스냅샷 묶음을 확정할 수 없습니다.');
@@ -372,13 +372,13 @@ const Customization = (() => {
     const batches = run.snapshotBatches.filter(batch => batch.preceding === last && batch.reason === 'Save:' + (last?.element_id ?? '') && batch.reliable);
     const final = run.complete ? run.snapshots.get('Final') : null;
     const saved = batches.length === 1 ? batches[0].values : null;
-    const keys = new Set([...FINAL_PARTS.filter(part => run.version !== 2 || part !== 'Keycap'), ...[...(saved?.keys() || []), ...(final?.keys() || [])].filter(part => part.startsWith('Image:') || run.version === 2 && part.startsWith('Keycap:')), 'Image:CaseWhole']);
-    if (run.version === 2 && ![...keys].some(part => part.startsWith('Keycap:'))) keys.add('Keycap:미기록');
+    const keys = new Set([...FINAL_PARTS.filter(part => run.version < 2 || part !== 'Keycap'), ...[...(saved?.keys() || []), ...(final?.keys() || [])].filter(part => part.startsWith('Image:') || run.version >= 2 && part.startsWith('Keycap:')), 'Image:CaseWhole']);
+    if (run.version >= 2 && ![...keys].some(part => part.startsWith('Keycap:'))) keys.add('Keycap:미기록');
     if (![...keys].some(part => part.startsWith('Image:Keycap:'))) keys.add('Image:Keycap:미기록');
     const different = [], unknown = [];
     keys.forEach(part => {
       const a = saved?.get(part), b = final?.get(part);
-      if (run.version === 2 && part.startsWith('Keycap:')) {
+      if (run.version >= 2 && part.startsWith('Keycap:')) {
         if (!KeyKnown(a) || !KeyKnown(b)) unknown.push(part); else if (KeySignature(a) !== KeySignature(b)) different.push(part);
       } else if (a?.element_id == null || b?.element_id == null) unknown.push(part); else if (a.element_id !== b.element_id) different.push(part);
     });
@@ -391,7 +391,7 @@ const Customization = (() => {
   function FinalElements(runs) {
     const completed = runs.filter(run => run.complete), result = [];
     for (const part of FINAL_PARTS.slice(0, 6)) {
-      for (const [build, items] of Playtest.Group(completed.filter(run => part !== 'Keycap' || run.version !== 2), run => run.build)) {
+      for (const [build, items] of Playtest.Group(completed.filter(run => part !== 'Keycap' || run.version < 2), run => run.build)) {
         const known = items.filter(run => run.snapshots.get('Final')?.get(part)?.element_id != null);
         const values = new Set(items.flatMap(run => [...run.options.filter(row => SameElementPart(row.part, part)).map(row => row.element_id), ...run.selected.filter(row => SameElementPart(row.part, part)).map(row => row.element_id), run.snapshots.get('Final')?.get(part)?.element_id]).filter(value => value != null));
         values.forEach(element => {
@@ -415,11 +415,11 @@ const Customization = (() => {
     const baseParts = ['Keycap', 'Switch', 'Case', 'Plate', 'LED'];
     let excluded = 0;
     completed.forEach(run => {
-      const values = baseParts.map(part => part === 'Keycap' && run.version === 2 ? KeycapComposition(run, 'Final', true) : run.snapshots.get('Final')?.get(part)?.element_id);
+      const values = baseParts.map(part => part === 'Keycap' && run.version >= 2 ? KeycapComposition(run, 'Final', true) : run.snapshots.get('Final')?.get(part)?.element_id);
       const displayValues = values.slice();
-      if (run.version === 2 && values[0] != null) displayValues[0] = 'v2 개별 키: ' + JSON.stringify(JSON.parse(values[0]).map(tuple => tuple.map((value, index) => index === 2 ? KeycapName(value) : value)));
+      if (run.version >= 2 && values[0] != null) displayValues[0] = 'v2+ 개별 키: ' + JSON.stringify(JSON.parse(values[0]).map(tuple => tuple.map((value, index) => index === 2 ? KeycapName(value) : value)));
       else if (values[0] != null) displayValues[0] = 'v1 공통 재질: ' + values[0];
-      if (values[0] != null) values[0] = (run.version === 2 ? 'v2 개별 키: ' : 'v1 공통 재질: ') + values[0];
+      if (values[0] != null) values[0] = (run.version >= 2 ? 'v2+ 개별 키: ' : 'v1 공통 재질: ') + values[0];
       if (values.some(value => value == null)) excluded++; else basic.push({ run, value: values.join(' + '), display: displayValues.join(' + '), build: run.build });
       const state = Images(run);
       const type = state.caseRetained === null || state.keycaps === null ? '판정 불가' : state.caseRetained ? state.keycaps > 0 ? '케이스와 키캡' : '케이스만' : state.keycaps > 0 ? '키캡만' : '없음';
@@ -431,11 +431,11 @@ const Customization = (() => {
 
   /** 개요 범위의 종류별 키캡 선택·적용과 정상 종료 장착 수 및 미수집 회차를 분리해 반환한다. */
   function KeycapOverview(runs) {
-    const modern = runs.filter(run => run.version === 2), completed = modern.filter(run => run.complete);
+    const modern = runs.filter(run => run.version >= 2), completed = modern.filter(run => run.complete);
     const states = completed.map(run => KeyStates(run));
     const known = states.filter(items => [...items.values()].some(row => typeof row.is_installed === 'boolean'));
     const installed = known.flatMap(items => [...items.values()].filter(row => row.is_installed === true));
-    const actions = modern.flatMap(run => run.rows.filter(row => row.schema_version === 2 && row.part === 'Keycap'));
+    const actions = modern.flatMap(run => run.rows.filter(row => row.schema_version >= 2 && row.part === 'Keycap'));
     const kinds = ['Regular', 'Artisan', null].map(kind => {
       const picked = actions.filter(row => row.record_type === 'ElementPicked' && (row.keycap_kind ?? null) === kind);
       const applies = actions.filter(row => row.record_type === 'KeycapApply' && (row.keycap_kind ?? null) === kind);
@@ -464,7 +464,7 @@ const Customization = (() => {
   }
   /** v2 회차의 지정 스냅샷에서 개별 키를 인덱스로 연결하고 Final의 중단 대체를 금지한다. */
   function KeyStates(run, phase = 'Final') {
-    const snapshot = run.version === 2 && (phase !== 'Final' || run.complete) ? run.snapshots.get(phase) : null;
+    const snapshot = run.version >= 2 && (phase !== 'Final' || run.complete) ? run.snapshots.get(phase) : null;
     return new Map([...(snapshot?.entries() || [])].filter(([part]) => /^Keycap:\d+$/.test(part)).map(([part, row]) => [Number(part.slice(7)), row]));
   }
   /** 개별 키의 장착 여부와 장착 파츠의 필수 정의가 확인되는지 반환한다. */
@@ -502,9 +502,9 @@ const Customization = (() => {
   }
   /** v2의 종류·파츠 ID·빌드별 버튼 선택, 적용 조작, 완료 Final 장착과 고유 플레이어를 따로 집계한다. */
   function KeycapStats(runs) {
-    const modern = runs.filter(run => run.version === 2);
+    const modern = runs.filter(run => run.version >= 2);
     const rows = modern.flatMap(run => [
-      ...run.rows.filter(row => row.schema_version === 2 && row.part === 'Keycap' && ['AvailableOption', 'ElementPicked', 'KeycapApply'].includes(row.record_type)).map(row => ({ run, row, final: false })),
+      ...run.rows.filter(row => row.schema_version >= 2 && row.part === 'Keycap' && ['AvailableOption', 'ElementPicked', 'KeycapApply'].includes(row.record_type)).map(row => ({ run, row, final: false })),
       ...[...KeyStates(run).values()].filter(row => row.is_installed === true).map(row => ({ run, row, final: true }))
     ]);
     return [...Playtest.Group(rows, item => JSON.stringify([item.run.build, item.row.keycap_kind ?? null, item.row.element_id ?? null])).values()].map(items => {

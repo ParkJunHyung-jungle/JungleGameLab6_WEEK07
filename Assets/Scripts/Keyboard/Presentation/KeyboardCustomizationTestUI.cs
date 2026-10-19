@@ -990,11 +990,16 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// <summary>파일 선택 창에서 사진 경로를 받아 입력란과 미리보기를 변경한다. 반환값은 없다.</summary>
     private void ChooseImage()
     {
-#if UNITY_EDITOR
         Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", "ChooseStarted");
         Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ExternalDialogStart");
         string path;
-        try { path = UnityEditor.EditorUtility.OpenFilePanel("Choose keyboard photo", "", "png,jpg,jpeg"); }
+        try { path = KeyboardImageFileDialog.ChooseImage(); }
+        catch (Exception exception) when (exception is InvalidOperationException || exception is PlatformNotSupportedException
+            || exception is DllNotFoundException || exception is EntryPointNotFoundException)
+        {
+            _message.text = exception.Message;
+            return;
+        }
         finally { Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ExternalDialogEnd"); }
         if (string.IsNullOrEmpty(path))
         {
@@ -1004,9 +1009,6 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _path.text = path;
         if (_embedded) HandleImagePathEdited(path);
         else ShowPreview();
-#else
-        _message.text = _embedded ? "이미지 경로를 입력한 뒤 적용 버튼을 눌러 주세요." : "Enter an image file path, then click Apply.";
-#endif
     }
 
     /// <summary>

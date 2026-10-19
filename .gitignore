@@ -106,3 +106,5 @@ Assets/Plugins/FMOD/Cache/Editor/FMODStudioCache.asset
 
 # Player Log Directory
 /PlaytestLogs/
+/output/PvpPractice/
+/output/PvpValidation/

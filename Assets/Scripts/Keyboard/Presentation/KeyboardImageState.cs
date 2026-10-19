@@ -18,8 +18,8 @@ public sealed class KeyboardImageState
     public int[] KeycapImages => _keycapImages;
     public bool[] IndividualImages => _individualImages;
     public int CaseImage => _caseImage;
-    public Vector2[] KeycapOffsets => _keycapOffsets;
-    public float[] KeycapZooms => _keycapZooms;
+    public Vector2[] KeycapOffsets => _keycapOffsets != null && _keycapOffsets.Length > 0 ? _keycapOffsets : null;
+    public float[] KeycapZooms => _keycapZooms != null && _keycapZooms.Length > 0 ? _keycapZooms : null;
     public Vector2 CaseOffset => _caseOffset;
     public float CaseZoom => _caseZoom;
 

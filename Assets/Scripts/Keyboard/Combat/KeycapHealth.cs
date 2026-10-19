@@ -194,6 +194,25 @@ public sealed class KeycapHealth : MonoBehaviour
     /// <summary>bonus를 이 키캡의 직접 피격 추가 피해로 저장한다. 능력 피해에는 적용하지 않으며 음수는 0으로 제한한다.</summary>
     public void ConfigurePassiveDamage(int bonus) { _passiveDirectDamageBonus = Mathf.Max(0, bonus); }
 
+    /// <summary>권한자의 hp를 표시 전용 복제본에 적용한다. 파괴 연출은 재생하되 피해·파괴·점수·능력 이벤트는 발생시키지 않는다.</summary>
+    public void ApplyReplicatedHealth(int hp)
+    {
+        hp = Mathf.Clamp(hp, 0, _maxHP);
+        if (_currentHP == hp) return;
+        bool justBroken = hp == 0 && !_broken;
+        _currentHP = hp;
+        if (justBroken)
+        {
+            _broken = true;
+            _statusEffects.Clear();
+            foreach (Renderer renderer in GetComponentsInChildren<Renderer>()) renderer.enabled = false;
+            foreach (Collider collider in _colliders) collider.enabled = false;
+            GameObject prefab = _breakMode == BreakMode.Fragments ? _fragmentsPrefab : _particlesPrefab;
+            KeycapBreakEffectPool.PlayEffect(prefab, transform.position, transform.rotation, transform.lossyScale, _fragmentSpeed, _upwardSpeed, _fragmentSpin, _effectLifetime);
+        }
+        UpdateDamageDecal();
+    }
+
     /// <summary>
     /// 입력 없이 현재 상태와 표시를 모두 초기화하며 체력과 장착된 키캡 SO는 유지한다.
     /// Awake 전의 비활성 키캡은 생성된 상태가 없으므로 변경 없이 종료한다.

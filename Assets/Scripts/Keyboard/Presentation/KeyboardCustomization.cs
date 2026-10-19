@@ -406,6 +406,22 @@ public sealed class KeyboardCustomization : MonoBehaviour
         images.RestoreState(photos, prepared);
     }
 
+    /// <summary>part를 PvP의 key 위치 또는 전체 부품 슬롯에 적용하고 성공 여부를 반환한다. 교체 키캡과 케이스의 이미지만 제거하고 다른 커스텀은 보존한다.</summary>
+    public bool ApplyPvpPart(Game.Tournament.KeyboardPartDefinition part, Key key)
+    {
+        if (part is Game.Tournament.KeycapDefinition keycap)
+            return TryGetKeycapIndex(key, out int index) && ApplyKeycapMaterialToKey(index, keycap.Material, false, keycap);
+        if (part is Game.Tournament.SwitchDefinition axis) return ApplySwitchType(axis.Data.Type, false);
+        if (part is Game.Tournament.PlateDefinition plate) return SetPlateMaterial(plate.Data.Material);
+        if (part is Game.Tournament.HousingDefinition housing)
+        {
+            ClearCaseImage();
+            SetCaseMaterial(housing.Material);
+            return true;
+        }
+        return false;
+    }
+
     void OnValidate()
     {
 #if UNITY_EDITOR

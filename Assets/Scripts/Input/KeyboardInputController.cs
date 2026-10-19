@@ -36,6 +36,8 @@ namespace KeyboardModeling
         private bool _alphabetKeysRequired;
         private bool _allKeysRequired;
         private bool _hasFocus;
+        private bool _externalInput;
+        private float[] _externalRelease;
         private Key _lastPressedKey;
         private KeycapButton[] _keycapButtons;
         private KeycapHealth[] _keycapHealths;
@@ -243,6 +245,7 @@ namespace KeyboardModeling
             _stemRestScales = new Vector3[_bindings.Length][];
             _pressAmounts = new float[_bindings.Length];
             _previousPressed = new bool[_bindings.Length];
+            _externalRelease = new float[_bindings.Length];
             _keycapButtons = new KeycapButton[_bindings.Length];
             _keycapHealths = new KeycapHealth[_bindings.Length];
             _lastPressDistance = _pressDistance;
@@ -262,6 +265,12 @@ namespace KeyboardModeling
         void Update()
         {
             if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (_externalInput)
+            {
+                for (int index = 0; index < _bindings.Length; index++)
+                    AnimateKey(index, _externalRelease[index] > Time.unscaledTime, Time.unscaledDeltaTime);
+                return;
+            }
             bool hasInputFocus = HasInputFocus();
             Keyboard keyboard = Keyboard.current;
             LogInputStatus(hasInputFocus, keyboard != null);
@@ -438,6 +447,37 @@ namespace KeyboardModeling
             _inputEnabled = inputEnabled;
             if (!inputEnabled && _restPositions != null)
                 RestoreKeys();
+        }
+
+        /// <summary>external을 외부 확정 입력 사용 여부로 저장한다. 장치 직접 읽기만 중단하고 기존 공격과 점수 이벤트는 유지한다.</summary>
+        public void SetExternalInput(bool external) { _externalInput = external; RestoreKeys(); }
+
+        /// <summary>권한자가 승인한 key를 기존 타건 순서로 한 번 처리하고 성공 여부를 반환한다. 비활성·파괴된 키는 점수와 피해를 발생시키지 않는다.</summary>
+        public bool ApplyExternalPress(Key key)
+        {
+            if (!_externalInput || !_inputEnabled || !_attackEnabled || !isActiveAndEnabled) return false;
+            for (int index = 0; index < _bindings.Length; index++)
+            {
+                if (_bindings[index].Key != key || !_keycapButtons[index].isActiveAndEnabled || _keycapHealths[index].CurrentHP <= 0) continue;
+                _lastPressedKey = key;
+                _externalRelease[index] = Time.unscaledTime + 0.08f;
+                PlayPressSound(_keycapHealths[index]);
+                KeycapPressed?.Invoke(_bindings[index].Keycap);
+                KeyPressed?.Invoke(key);
+                if (_inputEnabled && isActiveAndEnabled) AttackRequested?.Invoke(_keycapHealths[index]);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>확정된 key 타건의 표시와 소리만 재생한다. 점수·피해·입력 이벤트를 발생시키지 않는다.</summary>
+        public void PlayReplicatedPress(Key key)
+        {
+            if (!TryGetKeycapTransform(key, out Transform target)) return;
+            for (int index = 0; index < _bindings.Length; index++)
+                if (_bindings[index].Key == key) _externalRelease[index] = Time.unscaledTime + 0.08f;
+            PlayPressSound(target.GetComponent<KeycapHealth>());
+            ManualKeycapHit?.Invoke(target);
         }
 
         /// <summary>

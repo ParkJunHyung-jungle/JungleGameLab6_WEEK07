@@ -50,8 +50,9 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
         try
         {
             KeyboardCustomization keyboard = _holder.KeyboardBody.GetComponent<KeyboardCustomization>();
+            KeyboardCustomizationState original = _storage.CaptureCustomization(keyboard);
             KeyboardCustomizationState state = _storage.CaptureForBattle(keyboard);
-            TournamentKeyboardSession.Select(state);
+            TournamentKeyboardSession.Select(state, original);
 #if UNITY_EDITOR
             if (!Application.CanStreamedLevelBeLoaded(_battleScenePath))
             {

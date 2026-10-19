@@ -200,7 +200,7 @@ public sealed class KeycapHealth : MonoBehaviour
     /// </summary>
     public void ClearStatuses() { _statusEffects?.Clear(); }
 
-    void Update() { _statusEffects.Tick(Time.deltaTime); }
+    void Update() { if (!Game.Tournament.TournamentController.IsReturnPaused) _statusEffects.Tick(Time.deltaTime); }
     void OnDisable() { ClearStatuses(); }
     void OnDestroy() { ClearStatuses(); }
 

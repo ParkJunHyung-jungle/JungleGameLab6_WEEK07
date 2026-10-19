@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -110,6 +110,7 @@ namespace Game.Tutorials
 
         void Update()
         {
+            if (Game.Tournament.TournamentController.IsReturnPaused) return;
             if (!_paused && Keyboard.current != null && Keyboard.current.f10Key.wasPressedThisFrame)
                 HandleHelp(_help);
             if (!_paused) return;
@@ -121,6 +122,7 @@ namespace Game.Tutorials
 
         void LateUpdate()
         {
+            if (Game.Tournament.TournamentController.IsReturnPaused) return;
             if (_paused)
             {
                 Time.timeScale = 0f;
@@ -246,7 +248,7 @@ namespace Game.Tutorials
         /// <summary>button의 도움말 요청으로 첫 페이지를 연다. 다른 안내나 입력 해제 대기 중에는 중복으로 열지 않는다.</summary>
         private void HandleHelp(KeyboardEditButton button)
         {
-            if (IsBlocking || _pending.Count > 0 || Time.timeScale <= 0f) return;
+            if (Game.Tournament.TournamentController.IsReturnPaused || IsBlocking || _pending.Count > 0 || Time.timeScale <= 0f) return;
             _page = 0;
             _browsing = true;
             Open(_cards[0]);

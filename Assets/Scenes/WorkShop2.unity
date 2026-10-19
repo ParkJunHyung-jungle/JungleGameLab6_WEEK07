@@ -10273,6 +10273,8 @@ MonoBehaviour:
   _visitPosition: {x: 2.64, y: 0, z: 7.01}
   _throwOriginOffset: {x: -0.5, y: 1, z: 0}
   _throwTargetPosition: {x: 2, y: 2, z: 0.36}
+  _workshopKeyboardPrefab: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+  _storage: {fileID: 9911000150}
   _moveDuration: 0.6
   _waitBeforeThrow: 1
   _waitAfterThrow: 1

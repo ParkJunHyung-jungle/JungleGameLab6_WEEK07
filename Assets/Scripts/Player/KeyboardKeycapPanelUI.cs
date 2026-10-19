@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -262,7 +262,7 @@ namespace Game.Player
 
             foreach (var keyControl in keyboard.allKeys)
             {
-                if (!keyControl.wasPressedThisFrame) continue;
+                if (!WindowsSpecialKeyInput.WasPressedThisFrame(keyboard, keyControl.keyCode)) continue;
                 if (_customization.TryGetKeycapIndex(keyControl.keyCode, out int keycapIndex))
                 {
                     if (!_customization.HasSwitchForKeycap(keycapIndex))

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace KeyboardModeling
 {
@@ -70,7 +70,7 @@ namespace KeyboardModeling
 
         void LateUpdate()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Tournament.TournamentController.IsReturnPaused) return;
             if (!_isPressing)
                 return;
             if (_diagnosticMotion && !_diagnosticMotionStarted)

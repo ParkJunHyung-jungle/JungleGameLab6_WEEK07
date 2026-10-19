@@ -44,6 +44,14 @@ namespace Game.Tournament
         [Header("Navigation")]
         [SerializeField] private TournamentActionButton _continueButton;
         [SerializeField] private TournamentActionButton _restartButton;
+        [Header("Workshop Return Confirmation")]
+        [SerializeField] private GameObject _returnConfirmation;
+        [SerializeField] private TournamentActionButton _confirmReturnButton;
+        [SerializeField] private TournamentActionButton _cancelReturnButton;
+        [SerializeField] private TournamentActionButton _exitButton;
+        [SerializeField] private Text _returnMessage;
+        private bool _returnSubmitting;
+        private bool _abandonReturn;
         private readonly Dictionary<KeyboardPartDefinition, TournamentInventoryItemView> _inventoryItems = new Dictionary<KeyboardPartDefinition, TournamentInventoryItemView>();
         private readonly Dictionary<KeyboardPartDefinition, Texture2D> _thumbnails = new Dictionary<KeyboardPartDefinition, Texture2D>();
         private readonly List<KeyboardPartDefinition> _inventoryOrder = new List<KeyboardPartDefinition>();
@@ -63,7 +71,9 @@ namespace Game.Tournament
         /// <summary>controller와 상점 버튼 및 인벤토리 UI의 C# 이벤트를 연결한다. 패널 위치와 기존 배경색을 보관한다.</summary>
         public void Bind(TournamentController controller)
         {
+            if (_controller != null) return;
             _controller = controller;
+            _returnConfirmation.SetActive(false);
             _background = _panel.GetComponent<Image>();
             _backgroundColor = _background.color;
             _panelRect = _panel.transform as RectTransform;
@@ -82,6 +92,9 @@ namespace Game.Tournament
             _shopContinueButton.Clicked += Continue;
             _continueButton.Clicked += Continue;
             _restartButton.Clicked += Restart;
+            _confirmReturnButton.Clicked += ConfirmWorkshopReturn;
+            _cancelReturnButton.Clicked += CancelWorkshopReturn;
+            _exitButton.Clicked += RequestAbandonReturn;
         }
 
         /// <summary>현재 진행 단계와 재고·장착 상태를 읽어 화면을 갱신한다. 상점에서 두 프레임의 펼침 상태를 반영한다.</summary>
@@ -93,10 +106,14 @@ namespace Game.Tournament
                 _runId = _controller.PlaytestRunId;
                 _shopExpanded = true;
                 _inventoryExpanded = true;
+                _returnSubmitting = false;
+                _returnConfirmation.SetActive(false);
             }
 
             TournamentPhase phase = _controller.Phase;
             bool shop = phase == TournamentPhase.Shop;
+            _exitButton.gameObject.SetActive(phase == TournamentPhase.Battle || phase == TournamentPhase.Preparing || shop);
+            _exitButton.SetState("나가기", !_returnSubmitting && !_returnConfirmation.activeSelf);
             _header.text = $"TOURNAMENT {_controller.Round} / {_controller.Settings.RoundCount} · 재화 {_controller.Currency:N0}";
             _header.gameObject.SetActive(phase == TournamentPhase.Battle || phase == TournamentPhase.Preparing);
             _panel.SetActive(phase != TournamentPhase.Battle && phase != TournamentPhase.Preparing);
@@ -124,11 +141,11 @@ namespace Game.Tournament
             _inventory.text = summary.ToString();
             _inventorySummary.text = $"해금 키캡 {_controller.Inventory.Total} / {_controller.Settings.Capacity}\n직접 타격 +{_controller.Inventory.DamageBonus}";
             _continueButton.gameObject.SetActive(!shop);
-            _continueButton.SetState(phase == TournamentPhase.Finished ? "작업실로" : "계속", true);
+            _continueButton.SetState(phase == TournamentPhase.Finished ? "작업실로" : "계속", !_returnSubmitting);
             _shopContinueButton.gameObject.SetActive(shop);
             _shopContinueButton.SetState("다음 대전", true);
             _restartButton.gameObject.SetActive(phase == TournamentPhase.Finished);
-            _restartButton.SetState("다시 시작", true);
+            _restartButton.SetState("다시 시작", !_returnSubmitting);
             if (phase == TournamentPhase.Finished && _repeatOpportunityRunId != _controller.PlaytestRunId && _panel.activeInHierarchy)
             {
                 _repeatOpportunityRunId = _controller.PlaytestRunId;
@@ -222,11 +239,69 @@ namespace Game.Tournament
         /// <summary>index는 사용하지 않고 유료 상품 재추첨을 요청한다. 실제 비용 검사는 컨트롤러가 수행한다.</summary>
         private void Reroll(int index) { _controller.Reroll(); }
 
-        /// <summary>index는 사용하지 않고 현재 단계의 다음 진행을 요청한다. 장착 구성은 컨트롤러가 확정한다.</summary>
-        private void Continue(int index) { _controller.Continue(); }
+        /// <summary>index는 사용하지 않고 종료 단계에서는 복귀 확인창만 연다. 다른 단계의 진행은 기존 컨트롤러에 전달한다.</summary>
+        private void Continue(int index)
+        {
+            if (_returnSubmitting || _returnConfirmation.activeSelf) return;
+            if (_controller.Phase == TournamentPhase.Finished)
+            {
+                OpenReturnConfirmation(false);
+                return;
+            }
+            _controller.Continue();
+        }
+
+        /// <summary>index는 사용하지 않고 전투·상점 단계의 중도 포기 확인을 요청한다. 기존 결과 화면의 정상 복귀는 유지한다.</summary>
+        private void RequestAbandonReturn(int index)
+        {
+            if (_returnSubmitting || _returnConfirmation.activeSelf || TournamentController.IsReturnPaused) return;
+            TournamentPhase phase = _controller.Phase;
+            if (phase == TournamentPhase.Battle || phase == TournamentPhase.Preparing || phase == TournamentPhase.Shop)
+                OpenReturnConfirmation(true);
+        }
+
+        /// <summary>abandon으로 정상 복귀와 포기 문구를 선택해 기존 확인창을 연다. 정지에 성공한 경우에만 표시하고 전투 데이터는 변경하지 않는다.</summary>
+        private void OpenReturnConfirmation(bool abandon)
+        {
+            if (!_controller.PauseForWorkshopReturn()) return;
+            _abandonReturn = abandon;
+            _returnMessage.text = "전투에서 해금·강화한 능력과 전투용 재화는 초기화됩니다.\n키보드는 전투에 들어오기 전 모습으로 돌아갑니다."
+                + (abandon ? "\n중도에 나가면 이번 토너먼트의 골드 보상을 받을 수 없습니다." : "");
+            _tooltipPanel.SetActive(false);
+            _returnConfirmation.SetActive(true);
+            _confirmReturnButton.SetState("확인", true);
+            _cancelReturnButton.SetState("뒤로", true);
+            _exitButton.SetState("나가기", false);
+        }
+
+        /// <summary>index는 사용하지 않고 확인창의 복귀를 한 번 확정한다. 모든 복귀 버튼을 잠근 뒤 기존 복귀 처리를 호출한다.</summary>
+        private void ConfirmWorkshopReturn(int index)
+        {
+            if (_returnSubmitting || !_returnConfirmation.activeSelf) return;
+            _returnSubmitting = true;
+            _confirmReturnButton.SetState("확인", false);
+            _cancelReturnButton.SetState("뒤로", false);
+            _continueButton.SetState("작업실로", false);
+            _restartButton.SetState("다시 시작", false);
+            if (_abandonReturn) _controller.AbandonToWorkshop();
+            else _controller.ReturnToWorkshop();
+        }
+
+        /// <summary>index는 사용하지 않고 복귀 확인창만 닫는다. 토너먼트 상태와 키보드 원본은 변경하지 않는다.</summary>
+        private void CancelWorkshopReturn(int index)
+        {
+            if (_returnSubmitting) return;
+            _returnConfirmation.SetActive(false);
+            _controller.ReleaseReturnPause(false);
+            _exitButton.SetState("나가기", true);
+        }
 
         /// <summary>index는 사용하지 않고 종료된 토너먼트 재시작을 요청한다. 원본 작업실 데이터는 유지한다.</summary>
-        private void Restart(int index) { _controller.Restart(); }
+        private void Restart(int index)
+        {
+            if (_returnSubmitting || _returnConfirmation.activeSelf) return;
+            _controller.Restart();
+        }
 
         /// <summary>index는 사용하지 않고 왼쪽 상점 프레임의 펼침 상태를 바꾼다. 아이템 거래 상태는 유지한다.</summary>
         private void ToggleShop(int index)
@@ -280,6 +355,7 @@ namespace Game.Tournament
         {
             if (_controller != null)
             {
+                _controller.ReleaseReturnPause(true);
                 _controller.Changed -= Refresh;
                 foreach (TournamentActionButton button in _buyButtons) button.Clicked -= Buy;
                 _rerollButton.Clicked -= Reroll;
@@ -288,6 +364,9 @@ namespace Game.Tournament
                 _shopContinueButton.Clicked -= Continue;
                 _continueButton.Clicked -= Continue;
                 _restartButton.Clicked -= Restart;
+                _confirmReturnButton.Clicked -= ConfirmWorkshopReturn;
+                _cancelReturnButton.Clicked -= CancelWorkshopReturn;
+                _exitButton.Clicked -= RequestAbandonReturn;
             }
             ResetInventoryItems();
         }

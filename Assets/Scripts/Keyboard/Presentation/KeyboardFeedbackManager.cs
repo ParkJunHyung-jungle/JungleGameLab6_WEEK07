@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -136,7 +136,16 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     void Update()
     {
-        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+        if (Game.Tournament.TournamentController.IsReturnPaused)
+        {
+            if (_isHitStopped) _hitStopEnd += Time.unscaledDeltaTime;
+            _nextHitStop += Time.unscaledDeltaTime;
+            if (_flashEndTimes != null)
+                for (int index = 0; index < _flashEndTimes.Length; index++)
+                    if (_flashEndTimes[index] > 0f) _flashEndTimes[index] += Time.unscaledDeltaTime;
+            return;
+        }
+        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Tournament.TournamentController.IsReturnPaused) return;
         if (_isHitStopped && (!_enableHitStop || Time.unscaledTime >= _hitStopEnd))
         {
             EndHitStop();
@@ -153,7 +162,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
 
     void LateUpdate()
     {
-        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Tournament.TournamentController.IsReturnPaused) return;
         UpdateKeyboardBounce();
     }
 
@@ -505,7 +514,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             return;
         }
 
-        if (Time.timeScale == 0f)
+        if (Time.timeScale == 0f && !Game.Tournament.TournamentController.IsReturnPaused)
         {
             Time.timeScale = _savedTimeScale;
         }
@@ -853,6 +862,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         while (elapsed < appearDuration)
         {
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Mathf.Min(Time.deltaTime, appearDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
             float progress = Mathf.Clamp01(elapsed / appearDuration);
             UpdateFistPose(fist, viewCamera, root.TransformPoint(localImpactContact), fistLift, progress);
@@ -862,6 +872,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         while (elapsed < strikeDuration)
         {
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Mathf.Min(Time.deltaTime, strikeDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
             float progress = Mathf.Clamp01(elapsed / strikeDuration);
             float strikeProgress = progress * progress;
@@ -878,6 +889,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         while (elapsed < holdDuration)
         {
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Time.deltaTime;
         }
 
@@ -962,6 +974,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         while (elapsed < appearDuration)
         {
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Mathf.Min(Time.deltaTime, appearDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
             float progress = Mathf.Clamp01(elapsed / appearDuration);
             impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
@@ -974,6 +987,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             impactGrip = GetHammerImpactGrip(hammer, impactRotation, root.TransformPoint(localContact), gripLocal, headLocal);
             UpdateHammerPose(hammer, startRotation, impactGrip, gripLocal, 1f);
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Time.deltaTime;
         }
 
@@ -981,6 +995,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         while (elapsed < swingDuration)
         {
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Mathf.Min(Time.deltaTime, swingDuration * MAX_ANIMATION_PROGRESS_PER_FRAME);
             float progress = Mathf.Clamp01(elapsed / swingDuration);
             progress *= progress;
@@ -997,6 +1012,7 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
         while (elapsed < holdDuration)
         {
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += Time.deltaTime;
         }
 
@@ -1105,6 +1121,8 @@ public sealed class KeyboardFeedbackManager : MonoBehaviour
             }
 
             yield return null;
+
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             elapsed += travelDuration > 0f ? Time.deltaTime : Mathf.Min(Time.deltaTime, 1f / 30f);
         }
 

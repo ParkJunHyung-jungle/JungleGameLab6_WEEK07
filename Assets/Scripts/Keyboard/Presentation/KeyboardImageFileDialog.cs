@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 
 public static class KeyboardImageFileDialog
@@ -75,11 +75,13 @@ public static class KeyboardImageFileDialog
 #if UNITY_EDITOR
         return UnityEditor.EditorUtility.OpenFilePanel("Choose keyboard photo", "", "png,jpg,jpeg");
 #elif UNITY_STANDALONE_WIN
-        IntPtr file = Marshal.AllocHGlobal(FILE_PATH_CAPACITY * sizeof(char));
+        WindowsSpecialKeyInput.SuspendForFileDialog();
+        IntPtr file = IntPtr.Zero;
         IntPtr filter = IntPtr.Zero;
         IntPtr title = IntPtr.Zero;
         try
         {
+            file = Marshal.AllocHGlobal(FILE_PATH_CAPACITY * sizeof(char));
             Marshal.WriteInt16(file, 0);
             filter = Marshal.StringToHGlobalUni("Images (PNG, JPG, JPEG)\0*.png;*.jpg;*.jpeg\0\0");
             title = Marshal.StringToHGlobalUni("키보드에 적용할 이미지 선택");
@@ -91,9 +93,10 @@ public static class KeyboardImageFileDialog
         }
         finally
         {
-            Marshal.FreeHGlobal(file);
+            if (file != IntPtr.Zero) Marshal.FreeHGlobal(file);
             if (filter != IntPtr.Zero) Marshal.FreeHGlobal(filter);
             if (title != IntPtr.Zero) Marshal.FreeHGlobal(title);
+            WindowsSpecialKeyInput.ResumeAfterFileDialog();
         }
 #else
         throw new PlatformNotSupportedException("이 플랫폼에서는 이미지 파일 경로를 직접 입력해 주세요.");

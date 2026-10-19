@@ -259,6 +259,7 @@ namespace Game.Tournament
 
         void LateUpdate()
         {
+            if (Game.Tournament.TournamentController.IsReturnPaused) return;
             if (_keycaps == null) return;
             if (_workshopCustomization != null)
             {
@@ -288,6 +289,7 @@ namespace Game.Tournament
         /// <summary>activation의 지연, 전파와 반복을 실행한다. 모든 대기는 deltaTime을 사용하고 대전 종료 또는 완파 시 후속 피해와 연출을 중단한다.</summary>
         private IEnumerator ExecuteAbility(Activation activation)
         {
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             int center = activation.Index;
             KeycapAbilityDefinition ability = activation.Ability;
             if (ability.Delay > 0f && ability.WindupEffectPrefab != null)
@@ -300,6 +302,7 @@ namespace Game.Tournament
             {
                 if (!CanContinue(activation)) yield break;
                 yield return null;
+                while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
                 elapsed += Time.deltaTime;
             }
             for (int repeat = 0; repeat < ability.RepeatCount; repeat++)
@@ -329,7 +332,8 @@ namespace Game.Tournament
                         previous = target;
                         if (!CanContinue(activation)) yield break;
                     }
-                    if (reached < targets.Count) { yield return null; elapsed += Time.deltaTime; }
+                    if (reached < targets.Count) { yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null; elapsed += Time.deltaTime; }
                 }
                 if (repeat + 1 < ability.RepeatCount)
                 {
@@ -338,6 +342,7 @@ namespace Game.Tournament
                     {
                         if (!CanContinue(activation)) yield break;
                         yield return null;
+                        while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
                         elapsed += Time.deltaTime;
                     }
                 }

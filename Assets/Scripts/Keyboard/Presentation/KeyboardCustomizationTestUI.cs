@@ -18,6 +18,12 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private InputField _index;
     private RawImage _preview;
     private Text _message;
+    private Text _imageStateLabel;
+    private Texture2D _appliedPreviewTexture;
+    private ImageTarget _appliedPreviewTarget;
+    private int _appliedPreviewIndex;
+    private Vector2 _appliedPreviewOffset;
+    private float _appliedPreviewZoom;
     private Font _font;
     private Texture2D _texture;
     private KeyboardInputController _input;
@@ -369,7 +375,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         CreateTargetButton(_targetSection, 1, "케이스", "", 111f, 24f, 104f, 42f);
         CreateTargetButton(_targetSection, 2, "키캡 한 개", "", 222f, 24f, 104f, 42f);
 
-        _keyIndexPanel = Rect("KeyIndexPanel", _targetSection, 0f, 70f, 326f, 40f);
+        _imageStateLabel = AddEmbeddedLabel(_targetSection, "ImageState", "이미지 미선택", 0f, 72f, 326f, 26f, 12,
+            new Color32(140, 155, 170, 255), TextAnchor.MiddleLeft, FontStyle.Bold);
+        _keyIndexPanel = Rect("KeyIndexPanel", _targetSection, 0f, 100f, 326f, 40f);
         _keyIndexPanel.gameObject.AddComponent<Image>().color = new Color(0.07f, 0.16f, 0.19f);
         AddEmbeddedLabel(_keyIndexPanel, "KeyIndexLabel", "적용 키 (0부터)", 10f, 0f, 92f, 40f, 9,
             new Color(0.78f, 0.86f, 0.88f), TextAnchor.MiddleLeft);
@@ -608,10 +616,10 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         bool validIndex = !keyTarget || (parsedIndex && keyIndex >= 0 && keyIndex < _storage.Customization.PhotoKeycapCount);
         float pathOffset = _pathExpanded ? 0f : 36f;
         float targetTop = 434f - pathOffset;
-        float targetHeight = keyTarget ? 200f : 160f;
+        float targetHeight = keyTarget ? 230f : 190f;
         _keyIndexPanel.gameObject.SetActive(keyTarget);
-        _applyButtonRect.anchoredPosition = new Vector2(0f, keyTarget ? -116f : -72f);
-        _scopeNoteRect.anchoredPosition = new Vector2(0f, keyTarget ? -161f : -117f);
+        _applyButtonRect.anchoredPosition = new Vector2(0f, keyTarget ? -146f : -102f);
+        _scopeNoteRect.anchoredPosition = new Vector2(0f, keyTarget ? -191f : -147f);
         _formatNoteRect.anchoredPosition = new Vector2(16f, -(390f - pathOffset));
         _imageDividerRect.anchoredPosition = new Vector2(16f, -(428f - pathOffset));
         _targetSection.anchoredPosition = new Vector2(16f, -targetTop);
@@ -713,6 +721,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     {
         if (!_embedded || !_hasSelectedImage || _texture == null)
         {
+            RefreshImageStateLabel(false, -1);
             if (_storage != null && _storage.Customization != null)
                 _storage.Customization.ClearPhotoImagePreview();
             return;
@@ -720,7 +729,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
         if (_selectedTarget == ImageTarget.Case)
         {
-            _storage.Customization.PreviewCaseImage(_texture, _cropOffset, _cropZoom);
+            bool previewed = _storage.Customization.PreviewCaseImage(_texture, _cropOffset, _cropZoom);
+            RefreshImageStateLabel(previewed, -1);
             return;
         }
 
@@ -730,14 +740,35 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
                 || keyIndex < 0 || keyIndex >= _storage.Customization.PhotoKeycapCount)
             {
                 _storage.Customization.ClearPhotoImagePreview();
+                RefreshImageStateLabel(false, -1);
                 return;
             }
 
-            _storage.Customization.PreviewKeycapImage(_texture, keyIndex, _cropOffset, _cropZoom);
+            bool previewed = _storage.Customization.PreviewKeycapImage(_texture, keyIndex, _cropOffset, _cropZoom);
+            RefreshImageStateLabel(previewed, keyIndex);
             return;
         }
 
-        _storage.Customization.PreviewKeycapImage(_texture, -1, _cropOffset, _cropZoom);
+        bool allPreviewed = _storage.Customization.PreviewKeycapImage(_texture, -1, _cropOffset, _cropZoom);
+        RefreshImageStateLabel(allPreviewed, -1);
+    }
+
+    /// <summary>
+    /// previewed와 keyIndex를 사용해 현재 사진의 미리보기 또는 적용 완료 상태를 표시한다.
+    /// 마지막으로 적용한 이미지, 대상과 배치를 비교해 이미지나 배치를 수정하면 미적용 표시로 되돌린다.
+    /// </summary>
+    private void RefreshImageStateLabel(bool previewed, int keyIndex)
+    {
+        if (_imageStateLabel == null) return;
+        bool applied = previewed && _appliedPreviewTexture != null && _appliedPreviewTexture == _texture
+            && _appliedPreviewTarget == _selectedTarget && _appliedPreviewIndex == keyIndex
+            && _appliedPreviewOffset.Equals(_cropOffset) && _appliedPreviewZoom.Equals(_cropZoom);
+        _imageStateLabel.text = !_hasSelectedImage ? "이미지 미선택"
+            : !previewed ? "미리보기 불가 · 적용 대상을 확인하세요."
+            : applied ? "적용 완료 · 이미지가 적용됨"
+            : "미리보기 중 · 아직 적용되지 않음";
+        _imageStateLabel.color = applied ? new Color32(59, 217, 196, 255)
+            : previewed ? new Color32(255, 200, 96, 255) : new Color32(140, 155, 170, 255);
     }
 
     /// <summary>
@@ -873,7 +904,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
     /// <summary>
     /// 입력 없이 사진 커스터마이징을 시작한다.
-    /// 반환값 없이 편집 패널을 열고 키보드 파괴 입력을 비활성화한다.
+    /// 반환값 없이 편집 패널을 열고 키보드 타건 입력을 활성 상태로 유지한다.
     /// </summary>
     public void BeginCustomization()
     {
@@ -882,7 +913,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         if (_embedded) _previousInput = _input.InputEnabled;
         _isCustomizing = true;
         EventSystem.current.SetSelectedGameObject(null);
-        _input.InputEnabled = false;
+        _input.InputEnabled = true;
         if (_startPanel != null) _startPanel.SetActive(false);
         _customizationPanel.SetActive(true);
         RefreshEmbeddedPanel();
@@ -1080,8 +1111,10 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void ClearKeycapImages()
     {
+        _appliedPreviewTexture = null;
         _storage.Customization.ClearPhotoImagePreview();
         _storage.Customization.ClearKeycapImage();
+        RefreshImageStateLabel(false, -1);
         ObserveImage("Remove", "AllKeycapsCanvas", -1, true);
         _message.text = _embedded ? "키캡 이미지가 지워졌습니다." : "Keycap photos cleared.";
     }
@@ -1092,8 +1125,10 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void ClearCaseImage()
     {
+        _appliedPreviewTexture = null;
         _storage.Customization.ClearPhotoImagePreview();
         _storage.Customization.ClearCaseImage();
+        RefreshImageStateLabel(false, -1);
         ObserveImage("Remove", "CaseWhole", -1, true);
         _message.text = _embedded ? "케이스 이미지가 지워졌습니다." : "Case photo cleared.";
     }
@@ -1154,7 +1189,15 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _message.text = applied
             ? (_embedded ? "이미지를 적용했습니다. 저장하면 배치가 유지됩니다." : "Photo applied. Save to keep the layout.")
             : customization.ImageError;
-        if (applied && _embedded) RefreshLiveKeyboardPreview();
+        if (applied && _embedded)
+        {
+            _appliedPreviewTexture = _texture;
+            _appliedPreviewTarget = caseImage ? ImageTarget.Case : index < 0 ? ImageTarget.AllKeycaps : ImageTarget.Key;
+            _appliedPreviewIndex = index;
+            _appliedPreviewOffset = _cropOffset;
+            _appliedPreviewZoom = _cropZoom;
+            RefreshLiveKeyboardPreview();
+        }
         if (applied && !_embedded) ShowPreview();
     }
 

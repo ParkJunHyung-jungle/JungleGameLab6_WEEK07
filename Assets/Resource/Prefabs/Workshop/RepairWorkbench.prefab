@@ -21128,13 +21128,34 @@ PrefabInstance:
     - {fileID: 1264139386206111033, guid: e86bfa9f9d173634ba278b6bd8e2261f, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5648102524883158503, guid: e86bfa9f9d173634ba278b6bd8e2261f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3375843200731698167}
   m_SourcePrefab: {fileID: 100100000, guid: e86bfa9f9d173634ba278b6bd8e2261f, type: 3}
 --- !u!4 &412079633838790363 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6484209102016570918, guid: e86bfa9f9d173634ba278b6bd8e2261f, type: 3}
   m_PrefabInstance: {fileID: 6648590599516532989}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1307907284563326234 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5648102524883158503, guid: e86bfa9f9d173634ba278b6bd8e2261f, type: 3}
+  m_PrefabInstance: {fileID: 6648590599516532989}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3375843200731698167
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1307907284563326234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52fe722ed23e9b7438e8b3aa65cae958, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardLegendRenderer
+  _materialTemplate: {fileID: 2100000, guid: abd5db41bc189fb47b822bf20b9b7d40, type: 2}
 --- !u!1001 &6793974441270675810
 PrefabInstance:
   m_ObjectHideFlags: 0

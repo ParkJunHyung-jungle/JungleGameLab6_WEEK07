@@ -43,6 +43,7 @@ namespace Game.Player
         private Text _singleKeyButtonLabel;
         private Text _instructionLabel;
         private Text _statusLabel;
+        private Text _stateLabel;
         private Text _applyLabel;
         private Image _undoButtonBackground;
         private Image _applyButtonBackground;
@@ -76,8 +77,9 @@ namespace Game.Player
             _singleKeyButtonBackground = CreateButton(_panel, "SingleKeycap", "키캡 한 개", 183f, 82f, 159f, 42f,
                 _targetColor, 11, HandleSingleKeyClicked, out _singleKeyButtonLabel);
 
-            _statusRect = Rect("Status", _panel, 16f, 143f, 326f, 22f);
-            _statusLabel = Label(_statusRect, "재질을 선택한 후 적용하기를 누르세요.", 0f, 0f, 326f, 22f, 9, _mutedColor);
+            _stateLabel = Label(_panel, "키캡 미설치", 16f, 133f, 350f, 25f, 14, _mutedColor, FontStyle.Bold);
+            _statusRect = Rect("Status", _panel, 16f, 161f, 350f, 36f);
+            _statusLabel = Label(_statusRect, "재질을 선택한 후 적용하기를 누르세요.", 0f, 0f, 350f, 36f, 11, _mutedColor);
             _undoButtonBackground = CreateButton(_panel, "UndoKeycapMaterial", "미리보기 빼기", 16f, 178f, 159f, 40f,
                 _inactiveButtonColor, 11, HandleUndoClicked, out _);
             _applyButtonBackground = CreateButton(_panel, "ApplyKeycapMaterial", "전체 키캡 적용하기", 183f, 178f,
@@ -94,7 +96,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// customization 키보드의 오른쪽 편집 패널을 열고 입력 상태를 보관한다.
+        /// customization 키보드의 오른쪽 편집 패널을 열고 타건 입력을 활성 상태로 유지한다.
         /// customization의 키캡 및 축 상태와 InputEnabled를 사용하며 빈 키보드는 전체 범위로 연다.
         /// </summary>
         public void Open(KeyboardCustomization customization)
@@ -119,7 +121,7 @@ namespace Game.Player
 
             _input = customization.GetComponent<KeyboardInputController>();
             _previousInput = _input != null && _input.InputEnabled;
-            if (_input != null) _input.SetInputEnabled(false);
+            if (_input != null) _input.SetInputEnabled(true);
             _isOpen = true;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
             gameObject.SetActive(true);
@@ -329,10 +331,10 @@ namespace Game.Player
                 : _isAllKeys
                 ? "축이 설치된 키에 키캡을 씌우거나 한 개를 선택하세요."
                 : "재질을 선택한 뒤 축이 설치된 키를 누르세요.";
-            _statusRect.anchoredPosition = new Vector2(16f, -143f);
-            _undoButtonRect.anchoredPosition = new Vector2(16f, -178f);
-            _applyButtonRect.anchoredPosition = new Vector2(183f, -178f);
-            _panel.sizeDelta = new Vector2(390f, 234f);
+            _statusRect.anchoredPosition = new Vector2(16f, -161f);
+            _undoButtonRect.anchoredPosition = new Vector2(16f, -208f);
+            _applyButtonRect.anchoredPosition = new Vector2(183f, -208f);
+            _panel.sizeDelta = new Vector2(390f, 264f);
             _applyLabel.text = _isAllKeys
                 ? "전체 키캡 적용하기"
                 : IsSelectedIndexValid()
@@ -340,6 +342,12 @@ namespace Game.Player
                     : "키 입력 대기";
 
             bool canApply = CanApply();
+            bool hasInstalledKeycaps = _customization != null && _customization.HasAnyInstalledKeycaps();
+            _stateLabel.text = canApply ? "미리보기 중 · 아직 적용되지 않음"
+                : hasInstalledKeycaps ? "적용 완료 · 설치된 키캡"
+                : "키캡 미설치";
+            _stateLabel.color = canApply ? new Color32(255, 200, 96, 255)
+                : hasInstalledKeycaps ? _activeButtonColor : _mutedColor;
             _applyButtonGroup.interactable = canApply;
             _undoButtonGroup.interactable = _hasPendingMaterial;
             _applyButtonGroup.blocksRaycasts = true;
@@ -354,7 +362,7 @@ namespace Game.Player
                 : _isAllKeys && _customization != null && !_customization.HasAnySwitchForKeycaps()
                     ? "축이 설치된 키가 없어 키캡을 씌울 수 없습니다."
                     : canApply
-                        ? "미리보기를 확인한 뒤 적용하거나 다른 키를 누르세요."
+                        ? "적용하기를 눌러 확정하세요. 메뉴를 나가면 취소됩니다."
                         : _isAllKeys
                             ? "재질을 선택한 후 적용하기를 누르세요."
                             : _hasPendingMaterial

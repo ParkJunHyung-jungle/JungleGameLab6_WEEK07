@@ -66,13 +66,20 @@ namespace Game.Tournament
 
         /// <summary>health의 실제 바인딩 인덱스를 반환한다. 입력 로그를 현재 전투 구성과 연결한다.</summary>
         public int GetPlaytestIndex(KeycapHealth health) { return _indices[health]; }
-        public event Action<Key, KeycapDefinition, bool> PvpEffectApplied;
+        public event Action<Key, KeycapDefinition, bool, int> PvpEffectApplied;
 
         /// <summary>
         /// tournament와 inventory, score 및 layout으로 새 키보드의 체력, 특수 유형과 행열을 구성한다.
         /// 장착 SO와 위치별 해금 단계를 읽어 이벤트와 패시브를 구성하며 외형과 구매 재고는 유지한다.
         /// </summary>
         public void Initialize(TournamentController tournament, TournamentInventory inventory, KeyboardScoreCombo score, TournamentKeyLayout layout, int health)
+        {
+            _tournament = tournament;
+            InitializeInventory(inventory, layout, health, tournament.Settings.GetRequiredBrokenCount(tournament.Round));
+        }
+
+        /// <summary>inventory와 layout의 구매 단계로 체력·파괴 수량·능력과 외곽선을 구성한다. health와 requiredBrokenCount는 연결된 모드 설정을 사용한다.</summary>
+        private void InitializeInventory(TournamentInventory inventory, TournamentKeyLayout layout, int health, int requiredBrokenCount)
         {
             if (_keyboard != null)
             {
@@ -81,12 +88,11 @@ namespace Game.Tournament
             }
             if (_workshopCustomization != null) _workshopCustomization.KeycapDefinitionChanged -= HandleWorkshopDefinitionChanged;
             _workshopCustomization = null;
-            _tournament = tournament;
 
             _keyboard = GetComponent<KeyboardInputController>();
             _keyboard.UseAllDestructionKeys();
             _destruction = GetComponent<KeyboardDestruction>();
-            _destruction.ConfigureRequiredBrokenCount(tournament.Settings.GetRequiredBrokenCount(tournament.Round));
+            _destruction.ConfigureRequiredBrokenCount(requiredBrokenCount);
             InitializeBindings(layout);
             for (int index = 0; index < _keycaps.Length; index++)
             {
@@ -107,12 +113,11 @@ namespace Game.Tournament
             InitializeWorkshop();
         }
 
-        /// <summary>layout의 현재 외형에 연결된 능력을 일반 전투용 최대 단계로 구성한다. AI 해금·탈락 흐름과 저장 데이터는 사용하지 않는다.</summary>
-        public void InitializePvp(TournamentKeyLayout layout)
+        /// <summary>inventory의 해금 단계와 health 및 requiredBrokenCount로 PvP 전투를 준비한다. AI와 같은 초기화를 사용하되 진행 권한은 PvP 세션이 제어한다.</summary>
+        public void InitializePvp(TournamentInventory inventory, TournamentKeyLayout layout, int health, int requiredBrokenCount)
         {
-            _workshopLayout = layout;
-            InitializeWorkshop();
-            RefreshWorkshopAbilities();
+            _tournament = null;
+            InitializeInventory(inventory, layout, health, requiredBrokenCount);
         }
 
         /// <summary>작업실 레이아웃이 설정된 키보드의 능력 구독을 한 번 준비한다. 입력이 꺼진 동안에는 능력을 실행하지 않는다.</summary>
@@ -333,7 +338,7 @@ namespace Game.Tournament
                             Vector3 destination = GetSurfacePosition(target);
                             KeycapAbilityVfx.Play(ability.ImpactEffectPrefab, transform, source, destination,
                                 ability.ImpactLifetime, keyboard: _keyboard, keycap: _keycaps[target].transform);
-                            PvpEffectApplied?.Invoke(_keys[target], _parts[activation.Index], true);
+                            PvpEffectApplied?.Invoke(_keys[target], _parts[activation.Index], true, activation.Level);
                             ApplyEffects(target, ability, activation.Level);
                         }
                         previous = target;
@@ -380,7 +385,7 @@ namespace Game.Tournament
             KeycapAbilityDefinition ability = activation.Ability;
             Vector3 position = GetSurfacePosition(activation.Index);
             KeycapAbilityVfx.Play(ability.ActivationEffectPrefab, transform, position, position, ability.EffectLifetime, ability.EffectScale);
-            PvpEffectApplied?.Invoke(_keys[activation.Index], _parts[activation.Index], false);
+            PvpEffectApplied?.Invoke(_keys[activation.Index], _parts[activation.Index], false, activation.Level);
         }
 
         /// <summary>살아 있는 index 키캡에 ability의 피해 또는 상태 효과 목록을 순서대로 적용한다. 능력 피해로 구분해 추가 피해의 재귀 호출과 피격 능력 재발동을 방지한다.</summary>

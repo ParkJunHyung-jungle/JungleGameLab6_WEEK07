@@ -18,12 +18,12 @@ namespace Game.Pvp
 {
     public sealed class PvpPracticeUI : MonoBehaviour
     {
-        private static readonly Color NAVY = new Color32(13, 28, 66, 255);
-        private static readonly Color CREAM = new Color32(252, 241, 208, 255);
-        private static readonly Color GOLD = new Color32(210, 167, 83, 255);
-        private static readonly Color BLUE = new Color32(79, 111, 169, 255);
-        private static readonly Color MINT = new Color32(86, 224, 185, 255);
-        private static readonly Color ORANGE = new Color32(255, 171, 111, 255);
+        private static readonly Color _navy = new Color32(13, 28, 66, 255);
+        private static readonly Color _cream = new Color32(252, 241, 208, 255);
+        private static readonly Color _gold = new Color32(210, 167, 83, 255);
+        private static readonly Color _blue = new Color32(79, 111, 169, 255);
+        private static readonly Color _mint = new Color32(86, 224, 185, 255);
+        private static readonly Color _orange = new Color32(255, 171, 111, 255);
 
         [Header("Session")]
         [SerializeField] private PvpSession _session;
@@ -54,6 +54,7 @@ namespace Game.Pvp
         private GameObject _result;
         private RectTransform _roomContent;
         private RectTransform _stockContent;
+        private RectTransform _equipmentContent;
         private InputField _nickname;
         private InputField _key;
         private Text _identity;
@@ -68,6 +69,7 @@ namespace Game.Pvp
         private Text _roundResult;
         private Text _selection;
         private Text _equipment;
+        private Text _stockEmpty;
         private Text _resultTitle;
         private Text _resultBody;
         private Image _timerFill;
@@ -77,6 +79,7 @@ namespace Game.Pvp
         private KeyboardEditButton _cancel;
         private KeyboardEditButton _reroll;
         private KeyboardEditButton _equip;
+        private KeyboardEditButton _undo;
         private string _selectedPart = "";
         private string _stockSignature;
         private string _notice = "";
@@ -85,6 +88,7 @@ namespace Game.Pvp
         private bool _bound;
         private FMODRuntimeManagerOnGUIHelper _audioOverlay;
         private bool _overlayWasEnabled;
+        private bool _canApplySelected;
 
         void Awake()
         {
@@ -117,6 +121,7 @@ namespace Game.Pvp
 
         void Update()
         {
+            ProcessShopInput();
             if (Time.unscaledTimeAsDouble < _nextTimer) return;
             _nextTimer = Time.unscaledTimeAsDouble + 0.1;
             if (_audioOverlay == null)
@@ -147,73 +152,77 @@ namespace Game.Pvp
         private void BuildHud()
         {
             _hud = Rect("BattleHUD", _canvas.transform, Vector2.zero, Vector2.zero).gameObject; Stretch((RectTransform)_hud.transform);
-            RectTransform header = Panel("RoundHeader", _hud.transform, new Vector2(28, 28), new Vector2(540, 74), NAVY);
-            _phase = Label("Phase", header, new Vector2(18, 12), new Vector2(365, 48), 24, CREAM);
+            RectTransform header = Panel("RoundHeader", _hud.transform, new Vector2(28, 28), new Vector2(540, 74), _navy);
+            _phase = Label("Phase", header, new Vector2(18, 12), new Vector2(365, 48), 24, _cream);
             _timer = Label("Time", header, new Vector2(390, 9), new Vector2(130, 48), 38, Color.white, TextAnchor.MiddleRight);
             RectTransform track = Panel("TimeTrack", header, new Vector2(0, 69), new Vector2(540, 5), new Color(0, 0, 0, 0.45f));
-            _timerFill = Panel("TimeFill", track, Vector2.zero, new Vector2(540, 5), GOLD).GetComponent<Image>();
+            _timerFill = Panel("TimeFill", track, Vector2.zero, new Vector2(540, 5), _gold).GetComponent<Image>();
             for (int index = 0; index < 2; index++)
             {
-                Color accent = index == 0 ? MINT : ORANGE;
+                Color accent = index == 0 ? _mint : _orange;
                 RectTransform row = Panel(index == 0 ? "LocalScore" : "OpponentScore", _hud.transform,
-                    new Vector2(28, 122 + index * 148), new Vector2(540, 132), new Color(NAVY.r, NAVY.g, NAVY.b, 0.94f));
+                    new Vector2(28, 122 + index * 148), new Vector2(540, 132), new Color(_navy.r, _navy.g, _navy.b, 0.94f));
                 Panel("Accent", row, Vector2.zero, new Vector2(5, 132), accent);
                 _names[index] = Label("Nickname", row, new Vector2(20, 9), new Vector2(390, 32), 22, accent);
-                _wins[index] = Label("Wins", row, new Vector2(420, 9), new Vector2(98, 32), 22, CREAM, TextAnchor.MiddleRight);
+                _wins[index] = Label("Wins", row, new Vector2(420, 9), new Vector2(98, 32), 22, _cream, TextAnchor.MiddleRight);
                 _scores[index] = Label("Score", row, new Vector2(20, 45), new Vector2(320, 62), 46, Color.white);
                 _combos[index] = Label("Combo", row, new Vector2(340, 48), new Vector2(178, 62), 27, accent, TextAnchor.MiddleRight);
             }
-            _wallet = Label("MatchWallet", _hud.transform, new Vector2(46, 428), new Vector2(500, 42), 23, GOLD);
-            RectTransform settlement = Panel("RoundSettlement", _hud.transform, new Vector2(660, 28), new Vector2(1050, 92), NAVY);
-            _roundResult = Label("Result", settlement, new Vector2(24, 8), new Vector2(1002, 76), 25, CREAM, TextAnchor.MiddleCenter);
-            RectTransform status = Panel("Status", _hud.transform, new Vector2(28, 498), new Vector2(540, 340), NAVY);
-            _message = Label("Message", status, new Vector2(20, 16), new Vector2(500, 125), 22, CREAM);
+            _wallet = Label("MatchWallet", _hud.transform, new Vector2(46, 428), new Vector2(500, 42), 23, _gold);
+            RectTransform settlement = Panel("RoundSettlement", _hud.transform, new Vector2(660, 28), new Vector2(1050, 92), _navy);
+            _roundResult = Label("Result", settlement, new Vector2(24, 8), new Vector2(1002, 76), 25, _cream, TextAnchor.MiddleCenter);
+            RectTransform status = Panel("Status", _hud.transform, new Vector2(28, 498), new Vector2(540, 340), _navy);
+            _message = Label("Message", status, new Vector2(20, 16), new Vector2(500, 125), 22, _cream);
             _ready = Button(status, "준비 완료", new Vector2(20, 157), new Vector2(500, 52), () => _session.Ready());
             _retry = Button(status, "키보드·이미지 로딩 재시도", new Vector2(20, 219), new Vector2(500, 48), () => _session.RetryLoading());
             Button(status, "방 나가기", new Vector2(20, 281), new Vector2(500, 40), () => _session.LeaveRoom());
-            Label("BattleHint", _hud.transform, new Vector2(40, 858), new Vector2(520, 96), 20, CREAM).text =
+            Label("BattleHint", _hud.transform, new Vector2(40, 858), new Vector2(520, 96), 20, _cream).text =
                 "자신의 키보드를 타건해 점수를 겨루세요.\n30초 × 5라운드 · 동점은 무승부\n상점 재화는 이번 매치에서만 사용됩니다.";
         }
 
-        /// <summary>기준 씬처럼 상품 3개의 부품 카드와 별도 재고·장착 패널을 만든다. 구매와 교체는 기존 PvP API만 호출한다.</summary>
+        /// <summary>기준 씬처럼 상품 3개의 부품 카드와 별도 재고·능력 해금 패널을 만든다. 구매·강화·취소는 PvP API만 호출한다.</summary>
         private void BuildShop()
         {
-            _shop = Panel("ShopFrame", _canvas.transform, new Vector2(28, 480), new Vector2(550, 570), CREAM).gameObject;
-            Label("Title", _shop.transform, new Vector2(22, 12), new Vector2(500, 43), 30, NAVY).text = "부품 상점 · 작업대";
-            _shopWallet = Label("Wallet", _shop.transform, new Vector2(24, 58), new Vector2(498, 35), 22, NAVY);
+            _shop = Panel("ShopFrame", _canvas.transform, new Vector2(28, 480), new Vector2(550, 570), _cream).gameObject;
+            Label("Title", _shop.transform, new Vector2(22, 12), new Vector2(500, 43), 30, _navy).text = "부품 상점 · 작업대";
+            _shopWallet = Label("Wallet", _shop.transform, new Vector2(24, 58), new Vector2(498, 35), 22, _navy);
             for (int index = 0; index < 3; index++)
             {
                 int slot = index;
-                RectTransform card = Panel("Offer" + index, _shop.transform, new Vector2(18, 104 + index * 124), new Vector2(514, 114), NAVY);
-                RectTransform art = Panel("PartArt", card, new Vector2(10, 12), new Vector2(88, 88), BLUE);
+                RectTransform card = Panel("Offer" + index, _shop.transform, new Vector2(18, 104 + index * 124), new Vector2(514, 114), _navy);
+                RectTransform art = Panel("PartArt", card, new Vector2(10, 12), new Vector2(88, 88), _blue);
                 _offerImages[index] = art.GetComponent<Image>(); _offerImages[index].sprite = _cardSprite;
-                _offerSymbols[index] = Label("Symbol", art, Vector2.zero, new Vector2(88, 88), 24, NAVY, TextAnchor.MiddleCenter);
-                _offerTitles[index] = Label("Name", card, new Vector2(111, 6), new Vector2(385, 32), 21, CREAM);
-                _offerDescriptions[index] = Label("Description", card, new Vector2(111, 38), new Vector2(385, 36), 16, CREAM);
+                _offerSymbols[index] = Label("Symbol", art, Vector2.zero, new Vector2(88, 88), 24, _navy, TextAnchor.MiddleCenter);
+                _offerTitles[index] = Label("Name", card, new Vector2(111, 6), new Vector2(385, 32), 21, _cream);
+                _offerDescriptions[index] = Label("Description", card, new Vector2(111, 38), new Vector2(385, 36), 16, _cream);
                 _buy[index] = Button(card, "구매", new Vector2(285, 77), new Vector2(211, 30), () => _session.Buy(slot));
                 if (_coinSprite != null)
                 {
-                    Image coin = Panel("Coin", card, new Vector2(113, 79), new Vector2(27, 27), GOLD).GetComponent<Image>(); coin.sprite = _coinSprite;
+                    Image coin = Panel("Coin", card, new Vector2(113, 79), new Vector2(27, 27), _gold).GetComponent<Image>(); coin.sprite = _coinSprite;
                 }
             }
             _reroll = Button(_shop.transform, "리롤", new Vector2(18, 484), new Vector2(514, 48), () => _session.Reroll());
-            _shopHint = Label("DeadlineHint", _shop.transform, new Vector2(20, 536), new Vector2(510, 28), 16, NAVY);
-            _inventoryPanel = Panel("InventoryFrame", _canvas.transform, new Vector2(-28, 480), new Vector2(550, 570), CREAM, true).gameObject;
-            Label("Title", _inventoryPanel.transform, new Vector2(22, 12), new Vector2(500, 40), 30, NAVY).text = "구매 인벤토리 · 부품 교체";
-            Label("Hint", _inventoryPanel.transform, new Vector2(22, 56), new Vector2(500, 40), 18, NAVY).text = "구매품 선택 → 키 이름 입력 → 교체 적용";
+            _shopHint = Label("DeadlineHint", _shop.transform, new Vector2(20, 536), new Vector2(510, 28), 16, _navy);
+            _inventoryPanel = Panel("InventoryFrame", _canvas.transform, new Vector2(-28, 480), new Vector2(550, 570), _cream, true).gameObject;
+            Label("Title", _inventoryPanel.transform, new Vector2(22, 12), new Vector2(500, 40), 30, _navy).text = "구매 인벤토리 · 능력 해금";
+            Label("Hint", _inventoryPanel.transform, new Vector2(22, 56), new Vector2(500, 40), 18, _navy).text = "구매품 선택 → 같은 부품의 키 타건·클릭 → 강화";
             _stockContent = Scroll("Stock", _inventoryPanel.transform, new Vector2(18, 104), new Vector2(514, 220));
-            _selection = Label("Selection", _inventoryPanel.transform, new Vector2(22, 334), new Vector2(500, 36), 21, NAVY);
+            _stockEmpty = Label("Empty", _stockContent, new Vector2(12, 12), new Vector2(470, 100), 20, _navy);
+            _stockEmpty.text = "가져온 부품의 능력은 0단계로 시작합니다.\n상품을 구매해 능력을 해금·강화하세요.\n커스텀 외형과 이미지는 유지됩니다.";
+            _selection = Label("Selection", _inventoryPanel.transform, new Vector2(22, 334), new Vector2(500, 36), 21, _navy);
             _key = Field("Key", _inventoryPanel.transform, new Vector2(20, 378), new Vector2(164, 46), "A, Space 등"); _key.text = "A";
-            _equip = Button(_inventoryPanel.transform, "선택 부품 교체 적용", new Vector2(198, 378), new Vector2(332, 46), EquipSelected);
-            _equipment = Label("Equipment", _inventoryPanel.transform, new Vector2(22, 436), new Vector2(500, 112), 18, NAVY);
+            _equip = Button(_inventoryPanel.transform, "선택 위치 해금·강화", new Vector2(198, 378), new Vector2(332, 46), EquipSelected);
+            _undo = Button(_inventoryPanel.transform, "선택 키캡의 마지막 강화 취소", new Vector2(20, 434), new Vector2(510, 42), () => _session.UndoUpgrade(_selectedPart));
+            _equipmentContent = Scroll("Upgrades", _inventoryPanel.transform, new Vector2(20, 486), new Vector2(510, 66));
+            _equipment = Label("Equipment", _equipmentContent, new Vector2(6, 0), new Vector2(490, 66), 18, _navy);
         }
 
         /// <summary>최종 승패와 승수·정산 점수를 보여 주는 결과 패널을 만든다. 재대결과 퇴장은 세션으로 요청한다.</summary>
         private void BuildResult()
         {
-            _result = Panel("FinalResult", _canvas.transform, new Vector2(660, 290), new Vector2(1050, 500), CREAM).gameObject;
-            _resultTitle = Label("Title", _result.transform, new Vector2(40, 32), new Vector2(970, 85), 54, NAVY, TextAnchor.MiddleCenter);
-            _resultBody = Label("Result", _result.transform, new Vector2(50, 135), new Vector2(950, 190), 28, NAVY, TextAnchor.MiddleCenter);
+            _result = Panel("FinalResult", _canvas.transform, new Vector2(660, 290), new Vector2(1050, 500), _cream).gameObject;
+            _resultTitle = Label("Title", _result.transform, new Vector2(40, 32), new Vector2(970, 85), 54, _navy, TextAnchor.MiddleCenter);
+            _resultBody = Label("Result", _result.transform, new Vector2(50, 135), new Vector2(950, 190), 28, _navy, TextAnchor.MiddleCenter);
             Button(_result.transform, "재대결 동의", new Vector2(95, 362), new Vector2(410, 64), () => _session.Rematch());
             Button(_result.transform, "방 나가기", new Vector2(545, 362), new Vector2(410, 64), () => _session.LeaveRoom());
         }
@@ -223,22 +232,22 @@ namespace Game.Pvp
         {
             _lobby = Panel("LobbyBackdrop", _canvas.transform, Vector2.zero, Vector2.zero, new Color(0.025f, 0.045f, 0.09f, 0.98f)).gameObject;
             Stretch((RectTransform)_lobby.transform);
-            RectTransform panel = Panel("LobbyPanel", _lobby.transform, Vector2.zero, new Vector2(1000, 880), CREAM);
+            RectTransform panel = Panel("LobbyPanel", _lobby.transform, Vector2.zero, new Vector2(1000, 880), _cream);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
-            Label("Title", panel, new Vector2(40, 20), new Vector2(920, 74), 44, NAVY).text = "KEYBOARD BATTLE · 1 vs 1";
-            Label("Subtitle", panel, new Vector2(42, 100), new Vector2(916, 48), 21, NAVY).text = "같은 LAN에서 나만의 키보드로 대결하세요. · 방 4개 제한은 최선 노력";
-            _identity = Label("Identity", panel, new Vector2(42, 156), new Vector2(916, 60), 24, NAVY);
+            Label("Title", panel, new Vector2(40, 20), new Vector2(920, 74), 44, _navy).text = "KEYBOARD BATTLE · 1 vs 1";
+            Label("Subtitle", panel, new Vector2(42, 100), new Vector2(916, 48), 21, _navy).text = "같은 LAN에서 나만의 키보드로 대결하세요. · 방 4개 제한은 최선 노력";
+            _identity = Label("Identity", panel, new Vector2(42, 156), new Vector2(916, 60), 24, _navy);
             _login = Rect("NicknameEntry", panel, new Vector2(40, 236), new Vector2(920, 230)).gameObject;
-            Label("NicknameLabel", _login.transform, Vector2.zero, new Vector2(920, 50), 28, NAVY).text = "사용할 닉네임을 입력해 주세요";
+            Label("NicknameLabel", _login.transform, Vector2.zero, new Vector2(920, 50), 28, _navy).text = "사용할 닉네임을 입력해 주세요";
             _nickname = Field("Nickname", _login.transform, new Vector2(0, 68), new Vector2(920, 62), "닉네임 · 중복 및 특수문자 허용");
             Button(_login.transform, "닉네임으로 입장", new Vector2(0, 152), new Vector2(920, 62), EnterOnline);
             _roomList = Rect("RoomList", panel, new Vector2(40, 228), new Vector2(920, 520)).gameObject;
             _create = Button(_roomList.transform, "내 방 만들기", Vector2.zero, new Vector2(448, 58), () => _session.CreateRoom());
             Button(_roomList.transform, "탐색 목록 새로고침", new Vector2(472, 0), new Vector2(448, 58), () => _session.RefreshRooms());
-            _roomSummary = Label("RoomSummary", _roomList.transform, new Vector2(0, 72), new Vector2(920, 40), 22, NAVY);
+            _roomSummary = Label("RoomSummary", _roomList.transform, new Vector2(0, 72), new Vector2(920, 40), 22, _navy);
             _roomContent = Scroll("Rooms", _roomList.transform, new Vector2(0, 124), new Vector2(920, 304));
             _cancel = Button(_roomList.transform, "연결 취소", new Vector2(0, 446), new Vector2(920, 52), () => _session.LeaveRoom());
-            _lobbyMessage = Label("Message", panel, new Vector2(40, 744), new Vector2(670, 105), 21, NAVY);
+            _lobbyMessage = Label("Message", panel, new Vector2(40, 744), new Vector2(670, 105), 21, _navy);
             Button(panel, "작업실로", new Vector2(740, 770), new Vector2(220, 64), ReturnToWorkshop);
         }
 
@@ -288,14 +297,14 @@ namespace Game.Pvp
             PvpPhase phase = _session.Phase; _phase.text = $"ROUND {_session.Round} / 5 · {PhaseName(phase)}";
             bool timed = phase == PvpPhase.Battle || phase == PvpPhase.Shop || phase == PvpPhase.Countdown;
             _timer.text = timed ? $"{_session.Remaining:00.0}" : "--";
-            float duration = phase == PvpPhase.Shop ? 20 : phase == PvpPhase.Countdown ? 3 : 30;
+            float duration = phase == PvpPhase.Shop ? 20 : phase == PvpPhase.Countdown ? 3 : _session.Settings.BattleDuration;
             _timerFill.rectTransform.sizeDelta = new Vector2(540 * (timed ? Mathf.Clamp01((float)_session.Remaining / duration) : 0), 5);
-            _timerFill.color = timed && _session.Remaining <= 5 ? ORANGE : GOLD;
+            _timerFill.color = timed && _session.Remaining <= 5 ? _orange : _gold;
             if (phase == PvpPhase.Shop && _session.Remaining <= 0)
             {
                 foreach (KeyboardEditButton button in _buy) button.interactable = false;
                 foreach (KeyboardEditButton button in _stockButtons) button.interactable = false;
-                _reroll.interactable = _equip.interactable = _key.interactable = false;
+                _reroll.interactable = _equip.interactable = _undo.interactable = _key.interactable = false;
             }
         }
 
@@ -309,7 +318,7 @@ namespace Game.Pvp
                 KeyboardEditButton button = Button(_roomContent, "", new Vector2(0, index * 88), new Vector2(900, 78), () => _session.JoinRoom(selected));
                 Text title = button.GetComponentInChildren<Text>(); title.text = room.Name;
                 title.rectTransform.sizeDelta = new Vector2(880, 34); title.alignment = TextAnchor.MiddleLeft;
-                Label("RoomStatus", button.transform, new Vector2(10, 40), new Vector2(880, 30), 20, CREAM).text =
+                Label("RoomStatus", button.transform, new Vector2(10, 40), new Vector2(880, 30), 20, _cream).text =
                     $"{room.Count} / 2명 · {(room.Playing ? "경기 중" : "대기 중")} · {(room.Count >= 2 || room.Playing ? "입장 불가" : "참가하기")}";
                 button.interactable = !_session.IsJoining && room.Count < 2 && !room.Playing; _roomButtons.Add(button); index++;
             }
@@ -326,53 +335,75 @@ namespace Game.Pvp
             for (int index = 0; index < 3; index++)
             {
                 KeyboardPartDefinition part = PvpInventory.Find(_session.Catalog, inventory.Offers[index]);
-                _offerTitles[index].text = part != null ? $"{part.DisplayName} ×{part.Quantity}" : "상품 없음";
+                _offerTitles[index].text = part != null ? $"{part.DisplayName} · 능력 해금" : "상품 없음";
                 _offerDescriptions[index].text = part != null ? part.Description : "";
                 _offerSymbols[index].text = part is KeycapDefinition ? "KEY" : part is SwitchDefinition ? "SW" : part is PlateDefinition ? "PL" : "CASE";
                 Material material = part is KeycapDefinition cap ? cap.Material : part is HousingDefinition housing ? housing.Material : part is PlateDefinition plate ? plate.Data.Material : null;
-                _offerImages[index].color = material != null && material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") : BLUE;
+                _offerImages[index].color = material != null && material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") : _blue;
                 SetButtonText(_buy[index], inventory.Purchased[index] ? "구매 완료" : part != null ? $"{part.Price} 재화 · 구매" : "상품 없음");
-                _buy[index].interactable = open && part != null && !inventory.Purchased[index] && inventory.Currency >= part.Price;
+                _buy[index].interactable = open && part != null && inventory.CanBuyOffer(index) && inventory.Currency >= part.Price;
             }
             SetButtonText(_reroll, $"리롤 {_session.Settings.RerollCost} 재화 · 남은 {Math.Max(0, _session.Settings.RerollLimit - inventory.Rerolls)}회");
             _reroll.interactable = open && inventory.Currency >= _session.Settings.RerollCost && inventory.Rerolls < _session.Settings.RerollLimit;
-            string signature = string.Join("|", inventory.Stock) + ":" + _selectedPart;
+            string signature = string.Join("|", inventory.Stock) + ":" + string.Join("|", inventory.Equipment)
+                + ":" + string.Join(",", inventory.Positions) + ":" + _selectedPart;
             if (signature != _stockSignature)
             {
                 _stockSignature = signature; ClearRows(_stockButtons); int row = 0;
                 foreach (var group in inventory.Stock.GroupBy(id => id))
                 {
                     string id = group.Key; KeyboardPartDefinition part = PvpInventory.Find(_session.Catalog, id);
-                    KeyboardEditButton button = Button(_stockContent, (_selectedPart == id ? "선택 · " : "") + (part != null ? part.DisplayName : id) + $" ×{group.Count()}",
+                    KeyboardEditButton button = Button(_stockContent, (_selectedPart == id ? "선택 · " : "") + (part != null ? part.DisplayName : id)
+                        + (part is KeycapDefinition ? $" · 남은 {inventory.AvailableCount(id)} / 구매 {group.Count()}회" : $" · {group.Count()} / {TournamentInventory.MaxLevel}단계"),
                         new Vector2(0, row * 44), new Vector2(494, 38), () => SelectPart(id));
                     _stockButtons.Add(button); row++;
                 }
                 _stockContent.sizeDelta = new Vector2(0, Mathf.Max(220, row * 44));
             }
             KeyboardPartDefinition selected = PvpInventory.Find(_session.Catalog, _selectedPart);
+            _stockEmpty.gameObject.SetActive(inventory.Stock.Count == 0);
             foreach (KeyboardEditButton button in _stockButtons) button.interactable = open;
             _selection.text = selected == null ? "선택한 구매품 없음" : "선택 · " + selected.DisplayName;
-            _equip.interactable = open && inventory.Stock.Contains(_selectedPart); _key.interactable = open;
+            _canApplySelected = selected is KeycapDefinition && inventory.CanApply(_selectedPart);
+            _equip.interactable = open && _canApplySelected; _key.interactable = open && selected is KeycapDefinition;
+            _undo.interactable = open && selected is KeycapDefinition && inventory.Equipment.Contains(_selectedPart);
+            SetButtonText(_equip, selected != null && !(selected is KeycapDefinition) ? "구매 시 자동 적용" : "선택 위치 해금·강화");
             var equipped = new List<string>();
-            for (int index = 0; index < inventory.Equipment.Count; index++)
+            foreach (var group in Enumerable.Range(0, inventory.Equipment.Count).GroupBy(index => inventory.Positions[index]))
             {
+                int index = group.First();
                 KeyboardPartDefinition part = PvpInventory.Find(_session.Catalog, inventory.Equipment[index]);
-                string position = inventory.Positions[index] >= 0 ? ((Key)inventory.Positions[index]).ToString() : "전체";
-                equipped.Add(position + " · " + (part != null ? part.DisplayName : "부품"));
+                string position = group.Key >= 0 ? ((Key)group.Key).ToString() : "전체";
+                equipped.Add(position + " · " + (part != null ? part.DisplayName : "부품") + $" · {group.Count()} / {TournamentInventory.MaxLevel}단계");
             }
-            _equipment.text = "현재 교체 장착\n" + (equipped.Count == 0 ? "가져온 커스텀 키보드 유지" : string.Join(", ", equipped));
+            _equipment.text = "현재 해금·강화\n" + (equipped.Count == 0 ? "아직 해금한 능력이 없습니다." : string.Join("\n", equipped));
+            float contentHeight = Mathf.Max(66, (equipped.Count + 1) * 24);
+            _equipment.rectTransform.sizeDelta = new Vector2(490, contentHeight); _equipmentContent.sizeDelta = new Vector2(0, contentHeight);
         }
 
         /// <summary>id를 선택 부품으로 보관하고 재고 강조를 갱신한다. 구매품을 소비하거나 장착하지 않는다.</summary>
-        private void SelectPart(string id) { _selectedPart = id; _notice = ""; Refresh(); }
+        private void SelectPart(string id) { _selectedPart = _selectedPart == id ? "" : id; _notice = ""; Refresh(); }
 
-        /// <summary>입력한 키 이름과 선택 부품 ID로 교체를 요청한다. 유효하지 않은 키캡 위치는 안내하고 전송하지 않는다.</summary>
+        /// <summary>입력한 키 이름과 구매 부품 ID로 동일 부품 위치의 능력 강화를 요청한다. 유효하지 않은 키 이름은 안내하고 전송하지 않는다.</summary>
         private void EquipSelected()
         {
             KeyboardPartDefinition part = PvpInventory.Find(_session.Catalog, _selectedPart);
             if (part is KeycapDefinition && (!Enum.TryParse(_key.text.Trim(), true, out Key parsed) || !Enum.IsDefined(typeof(Key), parsed) || parsed == Key.None))
             { _selection.text = "키 이름을 확인하세요. 예: A, Space"; return; }
             Key key = Enum.TryParse(_key.text.Trim(), true, out Key value) ? value : Key.A; _session.Equip(_selectedPart, key);
+        }
+
+        /// <summary>선택한 구매 키캡을 타건하거나 자기 키보드에서 클릭한 위치에 강화 요청한다. 입력 필드 편집과 UI 클릭 및 상점 마감 이후에는 요청하지 않는다.</summary>
+        private void ProcessShopInput()
+        {
+            if (_session.Phase != PvpPhase.Shop || _session.Remaining <= 0 || !_canApplySelected) return;
+            GameObject selected = EventSystem.current.currentSelectedGameObject;
+            if (selected != null && selected.GetComponentInParent<InputField>() != null) return;
+            if (Keyboard.current != null)
+                foreach (var input in Keyboard.current.allKeys)
+                    if (input.wasPressedThisFrame) { _session.Equip(_selectedPart, input.keyCode); return; }
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !EventSystem.current.IsPointerOverGameObject()
+                && _session.TryGetShopKey(Mouse.current.position.ReadValue(), out Key key)) _session.Equip(_selectedPart, key);
         }
 
         /// <summary>닉네임 입력을 세션에 전달한다. 입장 성공 시 입력 포커스를 해제하고 방 목록을 갱신한다.</summary>
@@ -446,12 +477,12 @@ namespace Game.Pvp
         /// <summary>label과 크기로 버튼을 만들고 action을 C# 클릭 매핑에 등록한다. 활성 상태이면 한 번 구독하고 버튼을 반환한다.</summary>
         private KeyboardEditButton Button(Transform parent, string label, Vector2 position, Vector2 size, Action action)
         {
-            RectTransform rect = Panel("Action", parent, position, size, BLUE); Image image = rect.GetComponent<Image>(); image.raycastTarget = true;
+            RectTransform rect = Panel("Action", parent, position, size, _blue); Image image = rect.GetComponent<Image>(); image.raycastTarget = true;
             KeyboardEditButton button = rect.gameObject.AddComponent<KeyboardEditButton>(); button.targetGraphic = image;
             ColorBlock colors = button.colors; colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f); colors.pressedColor = new Color(0.65f, 0.75f, 0.9f);
             colors.disabledColor = new Color(0.45f, 0.45f, 0.45f, 0.75f); button.colors = colors;
             Navigation navigation = button.navigation; navigation.mode = Navigation.Mode.None; button.navigation = navigation;
-            Label("Label", rect, new Vector2(10, 2), size - new Vector2(20, 4), size.y < 40 ? 18 : 22, CREAM, TextAnchor.MiddleCenter).text = label;
+            Label("Label", rect, new Vector2(10, 2), size - new Vector2(20, 4), size.y < 40 ? 18 : 22, _cream, TextAnchor.MiddleCenter).text = label;
             _actions.Add(button, action); if (_bound) button.Clicked += HandleClick; return button;
         }
 
@@ -463,7 +494,7 @@ namespace Game.Pvp
         {
             RectTransform rect = Panel(name, parent, position, size, Color.white); Image image = rect.GetComponent<Image>(); image.raycastTarget = true;
             InputField field = rect.gameObject.AddComponent<InputField>(); field.targetGraphic = image;
-            field.textComponent = Label("Text", rect, new Vector2(12, 2), size - new Vector2(24, 4), 24, NAVY);
+            field.textComponent = Label("Text", rect, new Vector2(12, 2), size - new Vector2(24, 4), 24, _navy);
             field.textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
             field.placeholder = Label("Placeholder", rect, new Vector2(12, 2), size - new Vector2(24, 4), 22, new Color(0.3f, 0.35f, 0.45f));
             ((Text)field.placeholder).text = placeholder; return field;

@@ -69,6 +69,7 @@ public static class PvpSceneBuilder
         Set(battlefield, "_storage", storage);
         Set(battlefield, "_catalog", AssetDatabase.LoadAssetAtPath<KeyboardPartCatalog>(partsPath));
         Set(battlefield, "_layout", AssetDatabase.LoadAssetAtPath<TournamentKeyLayout>(layoutPath));
+        Set(battlefield, "_settings", AssetDatabase.LoadAssetAtPath<TournamentSettings>(settingsPath));
         var battlefieldData = new SerializedObject(battlefield);
         battlefieldData.FindProperty("_respawnDelay").floatValue = respawnDelay;
         battlefieldData.FindProperty("_spawners").arraySize = 2; battlefieldData.FindProperty("_points").arraySize = 2;

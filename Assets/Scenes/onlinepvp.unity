@@ -192,6 +192,7 @@ MonoBehaviour:
   _storage: {fileID: 2666267}
   _catalog: {fileID: 11400000, guid: 5670dc41f3f14064aefadceadc016d7b, type: 2}
   _layout: {fileID: 11400000, guid: 798199fc0c626b34c932ace9e3d0cc0a, type: 2}
+  _settings: {fileID: 11400000, guid: 875b12496b4b03b4f99432d8449c85a6, type: 2}
   _respawnDelay: 0.3
 --- !u!114 &2666269
 MonoBehaviour:

@@ -38,10 +38,11 @@ namespace Game.Pvp
             public Board(PvpBattlefield owner, int index, string original, PvpInventory inventory, bool authority)
             {
                 _owner = owner; _index = index; _original = original; _inventory = inventory; _authority = authority;
-                _spawner = owner._spawners[index]; _point = owner._points[index];
+                _spawner = owner._spawners[index]; _point = owner._points[index == owner._localIndex ? 0 : 1];
                 var scoreObject = new GameObject("PvpScore" + index); scoreObject.transform.SetParent(owner.transform);
                 _score = scoreObject.AddComponent<KeyboardScoreCombo>(); _score.SetTrackingEnabled(authority);
                 _spawner.KeyboardCreated += Created; _spawner.KeyboardSpawned += Spawned;
+                Debug.Log($"[PvP] board player={index} local={owner._localIndex} view={(index == owner._localIndex ? "near" : "far")} position={_point.position}");
                 try { Spawn(false, 1); }
                 catch { Dispose(); throw; }
             }
@@ -60,13 +61,17 @@ namespace Game.Pvp
                 _input.SetInputEnabled(false); _input.SetAttackEnabled(false);
                 KeyboardCustomization custom = obj.GetComponent<KeyboardCustomization>();
                 custom.PrepareForBattle(); _owner._storage.ApplyCustomization(PvpKeyboardTransfer.Validate(_original), custom);
-                ApplyEquipment(custom);
+                TournamentInventory rules = ConfigureInventory(_inventory);
+                _input.GetComponent<KeyboardAttackController>().ConfigurePartDamage(rules.DamageBonus);
+                obj.GetComponent<KeyboardAbilityOutline>().ConfigureInventory(rules);
                 _keys = _input.GetKeycapLayout(); _destruction = obj.GetComponent<KeyboardDestruction>();
                 if (_authority)
                 {
                     _score.SetKeyboard(_input);
                     _effects = obj.GetComponent<TournamentKeyboardEffects>();
-                    _effects.InitializePvp(_owner._layout); _effects.PvpEffectApplied += EffectApplied;
+                    _effects.InitializePvp(rules, _owner._layout, _owner._settings.KeycapHealth, _owner._settings.GetRequiredBrokenCount(_owner._round));
+                    _effects.PvpEffectApplied += EffectApplied;
+                    Debug.Log($"[PvP] rules player={_index} round={_owner._round} hp={_owner._settings.KeycapHealth} required={_owner._settings.GetRequiredBrokenCount(_owner._round)} unlocked={rules.Keycaps.Count} damageBonus={rules.DamageBonus}");
                     _destruction.Breaking += Breaking; _destruction.Finished += Finished;
                     var required = _input.GetDestructionKeycaps();
                     required.RemoveAll(health => !health.gameObject.activeInHierarchy);
@@ -78,23 +83,16 @@ namespace Game.Pvp
                     obj.GetComponent<KeyboardAttackController>().enabled = false;
                     obj.GetComponent<TournamentKeyboardEffects>().enabled = false;
                     _destruction.enabled = false;
+                    foreach (KeycapHealth health in _keys.Values) health.ConfigureTournamentHealth(_owner._settings.KeycapHealth);
                 }
                 if (_index == _owner._localIndex && AudioManager.instance != null) AudioManager.instance.SelectKeyboardEffects(custom);
             }
 
-            /// <summary>inventory의 구매 장착 구성을 custom에 적용한다. 원래 구성과 다른 위치만 교체하고 구매 전체 부품의 직접 피해를 합산한다.</summary>
-            private void ApplyEquipment(KeyboardCustomization custom)
+            /// <summary>inventory를 실제 원본 키보드와 AI 후보 풀로 복원한다. 외형·이미지는 변경하지 않고 기존 토너먼트 재고를 반환한다.</summary>
+            public TournamentInventory ConfigureInventory(PvpInventory inventory)
             {
-                int damage = 0;
-                for (int index = 0; index < _inventory.Equipment.Count; index++)
-                {
-                    KeyboardPartDefinition part = PvpInventory.Find(_owner._catalog, _inventory.Equipment[index]);
-                    if (part == null || !custom.ApplyPvpPart(part, (Key)_inventory.Positions[index])) throw new InvalidOperationException("구매 부품 적용 실패");
-                    if (part is SwitchDefinition axis) damage += axis.DamageBonus;
-                    else if (part is PlateDefinition plate) damage += plate.DamageBonus;
-                    else if (part is HousingDefinition housing) damage += housing.DamageBonus;
-                }
-                custom.GetComponent<KeyboardAttackController>().ConfigurePartDamage(damage);
+                return inventory.Configure(_object.GetComponent<KeyboardCustomization>(), PvpKeyboardTransfer.Validate(_original),
+                    _owner._catalog, _owner._layout, _owner._settings.Capacity);
             }
 
             /// <summary>스폰 완료된 obj의 입력을 공통 경기 상태에 맞추고 콤보 타이머를 재개한다. 로딩 단계에서는 입력을 계속 차단한다.</summary>
@@ -108,8 +106,8 @@ namespace Game.Pvp
             private void Finished() { _respawnAt = Time.realtimeSinceStartupAsDouble + _owner._respawnDelay; }
 
             /// <summary>확정된 key·part 능력 표현을 impact 여부와 현재 키보드 세대로 알린다. 확률과 대상 판정은 다시 실행하지 않는다.</summary>
-            private void EffectApplied(Key key, KeycapDefinition part, bool impact)
-            { if (_owner._active && part != null) _owner.EffectConfirmed?.Invoke(_index, _generation, key, part.Id, impact); }
+            private void EffectApplied(Key key, KeycapDefinition part, bool impact, int level)
+            { if (_owner._active && part != null) _owner.EffectConfirmed?.Invoke(_index, _generation, key, part.Id, impact, level); }
 
             /// <summary>현재 공통 마감 시각과 스폰 상태에 따라 입력·공격·점수 수집을 허용하거나 잠근다.</summary>
             private void Gate()
@@ -155,7 +153,7 @@ namespace Game.Pvp
             public void PlayPress(Key key, int generation) { if (!_authority && generation == _generation) _input.PlayReplicatedPress(key); }
 
             /// <summary>권한자가 선택한 key에 partId의 확정 능력 연출을 재생한다. impact 상태 마커는 표시하되 피해·점수·능력 재귀는 실행하지 않는다.</summary>
-            public void PlayEffect(Key key, int generation, string partId, bool impact)
+            public void PlayEffect(Key key, int generation, string partId, bool impact, int level)
             {
                 if (_authority || generation != _generation || !_keys.TryGetValue(key, out KeycapHealth target)) return;
                 var part = PvpInventory.Find(_owner._catalog, partId) as KeycapDefinition;
@@ -167,7 +165,15 @@ namespace Game.Pvp
                 KeycapAbilityVfx.Play(impact ? ability.ImpactEffectPrefab : ability.ActivationEffectPrefab, _object.transform,
                     position, position, impact ? ability.ImpactLifetime : ability.EffectLifetime, ability.EffectScale, _input, target.transform);
                 if (impact) foreach (KeycapAbilityEffect effect in ability.Effects)
-                    if (effect.Kind != KeycapEffectKind.Damage) target.ApplyStatus(effect.Status, TournamentInventory.MaxLevel);
+                    if (effect.Kind != KeycapEffectKind.Damage) target.ApplyStatus(effect.Status, level);
+            }
+
+            /// <summary>worldTarget이 이 보드의 실제 키캡이면 대응 키를 반환한다. 상대 보드나 장식 오브젝트는 선택하지 않는다.</summary>
+            public bool TryGetKey(Transform worldTarget, out Key key)
+            {
+                KeycapHealth target = worldTarget.GetComponentInParent<KeycapHealth>();
+                foreach (var pair in _keys) if (pair.Value == target) { key = pair.Key; return true; }
+                key = Key.None; return false;
             }
 
             /// <summary>inventory의 새 장착을 미리보기로 복원한다. 전투와 타이머를 시작하지 않고 새 구성만 표시한다.</summary>
@@ -194,17 +200,19 @@ namespace Game.Pvp
         [SerializeField] private KeyboardCustomizationStorage _storage;
         [SerializeField] private KeyboardPartCatalog _catalog;
         [SerializeField] private TournamentKeyLayout _layout;
+        [SerializeField] private TournamentSettings _settings;
         [SerializeField] private float _respawnDelay = 0.3f;
         private Board[] _boards;
         private bool _active;
         private int _localIndex;
         private double _deadline;
-        public event Action<int, int, Key, string, bool> EffectConfirmed;
+        private int _round;
+        public event Action<int, int, Key, string, bool, int> EffectConfirmed;
 
         /// <summary>양측 originals와 inventories를 새 라운드의 독립 키보드로 구성한다. localIndex로 로컬 음향 대상을 선택하며 authority만 판정한다.</summary>
-        public void Load(string[] originals, PvpInventory[] inventories, bool authority, int localIndex)
+        public void Load(string[] originals, PvpInventory[] inventories, bool authority, int localIndex, int round)
         {
-            Clear(); _localIndex = localIndex;
+            Clear(); _localIndex = localIndex; _round = round;
             _boards = new Board[2];
             try { for (int index = 0; index < 2; index++) _boards[index] = new Board(this, index, originals[index], inventories[index], authority); }
             catch { Clear(); throw; }
@@ -240,8 +248,19 @@ namespace Game.Pvp
         public void PlayPress(int player, int generation, Key key) { if (_boards != null && player >= 0 && player < 2) _boards[player].PlayPress(key, generation); }
 
         /// <summary>player와 generation에 속하는 확정 능력 연출을 재생한다. partId와 impact는 표현만 선택하며 전투를 재계산하지 않는다.</summary>
-        public void PlayEffect(int player, int generation, Key key, string partId, bool impact)
-        { if (_boards != null && player >= 0 && player < 2) _boards[player].PlayEffect(key, generation, partId, impact); }
+        public void PlayEffect(int player, int generation, Key key, string partId, bool impact, int level)
+        { if (_boards != null && player >= 0 && player < 2) _boards[player].PlayEffect(key, generation, partId, impact, level); }
+
+        /// <summary>player의 실제 키보드를 기준으로 candidate의 AI 강화 재고를 복원한다. 요청 판정용이며 현재 보드나 원본은 변경하지 않는다.</summary>
+        public void PrepareInventory(int player, PvpInventory candidate) { _boards[player].ConfigureInventory(candidate); }
+
+        /// <summary>screenPosition에서 가까운 실제 키캡을 찾아 로컬 보드의 key를 반환한다. 다른 플레이어 위치는 강화 대상으로 허용하지 않는다.</summary>
+        public bool TryGetLocalKey(Vector2 screenPosition, out Key key)
+        {
+            key = Key.None;
+            return _boards != null && Physics.Raycast(Camera.main.ScreenPointToRay(screenPosition), out RaycastHit hit)
+                && _boards[_localIndex].TryGetKey(hit.transform, out key);
+        }
 
         /// <summary>player의 inventory 장착 상태를 상점 미리보기에 반영한다. 원본 구성은 변경하지 않는다.</summary>
         public void Refresh(int player, PvpInventory inventory) { _boards?[player].Refresh(inventory); }

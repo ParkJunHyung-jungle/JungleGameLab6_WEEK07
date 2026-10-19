@@ -13,7 +13,7 @@ namespace Game.Pvp
     public sealed class PvpSession : MonoBehaviour
     {
         private const int TOTAL_ROUNDS = 5;
-        private const double ROUND_SECONDS = 30;
+        private const string RULES_VERSION = "ai-upgrades-v2";
         private const double SHOP_SECONDS = 20;
         private const double PREPARATION_TIMEOUT = 45;
 
@@ -83,6 +83,7 @@ namespace Game.Pvp
 
         void Awake()
         {
+            _contentVersion += "/" + RULES_VERSION;
             _playerId = Guid.NewGuid().ToString("N");
             _transport = new PvpLanTransport();
             _transport.Received += Receive; _transport.ConnectedPeer += Connected;
@@ -202,7 +203,7 @@ namespace Game.Pvp
                 else if (message.Kind == "press" && message.Match == _match && message.Round == _round)
                     _battlefield.PlayPress(message.Value, message.Generation, (Key)int.Parse(message.Text, CultureInfo.InvariantCulture));
                 else if (message.Kind == "effect" && message.Match == _match && message.Round == _round && _phase == PvpPhase.Battle && ServerTime < _end)
-                    _battlefield.PlayEffect(message.Value, message.Generation, (Key)int.Parse(message.Text, CultureInfo.InvariantCulture), message.Id, message.Json == "impact");
+                    _battlefield.PlayEffect(message.Value, message.Generation, (Key)int.Parse(message.Text, CultureInfo.InvariantCulture), message.Id, message.Json == "impact", Mathf.Clamp((int)message.Time, 1, TournamentInventory.MaxLevel));
                 else if (message.Kind == "notice") { _message = message.Text; Changed?.Invoke(); }
             }
             catch (Exception exception) { Fail("수신 처리 실패: " + exception.Message); }
@@ -249,18 +250,19 @@ namespace Game.Pvp
                 return;
             }
             if (_phase != PvpPhase.Shop || ServerTime >= _end) return;
-            PvpInventory inventory = _inventories[player]; bool accepted = false;
-            if (message.Kind == "buy") accepted = inventory.Buy(message.Value, message.Generation, _catalog, _layout, _settings);
-            else if (message.Kind == "reroll" && message.Generation == inventory.OfferGeneration) accepted = inventory.Reroll(_catalog, _layout, _settings);
-            else if (message.Kind == "equip")
+            if (message.Kind != "buy" && message.Kind != "reroll" && message.Kind != "equip" && message.Kind != "undoUpgrade") return;
+            PvpInventory inventory = _inventories[player];
+            PvpInventory candidate = JsonUtility.FromJson<PvpInventory>(JsonUtility.ToJson(inventory));
+            _battlefield.PrepareInventory(player, candidate);
+            bool accepted = false;
+            if (message.Kind == "buy") accepted = candidate.Buy(message.Value, message.Generation, _catalog, _layout, _settings);
+            else if (message.Kind == "reroll" && message.Generation == inventory.OfferGeneration) accepted = candidate.Reroll(_catalog, _layout, _settings);
+            else if (message.Kind == "equip") accepted = candidate.Equip(message.Text, (Key)message.Value, _catalog, _layout);
+            else if (message.Kind == "undoUpgrade") accepted = candidate.Undo(message.Text, _catalog, _layout);
+            if (accepted)
             {
-                PvpInventory candidate = JsonUtility.FromJson<PvpInventory>(JsonUtility.ToJson(inventory));
-                accepted = candidate.Equip(message.Text, (Key)message.Value, _catalog, _layout);
-                if (accepted)
-                {
-                    try { _battlefield.Refresh(player, candidate); _inventories[player] = candidate; inventory = candidate; }
-                    catch { _battlefield.Refresh(player, inventory); throw; }
-                }
+                try { _battlefield.Refresh(player, candidate); _inventories[player] = candidate; inventory = candidate; }
+                catch { _battlefield.Refresh(player, inventory); throw; }
             }
             if (accepted) { Debug.Log($"[PvP] 승인 {message.Kind} player={player} round={_round} seq={message.Sequence} balance={inventory.Currency}"); Publish(); }
             else Notice("요청이 거부되었습니다. 상품·재고·잔액 또는 마감 상태를 확인하세요.");
@@ -283,8 +285,15 @@ namespace Game.Pvp
         /// <summary>현재 상품 세대의 유료 리롤을 요청한다. 권한자가 실제 비용·횟수·공통 마감을 검사한다.</summary>
         public void Reroll() { if (_phase == PvpPhase.Shop && ServerTime < _end) Request("reroll", generation: LocalInventory().OfferGeneration); }
 
-        /// <summary>partId 구매품을 key 위치 또는 해당 전체 부품 슬롯에 교체 적용하도록 요청한다. 작업실 원본은 수정하지 않는다.</summary>
+        /// <summary>partId 구매 묶음을 동일한 key 부품 위치에 해금·강화하도록 요청한다. 전체 부품은 구매 즉시 적용되며 외형과 원본은 유지한다.</summary>
         public void Equip(string partId, Key key) { if (_phase == PvpPhase.Shop && ServerTime < _end) Request("equip", (int)key, text: partId); }
+
+        /// <summary>partId 키캡의 마지막 능력 단계를 취소하도록 요청한다. 공통 상점 마감 이후에는 전송하지 않는다.</summary>
+        public void UndoUpgrade(string partId) { if (_phase == PvpPhase.Shop && ServerTime < _end) Request("undoUpgrade", text: partId); }
+
+        /// <summary>screenPosition에서 클릭한 로컬 키보드의 키를 반환한다. 상점이 열려 있을 때만 강화 위치 선택을 허용한다.</summary>
+        public bool TryGetShopKey(Vector2 screenPosition, out Key key)
+        { key = Key.None; return _phase == PvpPhase.Shop && ServerTime < _end && _battlefield.TryGetLocalKey(screenPosition, out key); }
 
         /// <summary>로컬 플레이어의 읽기용 인벤토리 복사본을 반환한다. 외부 UI가 권한 상태를 직접 바꾸지 못하게 JSON으로 복사한다.</summary>
         public PvpInventory LocalInventory() { return JsonUtility.FromJson<PvpInventory>(JsonUtility.ToJson(_inventories[LocalIndex])); }
@@ -312,7 +321,7 @@ namespace Game.Pvp
             _loadToken = _match + "/" + _round + "/" + _phase;
             try
             {
-                _battlefield.Load(_originals, _inventories, _host, LocalIndex); _loadFailed = false;
+                _battlefield.Load(_originals, _inventories, _host, LocalIndex, _round); _loadFailed = false;
                 Request("loaded");
             }
             catch (Exception exception)
@@ -328,7 +337,7 @@ namespace Game.Pvp
             if (!_loaded[0] || !_loaded[1]) return;
             if (_phase == PvpPhase.ShopPreparing)
             { _start = ServerTime; _end = _start + SHOP_SECONDS; SetPhase(PvpPhase.Shop); }
-            else { _start = ServerTime + 3; _end = _start + ROUND_SECONDS; SetPhase(PvpPhase.Countdown); }
+            else { _start = ServerTime + 3; _end = _start + _settings.BattleDuration; SetPhase(PvpPhase.Countdown); }
             Publish();
         }
 
@@ -391,7 +400,7 @@ namespace Game.Pvp
                 if (phase == PvpPhase.Loading || phase == PvpPhase.ShopPreparing) _message = "양쪽 키보드·이미지 준비 중… 실패하면 재시도하거나 나갈 수 있습니다.";
                 else if (phase == PvpPhase.Countdown) _message = "준비 완료 · 공통 카운트다운";
                 else if (phase == PvpPhase.Battle) _message = "자신의 키보드를 타건하세요.";
-                else if (phase == PvpPhase.Shop) _message = "상점 20초 · 마감 이후 구매와 교체는 잠깁니다.";
+                else if (phase == PvpPhase.Shop) _message = "상점 20초 · 같은 부품의 능력을 해금·강화하세요. 마감 후에는 변경할 수 없습니다.";
                 else if (phase == PvpPhase.Finished) _message = "5라운드 종료 · 최종 결과";
             }
             _phase = phase; Changed?.Invoke();
@@ -401,13 +410,13 @@ namespace Game.Pvp
         private void Notice(string message) { _message = message; _transport.Send(new PvpWire("notice", text: message)); Changed?.Invoke(); }
 
         /// <summary>권한자가 확정한 player의 능력 대상 key를 세대와 함께 전송한다. 표현 전송만 초당 100회로 제한하고 실제 판정은 생략하지 않는다.</summary>
-        private void HandleEffect(int player, int generation, Key key, string partId, bool impact)
+        private void HandleEffect(int player, int generation, Key key, string partId, bool impact, int level)
         {
             if (!_host || _phase != PvpPhase.Battle || ServerTime >= _end) return;
             if (ServerTime - _effectWindow >= 1) { _effectWindow = ServerTime; _effectCount = 0; }
             if (++_effectCount > 100) return;
             _transport.Send(new PvpWire("effect", partId, ((int)key).ToString(CultureInfo.InvariantCulture), impact ? "impact" : "activation",
-                _match, _round, generation, value: player));
+                _match, _round, generation, time: level, value: player));
         }
 
         /// <summary>연결 해제를 대기 참가자 퇴장 또는 대전 중단으로 처리한다. 방장이 대기 중이면 빈자리로 돌아간다.</summary>

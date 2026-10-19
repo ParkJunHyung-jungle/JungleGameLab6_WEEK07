@@ -66,7 +66,7 @@ namespace Game.Player
             _panel = (RectTransform)transform;
             _panel.anchorMin = _panel.anchorMax = _panel.pivot = Vector2.one;
             _panel.anchoredPosition = new Vector2(-28f, -24f);
-            _panel.sizeDelta = new Vector2(414f, 888f);
+            _panel.sizeDelta = new Vector2(414f, 960f);
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _roundedSprite = CreateRoundedSprite(Color.white, Color.white, 9f);
             _circleSprite = CreateRoundedSprite(Color.white, Color.white, 32f);
@@ -79,14 +79,15 @@ namespace Game.Player
             Shadow shadow = gameObject.AddComponent<Shadow>();
             shadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
             shadow.effectDistance = new Vector2(0f, -10f);
-            Image background = CreateImage("Card", _panel, 1f, 1f, 412f, 886f, Color.white);
+            Image background = CreateImage("Card", _panel, 1f, 1f, 412f, 958f, Color.white);
             background.sprite = _cardSprite;
             Label(_panel, "▦  KEYBOARD WORKSHOP", 22f, 22f, 270f, 24f, 11, _mutedColor);
             Label(_panel, "CUSTOM / 02", 292f, 22f, 100f, 24f, 10, _mutedColor, TextAnchor.MiddleRight);
             Label(_panel, "LED 커스터마이징", 22f, 66f, 272f, 34f, 24, Color.white);
             Label(_panel, "내 키보드에 어울리는 빛을 디자인하세요.", 22f, 102f, 292f, 24f, 12, _mutedColor);
-            _powerText = Label(_panel, "ON", 300f, 78f, 32f, 24f, 11, Color.white, TextAnchor.MiddleRight);
-            KeyboardEditButton power = Button("Power", _panel, 344f, 78f, 43f, 24f, Color.white);
+            Text powerTitle = Label(_panel, "LED 전원", 22f, 142f, 180f, 22f, 13, Color.white);
+            _powerText = Label(_panel, "ON", 78f, 176f, 80f, 24f, 13, Color.white);
+            KeyboardEditButton power = Button("Power", _panel, 22f, 176f, 43f, 24f, Color.white);
             power.transition = Selectable.Transition.None;
             power.Clicked += HandlePowerClicked;
             _powerTrack = (Image)power.targetGraphic;
@@ -122,6 +123,12 @@ namespace Game.Player
             Label(_panel, "0 · 느리게", 22f, 846f, 160f, 18f, 10, _mutedColor);
             Label(_panel, "10 · 빠르게", 232f, 846f, 160f, 18f, 10, _mutedColor, TextAnchor.MiddleRight);
             CreatePatternMenu();
+            foreach (RectTransform control in _panel)
+            {
+                if (control == powerTitle.rectTransform || control == _powerText.rectTransform
+                    || control == power.transform || control.anchoredPosition.y > -142f) continue;
+                control.anchoredPosition += Vector2.down * 72f;
+            }
         }
 
         /// <summary>
@@ -337,17 +344,24 @@ namespace Game.Player
 
         /// <summary>
         /// color를 LED에 즉시 적용하고 syncPicker에 따라 색상환도 동기화한다.
-        /// 저장된 패턴과 전원은 유지하고 열려 있는 패턴 목록을 닫는다.
+        /// 색상 선택 시 LED 전원을 켜고 전원 표시를 갱신하며 패턴은 유지하고 선택 목록을 닫는다.
         /// </summary>
         private void ApplyColor(Color color, bool syncPicker)
         {
             string previous = ColorUtility.ToHtmlStringRGBA(_customization.LEDColor);
             _customization.SetLEDColor(color);
+            if (!_customization.LEDEnabled)
+            {
+                _customization.SetLEDEnabled(true);
+                Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Power",
+                    changed: true, details: "true");
+            }
             string applied = ColorUtility.ToHtmlStringRGBA(_customization.LEDColor);
             Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Color",
                 previous, changed: previous != applied, details: applied);
             _patternMenu.SetActive(false);
             RefreshColor(syncPicker);
+            RefreshPower();
         }
 
         /// <summary>

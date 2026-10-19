@@ -11,7 +11,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/TestScenes/TestScene_Battle.unity
     guid: 85fd5f043af80f946be07613fffa6a1e
-  - enabled: 1
+  - enabled: 0
     path: Assets/Legacy/Scene/Main_Legacy.unity
     guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:

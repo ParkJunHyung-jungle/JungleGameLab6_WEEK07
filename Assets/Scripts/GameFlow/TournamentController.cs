@@ -14,6 +14,11 @@ namespace Game.Tournament
     public sealed class TournamentController : MonoBehaviour
     {
         private const string WORKSHOP_SCENE_PATH = "Assets/Scenes/WorkShop2.unity";
+        private static TournamentController _returnPauseOwner;
+        private static int _returnResumeFrame = -1;
+
+        public static bool IsReturnPaused => _returnPauseOwner != null
+            && (_returnPauseOwner._returnPaused || Time.frameCount <= _returnResumeFrame);
 
         public static event Action<TournamentController, bool, string> PlaytestShopStateChanged;
         public static event Action<TournamentController, string> PlaytestInventorySnapshotRequested;
@@ -38,6 +43,10 @@ namespace Game.Tournament
         private int _rerollsUsed;
         private int _outcome;
         private bool _initialized;
+        private bool _workshopReturnStarted;
+        private bool _returnPaused;
+        private bool _abandoned;
+        private float _returnTimeScale;
         private bool _suddenDeath;
         private string _message;
         private long _enemyCurrency;
@@ -50,7 +59,7 @@ namespace Game.Tournament
         public long Currency { get; private set; }
         public long EnemyCurrency => _enemyCurrency;
         public TournamentResult Result { get; private set; }
-        public bool IsBattleActive => Phase == TournamentPhase.Battle && _manager.IsTimerRunning;
+        public bool IsBattleActive => !_workshopReturnStarted && Phase == TournamentPhase.Battle && _manager.IsTimerRunning;
         public TournamentInventory Inventory => _inventory;
         public KeycapDefinition SelectedKeycap => _selectedKeycap;
         public TournamentInventory PlaytestEnemyInventory => _enemyInventory;
@@ -85,6 +94,8 @@ namespace Game.Tournament
             Currency = 0;
             _enemyCurrency = 0;
             Result = null;
+            _workshopReturnStarted = false;
+            _abandoned = false;
             Round = 1;
             KeyboardCustomizationState selection = TournamentKeyboardSession.GetSelection();
             if (selection == null) _keyboardStorage.TryReadCustomization(out selection);
@@ -144,6 +155,7 @@ namespace Game.Tournament
         /// <summary>outcome과 양측 점수로 결과와 독립 재화를 확정한다. 무승부 연장전은 종료 후 점수로 정산하여 중복 지급하지 않는다.</summary>
         private void HandleBattleFinished(int outcome)
         {
+            if (Result != null || _workshopReturnStarted) return;
             _outcome = outcome;
             long playerScore = _manager.PlaytestPlayerScore.Score;
             long enemyScore = _manager.PlaytestEnemyScore.Score;
@@ -172,6 +184,7 @@ namespace Game.Tournament
         /// <summary>현재 단계에 따라 연장전, 상점, 다음 대전 또는 작업실 복귀를 요청한다. 상점에서는 미리보기 구성을 전투 상태로 확정한다.</summary>
         public void Continue()
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (Phase == TournamentPhase.Result)
             {
                 if (_outcome == 0) BeginBattle(true);
@@ -194,8 +207,12 @@ namespace Game.Tournament
         }
 
         /// <summary>종료된 토너먼트의 재고와 임시 구성을 비우고 Workshop2로 복귀한다. Result는 복귀 이벤트에 전달한다.</summary>
-        private void ReturnToWorkshop()
+        public void ReturnToWorkshop()
         {
+            if (_workshopReturnStarted || (!_abandoned && Phase != TournamentPhase.Finished)) return;
+            _workshopReturnStarted = true;
+            _manager.StopTournamentForReturn();
+            _workspace.Hide();
             PlaytestResearchSession.Emit("WorkshopReturnRequested", "ContinueButton");
             PlaytestInventorySnapshotRequested?.Invoke(this, "BeforeTournamentReset");
             Currency = 0;
@@ -204,8 +221,41 @@ namespace Game.Tournament
             _enemyInventory = new TournamentInventory(_settings.Capacity);
             _selectedKeycap = null;
             TournamentKeyboardSession.UpdateCurrent(_keyboardStorage.GetDefaultCustomization());
+            TournamentKeyboardSession.RequestWorkshopReturn();
+            ReleaseReturnPause(true);
             if (WorkshopReturnRequested != null) WorkshopReturnRequested.Invoke(Result);
             else SceneManager.LoadScene(WORKSHOP_SCENE_PATH);
+        }
+
+        /// <summary>현재 시간 배율을 보관하고 복귀 확인창의 정지를 시작한다. 중복 요청이나 다른 도움말 정지 중에는 false를 반환한다.</summary>
+        public bool PauseForWorkshopReturn()
+        {
+            if (IsReturnPaused || _workshopReturnStarted || Game.Tutorials.FirstEncounterTutorial.IsBlocking) return false;
+            _returnTimeScale = Time.timeScale;
+            _returnPauseOwner = this;
+            _returnPaused = true;
+            Time.timeScale = 0f;
+            return true;
+        }
+
+        /// <summary>leaving이 false이면 원래 시간 배율로 돌아가고 한 프레임 동안 남은 입력을 차단한다. 복귀 확정 시에는 작업실에 정지를 남기지 않는다.</summary>
+        public void ReleaseReturnPause(bool leaving)
+        {
+            if (_returnPauseOwner != this) return;
+            _returnPaused = false;
+            _returnResumeFrame = Time.frameCount + 1;
+            Time.timeScale = leaving && _returnTimeScale <= 0f ? 1f : _returnTimeScale;
+            if (leaving) _returnPauseOwner = null;
+        }
+
+        /// <summary>진행 중인 토너먼트를 보상 결과 없이 포기한다. 정상 완료 이벤트 없이 중단을 기록하고 기존 공통 복귀 처리를 한 번 실행한다.</summary>
+        public void AbandonToWorkshop()
+        {
+            if (_workshopReturnStarted || Phase == TournamentPhase.Finished) return;
+            _abandoned = true;
+            Result = null;
+            PlaytestResearchSession.InterruptTournament("Abandoned");
+            ReturnToWorkshop();
         }
 
         /// <summary>플레이어와 로봇에게 독립된 3개 상품을 추첨한다. 로봇은 제시된 순서에서 살 수 있는 상품만 구매한다.</summary>
@@ -269,6 +319,7 @@ namespace Game.Tournament
         /// <summary>설정된 비용을 차감해 상품을 다시 추첨한다. 보유 재화와 남은 리롤 횟수가 부족하면 유지한다.</summary>
         public void Reroll()
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (!CanReroll)
             {
                 Observe("RerollFailed", -1, null, Currency, false, false,
@@ -298,6 +349,7 @@ namespace Game.Tournament
         /// <summary>index 상품을 구매 재고에 보관한다. 잔액과 수량을 검사하고 장착 상태는 유지한다.</summary>
         public void Buy(int index)
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (!CanBuy(index))
             {
                 KeyboardPartDefinition offer = index >= 0 && index < _offers.Length ? _offers[index] : null;
@@ -329,6 +381,7 @@ namespace Game.Tournament
         /// <summary>part 인벤토리 아이템의 좌클릭을 처리한다. 키캡은 선택 상태를 바꾸고 다른 부품은 장착 상태를 갱신한다.</summary>
         public void ActivateInventoryItem(KeyboardPartDefinition part)
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (Phase != TournamentPhase.Shop || part == null || _inventory.GetCount(part) == 0) return;
             if (part is KeycapDefinition keycap)
             {
@@ -355,6 +408,7 @@ namespace Game.Tournament
         /// <summary>part 인벤토리 아이템의 우클릭을 처리한다. 키캡은 마지막 배치를, 다른 부품은 해당 슬롯을 해제한다.</summary>
         public void UnequipInventoryItem(KeyboardPartDefinition part)
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (Phase != TournamentPhase.Shop || part == null) return;
             Key removedKey = Key.None;
             int availableBefore = _inventory.GetAvailableCount(part);
@@ -374,6 +428,7 @@ namespace Game.Tournament
         /// <summary>상점 키보드의 key 입력에 선택된 키캡을 장착한다. 남은 수량이 없으면 선택을 해제하고 작업대 외형을 갱신한다.</summary>
         private void HandleShopKeyPressed(Key key)
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (Phase != TournamentPhase.Shop || _selectedKeycap == null) return;
             KeycapDefinition selected = _selectedKeycap;
             int levelBefore = _inventory.GetKeycapLevel(key);
@@ -409,6 +464,7 @@ namespace Game.Tournament
         /// <summary>최종 결과 화면에서만 씬을 재시작한다. 작업실 선택 원본과 저장 파일은 유지한다.</summary>
         public void Restart()
         {
+            if (IsReturnPaused || _workshopReturnStarted) return;
             if (Phase != TournamentPhase.Finished) return;
             PlaytestResearchSession.Emit("TournamentRestartRequested", "RestartButton");
             _manager.RestartGame();
@@ -436,9 +492,10 @@ namespace Game.Tournament
 
         void OnDestroy()
         {
+            ReleaseReturnPause(true);
             PlaytestShopStateChanged?.Invoke(this, false, "SceneExit");
             if (!_initialized) return;
-            if (!string.IsNullOrEmpty(PlaytestRunId) && Phase != TournamentPhase.Finished)
+            if (!string.IsNullOrEmpty(PlaytestRunId) && Phase != TournamentPhase.Finished && !_abandoned)
                 PlaytestResearchSession.InterruptTournament("SceneExit");
             _manager.TournamentKeyboardCreated -= ConfigureKeyboard;
             _manager.TournamentBattleFinished -= HandleBattleFinished;
@@ -450,6 +507,8 @@ namespace Game.Tournament
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetPlaytestObservers()
         {
+            _returnPauseOwner = null;
+            _returnResumeFrame = -1;
             PlaytestShopStateChanged = null;
             PlaytestInventorySnapshotRequested = null;
             PlaytestShopAction = null;

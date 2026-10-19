@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 
 using UnityEngine;
 
@@ -62,6 +62,7 @@ namespace KeyboardModeling
                 float progress = Mathf.Clamp01(elapsed / duration);
                 transform.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0f, 1f, progress));
                 yield return null;
+                while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
             }
             transform.position = end;
         }

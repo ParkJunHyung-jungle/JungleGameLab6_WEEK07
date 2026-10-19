@@ -61,6 +61,7 @@ public sealed class KeyboardScoreCombo : MonoBehaviour
 
     void Update()
     {
+        if (Game.Tournament.TournamentController.IsReturnPaused) return;
         if (_isTracking) _bonusRemaining = Mathf.Max(0f, _bonusRemaining - Time.deltaTime);
         if (!_isTracking || _combo == 0 || _isTimerPaused)
         {

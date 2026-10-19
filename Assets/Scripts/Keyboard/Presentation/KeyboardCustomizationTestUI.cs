@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -149,7 +149,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
         foreach (var keyControl in keyboard.allKeys)
         {
-            if (!keyControl.wasPressedThisFrame)
+            if (!WindowsSpecialKeyInput.WasPressedThisFrame(keyboard, keyControl.keyCode))
                 continue;
 
             if (_storage.Customization.TryGetPhotoKeycapIndex(keyControl.keyCode, out int keycapIndex))

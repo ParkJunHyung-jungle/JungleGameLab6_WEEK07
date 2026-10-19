@@ -1,9 +1,12 @@
-﻿using System.Collections;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
 
 using Game.Player;
+using Game.Tournament;
+using KeyboardModeling;
 
 namespace Game.Workshop
 {
@@ -17,6 +20,10 @@ namespace Game.Workshop
         [SerializeField] private Vector3 _visitPosition = new Vector3(-3.19f, 1f, 8.25f);
         [SerializeField] private Vector3 _throwOriginOffset = new Vector3(0f, 0.5f, 0f);
         [SerializeField] private Vector3 _throwTargetPosition = new Vector3(-6.7747407f, -1.912f, -1.9889657f);
+
+        [Header("Tournament Return")]
+        [SerializeField] private GameObject _workshopKeyboardPrefab;
+        [SerializeField] private KeyboardCustomizationStorage _storage;
 
         [Header("Movement")]
         [SerializeField, Min(0.01f)] private float _moveDuration = 0.6f;
@@ -38,6 +45,7 @@ namespace Game.Workshop
         [Header("Runtime")]
         private readonly Queue<Rigidbody> _pendingKeyboards = new Queue<Rigidbody>();
         private readonly HashSet<Rigidbody> _queuedKeyboards = new HashSet<Rigidbody>();
+        private readonly Dictionary<Rigidbody, List<Renderer>> _hiddenRenderers = new Dictionary<Rigidbody, List<Renderer>>();
         private bool _sequenceRunning;
 
         void Awake()
@@ -50,6 +58,38 @@ namespace Game.Workshop
             _playerStartPosition = _playerMovement.transform.position;
         }
 
+        void Start()
+        {
+            GameObject keyboard = null;
+            try
+            {
+                if (!TournamentKeyboardSession.TryBeginWorkshopReturn(out KeyboardCustomizationState original)) return;
+                if (_workshopKeyboardPrefab == null || _storage == null)
+                    throw new InvalidOperationException("복귀용 키보드 프리팹과 저장소 연결이 필요합니다.");
+
+                // 활성 프리팹의 Awake와 OnEnable이 끝난 뒤 사진을 포함한 원본을 동기 적용한다.
+                keyboard = Instantiate(_workshopKeyboardPrefab, _hiddenPosition, _workshopKeyboardPrefab.transform.rotation);
+                Rigidbody body = keyboard.GetComponent<Rigidbody>();
+                KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
+                if (body == null || customization == null)
+                    throw new InvalidOperationException("복귀용 키보드에 Rigidbody 또는 KeyboardCustomization이 없습니다.");
+                body.isKinematic = true;
+                body.useGravity = false;
+                body.detectCollisions = false;
+                keyboard.GetComponent<KeyboardInputController>().SetInputEnabled(false);
+                if (!IsKeyboard(body)) keyboard.AddComponent<KeyboardPickupTarget>();
+                _storage.ApplyCustomization(original, customization);
+                if (!RequestReturn(body))
+                    throw new InvalidOperationException("복원된 키보드의 반환 대기열 등록에 실패했습니다.");
+                TournamentKeyboardSession.CompleteWorkshopReturn();
+            }
+            catch (Exception exception)
+            {
+                if (keyboard != null) Destroy(keyboard);
+                Debug.LogError($"토너먼트 키보드 복원 실패. 원본을 메모리에 유지하며 자동 재시도하지 않습니다. {exception}", this);
+            }
+        }
+
         void OnDisable()
         {
             StopAllCoroutines();
@@ -58,9 +98,14 @@ namespace Game.Workshop
                 if (keyboard == null) continue;
                 keyboard.isKinematic = false;
                 keyboard.useGravity = true;
+                keyboard.detectCollisions = true;
                 keyboard.WakeUp();
             }
             _pendingKeyboards.Clear();
+            foreach (List<Renderer> renderers in _hiddenRenderers.Values)
+                foreach (Renderer renderer in renderers)
+                    if (renderer != null) renderer.forceRenderingOff = false;
+            _hiddenRenderers.Clear();
             _queuedKeyboards.Clear();
             _sequenceRunning = false;
             if (_actor != null)
@@ -77,17 +122,42 @@ namespace Game.Workshop
 
             Rigidbody keyboard = other.attachedRigidbody;
             if (keyboard == null || keyboard.isKinematic || !IsKeyboard(keyboard)) return;
-            if (!_queuedKeyboards.Add(keyboard)) return;
+            RequestReturn(keyboard);
+        }
 
-            keyboard.linearVelocity = Vector3.zero;
-            keyboard.angularVelocity = Vector3.zero;
+        /// <summary>
+        /// 준비된 keyboard를 기존 반환 대기열에 등록하고 성공 여부를 반환한다.
+        /// 명시적인 요청은 정적 물리 상태도 허용하며 중복 등록과 연출 중복 실행을 막는다.
+        /// </summary>
+        public bool RequestReturn(Rigidbody keyboard)
+        {
+            if (!isActiveAndEnabled || keyboard == null || !IsKeyboard(keyboard)) return false;
+            if (!_queuedKeyboards.Add(keyboard)) return false;
+
+            if (!keyboard.isKinematic)
+            {
+                keyboard.linearVelocity = Vector3.zero;
+                keyboard.angularVelocity = Vector3.zero;
+            }
+            keyboard.transform.SetParent(null, true);
             keyboard.useGravity = false;
             keyboard.isKinematic = true;
+            keyboard.detectCollisions = false;
+            keyboard.position = _hiddenPosition;
+            var hiddenRenderers = new List<Renderer>();
+            foreach (Renderer renderer in keyboard.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.forceRenderingOff) continue;
+                hiddenRenderers.Add(renderer);
+                renderer.forceRenderingOff = true;
+            }
+            _hiddenRenderers.Add(keyboard, hiddenRenderers);
             _pendingKeyboards.Enqueue(keyboard);
 
-            if (_sequenceRunning) return;
+            if (_sequenceRunning) return true;
             _sequenceRunning = true;
             StartCoroutine(ReturnKeyboardSequence());
+            return true;
         }
 
         /// <summary>
@@ -136,6 +206,7 @@ namespace Game.Workshop
 
                 LaunchKeyboard(keyboard);
                 yield return WaitFor(_waitAfterThrow);
+                _queuedKeyboards.Remove(keyboard);
             }
         }
 
@@ -151,6 +222,7 @@ namespace Game.Workshop
                 if (keyboard != null && _queuedKeyboards.Contains(keyboard)) return true;
                 _pendingKeyboards.Dequeue();
                 _queuedKeyboards.Remove(keyboard);
+                _hiddenRenderers.Remove(keyboard);
             }
 
             keyboard = null;
@@ -158,14 +230,13 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 대기 큐에서 가장 오래 기다린 키보드를 꺼내고 중복 등록 목록에서 제거한다.
-        /// 유효한 항목이 없으면 false를 반환한다.
+        /// 대기 큐에서 가장 오래 기다린 키보드를 꺼내 keyboard로 반환한다.
+        /// 유효한 항목이 없으면 false를 반환하며 연출 중 중복 등록 방지는 유지한다.
         /// </summary>
         private bool TryTakeKeyboard(out Rigidbody keyboard)
         {
             if (!TryPeekKeyboard(out keyboard)) return false;
             _pendingKeyboards.Dequeue();
-            _queuedKeyboards.Remove(keyboard);
             return true;
         }
 
@@ -218,12 +289,15 @@ namespace Game.Workshop
         {
             Vector3 origin = _actor.position + _throwOriginOffset;
             keyboard.position = origin;
+            foreach (Renderer renderer in _hiddenRenderers[keyboard])
+                if (renderer != null) renderer.forceRenderingOff = false;
+            _hiddenRenderers.Remove(keyboard);
             keyboard.useGravity = true;
             keyboard.isKinematic = false;
             keyboard.detectCollisions = true;
             keyboard.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             keyboard.linearVelocity = CalculateLaunchVelocity(origin, _throwTargetPosition);
-            keyboard.angularVelocity = Random.insideUnitSphere * _spinSpeed;
+            keyboard.angularVelocity = UnityEngine.Random.insideUnitSphere * _spinSpeed;
             keyboard.WakeUp();
         }
 

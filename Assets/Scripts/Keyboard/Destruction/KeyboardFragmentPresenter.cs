@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 
 using UnityEngine;
@@ -124,6 +124,7 @@ public sealed class KeyboardFragmentPresenter : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
         }
 
         foreach (Rigidbody body in bodies)

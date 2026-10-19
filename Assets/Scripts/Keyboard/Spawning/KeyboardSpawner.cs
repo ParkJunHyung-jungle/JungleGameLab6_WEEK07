@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 
 using UnityEngine;
@@ -115,6 +115,7 @@ public class KeyboardSpawner : MonoBehaviour
             float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _slideDuration));
             keyboard.transform.position = Vector3.Lerp(startPosition, targetPosition, progress);
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
         }
 
         keyboard.transform.position = targetPosition;
@@ -125,6 +126,7 @@ public class KeyboardSpawner : MonoBehaviour
         {
             delayTimer += Time.deltaTime;
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
         }
 
         // 보호 커버가 존재하면 제거 연출을 시작하고 완전히 소멸될 때까지 대기한다.
@@ -139,6 +141,7 @@ public class KeyboardSpawner : MonoBehaviour
                 while (coverInstance != null)
                 {
                     yield return null;
+                    while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
                 }
             }
         }

@@ -32,6 +32,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private bool _animateFirstSpawn = true;
     [SerializeField, Min(0f)] private float _respawnDelay = 0.3f;
 
+    [Header("Battle Manual Input")]
+    [SerializeField, Min(1)] private int _maximumManualKeys = 8;
+
     [Header("Round Timer Settings")]
     [SerializeField] private bool _timerEnabled = true;
     [SerializeField, Min(1f)] private float _roundTimeLimit = 60f;
@@ -235,6 +238,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
+        if (Game.Tournament.TournamentController.IsReturnPaused) return;
         if (!_timerEnabled || !_isTimerRunning)
         {
             return;
@@ -266,6 +270,7 @@ public class GameManager : MonoBehaviour
 
     void LateUpdate()
     {
+        if (Game.Tournament.TournamentController.IsReturnPaused) return;
         if (!_isSuddenDeath || !_isTimerRunning || (_playerClearFrame < 0 && _enemyClearFrame < 0)) return;
         int result = _playerClearFrame < 0 ? -1 : _enemyClearFrame < 0 ? 1
             : _playerClearFrame == _enemyClearFrame ? 0 : _playerClearFrame < _enemyClearFrame ? 1 : -1;
@@ -293,11 +298,12 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 생성 직후 keyboard에 플레이어 토너먼트 구성을 적용하도록 알린다.
-    /// 입력 활성화와 등장 완료 이벤트 전에 전투 키보드 상태를 확정한다.
+    /// 생성 직후 keyboard에 플레이어 수동 입력 제한을 설정하고 토너먼트 구성 적용을 알린다.
+    /// _maximumManualKeys를 사용하며 입력 활성화와 등장 완료 전에 전투 키보드 상태를 확정한다.
     /// </summary>
     private void HandlePlayerKeyboardCreated(GameObject keyboard)
     {
+        keyboard.GetComponent<KeyboardInputController>().ConfigureBattleManualInput(_maximumManualKeys);
         if (_tournamentController != null) TournamentKeyboardCreated?.Invoke(keyboard, false);
     }
 
@@ -459,6 +465,18 @@ public class GameManager : MonoBehaviour
         _comboHUD.SetTrackingEnabled(false);
         _enemyScoreCombo.SetTrackingEnabled(false);
         NotifyPlaytestRoundEnded(reason, true);
+    }
+
+    /// <summary>복귀 전에 타이머·AI·점수 수집과 모든 교체 코루틴을 종료한다. 활성 전투 키보드를 비활성화해 예약 효과와 늦은 타격 콜백을 취소한다.</summary>
+    public void StopTournamentForReturn()
+    {
+        FreezeTournamentBattle("WorkshopReturn");
+        StopAllCoroutines();
+        UnsubscribeKeyboardDestruction();
+        UnsubscribeEnemyKeyboardDestruction();
+        if (_activeKeyboard != null) _activeKeyboard.SetActive(false);
+        if (_activeEnemyKeyboard != null) _activeEnemyKeyboard.SetActive(false);
+        enabled = false;
     }
 
     /// <summary>
@@ -739,6 +757,7 @@ public class GameManager : MonoBehaviour
         {
             timer += Time.deltaTime;
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
         }
 
         // 이전 키보드 오브젝트가 남아 있다면 정리하고 새 키보드를 스폰한다.
@@ -905,6 +924,7 @@ public class GameManager : MonoBehaviour
         {
             timer += Time.deltaTime;
             yield return null;
+            while (Game.Tournament.TournamentController.IsReturnPaused) yield return null;
         }
 
         // 이전 로봇 키보드 오브젝트가 남아 있다면 정리하고 새 키보드를 스폰한다.

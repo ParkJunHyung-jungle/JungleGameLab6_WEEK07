@@ -42,6 +42,12 @@ namespace KeyboardModeling
         private MeshRenderer[] _keycapShellRenderers;
         private KeyboardSpawnProfile _spawnProfile;
 
+        [Header("Battle Manual Input")]
+        private readonly HashSet<Key> _manualHeldKeys = new HashSet<Key>();
+        private readonly HashSet<Key> _approvedManualKeys = new HashSet<Key>();
+        private int _maximumManualKeys;
+        private bool _manualInputSuspended = true;
+
         public event Action<Key> KeyPressed;
         public event Action KeycapsRestored;
         public event Action<bool> AttackModeChanged;
@@ -264,32 +270,51 @@ namespace KeyboardModeling
 
         void Update()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Tournament.TournamentController.IsReturnPaused)
+            {
+                SuspendManualInput();
+                return;
+            }
             bool hasInputFocus = HasInputFocus();
             Keyboard keyboard = Keyboard.current;
             LogInputStatus(hasInputFocus, keyboard != null);
             if (!_inputEnabled || !hasInputFocus || keyboard == null)
             {
+                SuspendManualInput();
                 RestoreKeys();
                 return;
+            }
+
+            if (_maximumManualKeys > 0)
+            {
+                if (_manualInputSuspended) SynchronizeManualInput(keyboard);
+                // 모든 물리 키의 해제를 먼저 반영하며 파괴된 키캡도 승인 자리를 유지한다.
+                foreach (KeyBinding binding in _bindings)
+                {
+                    if (WindowsSpecialKeyInput.IsPressed(keyboard, binding.Key)) continue;
+                    _manualHeldKeys.Remove(binding.Key);
+                    _approvedManualKeys.Remove(binding.Key);
+                }
             }
 
             bool pressedKeysChanged = false;
             for (int index = 0; index < _bindings.Length; index++)
             {
-                bool unityPressed = keyboard != null && (keyboard[_bindings[index].Key].isPressed || keyboard[_bindings[index].Key].wasPressedThisFrame);
+                bool unityPressed = WindowsSpecialKeyInput.IsPressed(keyboard, _bindings[index].Key);
                 bool isPressed = unityPressed;
                 bool stateChanged = isPressed != _previousPressed[index];
                 bool pressedThisFrame = isPressed && stateChanged;
                 pressedKeysChanged |= stateChanged;
                 _previousPressed[index] = isPressed;
+                bool acceptedPress = pressedThisFrame && (_maximumManualKeys == 0 || TryApproveManualInput(index));
+                bool gameplayPressed = isPressed && (_maximumManualKeys == 0 || _approvedManualKeys.Contains(_bindings[index].Key));
                 if (isPressed)
                 {
                     _lastPressedKey = _bindings[index].Key;
                 }
-                AnimateKey(index, isPressed || _actuatedKeys[index], _hitStopEnabled && Time.timeScale == 0f ? 0f : Time.unscaledDeltaTime);
+                AnimateKey(index, gameplayPressed || _actuatedKeys[index], _hitStopEnabled && Time.timeScale == 0f ? 0f : Time.unscaledDeltaTime);
 
-                if (pressedThisFrame)
+                if (acceptedPress)
                 {
                     PlaytestKeyProcessing?.Invoke(this, _bindings[index].Key);
                     PlayPressSound(_keycapHealths[index]);
@@ -303,14 +328,15 @@ namespace KeyboardModeling
                     }
                 }
 
-                _keycapButtons[index].SetPressed(isPressed);
+                if (_maximumManualKeys == 0 || acceptedPress || !gameplayPressed)
+                    _keycapButtons[index].SetPressed(gameplayPressed);
                 if (!_inputEnabled || !isActiveAndEnabled)
                 {
                     RestoreKeys();
                     return;
                 }
 
-                if (_attackEnabled && pressedThisFrame && _keycapHealths[index] != null &&
+                if (_attackEnabled && acceptedPress && _keycapHealths[index] != null &&
                     (_keycapHealths[index].CurrentHP == 0 || _keycapButtons[index].isActiveAndEnabled))
                 {
                     AttackRequested?.Invoke(_keycapHealths[index]);
@@ -327,6 +353,56 @@ namespace KeyboardModeling
             _lastPressDistance = _pressDistance;
             if (pressedKeysChanged)
                 RefreshPressedKeyNames();
+        }
+
+        /// <summary>
+        /// 플레이어 전투 입력에 maximumKeys개의 동시 승인 제한을 설정한다.
+        /// 현재 누른 키를 기준 상태로 수집해 생성 전부터 유지된 키는 재입력으로 처리하지 않는다.
+        /// </summary>
+        public void ConfigureBattleManualInput(int maximumKeys)
+        {
+            _maximumManualKeys = Mathf.Max(1, maximumKeys);
+            SuspendManualInput();
+            if (Keyboard.current != null) SynchronizeManualInput(Keyboard.current);
+        }
+
+        /// <summary>
+        /// index의 새 물리 키 누름이 유효한 전투 대상이고 빈 자리가 있는지 검사해 승인 여부를 반환한다.
+        /// 거부된 누름도 유지 목록에 기록하며 승인 자리는 실제 키 해제 전까지 반환하지 않는다.
+        /// </summary>
+        private bool TryApproveManualInput(int index)
+        {
+            Key key = _bindings[index].Key;
+            if (!_manualHeldKeys.Add(key)) return false;
+            if (!_attackEnabled || _keycapHealths[index] == null || _keycapHealths[index].CurrentHP <= 0
+                || !_keycapButtons[index].isActiveAndEnabled || _approvedManualKeys.Count >= _maximumManualKeys)
+                return false;
+            return _approvedManualKeys.Add(key);
+        }
+
+        /// <summary>
+        /// keyboard의 현재 눌린 바인딩을 수집하고 이전 승인을 비운다.
+        /// 입력 재개 및 키보드 생성 시 유지 중인 키를 새 누름으로 승인하지 않도록 기준 상태를 저장한다.
+        /// </summary>
+        private void SynchronizeManualInput(Keyboard keyboard)
+        {
+            _approvedManualKeys.Clear();
+            _manualHeldKeys.Clear();
+            foreach (KeyBinding binding in _bindings)
+                if (WindowsSpecialKeyInput.IsPressed(keyboard, binding.Key))
+                    _manualHeldKeys.Add(binding.Key);
+            _manualInputSuspended = false;
+        }
+
+        /// <summary>
+        /// 입력 중단 시 승인과 눌림 추적을 비우고 다음 유효 입력 프레임의 기준 상태 수집을 예약한다.
+        /// 입력과 반환값 없이 포커스 및 라운드 전환 후 남는 승인 자리를 제거한다.
+        /// </summary>
+        private void SuspendManualInput()
+        {
+            _approvedManualKeys.Clear();
+            _manualHeldKeys.Clear();
+            _manualInputSuspended = true;
         }
 
         /// <summary>
@@ -419,6 +495,7 @@ namespace KeyboardModeling
 
         void OnEnable()
         {
+            SuspendManualInput();
             _hasFocus = Application.isFocused;
             _lastStatusFlags = -1;
             if (_logInput)
@@ -427,6 +504,7 @@ namespace KeyboardModeling
 
         void OnDisable()
         {
+            SuspendManualInput();
             if (_logInput)
                 Debug.Log("[Keyboard] Controller disabled; releasing keys.", this);
             RestoreKeys();
@@ -434,6 +512,7 @@ namespace KeyboardModeling
 
         void OnApplicationFocus(bool hasFocus)
         {
+            SuspendManualInput();
             _hasFocus = hasFocus;
             if (!hasFocus)
             {
@@ -447,6 +526,11 @@ namespace KeyboardModeling
         /// </summary>
         public void SetInputEnabled(bool inputEnabled)
         {
+            if (_inputEnabled != inputEnabled)
+            {
+                SuspendManualInput();
+                if (inputEnabled && Keyboard.current != null) SynchronizeManualInput(Keyboard.current);
+            }
             _inputEnabled = inputEnabled;
             if (!inputEnabled && _restPositions != null)
                 RestoreKeys();

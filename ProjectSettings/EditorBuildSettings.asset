@@ -6,17 +6,20 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/WorkShop3.unity
+    guid: 008b97126a917094fbed9f5bb38d0ab6
+  - enabled: 1
+    path: Assets/Scenes/onlinepvp.unity
+    guid: 08532b8b3f94631418d8d3f5d32b7027
+  - enabled: 1
+    path: Assets/Scenes/TestScenes/TestScene_Battle.unity
+    guid: 85fd5f043af80f946be07613fffa6a1e
+  - enabled: 1
     path: Assets/Legacy/Scene/Main_Legacy.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
     path: Assets/Scenes/WorkShop2.unity
     guid: a9786bb83d3cb8941b0f2440a9502b8c
-  - enabled: 1
-    path: Assets/Scenes/TestScenes/TestScene_Battle.unity
-    guid: 85fd5f043af80f946be07613fffa6a1e
-  - enabled: 1
-    path: Assets/Scenes/onlinepvp.unity
-    guid: 08532b8b3f94631418d8d3f5d32b7027
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: 4c5c374b05d03f14b90f9abfd44314b8, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

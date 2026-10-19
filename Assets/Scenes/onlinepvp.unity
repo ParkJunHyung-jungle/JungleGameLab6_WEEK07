@@ -152,6 +152,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Pvp.PvpPracticeUI
   _session: {fileID: 2666269}
+  _cardSprite: {fileID: 21300000, guid: 30539fc2e8c8186458850a26946cf4fa, type: 2}
+  _coinSprite: {fileID: 21300000, guid: e03f0394e3c46a541b2dcb5f0c267476, type: 2}
+  _workshopScene: Assets/Scenes/WorkShop3.unity
 --- !u!114 &2666267
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -63,7 +63,10 @@ public static class PvpSceneBuilder
         Set(session, "_catalog", AssetDatabase.LoadAssetAtPath<KeyboardPartCatalog>(partsPath));
         Set(session, "_layout", AssetDatabase.LoadAssetAtPath<TournamentKeyLayout>(layoutPath));
         Set(session, "_storage", storage); Set(session, "_battlefield", battlefield); SetString(session, "_contentVersion", version);
-        Set(ui, "_session", session); Set(battlefield, "_storage", storage);
+        Set(ui, "_session", session);
+        Set(ui, "_cardSprite", AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath("30539fc2e8c8186458850a26946cf4fa")));
+        Set(ui, "_coinSprite", AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath("e03f0394e3c46a541b2dcb5f0c267476")));
+        Set(battlefield, "_storage", storage);
         Set(battlefield, "_catalog", AssetDatabase.LoadAssetAtPath<KeyboardPartCatalog>(partsPath));
         Set(battlefield, "_layout", AssetDatabase.LoadAssetAtPath<TournamentKeyLayout>(layoutPath));
         var battlefieldData = new SerializedObject(battlefield);

@@ -16,6 +16,9 @@ public sealed class MonitorGoalCloseButton : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         if (_popupCanvasGroup.interactable && eventData.button == PointerEventData.InputButton.Left)
+        {
+            AudioManager.instance.PlayButtonSound();
             Clicked?.Invoke();
+        }
     }
 }

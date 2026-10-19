@@ -17,7 +17,10 @@ public sealed class MonitorDesktopView : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         if (_isInputEnabled && eventData.button == PointerEventData.InputButton.Left && eventData.clickCount == 2)
+        {
+            AudioManager.instance.PlayButtonSound();
             ShopOpenRequested?.Invoke();
+        }
     }
 
     /// <summary>

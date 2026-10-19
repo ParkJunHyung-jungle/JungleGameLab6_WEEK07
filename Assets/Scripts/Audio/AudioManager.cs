@@ -295,6 +295,15 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>
+    /// FMODEvents의 Button 이벤트를 화면 UI 클릭음으로 한 번 재생한다.
+    /// 입력과 반환값 없이 위치와 키보드 음정 효과에 영향을 받지 않는 UI 이벤트를 시작한다.
+    /// </summary>
+    public void PlayButtonSound()
+    {
+        RuntimeManager.PlayOneShot(FMODEvents.instance.Button);
+    }
+
+    /// <summary>
     /// sound를 worldPos에서 재생하며 선택된 keyboard의 타건에만 이벤트 음정 배율을 적용한다.
     /// FMOD 설정과 재생 결과를 확인하고 인스턴스를 해제 예약하여 재생 종료 후 정리한다.
     /// </summary>

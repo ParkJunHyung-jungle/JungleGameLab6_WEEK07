@@ -46,7 +46,10 @@ public sealed class KeyboardGoalAppView : MonoBehaviour, IPointerClickHandler
     {
         if (_isInputEnabled && !IsOpen && eventData.button == PointerEventData.InputButton.Left
             && eventData.clickCount == 2)
+        {
+            AudioManager.instance.PlayButtonSound();
             OpenRequested?.Invoke();
+        }
     }
 
     /// <summary>

@@ -80,7 +80,10 @@ public sealed class MonitorSettingsAppView : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         if (_isInputEnabled && !IsOpen && eventData.button == PointerEventData.InputButton.Left && eventData.clickCount == 2)
+        {
+            AudioManager.instance.PlayButtonSound();
             OpenRequested?.Invoke();
+        }
     }
 
     /// <summary>

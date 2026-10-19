@@ -48,7 +48,9 @@ namespace Game.Tournament
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (_part == null) return;
+            if (_part == null || !isActiveAndEnabled) return;
+            if (eventData.button == PointerEventData.InputButton.Left || eventData.button == PointerEventData.InputButton.Right)
+                AudioManager.instance.PlayButtonSound();
             if (eventData.button == PointerEventData.InputButton.Left) LeftClicked?.Invoke(_part);
             else if (eventData.button == PointerEventData.InputButton.Right) RightClicked?.Invoke(_part);
         }

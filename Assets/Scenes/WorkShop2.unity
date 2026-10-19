@@ -1298,6 +1298,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      propertyPath: _persistentId
+      value: workshop-rack-d57adce98476464480ac12ff884e8cf5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2570,6 +2574,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      propertyPath: _persistentId
+      value: workshop-rack-5a0276e88fa54eaebe55a6c83ca15f30
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3546,6 +3554,10 @@ PrefabInstance:
     - target: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      propertyPath: _persistentId
+      value: workshop-rack-2cf4286230134d168effb0ff3060ad44
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4756,6 +4768,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      propertyPath: _persistentId
+      value: workshop-rack-93bb9c17740d49468e773235a61445fc
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5014,6 +5030,10 @@ PrefabInstance:
     - target: {fileID: 1000000000000000002, guid: 7b4e93c18a2f46d09c518e30f4b7a219, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000000000000000004, guid: 7b4e93c18a2f46d09c518e30f4b7a219, type: 3}
+      propertyPath: _persistentId
+      value: workshop-rack-e06d7f1f42c54b2c83312ab694f4986a
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10065,6 +10085,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorkshopTournamentEntry
   _holder: {fileID: 9911000310}
   _storage: {fileID: 9911000150}
+  _workshopState: {fileID: 7000000000000000105}
   _startButton: {fileID: 9911000304}
   _message: {fileID: 9911000308}
   _battleScenePath: Assets/Scenes/TestScenes/TestScene_Battle.unity
@@ -10213,6 +10234,7 @@ GameObject:
   - component: {fileID: 7000000000000000102}
   - component: {fileID: 7000000000000000103}
   - component: {fileID: 7000000000000000104}
+  - component: {fileID: 7000000000000000105}
   m_Layer: 0
   m_Name: EminemKeyboardReturnZone
   m_TagString: Untagged
@@ -10275,12 +10297,38 @@ MonoBehaviour:
   _throwTargetPosition: {x: 2, y: 2, z: 0.36}
   _workshopKeyboardPrefab: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
   _storage: {fileID: 9911000150}
+  _workshopState: {fileID: 7000000000000000105}
   _moveDuration: 0.6
   _waitBeforeThrow: 1
   _waitAfterThrow: 1
   _throwFlightDuration: 1.2
   _spinSpeed: 5
   _playerReturnPoint: {fileID: 163211645}
+--- !u!114 &7000000000000000105
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3ea26ec43be4fb19b048a9642f4ab92, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Workshop.WorkshopKeyboardStateController
+  _storage: {fileID: 9911000150}
+  _returnController: {fileID: 7000000000000000104}
+  _prefabs:
+  - _id: keyboard-customize
+    _prefab: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
+  _coverPrefab: {fileID: 1766723292100208528, guid: fc9017d00bcc36443801679d2e63891f, type: 3}
+  _floorColliders:
+  - {fileID: 9900990104}
+  _supportDistance: 0.025
+  _minimumSupportDot: 0.7
+  _maximumLinearSpeed: 0.2
+  _maximumAngularSpeed: 0.5
+  _settleDuration: 0.2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

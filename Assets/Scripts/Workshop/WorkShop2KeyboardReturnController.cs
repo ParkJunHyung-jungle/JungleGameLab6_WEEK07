@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -24,6 +24,7 @@ namespace Game.Workshop
         [Header("Tournament Return")]
         [SerializeField] private GameObject _workshopKeyboardPrefab;
         [SerializeField] private KeyboardCustomizationStorage _storage;
+        [SerializeField] private WorkshopKeyboardStateController _workshopState;
 
         [Header("Movement")]
         [SerializeField, Min(0.01f)] private float _moveDuration = 0.6f;
@@ -50,6 +51,7 @@ namespace Game.Workshop
 
         void Awake()
         {
+            if (_workshopState == null) _workshopState = GetComponent<WorkshopKeyboardStateController>();
             _actor.position = _hiddenPosition;
             foreach (GameObject candidate in GameObject.FindGameObjectsWithTag("Player"))
             {
@@ -63,6 +65,7 @@ namespace Game.Workshop
             GameObject keyboard = null;
             try
             {
+                _workshopState.RestorePendingKeyboards();
                 if (!TournamentKeyboardSession.TryBeginWorkshopReturn(out KeyboardCustomizationState original)) return;
                 if (_workshopKeyboardPrefab == null || _storage == null)
                     throw new InvalidOperationException("복귀용 키보드 프리팹과 저장소 연결이 필요합니다.");
@@ -77,7 +80,9 @@ namespace Game.Workshop
                 body.useGravity = false;
                 body.detectCollisions = false;
                 keyboard.GetComponent<KeyboardInputController>().SetInputEnabled(false);
-                if (!IsKeyboard(body)) keyboard.AddComponent<KeyboardPickupTarget>();
+                KeyboardPickupTarget pickup = keyboard.GetComponent<KeyboardPickupTarget>();
+                if (pickup == null) pickup = keyboard.AddComponent<KeyboardPickupTarget>();
+                pickup.SetSourcePrefab(_workshopKeyboardPrefab);
                 _storage.ApplyCustomization(original, customization);
                 if (!RequestReturn(body))
                     throw new InvalidOperationException("복원된 키보드의 반환 대기열 등록에 실패했습니다.");
@@ -169,6 +174,9 @@ namespace Game.Workshop
             Vector3 destination = _playerReturnPoint != null ? _playerReturnPoint.position : _playerStartPosition;
             _playerMovement.TeleportTo(destination);
         }
+
+        /// <summary>body가 반환 대기 또는 던지기 연출 중인지 반환한다. 작업실 보관에서 반환 중인 키보드를 제외한다.</summary>
+        public bool IsReturning(Rigidbody body) { return _queuedKeyboards.Contains(body); }
 
         /// <summary>
         /// body의 계층에 KeyboardPickupTarget이 있는지 확인해 키보드 여부를 반환한다.
@@ -283,7 +291,7 @@ namespace Game.Workshop
 
         /// <summary>
         /// 키보드를 에미넴 위치에서 throwTarget 방향으로 발사하고 물리 상태를 다시 활성화한다.
-        /// _throwOriginOffset, _throwFlightDuration, _spinSpeed를 사용해 위치와 속도를 갱신한다.
+        /// _throwOriginOffset, _throwFlightDuration, _spinSpeed로 위치와 속도를 갱신하고 발사 위치에서 Throwing을 재생한다.
         /// </summary>
         private void LaunchKeyboard(Rigidbody keyboard)
         {
@@ -299,6 +307,7 @@ namespace Game.Workshop
             keyboard.linearVelocity = CalculateLaunchVelocity(origin, _throwTargetPosition);
             keyboard.angularVelocity = UnityEngine.Random.insideUnitSphere * _spinSpeed;
             keyboard.WakeUp();
+            AudioManager.instance.PlayOneShot(FMODEvents.instance.Throwing, origin);
         }
 
         /// <summary>

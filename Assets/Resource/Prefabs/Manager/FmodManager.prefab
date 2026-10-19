@@ -69,6 +69,13 @@ MonoBehaviour:
       Data3: 245133704
       Data4: -171718166
     Path: event:/Ambient/IndoorAmbient
+  <Button>k__BackingField:
+    Guid:
+      Data1: -1413103422
+      Data2: 1224401576
+      Data3: -629847647
+      Data4: 1073906868
+    Path: event:/UI/Button
   <BlueSwitch>k__BackingField:
     Guid:
       Data1: 714337182
@@ -139,13 +146,27 @@ MonoBehaviour:
       Data3: 1676953496
       Data4: -686253831
     Path: event:/SFX/Player/FootSteps
+  <Throwing>k__BackingField:
+    Guid:
+      Data1: -161479908
+      Data2: 1312908407
+      Data3: -1696525640
+      Data4: -1003462232
+    Path: event:/SFX/Other/Throwing
+  <Trash>k__BackingField:
+    Guid:
+      Data1: -1402610498
+      Data2: 1238348543
+      Data3: 1232659857
+      Data4: -1504189152
+    Path: event:/SFX/Other/Trash
   <VendingMachineThud>k__BackingField:
     Guid:
       Data1: -1735314096
       Data2: 1200576674
       Data3: 680881561
       Data4: -507872415
-    Path: event:/SFX/VendingMachine/VendingMachineThud
+    Path: event:/SFX/Other/VendingMachineThud
   <ThumpKeyBoard>k__BackingField:
     Guid:
       Data1: -327434940

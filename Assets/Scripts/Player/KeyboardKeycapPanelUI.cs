@@ -29,6 +29,7 @@ namespace Game.Player
         private bool _isAllKeys = true;
         private bool _canApply;
         private bool _hasPendingMaterial;
+        private bool _singleKeyOnly;
         private int _selectedKeycapIndex;
 
         [Header("Panel Controls")]
@@ -150,6 +151,20 @@ namespace Game.Player
             RefreshPanel();
         }
 
+        /// <summary>singleKeyOnly가 true면 전체 적용을 막고 단일 키 모드로 전환한다. 기존 단일 키 선택은 유지하며 범위가 바뀔 때만 이벤트를 보낸다.</summary>
+        public void SetSingleKeyOnly(bool singleKeyOnly)
+        {
+            _singleKeyOnly = singleKeyOnly;
+            if (_singleKeyOnly && _isAllKeys) SetTarget(false);
+            else RefreshPanel();
+        }
+
+        /// <summary>message의 배치 실패 이유를 상태 영역에 표시한다. 선택 재질과 입력 대기 상태는 변경하지 않는다.</summary>
+        public void ShowPlacementFailure(string message)
+        {
+            _statusLabel.text = string.IsNullOrEmpty(message) ? "이 위치에는 적용할 수 없습니다. 다른 키를 누르세요." : message;
+        }
+
         /// <summary>
         /// 현재 범위 선택과 단일 키 인덱스를 반환한다.
         /// 전체 키 범위는 true이며 단일 키 선택은 0부터 시작하는 인덱스를 사용한다.
@@ -210,6 +225,7 @@ namespace Game.Player
         /// </summary>
         private void SetTarget(bool allKeys)
         {
+            if (_singleKeyOnly && allKeys) return;
             if (_isAllKeys == allKeys)
             {
                 if (!allKeys)
@@ -303,10 +319,14 @@ namespace Game.Player
             if (_panel == null) return;
 
             _allKeysButtonBackground.color = _isAllKeys ? _selectedTargetColor : _targetColor;
+            _allKeysButtonBackground.GetComponent<KeyboardCustomizationTestButton>().enabled = !_singleKeyOnly;
+            _allKeysButtonLabel.text = _singleKeyOnly ? "전체 적용 불가" : "전체 키캡";
             _singleKeyButtonBackground.color = _isAllKeys ? _targetColor : _selectedTargetColor;
             _allKeysButtonLabel.color = _isAllKeys ? Color.white : _mutedColor;
             _singleKeyButtonLabel.color = _isAllKeys ? _mutedColor : Color.white;
-            _instructionLabel.text = _isAllKeys
+            _instructionLabel.text = _singleKeyOnly
+                ? "아티산은 하나씩, 최대 3개까지 배치할 수 있습니다."
+                : _isAllKeys
                 ? "축이 설치된 키에 키캡을 씌우거나 한 개를 선택하세요."
                 : "재질을 선택한 뒤 축이 설치된 키를 누르세요.";
             _statusRect.anchoredPosition = new Vector2(16f, -143f);

@@ -409,9 +409,10 @@ namespace Game.Player
                 {
                     _hasActiveKeycapMaterialPreview = customization.PreviewKeycapMaterial(
                         _selectedMaterial, allKeys, keycapIndex, _selectedKeycapDefinition);
-                    _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
                 }
                 _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
+                if (targetIsValid && !_hasActiveKeycapMaterialPreview)
+                    _keycapUI.ShowPlacementFailure(customization.KeycapPlacementError);
                 return;
             }
 
@@ -481,8 +482,10 @@ namespace Game.Player
             ObserveKeycap("KeycapApply", _selectedKeycapDefinition, _selectedMaterial, allKeys, keycapIndex, success, previous, changed);
             if (!success)
             {
-                CancelKeycapMaterialPreview();
-                RefreshKeycapMaterialSelection();
+                customization.CancelKeycapMaterialPreview();
+                _hasActiveKeycapMaterialPreview = false;
+                _keycapUI.SetCanApply(false, _hasPendingKeycapMaterial);
+                _keycapUI.ShowPlacementFailure(customization.KeycapPlacementError);
                 return;
             }
 
@@ -530,6 +533,7 @@ namespace Game.Player
                 _selectedKeycapDefinition = _photoStorage.Customization.GetKeycapDefinition(-1);
             }
 
+            _keycapUI.SetSingleKeyOnly(_selectedKeycapDefinition != null && _selectedKeycapDefinition.IsArtisan);
             RefreshSelectionIndicators();
         }
 
@@ -1454,6 +1458,8 @@ namespace Game.Player
             if (_pickerMode != PickerMode.Keycap)
                 return;
 
+            _hasPendingKeycapMaterial = true;
+            _keycapUI.SetSingleKeyOnly(_selectedKeycapDefinition != null && _selectedKeycapDefinition.IsArtisan);
             bool targetIsValid = _keycapUI.TryGetTarget(out bool allKeys, out int keycapIndex);
             if (!targetIsValid)
             {
@@ -1468,9 +1474,10 @@ namespace Game.Player
                     allKeys,
                     keycapIndex,
                     _selectedKeycapDefinition);
-                _hasPendingKeycapMaterial = _hasActiveKeycapMaterialPreview;
             }
             _keycapUI.SetCanApply(_hasActiveKeycapMaterialPreview, _hasPendingKeycapMaterial);
+            if (targetIsValid && !_hasActiveKeycapMaterialPreview)
+                _keycapUI.ShowPlacementFailure(_photoStorage.Customization.KeycapPlacementError);
         }
 
         /// <summary>

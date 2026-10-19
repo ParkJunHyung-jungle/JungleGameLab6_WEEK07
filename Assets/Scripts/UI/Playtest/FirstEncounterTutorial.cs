@@ -302,7 +302,7 @@ namespace Game.Tutorials
             if (observation.Type == "PartChanged" && observation.Part == "Keycap") Request(TutorialTopic.KeycapEditing);
             if (observation.Type == "PartChanged" && observation.Part == "CustomImage") Request(TutorialTopic.Image);
             if (observation.Type == "CustomizationTestModeChanged" && observation.Element == "AttackEnabled") Request(TutorialTopic.AttackPreview);
-            if (observation.Type == "ElementSelected" && observation.KeycapKind == "Artisan") Request(TutorialTopic.Artisan);
+            if (observation.Type == "ElementPicked" && observation.KeycapKind == "Artisan") Request(TutorialTopic.Artisan);
         }
 
         /// <summary>source 상점의 open 상태를 받아 첫 상점 진입을 안내한다. 종료 통지는 안내를 만들지 않는다.</summary>

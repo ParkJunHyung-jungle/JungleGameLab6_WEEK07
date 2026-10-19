@@ -142,6 +142,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// </summary>
     public Material KeycapMaterial => _keycapMaterial;
 
+    public string KeycapPlacementError { get; private set; }
+
     /// <summary>
     /// keycapIndex 키캡에 현재 지정된 개별 재질 또는 공통 재질을 반환한다.
     /// 유효하지 않은 인덱스는 null을 반환하며 개별 재질이 있으면 우선 사용한다.
@@ -1296,20 +1298,36 @@ public sealed class KeyboardCustomization : MonoBehaviour
         return common;
     }
 
-    /// <summary>definition을 적용할 대상과 기존 아티산 수를 검사한다. 같은 종류도 각각 세어 최대 3개 장착만 허용하며 외형은 변경하지 않는다.</summary>
+    /// <summary>definition과 대상 위치로 아티산의 개별 적용과 크기 및 3개 한도를 검사한다. 실패 원인은 KeycapPlacementError에 저장하고 외형은 변경하지 않는다.</summary>
     private bool CanApplyArtisan(Game.Tournament.KeycapDefinition definition, bool allKeycaps, int keycapIndex)
     {
         if (definition == null || !definition.IsArtisan) return true;
+        if (allKeycaps)
+        {
+            KeycapPlacementError = "아티산은 전체 적용할 수 없습니다. 키캡 한 개로 적용하세요.";
+            return false;
+        }
         if (_keycaps == null) CacheKeycaps();
+        if (keycapIndex < 0 || keycapIndex >= _keycaps.Length)
+        {
+            KeycapPlacementError = "아티산을 놓을 키를 입력하세요.";
+            return false;
+        }
+        if (definition.OneUnitOnly && !_keycapModels[_keycaps[keycapIndex]].IsOneUnit)
+        {
+            KeycapPlacementError = "아티산은 일반 크기의 1칸 키에만 놓을 수 있습니다. 다른 키를 누르세요.";
+            return false;
+        }
         int count = 0;
         for (int index = 0; index < _keycaps.Length; index++)
         {
+            if (index == keycapIndex) continue;
             Transform keycap = _keycaps[index];
-            bool target = allKeycaps || index == keycapIndex;
-            if (target && HasSwitchForKeycap(index) && (!definition.OneUnitOnly || _keycapModels[keycap].IsOneUnit)) count++;
-            else if (keycap.gameObject.activeSelf && _keycapPartDefinitions.TryGetValue(keycap, out var part) && part.IsArtisan) count++;
+            if (keycap.gameObject.activeSelf && _keycapPartDefinitions.TryGetValue(keycap, out var part) && part.IsArtisan) count++;
         }
-        return count <= 3;
+        if (count < 3) return true;
+        KeycapPlacementError = "아티산은 같은 종류를 포함해 최대 3개까지 장착할 수 있습니다. 기존 아티산을 교체하세요.";
+        return false;
     }
 
     /// <summary>keycap 루트에 장착된 SO를 반환한다. 사진용 재질과 무관하게 실제 부품 정의를 읽으며 구성은 변경하지 않는다.</summary>
@@ -1467,7 +1485,14 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public bool PreviewKeycapMaterial(Material material, bool allKeycaps, int keycapIndex,
         Game.Tournament.KeycapDefinition definition = null)
     {
-        if (!CanApplyArtisan(definition, allKeycaps, keycapIndex)) return false;
+        KeycapPlacementError = "";
+        if (_keycapMaterialPreviewSnapshot != null)
+            RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
+        if (!CanApplyArtisan(definition, allKeycaps, keycapIndex))
+        {
+            CancelKeycapMaterialPreview();
+            return false;
+        }
         if (material == null)
             return false;
 
@@ -1484,11 +1509,6 @@ public sealed class KeyboardCustomization : MonoBehaviour
         {
             _keycapMaterialPreviewSnapshot = CaptureKeycapMaterialPreviewSnapshot();
         }
-        else
-        {
-            RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
-        }
-
         bool applied = false;
         if (allKeycaps)
         {
@@ -1535,9 +1555,16 @@ public sealed class KeyboardCustomization : MonoBehaviour
     public bool CommitKeycapMaterialPreview(Material material, bool allKeycaps, int keycapIndex,
         Game.Tournament.KeycapDefinition definition = null)
     {
-        if (!CanApplyArtisan(definition, allKeycaps, keycapIndex)) return false;
+        KeycapPlacementError = "";
         if (_keycapMaterialPreviewSnapshot == null || material == null)
             return false;
+
+        RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
+        if (!CanApplyArtisan(definition, allKeycaps, keycapIndex))
+        {
+            CancelKeycapMaterialPreview();
+            return false;
+        }
 
         bool targetHasSwitch = allKeycaps
             ? HasAnySwitchForKeycaps()
@@ -1547,8 +1574,6 @@ public sealed class KeyboardCustomization : MonoBehaviour
             CancelKeycapMaterialPreview();
             return false;
         }
-
-        RestoreKeycapMaterialPreviewSnapshot(_keycapMaterialPreviewSnapshot);
 
         bool applied;
         if (allKeycaps)
@@ -1649,6 +1674,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (keycap != null)
                 keycap.gameObject.SetActive(snapshot.KeycapActiveStates[index]);
         }
+        KeycapDefinitionChanged?.Invoke();
     }
 
     /// <summary>

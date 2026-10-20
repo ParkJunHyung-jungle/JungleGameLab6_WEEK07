@@ -91,6 +91,17 @@ namespace Game.Player
         private Vector2 _pendingKeyboardRotationDelta;
         private readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
 
+        [Header("Monitor Focus")]
+        [SerializeField, Min(0.1f)] private float _monitorFocusDistance = 2.5f;
+        [SerializeField, Range(1f, 179f)] private float _monitorFocusFieldOfView = 75f;
+        private Coroutine _monitorFocusTransition;
+        private Vector3 _monitorSavedPlayerPosition;
+        private Quaternion _monitorSavedCameraRotation;
+        private float _monitorSavedFieldOfView;
+        private bool _monitorMoveInputWasEnabled;
+        private bool _monitorCameraInputWasEnabled;
+        private bool _isMonitorFocusMode;
+
         void Awake()
         {
             _playerColliders = GetComponentsInChildren<Collider>(true);
@@ -161,6 +172,7 @@ namespace Game.Player
             _coverInput.action.Disable();
             _keyboardResetInput.started -= HandleKeyboardResetStarted;
             _keyboardResetInput.Disable();
+            ResetMonitorFocusMode();
             ResetKeyboardEditMode();
             DropHeldKeyboard();
             Cursor.lockState = CursorLockMode.None;
@@ -188,11 +200,13 @@ namespace Game.Player
 
         /// <summary>
         /// 좌클릭 입력이 시작되면 손에 든 키보드를 던지거나 조준한 대상을 작동시킨다.
-        /// context 입력을 받으며 키보드 보유 상태에 따라 던지기 또는 상호작용을 실행한다.
+        /// context와 포커스 상태를 사용하며 모니터 포커스 중에는 필드 상호작용을 실행하지 않는다.
         /// </summary>
         private void HandleClickStarted(InputAction.CallbackContext context)
         {
             if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (_isMonitorFocusMode || _monitorFocusTransition != null)
+                return;
             if (_isKeyboardEditMode)
             {
                 if (_cameraTransition == null)
@@ -238,14 +252,20 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 우클릭 입력으로 작업대 키보드 편집 모드를 전환하거나 손에 든 키보드의 커버를 조작한다.
-        /// context 입력을 받으며 조준 대상과 편집 상태에 따라 진입, 종료 또는 커버 전환을 실행한다.
+        /// 우클릭 입력으로 모니터 포커스나 작업대 키보드 편집을 전환하고, 손에 든 키보드의 커버를 조작한다.
+        /// context 입력을 받으며 조준 대상과 현재 상태에 따라 진입, 종료 또는 커버 전환을 실행한다.
         /// </summary>
         private void HandleCoverStarted(InputAction.CallbackContext context)
         {
             if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
-            if (_cameraTransition != null)
+            if (_cameraTransition != null || _monitorFocusTransition != null)
                 return;
+
+            if (_isMonitorFocusMode)
+            {
+                ExitMonitorFocusMode();
+                return;
+            }
 
             if (_isKeyboardEditMode)
             {
@@ -259,8 +279,17 @@ namespace Game.Player
                 return;
             }
 
-            if (TryGetInteractionHit(out RaycastHit hit)
-                && TryGetWorkbenchKeyboard(hit, out WorkbenchKeyboardHolder holder, out KeyboardInputController keyboard, out Vector3 aimPoint))
+            if (!TryGetInteractionHit(out RaycastHit hit))
+                return;
+
+            MonitorKeyboardHolder monitorHolder = hit.collider.GetComponentInParent<MonitorKeyboardHolder>();
+            if (monitorHolder != null && monitorHolder.KeyboardBody != null)
+            {
+                EnterMonitorFocusMode(monitorHolder);
+                return;
+            }
+
+            if (TryGetWorkbenchKeyboard(hit, out WorkbenchKeyboardHolder holder, out KeyboardInputController keyboard, out Vector3 aimPoint))
             {
                 EnterKeyboardEditMode(keyboard, holder, aimPoint);
             }
@@ -308,6 +337,13 @@ namespace Game.Player
                 return true;
             }
 
+            MonitorKeyboardHolder monitorHolder = hit.collider.GetComponentInParent<MonitorKeyboardHolder>();
+            if (monitorHolder != null && monitorHolder.KeyboardBody != null)
+            {
+                PickUpKeyboard(monitorHolder.KeyboardBody);
+                return true;
+            }
+
             KeyboardPickupTarget pickupTarget = hit.collider.GetComponentInParent<KeyboardPickupTarget>();
             if (pickupTarget != null)
             {
@@ -344,7 +380,11 @@ namespace Game.Player
         private void UpdateInteractionPrompt()
         {
             string prompt = string.Empty;
-            if (_isKeyboardEditMode)
+            if (_isMonitorFocusMode)
+            {
+                prompt = "우클릭으로 모니터 포커스 나가기";
+            }
+            else if (_isKeyboardEditMode)
             {
                 prompt = "우클릭으로 키보드 편집 모드 나가기";
             }
@@ -363,6 +403,8 @@ namespace Game.Player
                     prompt = "좌클릭으로 키보드 받기";
                 else if (hit.collider.GetComponentInParent<WorkbenchKeyboardHolder>() != null)
                     prompt = "좌클릭으로 키보드 들기 / 우클릭으로 편집";
+                else if (hit.collider.GetComponentInParent<MonitorKeyboardHolder>()?.KeyboardBody != null)
+                    prompt = "좌클릭으로 키보드 들기 / 우클릭으로 모니터 보기";
                 else if (hit.collider.GetComponentInParent<KeyboardPickupTarget>() != null)
                     prompt = "좌클릭으로 키보드 들기";
             }
@@ -373,12 +415,12 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 필드에서는 조준점 아래에 안내를 놓고 편집 모드에서는 저장된 하단 배치를 복원한다.
-        /// 편집 상태와 초기 RectTransform 값을 사용해 안내 UI의 기준점과 위치를 갱신한다.
+        /// 필드에서는 조준점 아래에 안내를 놓고 편집 또는 모니터 포커스에서는 하단 배치를 복원한다.
+        /// 현재 포커스 상태와 초기 RectTransform 값을 사용해 안내 UI의 기준점과 위치를 갱신한다.
         /// </summary>
         private void UpdateInteractionPromptPosition()
         {
-            if (_isKeyboardEditMode)
+            if (_isKeyboardEditMode || _isMonitorFocusMode)
             {
                 _interactionPromptRectTransform.anchorMin = _interactionPromptDefaultAnchorMin;
                 _interactionPromptRectTransform.anchorMax = _interactionPromptDefaultAnchorMax;
@@ -498,6 +540,167 @@ namespace Game.Player
             Vector3 direction = aimPoint - targetCameraPosition;
             Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
             BeginCameraTransition(targetRotation, targetPlayerPosition);
+        }
+
+        /// <summary>
+        /// holder에 고정된 키보드와 모니터 화면이 함께 보이도록 플레이어와 카메라를 이동한다.
+        /// holder의 화면 목표와 포커스 거리 및 시야각을 사용하며 이동·카메라 입력과 커서 상태를 전환한다.
+        /// </summary>
+        private void EnterMonitorFocusMode(MonitorKeyboardHolder holder)
+        {
+            if (_camera == null
+                || _moveInput?.action == null
+                || _cameraPanTilt == null
+                || _cameraInputAxisController == null
+                || _editingCinemachineCamera == null
+                || holder.MonitorFocusTarget == null)
+            {
+                Debug.LogError("모니터 포커스에 필요한 카메라, 입력 또는 화면 목표 참조가 없습니다.", this);
+                return;
+            }
+
+            _monitorSavedPlayerPosition = transform.position;
+            _monitorSavedCameraRotation = _camera.transform.rotation;
+            _monitorSavedFieldOfView = _editingCinemachineCamera.Lens.FieldOfView;
+            _monitorMoveInputWasEnabled = _moveInput.action.enabled;
+            _monitorCameraInputWasEnabled = _cameraInputAxisController.enabled;
+            _isMonitorFocusMode = true;
+
+            _moveInput.action.Disable();
+            _cameraInputAxisController.enabled = false;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            if (_centerReticle != null)
+                _centerReticle.SetActive(false);
+
+            Vector3 targetPlayerPosition = holder.transform.position
+                - holder.transform.forward * _monitorFocusDistance;
+            targetPlayerPosition.y = transform.position.y;
+            Vector3 targetCameraPosition = _camera.transform.position
+                + targetPlayerPosition - transform.position;
+            Vector3 aimPoint = Vector3.Lerp(
+                holder.transform.position,
+                holder.MonitorFocusTarget.position,
+                0.5f);
+            Quaternion targetRotation = Quaternion.LookRotation(
+                aimPoint - targetCameraPosition,
+                Vector3.up);
+            BeginMonitorFocusTransition(
+                targetRotation,
+                targetPlayerPosition,
+                _monitorFocusFieldOfView,
+                false);
+        }
+
+        /// <summary>
+        /// 모니터 포커스를 해제하고 진입 전의 플레이어 위치와 카메라 시야로 돌아간다.
+        /// 저장된 위치·회전·시야각을 사용하며 전환 완료 후 이동 입력과 커서를 복원한다.
+        /// </summary>
+        private void ExitMonitorFocusMode()
+        {
+            _isMonitorFocusMode = false;
+            BeginMonitorFocusTransition(
+                _monitorSavedCameraRotation,
+                _monitorSavedPlayerPosition,
+                _monitorSavedFieldOfView,
+                true);
+        }
+
+        /// <summary>
+        /// 모니터 포커스 카메라 전환 코루틴을 시작한다.
+        /// targetRotation, targetPlayerPosition, targetFieldOfView와 restoreInput을 전달하며 진행 중 전환을 교체한다.
+        /// </summary>
+        private void BeginMonitorFocusTransition(
+            Quaternion targetRotation,
+            Vector3 targetPlayerPosition,
+            float targetFieldOfView,
+            bool restoreInput)
+        {
+            if (_monitorFocusTransition != null)
+                StopCoroutine(_monitorFocusTransition);
+
+            _monitorFocusTransition = StartCoroutine(TransitionMonitorFocus(
+                targetRotation,
+                targetPlayerPosition,
+                targetFieldOfView,
+                restoreInput));
+        }
+
+        /// <summary>
+        /// 플레이어 위치와 카메라 회전·시야각을 모니터 포커스 목표까지 부드럽게 변경한다.
+        /// 목표 위치·회전·시야각과 Time.deltaTime을 사용하며 복귀 전환이 끝나면 입력을 복원한다.
+        /// </summary>
+        private IEnumerator TransitionMonitorFocus(
+            Quaternion targetRotation,
+            Vector3 targetPlayerPosition,
+            float targetFieldOfView,
+            bool restoreInput)
+        {
+            Vector3 startPlayerPosition = transform.position;
+            Quaternion startRotation = _camera.transform.rotation;
+            float startFieldOfView = _editingCinemachineCamera.Lens.FieldOfView;
+            float elapsed = 0f;
+            while (elapsed < _cameraTransitionDuration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _cameraTransitionDuration));
+                transform.position = Vector3.Lerp(startPlayerPosition, targetPlayerPosition, progress);
+                Quaternion rotation = Quaternion.Slerp(startRotation, targetRotation, progress);
+                _cameraPanTilt.ForceCameraPosition(_camera.transform.position, rotation);
+                SetEditingCameraFieldOfView(Mathf.Lerp(startFieldOfView, targetFieldOfView, progress));
+                yield return null;
+            }
+
+            transform.position = targetPlayerPosition;
+            _cameraPanTilt.ForceCameraPosition(_camera.transform.position, targetRotation);
+            SetEditingCameraFieldOfView(targetFieldOfView);
+            yield return null;
+
+            _monitorFocusTransition = null;
+            if (restoreInput)
+                RestoreMonitorFocusInput();
+        }
+
+        /// <summary>
+        /// 모니터 포커스 전에 저장한 이동·카메라 입력과 커서 상태를 되돌린다.
+        /// 저장된 입력 활성 상태를 사용하며 조준점과 커서 잠금을 필드 상태로 복원한다.
+        /// </summary>
+        private void RestoreMonitorFocusInput()
+        {
+            if (_monitorMoveInputWasEnabled)
+                _moveInput.action.Enable();
+            else
+                _moveInput.action.Disable();
+
+            _cameraInputAxisController.enabled = _monitorCameraInputWasEnabled;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            if (_centerReticle != null)
+                _centerReticle.SetActive(true);
+        }
+
+        /// <summary>
+        /// 비활성화 중 모니터 포커스 전환을 중단하고 저장한 시점과 입력을 복원한다.
+        /// 저장된 플레이어 위치·카메라 회전·시야각을 사용하며 포커스 상태를 초기화한다.
+        /// </summary>
+        private void ResetMonitorFocusMode()
+        {
+            if (!_isMonitorFocusMode && _monitorFocusTransition == null)
+                return;
+
+            if (_monitorFocusTransition != null)
+            {
+                StopCoroutine(_monitorFocusTransition);
+                _monitorFocusTransition = null;
+            }
+
+            _isMonitorFocusMode = false;
+            transform.position = _monitorSavedPlayerPosition;
+            if (_camera != null && _cameraPanTilt != null)
+                _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _monitorSavedCameraRotation);
+            if (_editingCinemachineCamera != null)
+                SetEditingCameraFieldOfView(_monitorSavedFieldOfView);
+            RestoreMonitorFocusInput();
         }
 
         /// <summary>
@@ -950,7 +1153,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 화면 중앙에서 상호작용 거리 안의 콜라이더나 작업대 키보드 보관함을 찾는다.
+        /// 화면 중앙에서 상호작용 거리 안의 콜라이더나 키보드 보관함을 찾는다.
         /// 카메라와 상호작용 거리 및 레이어를 사용하며 손에 든 키보드를 제외한 가장 가까운 유효 RaycastHit을 반환한다.
         /// </summary>
         private bool TryGetInteractionHit(out RaycastHit hit)
@@ -971,7 +1174,8 @@ namespace Game.Player
                 if (_heldKeyboardBody != null && candidate.transform.IsChildOf(_heldKeyboardBody.transform))
                     continue;
 
-                if (candidate.GetComponentInParent<WorkbenchKeyboardHolder>() != null)
+                if (candidate.GetComponentInParent<WorkbenchKeyboardHolder>() != null
+                    || candidate.GetComponentInParent<MonitorKeyboardHolder>() != null)
                 {
                     if (holderHitIndex < 0 || _interactionHits[i].distance < _interactionHits[holderHitIndex].distance)
                         holderHitIndex = i;

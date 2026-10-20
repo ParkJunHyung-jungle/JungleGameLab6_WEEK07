@@ -234,6 +234,12 @@ namespace KeyboardModeling
 
         void Awake()
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
+            {
+                // WorkShop0에서는 타건을 유지하고 공격 입력만 비활성화한다.
+                // SetAttackEnabled(true);
+                SetAttackEnabled(false);
+            }
             GameSession session = FindAnyObjectByType<GameSession>();
             _gameSettings = session != null ? session.Settings : null;
             if (_gameSettings != null)
@@ -542,6 +548,8 @@ namespace KeyboardModeling
         /// </summary>
         public void SetAttackEnabled(bool attackEnabled)
         {
+            // 공용 UI나 복원 코드가 요청해도 WorkShop0에서는 전투 모드를 켜지 않는다.
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive) attackEnabled = false;
             if (_attackEnabled == attackEnabled) return;
             _attackEnabled = attackEnabled;
             AttackModeChanged?.Invoke(attackEnabled);

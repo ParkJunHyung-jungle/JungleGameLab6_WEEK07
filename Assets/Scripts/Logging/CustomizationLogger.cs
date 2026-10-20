@@ -39,6 +39,7 @@ namespace Game.Logging
             string previous = "", bool success = true, bool changed = false, string scope = "", string key = "", string details = "", string keycapKind = "", string materialId = "")
         {
             if (!Application.isPlaying) return;
+            // WorkShop0에서도 커마 조작은 기록하며 전투 로거 차단과 분리한다.
             CustomizationLogger.EnsureLogger();
             Observed?.Invoke(new CustomizationObservation(target, type, part, element, previous, success, changed, scope, key, details, keycapKind, materialId));
         }
@@ -158,13 +159,13 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 최초 실행 씬이 WorkShop2이면 로거의 존재를 보장한다.
+        /// 최초 실행 씬이 WorkShop2 또는 WorkShop0이면 로거의 존재를 보장한다.
         /// 이미 씬에 연결된 인스턴스는 그대로 사용하고 중복 파일을 생성하지 않는다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureWorkshopLogger()
         {
-            if (SceneManager.GetActiveScene().name == "WorkShop2") EnsureLogger();
+            if (SceneManager.GetActiveScene().name == "WorkShop2" || Game.Workshop.CustomizationOnlyWorkshop.IsActive) EnsureLogger();
         }
 
         void Update()

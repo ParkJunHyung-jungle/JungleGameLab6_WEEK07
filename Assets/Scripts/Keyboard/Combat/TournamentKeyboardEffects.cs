@@ -103,6 +103,13 @@ namespace Game.Tournament
 
         void Start()
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
+            {
+                // 순수 커마 씬에서는 아티산 전투 능력과 피해 이벤트를 연결하지 않는다.
+                // InitializeWorkshop();
+                enabled = false;
+                return;
+            }
             InitializeWorkshop();
         }
 

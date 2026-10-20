@@ -363,6 +363,11 @@ namespace Game.Player
         /// </summary>
         public void SetSelectedAttackMode(bool attackModeSelected)
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
+            {
+                _modeStatus.text = "키보드 커스터마이징";
+                return;
+            }
             _generalModeButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(!attackModeSelected);
             _attackModeButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(attackModeSelected);
             _modeStatus.text = attackModeSelected

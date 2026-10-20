@@ -47,6 +47,12 @@ namespace Game.Logging
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreatePanel()
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
+            {
+                // WorkShop0에서는 전투 연구 세션과 진행자용 기록 화면을 생성하지 않는다.
+                // new GameObject("PlaytestResearchSession").AddComponent<PlaytestResearchSession>();
+                return;
+            }
             new GameObject("PlaytestResearchSession").AddComponent<PlaytestResearchSession>();
         }
 
@@ -242,6 +248,7 @@ namespace Game.Logging
         /// <summary>type과 reason을 두 CSV의 관찰자에게 같은 eventId로 전달한다. 행동의 동기는 추정하지 않는다.</summary>
         public static void Emit(string type, string reason)
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive) return;
             Observed?.Invoke(type, reason, Guid.NewGuid().ToString("N"));
         }
 

@@ -1304,6 +1304,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// <summary>definition과 대상 위치로 아티산의 개별 적용과 크기 및 3개 한도를 검사한다. 실패 원인은 KeycapPlacementError에 저장하고 외형은 변경하지 않는다.</summary>
     private bool CanApplyArtisan(Game.Tournament.KeycapDefinition definition, bool allKeycaps, int keycapIndex)
     {
+        // WorkShop0의 전체 적용은 대상별 1칸 크기를 검사하고 나머지 키를 유지한다.
+        if (Game.Workshop.CustomizationOnlyWorkshop.IsActive && allKeycaps) return true;
         if (definition == null || !definition.IsArtisan) return true;
         if (allKeycaps)
         {
@@ -1321,6 +1323,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
             KeycapPlacementError = "아티산은 일반 크기의 1칸 키에만 놓을 수 있습니다. 다른 키를 누르세요.";
             return false;
         }
+        // WorkShop0에서도 크기 조건은 유지하고 장착 개수만 제한하지 않는다.
+        if (Game.Workshop.CustomizationOnlyWorkshop.IsActive) return true;
         int count = 0;
         for (int index = 0; index < _keycaps.Length; index++)
         {

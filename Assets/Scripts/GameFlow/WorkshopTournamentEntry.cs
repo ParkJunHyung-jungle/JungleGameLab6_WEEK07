@@ -35,6 +35,12 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
     /// </summary>
     private void HandleStartClicked(KeyboardEditButton button)
     {
+        if (CustomizationOnlyWorkshop.IsActive)
+        {
+            // WorkShop0는 커스터마이징 전용이므로 전투 씬 진입 호출을 실행하지 않는다.
+            // EnterTournament();
+            return;
+        }
         EnterTournament();
     }
 
@@ -44,6 +50,12 @@ public sealed class WorkshopTournamentEntry : MonoBehaviour
     /// </summary>
     public void EnterTournament()
     {
+        if (CustomizationOnlyWorkshop.IsActive)
+        {
+            // 다른 코드에서 직접 요청해도 WorkShop0에서는 전투 씬으로 이동하지 않는다.
+            // SceneManager.LoadScene(_battleScenePath);
+            return;
+        }
         if (_holder.KeyboardBody == null)
         {
             _message.text = "작업대에 키보드를 배치해 주세요.";

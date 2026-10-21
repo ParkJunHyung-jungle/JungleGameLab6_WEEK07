@@ -50,7 +50,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool ProcessPointer(Ray ray, Vector2 screenPosition, Mouse mouse)
         {
-            if (!isActiveAndEnabled || _fuller == null)
+            if (!_dragInput.InputAllowed || !isActiveAndEnabled || _fuller == null)
                 return false;
 
             Physics.SyncTransforms();

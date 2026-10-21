@@ -27,6 +27,7 @@ namespace KeyboardModeling.Assembly
         private AssemblyCatalogEntry _inventoryEntry;
         private bool _fromInventory;
         private bool _showingIcon;
+        private bool _inputAllowed = true;
 
         [Header("Drag Height")]
         [SerializeField, Min(0f)] private float _heightOffset = 0.3f;
@@ -50,6 +51,7 @@ namespace KeyboardModeling.Assembly
         private EventSystem _pointerEventSystem;
 
         public AssemblyPartSlot[] Slots => _slots;
+        public bool InputAllowed => _inputAllowed;
         public bool IsDragging => _isDragging;
         public AssemblyPartSlot KeycapSlot => _partSlot;
         public AssemblyPartSlot SwitchSlot => _switchSlot;
@@ -65,7 +67,7 @@ namespace KeyboardModeling.Assembly
 
         void Update()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (!_inputAllowed || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
             {
                 CancelDrag();
                 return;
@@ -125,6 +127,18 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
+        /// allowed와 inputCamera로 조립 입력 허용 여부와 출력 카메라를 연결한다.
+        /// 입력을 차단할 때 기존 조작만 취소하며 지연 회수 코루틴과 장착 결과는 유지한다.
+        /// </summary>
+        public void SetInputAllowed(bool allowed, Camera inputCamera)
+        {
+            if (!allowed)
+                CancelDrag();
+            _camera = inputCamera;
+            _inputAllowed = allowed;
+        }
+
+        /// <summary>
         /// catalog를 이 입력의 인벤토리 UI로 연결한다.
         /// 월드에서 집은 부품의 반환 영역과 아이콘 표시를 같은 UI에서 처리한다.
         /// </summary>
@@ -168,7 +182,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool TryBeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (_isDragging || !isActiveAndEnabled || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
                 return false;
 
             if (_fullerTool != null)
@@ -193,7 +207,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool TryBeginBulkPlacement(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (_isDragging || !isActiveAndEnabled || entry.IsSwitch || entry.AvailableQuantity <= 0)
+            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || entry.IsSwitch || entry.AvailableQuantity <= 0)
                 return false;
 
             if (_fullerTool != null)

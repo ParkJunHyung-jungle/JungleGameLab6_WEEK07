@@ -228,6 +228,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandleToggleClicked(AssemblyCatalogButton button)
         {
+            if (!_dragInput.InputAllowed)
+                return;
             _dragInput.CancelDrag();
             bool isExpanded = !_panel.activeSelf;
             _panel.SetActive(isExpanded);
@@ -380,6 +382,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandleCardPressed(AssemblyCatalogButton button, Vector2 screenPosition)
         {
+            if (!_dragInput.InputAllowed)
+                return;
             AssemblyCatalogEntry entry = _cardEntries[button];
             if (_bulkPlacement && !entry.IsSwitch)
             {
@@ -402,6 +406,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandlePlacementModeClicked(AssemblyCatalogButton button)
         {
+            if (!_dragInput.InputAllowed)
+                return;
             if (_dragInput.IsDragging)
                 return;
             _bulkPlacement = button == _bulkPlacementButton;
@@ -422,12 +428,28 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
+        /// visible에 따라 생성된 인벤토리 Canvas와 UI 레이캐스트만 전환한다.
+        /// 재고, 선택, 접힘과 스크롤 상태 및 자식 EventSystem은 그대로 유지한다.
+        /// </summary>
+        public void SetInventoryVisible(bool visible)
+        {
+            if (_canvasRect == null)
+                return;
+            _canvasRect.GetComponent<Canvas>().enabled = visible;
+            _canvasRect.GetComponent<GraphicRaycaster>().enabled = visible;
+            EventSystem events = EventSystem.current;
+            if (!visible && events != null && events.currentSelectedGameObject != null
+                && events.currentSelectedGameObject.transform.IsChildOf(_canvasRect))
+                events.SetSelectedGameObject(null);
+        }
+
+        /// <summary>
         /// screenPosition이 현재 열린 명시적 목록 Viewport 안인지 반환한다.
         /// 카드 수나 현재 카테고리와 무관하게 빈 목록도 반환 영역으로 취급한다.
         /// </summary>
         public bool IsInReturnArea(Vector2 screenPosition)
         {
-            return isActiveAndEnabled && _panel.activeInHierarchy
+            return _dragInput.InputAllowed && isActiveAndEnabled && _panel.activeInHierarchy
                 && RectTransformUtility.RectangleContainsScreenPoint(_returnArea, screenPosition, null);
         }
 
@@ -449,7 +471,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void HideDragIcon()
         {
-            _dragIcon.gameObject.SetActive(false);
+            if (_dragIcon != null)
+                _dragIcon.gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -500,6 +523,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandleTabClicked(AssemblyCatalogButton button)
         {
+            if (!_dragInput.InputAllowed)
+                return;
             int index = _tabs.IndexOf(button);
             ShowCategory(index);
             CategorySelected?.Invoke(index);
@@ -511,6 +536,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandleCardClicked(AssemblyCatalogButton button)
         {
+            if (!_dragInput.InputAllowed)
+                return;
             int category = _cardCategories[button];
             if (_selections.TryGetValue(category, out AssemblyCatalogButton previous))
                 SetSelected(previous, false);

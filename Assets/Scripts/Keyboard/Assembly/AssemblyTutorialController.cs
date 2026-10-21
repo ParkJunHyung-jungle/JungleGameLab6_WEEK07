@@ -62,6 +62,7 @@ namespace KeyboardModeling.Assembly
             else if (category == 1) FirstEncounterTutorial.Request(TutorialTopic.AssemblySwitch);
             else if (category == 2) FirstEncounterTutorial.Request(TutorialTopic.CaseEditing);
             else if (category == 3) FirstEncounterTutorial.Request(TutorialTopic.PlateEditing);
+            else if (category == 4) FirstEncounterTutorial.Request(TutorialTopic.LEDEditing);
         }
 
         /// <summary>선택한 entry의 종류에 따라 스위치, 일반 키캡 또는 아티산 안내를 예약한다. 파츠 수량과 장착 상태는 변경하지 않는다.</summary>

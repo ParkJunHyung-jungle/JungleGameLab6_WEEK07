@@ -13,7 +13,7 @@ using KeyboardModeling;
 
 [ExecuteAlways]
 [DisallowMultipleComponent]
-public sealed class KeyboardCustomization : MonoBehaviour
+public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings
 {
     private const float MAX_LED_INTENSITY = 10f;
     private const float MAX_LED_SPEED = 10f;

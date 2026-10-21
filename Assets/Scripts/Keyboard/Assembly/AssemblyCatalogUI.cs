@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
+using Game.Player;
 using Game.Tournament;
 
 namespace KeyboardModeling.Assembly
@@ -35,6 +36,11 @@ namespace KeyboardModeling.Assembly
         private readonly Dictionary<AssemblyCatalogButton, Material> _surfaceMaterials = new Dictionary<AssemblyCatalogButton, Material>();
         private int _caseCategory = -1;
         private int _plateCategory = -1;
+
+        [Header("LED Customization")]
+        [SerializeField] private AssemblyLEDSettings _ledSettings;
+        private KeyboardLEDPanelUI _ledUI;
+        private int _ledCategory = -1;
 
         [Header("Appearance")]
         [SerializeField] private Sprite _sprite;
@@ -116,6 +122,7 @@ namespace KeyboardModeling.Assembly
         void OnDisable()
         {
             _dragInput.CancelDrag();
+            if (_ledUI != null) _ledUI.Close();
         }
 
         void OnDestroy()
@@ -241,6 +248,11 @@ namespace KeyboardModeling.Assembly
             _panel.SetActive(isExpanded);
             _toggleLabel.text = isExpanded ? "UI 접기" : "UI 펼치기";
             _toggleRect.anchoredPosition = new Vector2(isExpanded ? 348f : 20f, -20f);
+            if (_ledUI != null)
+            {
+                if (isExpanded && _currentCategory == _ledCategory) _ledUI.OpenAssembly(_ledSettings);
+                else _ledUI.Close();
+            }
             if (isExpanded) PanelOpened?.Invoke();
         }
 
@@ -288,6 +300,18 @@ namespace KeyboardModeling.Assembly
                 Mesh plateMesh = keyboard.PlateRenderer.GetComponent<MeshFilter>().sharedMesh;
                 foreach (Material material in _keycapMaterials)
                     AddCard(category, material.name, plateMesh, new[] { material });
+            }
+            if (_ledSettings != null)
+            {
+                _ledCategory = AddCategory("LED");
+                RectTransform content = _contents[_ledCategory];
+                content.GetComponent<GridLayoutGroup>().enabled = false;
+                content.GetComponent<ContentSizeFitter>().enabled = false;
+                RectTransform ledPanel = Rect("LEDCustomizationPanel", content);
+                ledPanel.gameObject.SetActive(false);
+                _ledUI = ledPanel.gameObject.AddComponent<KeyboardLEDPanelUI>();
+                float height = _ledUI.InitializeEmbedded(content, 272f);
+                content.sizeDelta = new Vector2(0f, height);
             }
         }
 
@@ -556,6 +580,15 @@ namespace KeyboardModeling.Assembly
             }
             _scroll.content = _contents[index];
             _currentCategory = index;
+            bool isLED = index == _ledCategory;
+            _scroll.gameObject.SetActive(true);
+            _singlePlacementButton.gameObject.SetActive(!isLED);
+            _bulkPlacementButton.gameObject.SetActive(!isLED);
+            if (_ledUI != null)
+            {
+                if (isLED) _ledUI.OpenAssembly(_ledSettings);
+                else _ledUI.Close();
+            }
             UpdateHeading();
             Canvas.ForceUpdateCanvases();
             _scroll.StopMovement();

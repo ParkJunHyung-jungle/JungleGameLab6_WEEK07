@@ -877,6 +877,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 673155677120519250, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1824205565555382331, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
       propertyPath: m_Name
       value: RepairWorkbench
@@ -1622,11 +1626,113 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &1857188595
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1857188597}
+  - component: {fileID: 1857188596}
+  m_Layer: 0
+  m_Name: AssemblyKeyboardPickup
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1857188596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1857188595}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00b1c27e5878e8349a814acfe7c51afc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.AssemblyKeyboardPickup
+  _focusController: {fileID: 1949275071}
+  _brain: {fileID: 203759076}
+  _inputCamera: {fileID: 961761716}
+  _keyboardBody: {fileID: 1885668288}
+  _pickupTarget: {fileID: 1885668287}
+  _interactionDistance: 12
+  _interactionLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _heldDistance: 2
+  _heldOffset: {x: 0, y: 0.12, z: 0}
+  _heldEulerAngles: {x: -75, y: 0, z: 0}
+  _followSpeed: 12
+  _throwSpeed: 10
+--- !u!4 &1857188597
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1857188595}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1885668284 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
+  m_PrefabInstance: {fileID: 4248216447086206701}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1885668285 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1885451075537805472, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
   m_PrefabInstance: {fileID: 4248216447086206701}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1885668287
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1885668284}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77cd2a40d51f4a58a6365feea3a9fbb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardPickupTarget
+--- !u!54 &1885668288
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1885668284}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 1
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &1949275070
 GameObject:
   m_ObjectHideFlags: 0
@@ -1668,6 +1774,7 @@ MonoBehaviour:
   _inputAxes: {fileID: 961761714}
   _dragInput: {fileID: 1055555871}
   _catalog: {fileID: 9900102}
+  _pickupController: {fileID: 1857188596}
 --- !u!4 &1949275072
 Transform:
   m_ObjectHideFlags: 0
@@ -1780,7 +1887,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1885668288}
+    - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1885668287}
   m_SourcePrefab: {fileID: 100100000, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
 --- !u!114 &4248216447086206702 stripped
 MonoBehaviour:
@@ -3691,3 +3804,4 @@ SceneRoots:
   - {fileID: 961761717}
   - {fileID: 1650989896}
   - {fileID: 1949275072}
+  - {fileID: 1857188597}

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using UnityEngine;
 
 namespace KeyboardModeling.Assembly
@@ -26,6 +28,8 @@ namespace KeyboardModeling.Assembly
         private Vector3 _returnAngularVelocity;
         private AssemblyCatalogEntry _catalogEntry;
         private int _interactionVersion;
+        private readonly List<(Collider Collider, bool WasIgnored)> _keyboardCollisionStates
+            = new List<(Collider Collider, bool WasIgnored)>();
 
         public bool IsSwitch => _isSwitch;
         public bool IsAdaptiveKeycap => _isAdaptiveKeycap;
@@ -87,6 +91,7 @@ namespace KeyboardModeling.Assembly
             if (_slot != null)
                 _slot.Release(this);
             SetBodyFrozen(true);
+            RestoreKeyboardCollisions();
             transform.SetParent(null, true);
         }
 
@@ -143,6 +148,7 @@ namespace KeyboardModeling.Assembly
             _slot = null;
             _originSlot = null;
             SetBodyFrozen(true);
+            RestoreKeyboardCollisions();
             transform.SetParent(null, true);
             gameObject.SetActive(false);
         }
@@ -160,6 +166,7 @@ namespace KeyboardModeling.Assembly
             transform.SetParent(_slot.transform, true);
             transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
             transform.localScale = Vector3.one;
+            IgnoreKeyboardCollisions();
         }
 
         /// <summary>
@@ -170,6 +177,7 @@ namespace KeyboardModeling.Assembly
         {
             if (_slot != null)
                 _slot.Release(this);
+            RestoreKeyboardCollisions();
             transform.SetParent(null, true);
             SetBodyFrozen(false);
         }
@@ -208,6 +216,7 @@ namespace KeyboardModeling.Assembly
             _isSwitch = entry.IsSwitch;
             _isAdaptiveKeycap = !entry.IsSwitch && !entry.IsArtisan;
             _keycapShape = previewShape;
+            RestoreKeyboardCollisions();
             transform.SetParent(null, true);
             transform.localScale = entry.Prefab.transform.localScale;
             if (_isAdaptiveKeycap)
@@ -249,6 +258,37 @@ namespace KeyboardModeling.Assembly
             BoxCollider collider = (BoxCollider)_partCollider;
             collider.center = bounds.center;
             collider.size = bounds.size;
+        }
+
+        /// <summary>
+        /// 장착 슬롯의 본체 Rigidbody에 속한 Collider와 이 부품 사이의 기존 충돌 설정을 보관한다.
+        /// 부모 본체가 있을 때만 자기 충돌을 제외하며 다른 물체와의 충돌은 유지한다.
+        /// </summary>
+        private void IgnoreKeyboardCollisions()
+        {
+            RestoreKeyboardCollisions();
+            Rigidbody keyboardBody = _slot.GetComponentInParent<Rigidbody>();
+            if (keyboardBody == null)
+                return;
+            foreach (Collider collider in keyboardBody.GetComponentsInChildren<Collider>(true))
+            {
+                if (collider.attachedRigidbody != keyboardBody)
+                    continue;
+                _keyboardCollisionStates.Add((collider, Physics.GetIgnoreCollision(_partCollider, collider)));
+                Physics.IgnoreCollision(_partCollider, collider, true);
+            }
+        }
+
+        /// <summary>
+        /// 본체 결합 시 저장한 Collider 쌍의 충돌 설정을 복원하고 기록을 비운다.
+        /// 분리 부품은 본체와 다시 충돌하며 이미 파괴된 Collider는 건너뛴다.
+        /// </summary>
+        private void RestoreKeyboardCollisions()
+        {
+            foreach (var state in _keyboardCollisionStates)
+                if (state.Collider != null)
+                    Physics.IgnoreCollision(_partCollider, state.Collider, state.WasIgnored);
+            _keyboardCollisionStates.Clear();
         }
 
         /// <summary>

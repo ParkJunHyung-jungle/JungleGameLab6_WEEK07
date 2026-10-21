@@ -25,6 +25,7 @@ namespace KeyboardModeling.Assembly
         [Header("Assembly")]
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private AssemblyCatalogUI _catalog;
+        [SerializeField] private AssemblyKeyboardPickup _pickupController;
         private bool _isFocused;
         private bool _initialized;
 
@@ -60,7 +61,7 @@ namespace KeyboardModeling.Assembly
                 return;
             }
 
-            if (!_brain.IsBlending && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
+            if (!_pickupController.IsHolding && !_brain.IsBlending && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
                 && IsTargetInCenter())
                 SetFocused(true);
         }

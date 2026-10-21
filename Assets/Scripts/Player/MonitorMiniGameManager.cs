@@ -10,10 +10,11 @@ namespace Game.Player
     public sealed class MonitorMiniGameManager : MonoBehaviour
     {
         [Header("Mini Games")]
-        [SerializeField] private MonitorMiniGame[] _games = Array.Empty<MonitorMiniGame>();
+        [SerializeField] private MonitorMiniGameDefinition[] _games = Array.Empty<MonitorMiniGameDefinition>();
+        [SerializeField] private Transform _screenRoot;
         private MonitorMiniGame _currentGame;
 
-        public IReadOnlyList<MonitorMiniGame> Games => _games;
+        public IReadOnlyList<MonitorMiniGameDefinition> Games => _games;
         public MonitorMiniGame CurrentGame => _currentGame;
         public event Action<MonitorMiniGame> GameChanged;
 
@@ -27,23 +28,31 @@ namespace Game.Player
             StopGame();
         }
 
-        /// <summary>Inspector 목록의 index에 등록된 게임을 시작한다. 현재 게임은 먼저 종료하며 유효하지 않은 대상이면 false를 반환하고 기존 실행을 유지한다.</summary>
+        /// <summary>Inspector 목록의 index에 등록된 SO를 사용해 게임 화면을 생성한다. 유효하지 않은 인덱스면 false를 반환하며 기존 실행은 유지한다.</summary>
         public bool StartGame(int index)
         {
             if (!isActiveAndEnabled || index < 0 || index >= _games.Length) return false;
-            MonitorMiniGame game = _games[index];
-            if (game == null || !game.isActiveAndEnabled) return false;
-            if (_currentGame == game) return true;
+            return StartGame(_games[index]);
+        }
+
+        /// <summary>definition의 화면 프리팹을 모니터 화면 영역에 생성하고 SO 데이터로 실행한다. 잘못된 구성은 false를 반환하며 동일 게임은 기존 실행을 유지한다.</summary>
+        public bool StartGame(MonitorMiniGameDefinition definition)
+        {
+            if (!isActiveAndEnabled || definition == null || _screenRoot == null
+                || definition.ScreenPrefab == null || !definition.ScreenPrefab.gameObject.activeSelf
+                || !definition.ScreenPrefab.enabled || !definition.ScreenPrefab.CanRun(definition)) return false;
+            if (_currentGame != null && _currentGame.Definition == definition) return true;
 
             StopGame();
+            MonitorMiniGame game = Instantiate(definition.ScreenPrefab, _screenRoot, false);
             _currentGame = game;
             game.Finished += HandleFinished;
-            game.Begin();
+            game.Begin(definition);
             if (_currentGame == game) GameChanged?.Invoke(game);
             return _currentGame == game;
         }
 
-        /// <summary>현재 게임의 완료 구독을 해제하고 종료 처리를 호출한다. 입력값과 반환값 없이 선택을 비우고 GameChanged에 null을 전달한다.</summary>
+        /// <summary>현재 게임의 구독을 해제하고 실행 화면을 정리한다. 입력값과 반환값 없이 선택을 비우고 GameChanged에 null을 전달한다.</summary>
         public void StopGame()
         {
             if (_currentGame == null) return;
@@ -51,6 +60,8 @@ namespace Game.Player
             _currentGame = null;
             game.Finished -= HandleFinished;
             game.End();
+            game.gameObject.SetActive(false);
+            Destroy(game.gameObject);
             GameChanged?.Invoke(null);
         }
 

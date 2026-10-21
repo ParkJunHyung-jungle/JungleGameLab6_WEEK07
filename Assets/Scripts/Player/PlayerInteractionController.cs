@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -101,6 +102,7 @@ namespace Game.Player
         private bool _monitorMoveInputWasEnabled;
         private bool _monitorCameraInputWasEnabled;
         private bool _isMonitorFocusMode;
+        public event Action<MonitorKeyboardHolder> MonitorFocusChanged;
 
         void Awake()
         {
@@ -565,6 +567,7 @@ namespace Game.Player
             _monitorMoveInputWasEnabled = _moveInput.action.enabled;
             _monitorCameraInputWasEnabled = _cameraInputAxisController.enabled;
             _isMonitorFocusMode = true;
+            MonitorFocusChanged?.Invoke(holder);
 
             _moveInput.action.Disable();
             _cameraInputAxisController.enabled = false;
@@ -599,6 +602,7 @@ namespace Game.Player
         private void ExitMonitorFocusMode()
         {
             _isMonitorFocusMode = false;
+            MonitorFocusChanged?.Invoke(null);
             BeginMonitorFocusTransition(
                 _monitorSavedCameraRotation,
                 _monitorSavedPlayerPosition,
@@ -696,6 +700,7 @@ namespace Game.Player
 
             _isMonitorFocusMode = false;
             transform.position = _monitorSavedPlayerPosition;
+            MonitorFocusChanged?.Invoke(null);
             if (_camera != null && _cameraPanTilt != null)
                 _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _monitorSavedCameraRotation);
             if (_editingCinemachineCamera != null)

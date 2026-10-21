@@ -70,7 +70,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// 현재 위치, 회전과 슬롯 점유 상태를 저장하고 드래그를 시작한다.
-        /// 기존 슬롯 점유를 해제하고 물리 시뮬레이션을 일시 정지한다.
+        /// 기존 슬롯 점유를 해제하고 물리를 정지하며 실제 장착 상태였던 부품에만 제거음을 재생한다.
         /// </summary>
         public void BeginDrag()
         {
@@ -85,6 +85,7 @@ namespace KeyboardModeling.Assembly
             if (_slot != null)
                 _slot.Release(this);
             SetBodyFrozen(true);
+            if (_wasInstalled) AudioManager.PlayPartSound(_returnPosition, true);
         }
 
         /// <summary>
@@ -93,7 +94,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void EndDrag(bool install)
         {
-            if (install && _slot.Install(this))
+            if (install && _slot.Install(this, true))
                 return;
 
             if (_restoreOnInvalidDrop)
@@ -172,7 +173,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// 장착된 키캡만 슬롯에서 분리하고 velocity와 angularVelocity로 튀어 오르게 한다.
-        /// 점유를 해제하고 중력을 활성화하며 이미 분리된 부품이나 스위치이면 false를 반환한다.
+        /// 점유 해제와 중력 활성화에 성공하면 제거음을 재생하며 이미 분리된 부품이나 스위치이면 false를 반환한다.
         /// </summary>
         public bool TryPopOff(Vector3 velocity, Vector3 angularVelocity)
         {
@@ -181,6 +182,7 @@ namespace KeyboardModeling.Assembly
             DropWithPhysics();
             _body.linearVelocity = velocity;
             _body.angularVelocity = angularVelocity;
+            AudioManager.PlayPartSound(transform.position, true);
             return true;
         }
 

@@ -238,14 +238,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 8f826efd0c3ec5941941d1e269490a42, type: 2}
   - {fileID: 11400000, guid: bd31123c656224b4eb33cd51b321d11a, type: 2}
   - {fileID: 11400000, guid: b103a6afca946d640b4c502acc209e77, type: 2}
-  _caseRenderers:
-  - {fileID: 1074638126}
-  - {fileID: 955253302}
-  - {fileID: 358492076}
-  - {fileID: 1541391241}
-  - {fileID: 339507578}
-  _plateRenderer: {fileID: 1292965394}
-  _ledSettings: {fileID: 2125866916}
   _sprite: {fileID: 0}
   _startCollapsed: 1
   _dragInput: {fileID: 1055555871}
@@ -433,23 +425,6 @@ MonoBehaviour:
   _outlineColor: {r: 0.34, g: 0.84, b: 0.95, a: 1}
   _outlineWidth: 0.008
   _returnOpacity: 0.25
---- !u!1 &68566327 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 7420572367496054787, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &68566331
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 68566327}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 971d2f55cffc34b4693c7432701f0af3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardLED
 --- !u!1 &203759071
 GameObject:
   m_ObjectHideFlags: 0
@@ -462,6 +437,7 @@ GameObject:
   - component: {fileID: 203759073}
   - component: {fileID: 203759075}
   - component: {fileID: 900010}
+  - component: {fileID: 203759076}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -579,6 +555,20 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &203759076
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 203759071}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86c6556701af9e04380698b89f691b6e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FMODUnity::FMODUnity.StudioListener
+  nonRigidbodyVelocity: 0
+  attenuationObject: {fileID: 0}
 --- !u!1001 &235272819
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -701,16 +691,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!23 &339507578 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 1195518294156611782, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
---- !u!23 &358492076 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 8827512677548284083, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &846001678 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7496860464301597497, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
@@ -791,11 +771,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
---- !u!23 &955253302 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 4182850449193213064, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1055555870
 GameObject:
   m_ObjectHideFlags: 0
@@ -1021,21 +996,63 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!23 &1074638126 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 2633254858743083414, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
---- !u!23 &1292965394 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 4952972323714551931, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
---- !u!23 &1541391241 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 5718502229770142375, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &1258285164
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -1.36652
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.85575
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.70406
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3464317468454059254, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6233164409691592997, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
+      propertyPath: m_Name
+      value: FmodManager
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: dd0ffe0a7a13a7a4c86241eda8feab63, type: 3}
 --- !u!1001 &1775379889
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1134,7 +1151,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7496860464301597497, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1282,29 +1299,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f7b90159f2ffc5479c7632bf1a9421d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.AssemblyPartSlot
---- !u!1 &2125866913 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-  m_PrefabInstance: {fileID: 4248216447086206701}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &2125866916
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2125866913}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d54fb514c7b54d24ca9f75d8cfa023ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.AssemblyLEDSettings
-  _ledLayer: {fileID: 68566331}
-  _ledEnabled: 0
-  _ledColor: {r: 0, g: 0.8, b: 1, a: 1}
-  _ledIntensity: 3
-  _ledPattern: 0
-  _ledSpeed: 1
 --- !u!114 &3946349001033484382 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 381994015645601254, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
@@ -1335,10 +1329,6 @@ PrefabInstance:
     - target: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
       propertyPath: m_Name
       value: Keyboard_AssemblyPreview
-      objectReference: {fileID: 0}
-    - target: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1885451075537805472, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1395,13 +1385,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 2125866916}
-    - targetCorrespondingSourceObject: {fileID: 7420572367496054787, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 68566331}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
 --- !u!114 &4248216447086206702 stripped
 MonoBehaviour:
@@ -3308,3 +3292,4 @@ SceneRoots:
   - {fileID: 9900101}
   - {fileID: 235272819}
   - {fileID: 1775379889}
+  - {fileID: 1258285164}

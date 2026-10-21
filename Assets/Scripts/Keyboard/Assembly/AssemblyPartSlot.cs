@@ -95,18 +95,23 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// part를 장착하되 다른 키캡이 점유한 키캡 슬롯이면 상태 변경 없이 false를 반환한다.
-        /// 스위치는 기존 교체 처리를 유지하며 성공 시 점유와 위치 및 회전을 갱신하고 true를 반환한다.
+        /// 스위치 교체를 유지하며 성공 시 점유와 자세를 갱신하고 true를 반환한다. playSound는 사용자 설치 성공 시에만 소리를 허용한다.
         /// </summary>
-        public bool Install(AssemblyDraggablePart part)
+        public bool Install(AssemblyDraggablePart part, bool playSound = false)
         {
             if (!_isSwitch && _installedPart != null && _installedPart != part)
                 return false;
 
-            if (_installedPart != null && _installedPart != part)
+            bool changed = _installedPart != part;
+            if (_installedPart != null && changed)
+            {
+                if (playSound) AudioManager.PlayPartSound(_installedPart.transform.position, true);
                 _installedPart.DropWithPhysics();
+            }
             part.AttachSlot(this);
             _installedPart = part;
             part.SnapToSlot();
+            if (playSound && changed) AudioManager.PlayPartSound(transform.position, false);
             return true;
         }
 

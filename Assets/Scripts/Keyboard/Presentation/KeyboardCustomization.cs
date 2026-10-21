@@ -13,7 +13,7 @@ using KeyboardModeling;
 
 [ExecuteAlways]
 [DisallowMultipleComponent]
-public sealed class KeyboardCustomization : MonoBehaviour
+public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings
 {
     private const float MAX_LED_INTENSITY = 10f;
     private const float MAX_LED_SPEED = 10f;
@@ -69,6 +69,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// 저장된 _caseMaterialIndex를 UI 선택 표시에 제공한다.
     /// </summary>
     public int CaseMaterialIndex => _caseMaterialIndex;
+    public Material CaseMaterial => _caseMaterial;
 
     [Header("Keycaps")]
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];

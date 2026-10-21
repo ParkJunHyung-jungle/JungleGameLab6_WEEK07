@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -10,11 +11,14 @@ namespace KeyboardModeling.Assembly
     [DisallowMultipleComponent]
     public sealed class AssemblyDragInput : MonoBehaviour
     {
+        private const float EXTRACTED_RETURN_DELAY = 2f;
+
         [Header("Scene References")]
         [SerializeField] private Camera _camera;
         [SerializeField] private AssemblyPartSlot _partSlot;
         [SerializeField] private AssemblyPartSlot _switchSlot;
         [SerializeField] private AssemblyPartSlot[] _slots = new AssemblyPartSlot[0];
+        [SerializeField] private AssemblyFullerTool _fullerTool;
         private readonly List<AssemblyDraggablePart> _parts = new List<AssemblyDraggablePart>();
         private AssemblyDraggablePart _activePart;
         private AssemblyCatalogUI _catalog;
@@ -47,6 +51,8 @@ namespace KeyboardModeling.Assembly
         public bool IsDragging => _isDragging;
         public AssemblyPartSlot KeycapSlot => _partSlot;
         public AssemblyPartSlot SwitchSlot => _switchSlot;
+        public Camera InputCamera => _camera;
+        public float DragWorldHeight => _partSlot.transform.position.y + _heightOffset;
 
         void Start()
         {
@@ -65,6 +71,8 @@ namespace KeyboardModeling.Assembly
 
             Vector2 screenPosition = mouse.position.ReadValue();
             Ray ray = _camera.ScreenPointToRay(screenPosition);
+            if (_fullerTool != null && _fullerTool.ProcessPointer(ray, screenPosition, mouse))
+                return;
             if (!_isDragging && mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI(screenPosition))
                 TryBeginDrag(ray);
 
@@ -116,6 +124,35 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
+        /// 일괄로 분리한 part를 기존 카탈로그 항목으로 회수할 타이머를 시작한다.
+        /// 연결된 항목과 현재 조작 버전을 사용하며 개별 분리에는 적용하지 않는다.
+        /// </summary>
+        public void ScheduleExtractedReturn(AssemblyDraggablePart part)
+        {
+            if (part.CatalogEntry != null)
+                StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
+        }
+
+        /// <summary>
+        /// part가 interactionVersion 이후 다시 조작되지 않았으면 1초 뒤 기존 재고로 회수한다.
+        /// 시간은 deltaTime으로 누적하며 실물의 집기 등록을 해제하고 재고 한 개와 UI를 갱신한다.
+        /// </summary>
+        private IEnumerator ReturnExtractedPart(AssemblyDraggablePart part, int interactionVersion)
+        {
+            float elapsed = 0f;
+            while (elapsed < EXTRACTED_RETURN_DELAY)
+            {
+                yield return null;
+                if (part == null || part.InteractionVersion != interactionVersion)
+                    yield break;
+                elapsed += Time.deltaTime;
+            }
+            _parts.Remove(part);
+            part.CatalogEntry.StorePart(part, true);
+            _catalog.RefreshInventory();
+        }
+
+        /// <summary>
         /// 예약된 entry를 screenPosition의 UI 아이콘으로 집는다.
         /// 입력을 사용할 수 없거나 이미 드래그 중이면 false를 반환하며 실물은 생성하지 않는다.
         /// </summary>
@@ -124,6 +161,8 @@ namespace KeyboardModeling.Assembly
             if (_isDragging || !isActiveAndEnabled)
                 return false;
 
+            if (_fullerTool != null)
+                _fullerTool.ReturnToOrigin();
             _inventoryEntry = entry;
             _fromInventory = true;
             _activePart = null;
@@ -145,6 +184,8 @@ namespace KeyboardModeling.Assembly
             if (_isDragging || !isActiveAndEnabled || entry.IsSwitch || entry.AvailableQuantity <= 0)
                 return false;
 
+            if (_fullerTool != null)
+                _fullerTool.ReturnToOrigin();
             _bulkEntry = entry;
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
             _dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragHeight, 0f));
@@ -428,7 +469,7 @@ namespace KeyboardModeling.Assembly
         /// screenPosition에서 현재 UI를 직접 레이캐스트하여 UI 입력 여부를 반환한다.
         /// EventSystem 갱신 순서와 무관하게 UI를 누를 때 뒤쪽 키캡의 집기 시작을 막는다.
         /// </summary>
-        private bool IsPointerOverUI(Vector2 screenPosition)
+        public bool IsPointerOverUI(Vector2 screenPosition)
         {
             EventSystem events = EventSystem.current;
             if (events == null)
@@ -510,6 +551,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void CancelDrag()
         {
+            if (_fullerTool != null)
+                _fullerTool.ReturnToOrigin();
             if (!_isDragging)
                 return;
 

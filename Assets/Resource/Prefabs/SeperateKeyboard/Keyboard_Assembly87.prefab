@@ -504,6 +504,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &38878964946596174
 GameObject:
   m_ObjectHideFlags: 0
@@ -5109,6 +5110,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &362984188732120810
 GameObject:
   m_ObjectHideFlags: 0
@@ -5784,6 +5786,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &408756766108800804
 GameObject:
   m_ObjectHideFlags: 0
@@ -7735,6 +7738,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &577203682976002783
 GameObject:
   m_ObjectHideFlags: 0
@@ -9031,6 +9035,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &673393642064928917
 GameObject:
   m_ObjectHideFlags: 0
@@ -10768,6 +10773,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &777572100612658293
 GameObject:
   m_ObjectHideFlags: 0
@@ -13721,6 +13727,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1885451075537805472}
   - component: {fileID: 5328275870496507222}
+  - component: {fileID: 9119643164805234818}
   m_Layer: 0
   m_Name: Keyboard_Assembly87
   m_TagString: Untagged
@@ -13760,6 +13767,33 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.KeyboardLegendRenderer
   _materialTemplate: {fileID: 2100000, guid: abd5db41bc189fb47b822bf20b9b7d40, type: 2}
+--- !u!54 &9119643164805234818
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 987670696490926945}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &996451694223803184
 GameObject:
   m_ObjectHideFlags: 0
@@ -14911,6 +14945,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1075492605696872935
 GameObject:
   m_ObjectHideFlags: 0
@@ -18674,6 +18709,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1293549181809171699
 GameObject:
   m_ObjectHideFlags: 0
@@ -21851,6 +21887,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1438466749853755191
 GameObject:
   m_ObjectHideFlags: 0
@@ -21995,6 +22032,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1451902153179129932
 GameObject:
   m_ObjectHideFlags: 0
@@ -23223,6 +23261,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1550601018371969891
 GameObject:
   m_ObjectHideFlags: 0
@@ -25719,6 +25758,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1677154475303599081
 GameObject:
   m_ObjectHideFlags: 0
@@ -29672,6 +29712,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1959666428695796039
 GameObject:
   m_ObjectHideFlags: 0
@@ -29997,6 +30038,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &1991169108927212943
 GameObject:
   m_ObjectHideFlags: 0
@@ -31995,6 +32037,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2136543209168158420
 GameObject:
   m_ObjectHideFlags: 0
@@ -34407,6 +34450,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2288782471770336596
 GameObject:
   m_ObjectHideFlags: 0
@@ -37628,6 +37672,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2515924579280524288
 GameObject:
   m_ObjectHideFlags: 0
@@ -38011,6 +38056,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2550547868970537918
 GameObject:
   m_ObjectHideFlags: 0
@@ -39063,6 +39109,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2643192191746121379
 GameObject:
   m_ObjectHideFlags: 0
@@ -40290,6 +40337,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2702574022597219075
 GameObject:
   m_ObjectHideFlags: 0
@@ -40671,6 +40719,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2727666203396235940
 GameObject:
   m_ObjectHideFlags: 0
@@ -41936,6 +41985,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2822774435596355026
 GameObject:
   m_ObjectHideFlags: 0
@@ -43117,6 +43167,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2919996375907880669
 GameObject:
   m_ObjectHideFlags: 0
@@ -43171,6 +43222,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &2944141674667390488
 GameObject:
   m_ObjectHideFlags: 0
@@ -44455,6 +44507,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3029578252909613912
 GameObject:
   m_ObjectHideFlags: 0
@@ -44871,6 +44924,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3079721104587574167
 GameObject:
   m_ObjectHideFlags: 0
@@ -47095,6 +47149,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3186086551325062462
 GameObject:
   m_ObjectHideFlags: 0
@@ -47239,6 +47294,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3189728621303812714
 GameObject:
   m_ObjectHideFlags: 0
@@ -48630,6 +48686,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3284512500934300703
 GameObject:
   m_ObjectHideFlags: 0
@@ -53150,6 +53207,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3578203014784562186
 GameObject:
   m_ObjectHideFlags: 0
@@ -54670,6 +54728,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3682821761634473040
 GameObject:
   m_ObjectHideFlags: 0
@@ -57214,6 +57273,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3792090368445861752
 GameObject:
   m_ObjectHideFlags: 0
@@ -59469,6 +59529,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &3961398152615994900
 GameObject:
   m_ObjectHideFlags: 0
@@ -60211,6 +60272,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &4020341027532887459
 GameObject:
   m_ObjectHideFlags: 0
@@ -61602,6 +61664,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &4100722102498695023
 GameObject:
   m_ObjectHideFlags: 0
@@ -62212,6 +62275,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &4135435458440398015
 GameObject:
   m_ObjectHideFlags: 0
@@ -62503,6 +62567,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &4168807946687260343
 GameObject:
   m_ObjectHideFlags: 0
@@ -65157,6 +65222,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &4355292476606988342
 GameObject:
   m_ObjectHideFlags: 0
@@ -72055,6 +72121,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &4822214571057042218
 GameObject:
   m_ObjectHideFlags: 0
@@ -75062,6 +75129,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5092256095650232955
 GameObject:
   m_ObjectHideFlags: 0
@@ -77621,6 +77689,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5266158307560958570
 GameObject:
   m_ObjectHideFlags: 0
@@ -78668,6 +78737,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5324179302100050978
 GameObject:
   m_ObjectHideFlags: 0
@@ -79086,6 +79156,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5352204214703773721
 GameObject:
   m_ObjectHideFlags: 0
@@ -80241,6 +80312,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5422006207519666122
 GameObject:
   m_ObjectHideFlags: 0
@@ -80385,6 +80457,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5434616084151525462
 GameObject:
   m_ObjectHideFlags: 0
@@ -81072,6 +81145,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5472110975408913947
 GameObject:
   m_ObjectHideFlags: 0
@@ -81848,6 +81922,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5502689979931120334
 GameObject:
   m_ObjectHideFlags: 0
@@ -83271,6 +83346,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5601215453775327889
 GameObject:
   m_ObjectHideFlags: 0
@@ -83471,6 +83547,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5617379733131007104
 GameObject:
   m_ObjectHideFlags: 0
@@ -83615,6 +83692,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5641248317585772749
 GameObject:
   m_ObjectHideFlags: 0
@@ -84837,6 +84915,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 0
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5724194721280134124
 GameObject:
   m_ObjectHideFlags: 0
@@ -85130,6 +85209,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5753434751148023698
 GameObject:
   m_ObjectHideFlags: 0
@@ -85794,6 +85874,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5803489708742655095
 GameObject:
   m_ObjectHideFlags: 0
@@ -87217,6 +87298,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &5887774391036595282
 GameObject:
   m_ObjectHideFlags: 0
@@ -88504,6 +88586,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6064015116162166121
 GameObject:
   m_ObjectHideFlags: 0
@@ -88828,6 +88911,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6075459027576294434
 GameObject:
   m_ObjectHideFlags: 0
@@ -89630,6 +89714,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6129738533103835927
 GameObject:
   m_ObjectHideFlags: 0
@@ -89865,6 +89950,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6131689572493161582
 GameObject:
   m_ObjectHideFlags: 0
@@ -91114,6 +91200,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6189520783266103261
 GameObject:
   m_ObjectHideFlags: 0
@@ -92077,6 +92164,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6258757083292162513
 GameObject:
   m_ObjectHideFlags: 0
@@ -97232,6 +97320,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6550489488218833528
 GameObject:
   m_ObjectHideFlags: 0
@@ -97286,6 +97375,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6557341063691764613
 GameObject:
   m_ObjectHideFlags: 0
@@ -97831,6 +97921,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6610302057530659802
 GameObject:
   m_ObjectHideFlags: 0
@@ -100065,6 +100156,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6714728477456699205
 GameObject:
   m_ObjectHideFlags: 0
@@ -101708,6 +101800,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6802739222918500124
 GameObject:
   m_ObjectHideFlags: 0
@@ -103264,6 +103357,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6863879693809519057
 GameObject:
   m_ObjectHideFlags: 0
@@ -103318,6 +103412,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &6865087171173003593
 GameObject:
   m_ObjectHideFlags: 0
@@ -106130,6 +106225,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7028241086173242789
 GameObject:
   m_ObjectHideFlags: 0
@@ -106184,6 +106280,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7033404030787264105
 GameObject:
   m_ObjectHideFlags: 0
@@ -106419,6 +106516,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7053774616808627496
 GameObject:
   m_ObjectHideFlags: 0
@@ -110914,6 +111012,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7375737703950387678
 GameObject:
   m_ObjectHideFlags: 0
@@ -113570,6 +113669,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7517025067489740237
 GameObject:
   m_ObjectHideFlags: 0
@@ -114167,6 +114267,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7547692110267084910
 GameObject:
   m_ObjectHideFlags: 0
@@ -116681,6 +116782,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7731394120138928007
 GameObject:
   m_ObjectHideFlags: 0
@@ -118541,6 +118643,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7811870965397496825
 GameObject:
   m_ObjectHideFlags: 0
@@ -120382,6 +120485,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7898591392690197866
 GameObject:
   m_ObjectHideFlags: 0
@@ -120819,6 +120923,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &7913749139787309163
 GameObject:
   m_ObjectHideFlags: 0
@@ -124753,6 +124858,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8195255336440848583
 GameObject:
   m_ObjectHideFlags: 0
@@ -125224,6 +125330,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8221032371742567366
 GameObject:
   m_ObjectHideFlags: 0
@@ -127526,6 +127633,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8327015448901907628
 GameObject:
   m_ObjectHideFlags: 0
@@ -131662,6 +131770,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8572645696793434786
 GameObject:
   m_ObjectHideFlags: 0
@@ -132271,6 +132380,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8604784896252950122
 GameObject:
   m_ObjectHideFlags: 0
@@ -132597,6 +132707,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8617330521680229643
 GameObject:
   m_ObjectHideFlags: 0
@@ -134392,6 +134503,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8745036860630489498
 GameObject:
   m_ObjectHideFlags: 0
@@ -134981,6 +135093,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8790376937069425814
 GameObject:
   m_ObjectHideFlags: 0
@@ -135455,6 +135568,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &8818281778595638380
 GameObject:
   m_ObjectHideFlags: 0
@@ -139510,6 +139624,7 @@ MonoBehaviour:
   _snapRadius: 0.13
   _startsInstalled: 1
   _restoreOnInvalidDrop: 1
+  _removalBlockers: []
 --- !u!1 &9064439066886413579
 GameObject:
   m_ObjectHideFlags: 0

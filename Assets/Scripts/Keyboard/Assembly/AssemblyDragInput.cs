@@ -29,6 +29,15 @@ namespace KeyboardModeling.Assembly
         private float _dragHeight;
         private bool _isDragging;
 
+        [Header("Bulk Placement")]
+        private bool _isBulkPlacing;
+        private AssemblyCatalogEntry _bulkEntry;
+        private AssemblyDraggablePart _bulkPreview;
+        private Vector3 _previousBulkPosition;
+        private bool _hasPreviousBulkPosition;
+        private readonly HashSet<AssemblyPartSlot> _bulkVisited = new HashSet<AssemblyPartSlot>();
+        private readonly List<KeyValuePair<float, AssemblyPartSlot>> _bulkCandidates = new List<KeyValuePair<float, AssemblyPartSlot>>();
+
         [Header("UI Input")]
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
         private PointerEventData _pointerEvent;
@@ -61,6 +70,14 @@ namespace KeyboardModeling.Assembly
 
             if (!_isDragging)
                 return;
+
+            if (_isBulkPlacing)
+            {
+                UpdateBulkPlacement(ray, screenPosition);
+                if (_isBulkPlacing && (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed))
+                    EndBulkPlacement();
+                return;
+            }
 
             bool overUI = IsPointerOverUI(screenPosition);
             bool inReturnArea = _catalog != null && _catalog.IsInReturnArea(screenPosition);
@@ -117,6 +134,168 @@ namespace KeyboardModeling.Assembly
             _isDragging = true;
             _catalog.ShowDragIcon(entry, screenPosition);
             return true;
+        }
+
+        /// <summary>
+        /// entry의 키캡을 screenPosition에서 일괄 배치할 미리보기로 준비한다.
+        /// 재고와 입력 상태를 검사하고 실제 부품 등록이나 슬롯 점유 없이 배치를 시작한다.
+        /// </summary>
+        public bool TryBeginBulkPlacement(AssemblyCatalogEntry entry, Vector2 screenPosition)
+        {
+            if (_isDragging || !isActiveAndEnabled || entry.IsSwitch || entry.AvailableQuantity <= 0)
+                return false;
+
+            _bulkEntry = entry;
+            _dragHeight = _partSlot.transform.position.y + _heightOffset;
+            _dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragHeight, 0f));
+            _bulkPreview = Instantiate(entry.Prefab);
+            _bulkPreview.name = "BulkKeycapPreview";
+            _bulkPreview.Initialize(_partSlot, _bulkPreview.PartCollider, false);
+            _bulkPreview.SetCatalogEntry(entry);
+            _bulkPreview.PrepareInventoryPart(entry, _partSlot.KeycapShape);
+            foreach (Collider collider in _bulkPreview.GetComponentsInChildren<Collider>(true))
+                collider.enabled = false;
+            _bulkPreview.gameObject.SetActive(false);
+            _bulkVisited.Clear();
+            _hasPreviousBulkPosition = false;
+            _isBulkPlacing = true;
+            _isDragging = true;
+            UpdateBulkPlacement(_camera.ScreenPointToRay(screenPosition), screenPosition);
+            return true;
+        }
+
+        /// <summary>
+        /// ray를 기존 드래그 평면에 투영하여 미리보기와 이전 프레임부터의 설치 경로를 갱신한다.
+        /// screenPosition이 UI 위면 아이콘을 표시하며 재고가 소진되면 미리보기와 배치를 즉시 종료한다.
+        /// </summary>
+        private void UpdateBulkPlacement(Ray ray, Vector2 screenPosition)
+        {
+            if (_bulkEntry.AvailableQuantity <= 0)
+            {
+                EndBulkPlacement();
+                return;
+            }
+
+            if (!_dragPlane.Raycast(ray, out float distance))
+            {
+                _bulkPreview.gameObject.SetActive(false);
+                _catalog.ShowDragIcon(_bulkEntry, screenPosition);
+                _hasPreviousBulkPosition = false;
+                return;
+            }
+
+            Vector3 position = ray.GetPoint(distance);
+            position.y = _dragHeight;
+            _bulkPreview.transform.SetPositionAndRotation(position, _partSlot.transform.rotation);
+            bool overUI = IsPointerOverUI(screenPosition);
+            _bulkPreview.gameObject.SetActive(!overUI);
+            if (overUI)
+                _catalog.ShowDragIcon(_bulkEntry, screenPosition);
+            else
+                _catalog.HideDragIcon();
+            InstallAlongBulkPath(_hasPreviousBulkPosition ? _previousBulkPosition : position, position);
+            if (_bulkEntry.AvailableQuantity <= 0)
+            {
+                EndBulkPlacement();
+                return;
+            }
+            _previousBulkPosition = position;
+            _hasPreviousBulkPosition = true;
+        }
+
+        /// <summary>
+        /// start와 end 사이 XZ 선분에 닿는 호환 빈 슬롯을 이동 순서대로 장착한다.
+        /// UI에 가려진 지점과 이미 방문한 슬롯을 제외하고 성공한 설치마다 재고 한 개를 소비한다.
+        /// </summary>
+        private void InstallAlongBulkPath(Vector3 start, Vector3 end)
+        {
+            if (_bulkEntry.AvailableQuantity <= 0)
+                return;
+
+            Vector3 direction = end - start;
+            direction.y = 0f;
+            float lengthSquared = direction.sqrMagnitude;
+            _bulkCandidates.Clear();
+            foreach (AssemblyPartSlot slot in _slots)
+            {
+                if (slot.IsSwitch || slot.IsInstalled || _bulkVisited.Contains(slot)
+                    || slot.KeycapShape == null || !slot.IsCompatible(_bulkPreview))
+                    continue;
+
+                Vector3 offset = slot.transform.position - start;
+                offset.y = 0f;
+                float progress = lengthSquared > 0f ? Mathf.Clamp01(Vector3.Dot(offset, direction) / lengthSquared) : 0f;
+                Vector3 closest = start + direction * progress;
+                if (!slot.IsInsideSlot(closest))
+                    continue;
+                Vector3 screen = _camera.WorldToScreenPoint(closest);
+                if (screen.z <= 0f || IsPointerOverUI(new Vector2(screen.x, screen.y)))
+                    continue;
+                _bulkCandidates.Add(new KeyValuePair<float, AssemblyPartSlot>(progress, slot));
+            }
+
+            _bulkCandidates.Sort(CompareBulkCandidates);
+            bool inventoryChanged = false;
+            foreach (KeyValuePair<float, AssemblyPartSlot> candidate in _bulkCandidates)
+            {
+                AssemblyPartSlot slot = candidate.Value;
+                if (slot.IsInstalled)
+                    continue;
+                if (!_bulkEntry.TryReserve())
+                    break;
+                AssemblyDraggablePart part = _bulkEntry.TakeStoredPart();
+                if (part == null)
+                    part = Instantiate(_bulkEntry.Prefab, slot.transform.position, slot.transform.rotation);
+                part.Initialize(slot, part.PartCollider, false);
+                part.SetCatalogEntry(_bulkEntry);
+                part.PrepareInventoryPart(_bulkEntry, _partSlot.KeycapShape);
+                part.gameObject.SetActive(true);
+                bool installed = slot.IsCompatible(part) && slot.Install(part);
+                _bulkEntry.FinishReservation(installed);
+                if (installed)
+                {
+                    _parts.Add(part);
+                    _bulkVisited.Add(slot);
+                    inventoryChanged = true;
+                }
+                else
+                {
+                    _bulkEntry.StorePart(part, false);
+                }
+            }
+            if (inventoryChanged)
+                _catalog.RefreshInventory();
+        }
+
+        /// <summary>
+        /// left와 right의 경로 진행률을 비교한 정렬 값을 반환한다.
+        /// 빠른 드래그에서도 먼저 지나간 슬롯부터 남은 재고를 사용하도록 한다.
+        /// </summary>
+        private static int CompareBulkCandidates(KeyValuePair<float, AssemblyPartSlot> left,
+            KeyValuePair<float, AssemblyPartSlot> right)
+        {
+            return left.Key.CompareTo(right.Key);
+        }
+
+        /// <summary>
+        /// 일괄 배치의 미리보기와 경로 상태를 제거한다.
+        /// 설치된 부품과 재고 및 UI의 선택 모드는 유지하고 입력 점유만 해제한다.
+        /// </summary>
+        private void EndBulkPlacement()
+        {
+            if (!_isBulkPlacing)
+                return;
+
+            _bulkPreview.gameObject.SetActive(false);
+            Destroy(_bulkPreview.gameObject);
+            _catalog.HideDragIcon();
+            _bulkPreview = null;
+            _bulkEntry = null;
+            _bulkVisited.Clear();
+            _bulkCandidates.Clear();
+            _hasPreviousBulkPosition = false;
+            _isBulkPlacing = false;
+            _isDragging = false;
         }
 
         /// <summary>
@@ -333,6 +512,12 @@ namespace KeyboardModeling.Assembly
         {
             if (!_isDragging)
                 return;
+
+            if (_isBulkPlacing)
+            {
+                EndBulkPlacement();
+                return;
+            }
 
             _isDragging = false;
             if (_showingIcon)

@@ -55,6 +55,9 @@ namespace KeyboardModeling.Assembly
         private RectTransform _toggleRect;
         private AssemblyCatalogButton _toggleButton;
         private Text _toggleLabel;
+        private AssemblyCatalogButton _singlePlacementButton;
+        private AssemblyCatalogButton _bulkPlacementButton;
+        private bool _bulkPlacement;
         private readonly List<RectTransform> _contents = new List<RectTransform>();
         private readonly List<AssemblyCatalogButton> _tabs = new List<AssemblyCatalogButton>();
         private readonly List<AssemblyCatalogButton> _cards = new List<AssemblyCatalogButton>();
@@ -83,6 +86,13 @@ namespace KeyboardModeling.Assembly
                 slot.OriginalPart.SetCatalogEntry(FindPrefabEntry(slot.InventoryPrefab));
         }
 
+        void Update()
+        {
+            bool canChangeMode = !_dragInput.IsDragging;
+            _singlePlacementButton.interactable = canChangeMode;
+            _bulkPlacementButton.interactable = canChangeMode;
+        }
+
         void OnDisable()
         {
             _dragInput.CancelDrag();
@@ -91,6 +101,8 @@ namespace KeyboardModeling.Assembly
         void OnDestroy()
         {
             _toggleButton.Clicked -= HandleToggleClicked;
+            _singlePlacementButton.Clicked -= HandlePlacementModeClicked;
+            _bulkPlacementButton.Clicked -= HandlePlacementModeClicked;
             foreach (AssemblyCatalogButton tab in _tabs)
                 tab.Clicked -= HandleTabClicked;
             foreach (AssemblyCatalogButton card in _cards)
@@ -147,8 +159,23 @@ namespace KeyboardModeling.Assembly
             _heading.color = _accentColor;
             Place(_heading.rectTransform, 18f, 62f, 284f, 26f);
 
+            RectTransform singleMode = Rect("SinglePlacement", panel);
+            Place(singleMode, 18f, 98f, 136f, 34f);
+            _singlePlacementButton = CreateButton(singleMode);
+            Text singleLabel = Label(singleMode, "한 개 배치", 14);
+            Stretch(singleLabel.rectTransform, Vector2.zero, Vector2.zero);
+            _singlePlacementButton.Clicked += HandlePlacementModeClicked;
+            RectTransform bulkMode = Rect("BulkPlacement", panel);
+            Place(bulkMode, 166f, 98f, 136f, 34f);
+            _bulkPlacementButton = CreateButton(bulkMode);
+            Text bulkLabel = Label(bulkMode, "일괄 배치", 14);
+            Stretch(bulkLabel.rectTransform, Vector2.zero, Vector2.zero);
+            _bulkPlacementButton.Clicked += HandlePlacementModeClicked;
+            SetSelected(_singlePlacementButton, true);
+            SetSelected(_bulkPlacementButton, false);
+
             RectTransform scrollArea = Rect("PartList", panel);
-            Stretch(scrollArea, new Vector2(14f, 16f), new Vector2(-14f, -102f));
+            Stretch(scrollArea, new Vector2(14f, 16f), new Vector2(-14f, -146f));
             _scroll = scrollArea.gameObject.AddComponent<AssemblyCatalogScrollRect>();
             _scroll.horizontal = false;
             _scroll.vertical = true;
@@ -341,6 +368,12 @@ namespace KeyboardModeling.Assembly
         private void HandleCardPressed(AssemblyCatalogButton button, Vector2 screenPosition)
         {
             AssemblyCatalogEntry entry = _cardEntries[button];
+            if (_bulkPlacement && !entry.IsSwitch)
+            {
+                if (_dragInput.TryBeginBulkPlacement(entry, screenPosition))
+                    HandleCardClicked(button);
+                return;
+            }
             if (_dragInput.IsDragging || !entry.TryReserve())
                 return;
             if (!_dragInput.TryBeginInventoryDrag(entry, screenPosition))
@@ -348,6 +381,19 @@ namespace KeyboardModeling.Assembly
             else
                 HandleCardClicked(button);
             RefreshInventory();
+        }
+
+        /// <summary>
+        /// button에 대응하는 한 개 또는 일괄 배치 모드를 선택한다.
+        /// 드래그 중에는 변경을 거부하고 두 버튼의 선택 표시를 갱신한다.
+        /// </summary>
+        private void HandlePlacementModeClicked(AssemblyCatalogButton button)
+        {
+            if (_dragInput.IsDragging)
+                return;
+            _bulkPlacement = button == _bulkPlacementButton;
+            SetSelected(_singlePlacementButton, !_bulkPlacement);
+            SetSelected(_bulkPlacementButton, _bulkPlacement);
         }
 
         /// <summary>

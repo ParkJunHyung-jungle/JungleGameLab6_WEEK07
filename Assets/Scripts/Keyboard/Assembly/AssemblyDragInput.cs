@@ -330,7 +330,7 @@ namespace KeyboardModeling.Assembly
                 part.SetCatalogEntry(_bulkEntry);
                 part.PrepareInventoryPart(_bulkEntry, _partSlot.KeycapShape);
                 part.gameObject.SetActive(true);
-                bool installed = slot.IsCompatible(part) && slot.Install(part);
+                bool installed = slot.IsCompatible(part) && slot.Install(part, true);
                 _bulkEntry.FinishReservation(installed);
                 if (installed)
                 {

@@ -13,7 +13,7 @@ using KeyboardModeling;
 
 [ExecuteAlways]
 [DisallowMultipleComponent]
-public sealed class KeyboardCustomization : MonoBehaviour
+public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings
 {
     private const float MAX_LED_INTENSITY = 10f;
     private const float MAX_LED_SPEED = 10f;
@@ -69,6 +69,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// 저장된 _caseMaterialIndex를 UI 선택 표시에 제공한다.
     /// </summary>
     public int CaseMaterialIndex => _caseMaterialIndex;
+    public Material CaseMaterial => _caseMaterial;
 
     [Header("Keycaps")]
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];
@@ -1100,7 +1101,9 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (activate && Application.IsPlaying(gameObject))
             {
                 Transform keycap = index < _keycaps.Length ? _keycaps[index] : null;
-                _partInstallation.ReplaceSwitch(keyboardSwitch.transform, keycap, () => keyboardSwitch.ChangeSwitch(type));
+                bool playSound = !keyboardSwitch.gameObject.activeSelf || keyboardSwitch.CurrentData == null
+                    || keyboardSwitch.CurrentData.Type != type;
+                _partInstallation.ReplaceSwitch(keyboardSwitch.transform, keycap, () => keyboardSwitch.ChangeSwitch(type), playSound);
             }
             else
             {
@@ -1122,7 +1125,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// part의 설치 연출 컴포넌트를 준비하고 위에서 내려오는 움직임을 재생한다.
     /// 편집 모드에서는 활성화만 수행하고 런타임에서는 기존 파츠도 다시 설치한다.
     /// </summary>
-    private void PlayPartInstallation(Transform part)
+    private void PlayPartInstallation(Transform part, bool playSound = true)
     {
         if (!Application.IsPlaying(gameObject))
         {
@@ -1130,7 +1133,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             return;
         }
         PreparePartInstallation();
-        _partInstallation.Play(part);
+        _partInstallation.Play(part, playSound);
     }
 
     /// <summary>
@@ -1235,7 +1238,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// 축이 설치된 키캡만 활성화하며 음수 입력은 전체 키캡을 대상으로 한다.
     /// keycapIndex와 축 상태를 사용하며 설치 대상에는 기존 키캡 연출을 재생한다.
     /// </summary>
-    private void EnableKeycaps(int keycapIndex = -1)
+    private void EnableKeycaps(int keycapIndex = -1, bool playSound = true)
     {
         if (_keycaps == null) CacheKeycaps();
         for (int index = 0; index < _keycaps.Length; index++)
@@ -1243,7 +1246,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             if (keycapIndex >= 0 && index != keycapIndex) continue;
             if (!HasSwitchForKeycap(index)) continue;
             Transform keycap = _keycaps[index];
-            if (keycap != null) PlayPartInstallation(keycap);
+            if (keycap != null) PlayPartInstallation(keycap, playSound);
         }
     }
 
@@ -1476,12 +1479,16 @@ public sealed class KeyboardCustomization : MonoBehaviour
         if (!HasAnySwitchForKeycaps())
             return;
 
+        bool[] playSounds = new bool[_keycaps.Length];
+        for (int index = 0; index < _keycaps.Length; index++)
+            playSounds[index] = !IsKeycapInstalled(index) || GetKeycapMaterial(index) != material
+                || GetKeycapDefinition(index) != null;
         _keycapMaterial = material;
         _keycapMaterialIndex = Array.IndexOf(_materials, material);
         _keycapMaterialOverrides.Clear();
         for (int index = 0; index < _keycaps.Length; index++)
         {
-            ApplyKeycapMaterialToKey(index, material, true);
+            ApplyKeycapMaterialToKey(index, material, true, playSoundOverride: playSounds[index]);
         }
     }
 
@@ -1585,6 +1592,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
         bool applied;
         if (allKeycaps)
         {
+            bool[] playSounds = new bool[_keycaps.Length];
+            for (int index = 0; index < _keycaps.Length; index++)
+                playSounds[index] = !IsKeycapInstalled(index) || GetKeycapMaterial(index) != material
+                    || GetKeycapDefinition(index) != definition;
             if (definition == null || !definition.OneUnitOnly)
             {
                 _keycapMaterial = material;
@@ -1592,7 +1603,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
             }
             applied = false;
             for (int index = 0; index < _keycaps.Length; index++)
-                applied |= ApplyKeycapMaterialToKey(index, material, true, definition);
+                applied |= ApplyKeycapMaterialToKey(index, material, true, definition, playSounds[index]);
         }
         else
         {
@@ -1687,10 +1698,10 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// <summary>
     /// 축이 설치된 keycapIndex 키캡에 material을 반영하고 필요하면 설치 연출을 재생한다.
     /// playInstallation이 true면 설치 연출과 파손 복구를 실행한다. definition의 SO와 모델을 적용하며 축이나 모델 크기가 맞지 않으면 false를 반환한다.
-    /// 유효한 입력은 개별 재질과 사진 상태를 갱신한다.
+    /// 유효한 입력은 개별 재질과 사진을 갱신하며 playSoundOverride로 전체 변경 전 판단한 설치음 여부를 유지한다.
     /// </summary>
     private bool ApplyKeycapMaterialToKey(int keycapIndex, Material material, bool playInstallation,
-        Game.Tournament.KeycapDefinition definition = null)
+        Game.Tournament.KeycapDefinition definition = null, bool? playSoundOverride = null)
     {
         if (_keycaps == null) CacheKeycaps();
         if (material == null
@@ -1705,6 +1716,8 @@ public sealed class KeyboardCustomization : MonoBehaviour
         if (definition != null && definition.OneUnitOnly && !_keycapModels[keycap].IsOneUnit)
             return false;
 
+        bool playSound = playSoundOverride ?? (!IsKeycapInstalled(keycapIndex) || GetKeycapMaterial(keycapIndex) != material
+            || GetKeycapDefinition(keycapIndex) != definition);
         ClearKeycapImage(keycapIndex);
         SetKeycapModel(keycap, definition);
         _keycapMaterialOverrides[keycap] = material;
@@ -1730,7 +1743,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
         }
         else if (applied)
         {
-            EnableKeycaps(keycapIndex);
+            EnableKeycaps(keycapIndex, playSound);
             if (Application.IsPlaying(gameObject))
             {
                 KeycapHealth keycapHealth = keycap.GetComponent<KeycapHealth>();

@@ -1055,10 +1055,10 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 선택한 공유 재질 인덱스를 편집 대상의 케이스 전체에 적용한다.
-        /// index와 현재 키보드를 사용하며 적용 후 목록의 선택 표시를 갱신한다.
+        /// 선택한 공통 material을 편집 대상의 케이스 전체에 적용한다.
+        /// 현재 키보드의 재질을 변경하고 목록의 선택 표시와 변경 기록을 갱신한다.
         /// </summary>
-        private void HandleCaseMaterialSelected(int index)
+        private void HandleCaseMaterialSelected(Material material)
         {
             if (_editingKeyboard == null)
                 return;
@@ -1066,12 +1066,12 @@ namespace Game.Player
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
             if (customization != null)
             {
-                int previous = customization.CaseMaterialIndex;
-                customization.SetCaseMaterialIndex(index);
+                Material previous = customization.CaseMaterial;
+                customization.SetCaseMaterial(material);
                 _keyboardEditOverlayUI.RefreshCaseMaterialSelection();
                 Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Case",
-                    customization.CaseMaterials[index].name, customization.CaseMaterials[previous].name,
-                    changed: previous != customization.CaseMaterialIndex);
+                    material.name, previous != null ? previous.name : "",
+                    changed: previous != customization.CaseMaterial);
             }
         }
 

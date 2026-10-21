@@ -115,18 +115,23 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// part의 규격과 선행 장착 및 점유 조건을 검사하고 거부되면 상태 변경 없이 false를 반환한다.
-        /// 스위치는 기존 교체 처리를 유지하며 성공 시 점유와 위치 및 회전을 갱신하고 true를 반환한다.
+        /// 성공 시 점유와 자세를 갱신하고 true를 반환하며 playSound가 참이면 변경된 장착과 교체의 소리를 재생한다.
         /// </summary>
-        public bool Install(AssemblyDraggablePart part)
+        public bool Install(AssemblyDraggablePart part, bool playSound = false)
         {
             if (!CanInstall(part))
                 return false;
 
-            if (_installedPart != null && _installedPart != part)
+            bool changed = _installedPart != part;
+            if (_installedPart != null && changed)
+            {
+                if (playSound) AudioManager.PlayPartSound(_installedPart.transform.position, true);
                 _installedPart.DropWithPhysics();
+            }
             part.AttachSlot(this);
             _installedPart = part;
             part.SnapToSlot();
+            if (playSound && changed) AudioManager.PlayPartSound(transform.position, false);
             return true;
         }
 

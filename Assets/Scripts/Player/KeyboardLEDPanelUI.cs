@@ -25,6 +25,7 @@ namespace Game.Player
 
         [Header("Runtime State")]
         private KeyboardCustomization _customization;
+        private IKeyboardLEDSettings _settings;
         private KeyboardInputController _input;
         private Canvas _canvas;
         private RectTransform _panel;
@@ -132,6 +133,44 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// parent의 목록 영역에 기존 LED 컨트롤을 배치한다.
+        /// width에 맞춰 크기를 조정하고 독립 카드 장식을 제거한 뒤 스크롤에 필요한 높이를 반환한다.
+        /// </summary>
+        public float InitializeEmbedded(RectTransform parent, float width)
+        {
+            Initialize();
+            _panel.SetParent(parent, false);
+            _panel.anchorMin = _panel.anchorMax = _panel.pivot = new Vector2(0f, 1f);
+            _panel.anchoredPosition = Vector2.zero;
+            float scale = width / 414f;
+            _panel.localScale = Vector3.one * scale;
+            _panel.sizeDelta = new Vector2(414f, 1100f);
+            GetComponent<Image>().enabled = false;
+            GetComponent<Shadow>().enabled = false;
+            foreach (RectTransform control in _panel)
+            {
+                if (control.name == "Card" || control.anchoredPosition.y > -142f)
+                {
+                    control.gameObject.SetActive(false);
+                    continue;
+                }
+                control.anchoredPosition += Vector2.up * 142f;
+                Vector2 position = control.anchoredPosition;
+                position.y *= 1.25f;
+                control.anchoredPosition = position;
+            }
+            foreach (Text label in _panel.GetComponentsInChildren<Text>(true))
+            {
+                label.fontSize = Mathf.Max(20, Mathf.RoundToInt(label.fontSize * 1.5f));
+                Vector2 size = label.rectTransform.sizeDelta;
+                size.y = Mathf.Max(size.y, label.fontSize * 1.5f);
+                label.rectTransform.sizeDelta = size;
+                label.verticalOverflow = VerticalWrapMode.Overflow;
+            }
+            return _panel.sizeDelta.y * scale;
+        }
+
+        /// <summary>
         /// customization의 현재 LED 값을 읽고 패널을 열며 키보드 타건 입력을 활성 상태로 유지한다.
         /// 진입 전 입력 상태를 저장하고 UI 동기화 과정에서는 LED 설정 변경 이벤트를 발생시키지 않는다.
         /// </summary>
@@ -142,14 +181,36 @@ namespace Game.Player
             _input = customization.GetComponent<KeyboardInputController>();
             _previousInput = _input.InputEnabled;
             _input.SetInputEnabled(true);
+            OpenSettings(customization);
+        }
+
+        /// <summary>
+        /// 조립용 settings를 연결하여 기존 LED 패널을 연다.
+        /// 키보드 입력 상태를 변경하지 않고 현재 LED 설정과 UI 표시를 동기화한다.
+        /// </summary>
+        public void OpenAssembly(IKeyboardLEDSettings settings)
+        {
+            if (_isOpen || settings == null) return;
+            _customization = null;
+            _input = null;
+            OpenSettings(settings);
+        }
+
+        /// <summary>
+        /// settings의 현재 LED 값을 읽어 패널과 각 컨트롤을 표시한다.
+        /// 설정 변경 없이 열린 상태와 표시값만 갱신한다.
+        /// </summary>
+        private void OpenSettings(IKeyboardLEDSettings settings)
+        {
+            _settings = settings;
             _isOpen = true;
             EventSystem.current.SetSelectedGameObject(null);
             _patternMenu.SetActive(false);
             RefreshColor(true);
             RefreshPower();
             RefreshPattern();
-            _intensitySlider.SetValueWithoutNotify(customization.LEDIntensity);
-            _speedSlider.SetValueWithoutNotify(customization.LEDSpeed);
+            _intensitySlider.SetValueWithoutNotify(settings.LEDIntensity);
+            _speedSlider.SetValueWithoutNotify(settings.LEDSpeed);
             RefreshValues();
             gameObject.SetActive(true);
         }
@@ -252,8 +313,8 @@ namespace Game.Player
                 Label(button.transform, _patternNames[index], 10f, 0f, 340f, 32f, 12, Color.white);
                 button.Clicked += selected =>
                 {
-                    string previous = _customization.CurrentLEDPattern.ToString();
-                    _customization.SetLEDPattern(pattern);
+                    string previous = _settings.CurrentLEDPattern.ToString();
+                    _settings.SetLEDPattern(pattern);
                     Game.Logging.CustomizationTelemetry.Emit(_customization, "ElementSelected", "LED", pattern.ToString(),
                         previous, changed: previous != pattern.ToString());
                     RefreshPattern();
@@ -270,9 +331,9 @@ namespace Game.Player
         /// </summary>
         private void HandlePowerClicked(KeyboardEditButton button)
         {
-            _customization.SetLEDEnabled(!_customization.LEDEnabled);
+            _settings.SetLEDEnabled(!_settings.LEDEnabled);
             Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Power",
-                changed: true, details: _customization.LEDEnabled ? "true" : "false");
+                changed: true, details: _settings.LEDEnabled ? "true" : "false");
             RefreshPower();
         }
 
@@ -314,7 +375,7 @@ namespace Game.Player
         /// </summary>
         private void HandleHexFinished()
         {
-            _hexInput.SetTextWithoutNotify("#" + ColorUtility.ToHtmlStringRGB(_customization.LEDColor));
+            _hexInput.SetTextWithoutNotify("#" + ColorUtility.ToHtmlStringRGB(_settings.LEDColor));
             _hexBorder.color = _borderColor;
         }
 
@@ -324,9 +385,9 @@ namespace Game.Player
         /// </summary>
         private void HandleIntensityChanged(float value)
         {
-            float previous = _customization.LEDIntensity;
-            _customization.SetLEDIntensity(value);
-            ObserveAdjustment("Intensity", previous, _customization.LEDIntensity);
+            float previous = _settings.LEDIntensity;
+            _settings.SetLEDIntensity(value);
+            ObserveAdjustment("Intensity", previous, _settings.LEDIntensity);
             RefreshValues();
         }
 
@@ -336,9 +397,9 @@ namespace Game.Player
         /// </summary>
         private void HandleSpeedChanged(float value)
         {
-            float previous = _customization.LEDSpeed;
-            _customization.SetLEDSpeed(value);
-            ObserveAdjustment("Speed", previous, _customization.LEDSpeed);
+            float previous = _settings.LEDSpeed;
+            _settings.SetLEDSpeed(value);
+            ObserveAdjustment("Speed", previous, _settings.LEDSpeed);
             RefreshValues();
         }
 
@@ -348,15 +409,15 @@ namespace Game.Player
         /// </summary>
         private void ApplyColor(Color color, bool syncPicker)
         {
-            string previous = ColorUtility.ToHtmlStringRGBA(_customization.LEDColor);
-            _customization.SetLEDColor(color);
-            if (!_customization.LEDEnabled)
+            string previous = ColorUtility.ToHtmlStringRGBA(_settings.LEDColor);
+            _settings.SetLEDColor(color);
+            if (!_settings.LEDEnabled)
             {
-                _customization.SetLEDEnabled(true);
+                _settings.SetLEDEnabled(true);
                 Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Power",
                     changed: true, details: "true");
             }
-            string applied = ColorUtility.ToHtmlStringRGBA(_customization.LEDColor);
+            string applied = ColorUtility.ToHtmlStringRGBA(_settings.LEDColor);
             Game.Logging.CustomizationTelemetry.Emit(_customization, "Adjustment", "LED", "Color",
                 previous, changed: previous != applied, details: applied);
             _patternMenu.SetActive(false);
@@ -381,7 +442,7 @@ namespace Game.Player
         /// </summary>
         private void RefreshColor(bool syncPicker)
         {
-            Color color = _customization.LEDColor;
+            Color color = _settings.LEDColor;
             string hex = "#" + ColorUtility.ToHtmlStringRGB(color);
             _hexInput.SetTextWithoutNotify(hex);
             _hexBorder.color = _borderColor;
@@ -401,7 +462,7 @@ namespace Game.Player
         /// </summary>
         private void RefreshPower()
         {
-            bool enabled = _customization.LEDEnabled;
+            bool enabled = _settings.LEDEnabled;
             _powerText.text = enabled ? "ON" : "OFF";
             _powerTrack.color = enabled ? new Color32(36, 199, 181, 255) : new Color32(40, 51, 61, 255);
             _powerKnob.color = enabled ? new Color32(6, 39, 35, 255) : new Color32(189, 201, 209, 255);
@@ -414,7 +475,7 @@ namespace Game.Player
         /// </summary>
         private void RefreshPattern()
         {
-            int index = (int)_customization.CurrentLEDPattern;
+            int index = (int)_settings.CurrentLEDPattern;
             _patternText.text = _patternNames[index];
             _patternDescription.text = _patternDescriptions[index];
         }
@@ -425,8 +486,8 @@ namespace Game.Player
         /// </summary>
         private void RefreshValues()
         {
-            _intensityText.text = _customization.LEDIntensity.ToString("F1", CultureInfo.InvariantCulture);
-            _speedText.text = _customization.LEDSpeed.ToString("F1", CultureInfo.InvariantCulture) + "×";
+            _intensityText.text = _settings.LEDIntensity.ToString("F1", CultureInfo.InvariantCulture);
+            _speedText.text = _settings.LEDSpeed.ToString("F1", CultureInfo.InvariantCulture) + "×";
         }
 
         /// <summary>

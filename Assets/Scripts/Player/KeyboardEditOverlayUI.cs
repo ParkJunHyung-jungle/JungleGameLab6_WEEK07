@@ -130,7 +130,7 @@ namespace Game.Player
 
         public event Action<Material, Material, bool, int> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
-        public event Action<int> CaseMaterialSelected;
+        public event Action<Material> CaseMaterialSelected;
         public event Action<Material> PlateMaterialSelected;
         public event Action<PlateEffect> PlateEffectSelected;
         public event Action<bool> AttackModeSelected;
@@ -573,7 +573,7 @@ namespace Game.Player
 
         /// <summary>
         /// 현재 케이스 재질과 일치하는 카드의 선택 표시를 갱신한다.
-        /// 케이스 재질 인덱스를 사용하며 각 카드의 배경과 체크 표시를 변경한다.
+        /// 공통 재질 목록과 현재 재질을 비교하며 각 카드의 배경과 체크 표시를 변경한다.
         /// </summary>
         public void RefreshCaseMaterialSelection()
         {
@@ -583,7 +583,7 @@ namespace Game.Player
                     _casePreviewButtons[index],
                     _caseCardBackgrounds[index],
                     _caseSelectionIndicators[index],
-                    _caseMaterialIndices[index] == _caseCustomization.CaseMaterialIndex);
+                    _keycapMaterials[_caseMaterialIndices[index]] == _caseCustomization.CaseMaterial);
             }
         }
 
@@ -703,12 +703,12 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 클릭한 케이스 미리보기에 해당하는 공유 재질 인덱스를 전달한다.
-        /// button으로 원본 인덱스를 찾아 C# 이벤트로 적용을 요청하며 목록은 유지한다.
+        /// 클릭한 케이스 미리보기에 해당하는 공통 재질을 전달한다.
+        /// button으로 재질을 찾아 C# 이벤트로 적용을 요청하며 목록은 유지한다.
         /// </summary>
         private void HandleCasePreviewClicked(KeyboardEditButton button)
         {
-            CaseMaterialSelected?.Invoke(_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]);
+            CaseMaterialSelected?.Invoke(_keycapMaterials[_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]]);
         }
 
         /// <summary>
@@ -1522,7 +1522,7 @@ namespace Game.Player
             _caseSelectionIndicators.Clear();
             DestroyPreviewTextures(_casePreviewTextures);
             _caseButton.interactable = _caseCustomization != null
-                && _caseCustomization.CaseMaterials.Count > 0
+                && _keycapMaterials.Length > 0
                 && _caseCustomization.CaseRenderers.Count > 0;
             if (!_caseButton.interactable)
                 return;
@@ -1537,7 +1537,7 @@ namespace Game.Player
             Texture2D[] previews;
             try
             {
-                previews = CreateMaterialPreviewTextures(caseMesh, _caseCustomization.CaseMaterials, _casePreviewTextures, "Case");
+                previews = CreateMaterialPreviewTextures(caseMesh, _keycapMaterials, _casePreviewTextures, "Case");
             }
             finally
             {
@@ -1551,7 +1551,7 @@ namespace Game.Player
 
         /// <summary>
         /// 편집 키보드의 보강판 색상과 효과를 탭으로 나눈 상단 선택 패널에 구성한다.
-        /// 등록된 PlateData와 효과 목록을 사용하며 재질 미리보기, 효과 카드, 선택 상태를 저장한다.
+        /// 키캡과 공유하는 일반 재질 및 효과 목록을 사용하며 재질 미리보기, 효과 카드, 선택 상태를 저장한다.
         /// </summary>
         private void CreatePlatePicker()
         {
@@ -1589,13 +1589,13 @@ namespace Game.Player
                 return;
             }
 
-            foreach (PlateData plateData in _plateCustomization.AvailablePlates)
+            foreach (Material material in _keycapMaterials)
             {
-                if (plateData == null || plateData.Material == null)
+                if (material == null)
                     continue;
 
-                _plateMaterials.Add(plateData.Material);
-                _plateMaterialLabels.Add(GetPlateMaterialLabel(plateData.Type));
+                _plateMaterials.Add(material);
+                _plateMaterialLabels.Add(material.name);
             }
 
             if (_plateMaterials.Count == 0)
@@ -1993,7 +1993,7 @@ namespace Game.Player
                 if (previews[index] == null)
                     continue;
 
-                Material material = _caseCustomization.CaseMaterials[index];
+                Material material = _keycapMaterials[index];
                 KeyboardEditButton button = CreatePickerItemButton(
                     content,
                     "CaseMaterial_" + material.name,
@@ -2112,7 +2112,7 @@ namespace Game.Player
             foreach (SwitchType type in _switchSoundTypes)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Switch", type.ToString());
             foreach (int index in _caseMaterialIndices)
-                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Case", _caseCustomization.CaseMaterials[index].name);
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "Case", _keycapMaterials[index].name);
             foreach (Material material in _plateMaterialButtonMaterials)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "AvailableOption", "PlateMaterial", material.name);
             foreach (PlateEffect effect in _plateEffects)

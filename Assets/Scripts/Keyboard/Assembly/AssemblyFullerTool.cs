@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -19,6 +21,7 @@ namespace KeyboardModeling.Assembly
         [Header("Return Outline")]
         [SerializeField] private Color _outlineColor = new Color(0.34f, 0.84f, 0.95f, 1f);
         [SerializeField, Min(0.001f)] private float _outlineWidth = 0.008f;
+        [SerializeField, Range(0.05f, 1f)] private float _returnOpacity = 0.25f;
         private GameObject _returnMarker;
         private BoxCollider _returnCollider;
         private Material _outlineMaterial;
@@ -142,41 +145,48 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 원본 렌더러의 로컬 경계를 선으로 그려 원래 자리에 클릭 가능한 복귀 표시를 만든다.
-        /// 원본 스크립트와 Rigidbody를 복제하지 않고 독립된 선 렌더러와 클릭용 Collider만 생성한다.
+        /// 풀러의 메시와 원래 자세를 사용해 반투명 복귀 표시와 클릭 범위를 생성한다.
+        /// 원본 메시를 공유하며 스크립트와 물리 동작은 복제하지 않는다.
         /// </summary>
         private void CreateReturnMarker()
         {
             _returnMarker = new GameObject("FullerReturnOutline");
             _returnMarker.transform.SetPositionAndRotation(_originPosition, _originRotation);
             _returnMarker.transform.localScale = _fuller.lossyScale;
-            _outlineMaterial = new Material(Shader.Find("Sprites/Default"));
+            _outlineMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            Color color = _outlineColor;
+            color.a *= _returnOpacity;
+            _outlineMaterial.SetColor("_BaseColor", color);
+            _outlineMaterial.SetFloat("_Surface", 1f);
+            _outlineMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            _outlineMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            _outlineMaterial.SetFloat("_ZWrite", 0f);
+            _outlineMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            _outlineMaterial.SetOverrideTag("RenderType", "Transparent");
+            _outlineMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            var transforms = new Dictionary<Transform, Transform> { { _fuller, _returnMarker.transform } };
             Bounds total = new Bounds();
             bool hasBounds = false;
-            foreach (Renderer renderer in _fuller.GetComponentsInChildren<Renderer>())
+            foreach (MeshRenderer renderer in _fuller.GetComponentsInChildren<MeshRenderer>())
             {
                 if (!renderer.enabled)
                     continue;
+                CreateReturnMesh(renderer, transforms);
                 Bounds bounds = renderer.localBounds;
-                Vector3[] corners = new Vector3[8];
                 for (int corner = 0; corner < 8; corner++)
                 {
                     Vector3 sign = new Vector3((corner & 1) == 0 ? -1f : 1f,
                         (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f);
-                    corners[corner] = _fuller.InverseTransformPoint(renderer.transform.TransformPoint(
+                    Vector3 point = _fuller.InverseTransformPoint(renderer.transform.TransformPoint(
                         bounds.center + Vector3.Scale(bounds.extents, sign)));
                     if (hasBounds)
-                        total.Encapsulate(corners[corner]);
+                        total.Encapsulate(point);
                     else
                     {
-                        total = new Bounds(corners[corner], Vector3.zero);
+                        total = new Bounds(point, Vector3.zero);
                         hasBounds = true;
                     }
                 }
-                for (int corner = 0; corner < 8; corner++)
-                    for (int axis = 1; axis <= 4; axis *= 2)
-                        if ((corner & axis) == 0)
-                            CreateOutlineEdge(corners[corner], corners[corner | axis]);
             }
             _returnCollider = _returnMarker.AddComponent<BoxCollider>();
             _returnCollider.center = total.center;
@@ -185,23 +195,43 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 복귀 표시의 로컬 start와 end를 연결하는 선 하나를 생성한다.
-        /// Inspector의 두께와 색상을 적용하며 물리 및 원본 동작은 추가하지 않는다.
+        /// renderer의 메시와 transforms의 복제 계층을 사용해 복귀 위치의 외형을 생성한다.
+        /// 모든 서브메시에 표시용 재질을 적용하고 그림자와 광원 프로브를 비활성화한다.
         /// </summary>
-        private void CreateOutlineEdge(Vector3 start, Vector3 end)
+        private void CreateReturnMesh(MeshRenderer renderer, Dictionary<Transform, Transform> transforms)
         {
-            GameObject edge = new GameObject("OutlineEdge");
-            edge.transform.SetParent(_returnMarker.transform, false);
-            LineRenderer line = edge.AddComponent<LineRenderer>();
-            line.sharedMaterial = _outlineMaterial;
-            line.useWorldSpace = false;
-            line.startWidth = line.endWidth = _outlineWidth;
-            line.startColor = line.endColor = _outlineColor;
-            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            line.receiveShadows = false;
-            line.positionCount = 2;
-            line.SetPosition(0, start);
-            line.SetPosition(1, end);
+            MeshFilter source = renderer.GetComponent<MeshFilter>();
+            if (source == null || source.sharedMesh == null)
+                return;
+            Transform target = CreateReturnTransform(renderer.transform, transforms);
+            target.gameObject.AddComponent<MeshFilter>().sharedMesh = source.sharedMesh;
+            MeshRenderer ghost = target.gameObject.AddComponent<MeshRenderer>();
+            Material[] materials = new Material[source.sharedMesh.subMeshCount];
+            for (int index = 0; index < materials.Length; index++)
+                materials[index] = _outlineMaterial;
+            ghost.sharedMaterials = materials;
+            ghost.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            ghost.receiveShadows = false;
+            ghost.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            ghost.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        }
+
+        /// <summary>
+        /// original의 부모 계층과 로컬 자세를 복사하고 transforms에 등록한 Transform을 반환한다.
+        /// 이미 생성한 계층은 재사용하며 원본 컴포넌트는 복제하지 않는다.
+        /// </summary>
+        private Transform CreateReturnTransform(Transform original, Dictionary<Transform, Transform> transforms)
+        {
+            if (transforms.TryGetValue(original, out Transform target))
+                return target;
+            Transform parent = CreateReturnTransform(original.parent, transforms);
+            target = new GameObject(original.name).transform;
+            target.SetParent(parent, false);
+            target.localPosition = original.localPosition;
+            target.localRotation = original.localRotation;
+            target.localScale = original.localScale;
+            transforms.Add(original, target);
+            return target;
         }
 
         /// <summary>

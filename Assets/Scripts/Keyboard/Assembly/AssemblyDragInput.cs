@@ -20,12 +20,14 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private AssemblyPartSlot _switchSlot;
         [SerializeField] private AssemblyPartSlot[] _slots = new AssemblyPartSlot[0];
         [SerializeField] private AssemblyFullerTool _fullerTool;
+        [SerializeField] private AssemblyFullerTool _switchPullerTool;
         private readonly List<AssemblyDraggablePart> _parts = new List<AssemblyDraggablePart>();
         private AssemblyDraggablePart _activePart;
         private AssemblyCatalogUI _catalog;
         private AssemblyCatalogEntry _inventoryEntry;
         private bool _fromInventory;
         private bool _showingIcon;
+        private bool _inputAllowed = true;
 
         [Header("Drag Height")]
         [SerializeField, Min(0f)] private float _heightOffset = 0.3f;
@@ -49,12 +51,24 @@ namespace KeyboardModeling.Assembly
         private EventSystem _pointerEventSystem;
 
         public AssemblyPartSlot[] Slots => _slots;
+        public bool InputAllowed => _inputAllowed;
         public bool IsDragging => _isDragging;
         public AssemblyPartSlot KeycapSlot => _partSlot;
         public AssemblyPartSlot SwitchSlot => _switchSlot;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _partSlot.transform.position.y + _heightOffset;
         public event Action<AssemblyDraggablePart> PartPicked;
+
+        void Awake()
+        {
+            var switchSlots = new Dictionary<Key, AssemblyPartSlot>();
+            foreach (AssemblyPartSlot slot in _slots)
+                if (slot.IsSwitch)
+                    switchSlots.Add(slot.Key, slot);
+            foreach (AssemblyPartSlot slot in _slots)
+                if (!slot.IsSwitch)
+                    slot.SetInstallationPrerequisite(switchSlots[slot.Key]);
+        }
 
         void Start()
         {
@@ -64,7 +78,7 @@ namespace KeyboardModeling.Assembly
 
         void Update()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (!_inputAllowed || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
             {
                 CancelDrag();
                 return;
@@ -79,6 +93,8 @@ namespace KeyboardModeling.Assembly
             Vector2 screenPosition = mouse.position.ReadValue();
             Ray ray = _camera.ScreenPointToRay(screenPosition);
             if (_fullerTool != null && _fullerTool.ProcessPointer(ray, screenPosition, mouse))
+                return;
+            if (_switchPullerTool != null && _switchPullerTool.ProcessPointer(ray, screenPosition, mouse))
                 return;
             if (!_isDragging && mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI(screenPosition))
                 TryBeginDrag(ray);
@@ -119,6 +135,18 @@ namespace KeyboardModeling.Assembly
 
             if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
                 CompleteDrag(inReturnArea, overUI);
+        }
+
+        /// <summary>
+        /// allowed와 inputCamera로 조립 입력 허용 여부와 출력 카메라를 연결한다.
+        /// 입력을 차단할 때 기존 조작만 취소하며 지연 회수 코루틴과 장착 결과는 유지한다.
+        /// </summary>
+        public void SetInputAllowed(bool allowed, Camera inputCamera)
+        {
+            if (!allowed)
+                CancelDrag();
+            _camera = inputCamera;
+            _inputAllowed = allowed;
         }
 
         /// <summary>
@@ -165,11 +193,13 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool TryBeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (_isDragging || !isActiveAndEnabled || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
                 return false;
 
             if (_fullerTool != null)
                 _fullerTool.ReturnToOrigin();
+            if (_switchPullerTool != null)
+                _switchPullerTool.ReturnToOrigin();
             _inventoryEntry = entry;
             _fromInventory = true;
             _activePart = null;
@@ -183,22 +213,25 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// entry의 키캡을 screenPosition에서 일괄 배치할 미리보기로 준비한다.
+        /// entry의 키캡 또는 스위치를 screenPosition에서 일괄 배치할 미리보기로 준비한다.
         /// 재고와 입력 상태를 검사하고 실제 부품 등록이나 슬롯 점유 없이 배치를 시작한다.
         /// </summary>
         public bool TryBeginBulkPlacement(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (_isDragging || !isActiveAndEnabled || entry.IsSwitch || entry.AvailableQuantity <= 0)
+            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || entry.AvailableQuantity <= 0)
                 return false;
 
             if (_fullerTool != null)
                 _fullerTool.ReturnToOrigin();
+            if (_switchPullerTool != null)
+                _switchPullerTool.ReturnToOrigin();
             _bulkEntry = entry;
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
             _dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragHeight, 0f));
             _bulkPreview = Instantiate(entry.Prefab);
-            _bulkPreview.name = "BulkKeycapPreview";
-            _bulkPreview.Initialize(_partSlot, _bulkPreview.PartCollider, false);
+            _bulkPreview.name = entry.IsSwitch ? "BulkSwitchPreview" : "BulkKeycapPreview";
+            AssemblyPartSlot previewSlot = entry.IsSwitch ? _switchSlot : _partSlot;
+            _bulkPreview.Initialize(previewSlot, _bulkPreview.PartCollider, false);
             _bulkPreview.SetCatalogEntry(entry);
             _bulkPreview.PrepareInventoryPart(entry, _partSlot.KeycapShape);
             foreach (Collider collider in _bulkPreview.GetComponentsInChildren<Collider>(true))
@@ -234,7 +267,7 @@ namespace KeyboardModeling.Assembly
 
             Vector3 position = ray.GetPoint(distance);
             position.y = _dragHeight;
-            _bulkPreview.transform.SetPositionAndRotation(position, _partSlot.transform.rotation);
+            _bulkPreview.transform.SetPositionAndRotation(position, _bulkPreview.Slot.transform.rotation);
             bool overUI = IsPointerOverUI(screenPosition);
             _bulkPreview.gameObject.SetActive(!overUI);
             if (overUI)
@@ -266,8 +299,7 @@ namespace KeyboardModeling.Assembly
             _bulkCandidates.Clear();
             foreach (AssemblyPartSlot slot in _slots)
             {
-                if (slot.IsSwitch || slot.IsInstalled || _bulkVisited.Contains(slot)
-                    || slot.KeycapShape == null || !slot.IsCompatible(_bulkPreview))
+                if (slot.IsInstalled || _bulkVisited.Contains(slot) || !slot.CanInstall(_bulkPreview))
                     continue;
 
                 Vector3 offset = slot.transform.position - start;
@@ -531,7 +563,7 @@ namespace KeyboardModeling.Assembly
                     picked = part;
                 }
             }
-            if (picked == null)
+            if (picked == null || (picked.Slot != null && picked.Slot.InstalledPart == picked && !picked.Slot.CanRemove()))
                 return;
 
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
@@ -561,6 +593,8 @@ namespace KeyboardModeling.Assembly
         {
             if (_fullerTool != null)
                 _fullerTool.ReturnToOrigin();
+            if (_switchPullerTool != null)
+                _switchPullerTool.ReturnToOrigin();
             if (!_isDragging)
                 return;
 

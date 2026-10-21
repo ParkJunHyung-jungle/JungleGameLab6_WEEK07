@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using UnityEngine;
 
 namespace KeyboardModeling.Assembly
@@ -26,6 +28,8 @@ namespace KeyboardModeling.Assembly
         private Vector3 _returnAngularVelocity;
         private AssemblyCatalogEntry _catalogEntry;
         private int _interactionVersion;
+        private readonly List<(Collider Collider, bool WasIgnored)> _keyboardCollisionStates
+            = new List<(Collider Collider, bool WasIgnored)>();
 
         public bool IsSwitch => _isSwitch;
         public bool IsAdaptiveKeycap => _isAdaptiveKeycap;
@@ -70,10 +74,12 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// 현재 위치, 회전과 슬롯 점유 상태를 저장하고 드래그를 시작한다.
-        /// 기존 슬롯 점유를 해제하고 물리를 정지하며 실제 장착 상태였던 부품에만 제거음을 재생한다.
+        /// 기존 점유와 부모 결합을 해제하고 월드 자세와 물리 정지 상태를 유지하며 장착 부품의 제거음을 재생한다.
         /// </summary>
         public void BeginDrag()
         {
+            if (_slot != null && _slot.InstalledPart == this && !_slot.CanRemove())
+                return;
             _interactionVersion++;
             _returnPosition = transform.position;
             _returnRotation = transform.rotation;
@@ -85,6 +91,8 @@ namespace KeyboardModeling.Assembly
             if (_slot != null)
                 _slot.Release(this);
             SetBodyFrozen(true);
+            RestoreKeyboardCollisions();
+            transform.SetParent(null, true);
             if (_wasInstalled) AudioManager.PlayPartSound(_returnPosition, true);
         }
 
@@ -129,7 +137,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// 실물 부품을 재고 보관 상태로 전환한다.
-        /// 슬롯의 점유 및 원본 참조를 해제하고 물리를 고정한 뒤 오브젝트를 숨긴다.
+        /// 슬롯의 점유 및 원본 참조와 부모 결합을 해제하고 물리를 고정한 뒤 오브젝트를 숨긴다.
         /// </summary>
         public void StoreInInventory()
         {
@@ -141,11 +149,13 @@ namespace KeyboardModeling.Assembly
             _slot = null;
             _originSlot = null;
             SetBodyFrozen(true);
+            RestoreKeyboardCollisions();
+            transform.SetParent(null, true);
             gameObject.SetActive(false);
         }
 
         /// <summary>
-        /// 연결된 슬롯의 위치와 회전으로 부품을 정렬한다.
+        /// 연결된 슬롯의 자식으로 부품을 결합하고 슬롯 기준 자세로 정렬한다.
         /// 재질형 키캡에는 슬롯의 기존 형상을 적용하고 원본 규격의 크기와 고정 상태를 유지한다.
         /// </summary>
         public void SnapToSlot()
@@ -154,30 +164,32 @@ namespace KeyboardModeling.Assembly
             SetBodyFrozen(true);
             if (_isAdaptiveKeycap)
                 ApplyKeycapShape(_slot.KeycapShape, _catalogEntry.KeycapMaterial);
-            transform.SetPositionAndRotation(_slot.transform.position, _slot.transform.rotation);
-            Vector3 scale = _slot.transform.lossyScale;
-            Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
-            transform.localScale = new Vector3(scale.x / parentScale.x, scale.y / parentScale.y, scale.z / parentScale.z);
+            transform.SetParent(_slot.transform, true);
+            transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            transform.localScale = Vector3.one;
+            IgnoreKeyboardCollisions();
         }
 
         /// <summary>
         /// 현재 부품의 슬롯 점유를 해제하고 중력 낙하를 시작한다.
-        /// 현재 위치와 회전은 유지하며 Rigidbody를 동적 상태로 전환한다.
+        /// 부모 결합을 해제하되 월드 자세와 크기는 유지하며 Rigidbody를 동적 상태로 전환한다.
         /// </summary>
         public void DropWithPhysics()
         {
             if (_slot != null)
                 _slot.Release(this);
+            RestoreKeyboardCollisions();
+            transform.SetParent(null, true);
             SetBodyFrozen(false);
         }
 
         /// <summary>
-        /// 장착된 키캡만 슬롯에서 분리하고 velocity와 angularVelocity로 튀어 오르게 한다.
-        /// 점유 해제와 중력 활성화에 성공하면 제거음을 재생하며 이미 분리된 부품이나 스위치이면 false를 반환한다.
+        /// 장착된 부품의 선행 분리 조건을 검사하고 velocity와 angularVelocity로 튀어 오르게 한다.
+        /// 성공하면 점유를 해제하고 제거음을 재생하며 미장착 상태 또는 선행 부품이 남아 있으면 false를 반환한다.
         /// </summary>
         public bool TryPopOff(Vector3 velocity, Vector3 angularVelocity)
         {
-            if (_isSwitch || _slot == null || _slot.InstalledPart != this)
+            if (_slot == null || _slot.InstalledPart != this || !_slot.CanRemove())
                 return false;
             DropWithPhysics();
             _body.linearVelocity = velocity;
@@ -206,6 +218,7 @@ namespace KeyboardModeling.Assembly
             _isSwitch = entry.IsSwitch;
             _isAdaptiveKeycap = !entry.IsSwitch && !entry.IsArtisan;
             _keycapShape = previewShape;
+            RestoreKeyboardCollisions();
             transform.SetParent(null, true);
             transform.localScale = entry.Prefab.transform.localScale;
             if (_isAdaptiveKeycap)
@@ -247,6 +260,37 @@ namespace KeyboardModeling.Assembly
             BoxCollider collider = (BoxCollider)_partCollider;
             collider.center = bounds.center;
             collider.size = bounds.size;
+        }
+
+        /// <summary>
+        /// 장착 슬롯의 본체 Rigidbody에 속한 Collider와 이 부품 사이의 기존 충돌 설정을 보관한다.
+        /// 부모 본체가 있을 때만 자기 충돌을 제외하며 다른 물체와의 충돌은 유지한다.
+        /// </summary>
+        private void IgnoreKeyboardCollisions()
+        {
+            RestoreKeyboardCollisions();
+            Rigidbody keyboardBody = _slot.GetComponentInParent<Rigidbody>();
+            if (keyboardBody == null)
+                return;
+            foreach (Collider collider in keyboardBody.GetComponentsInChildren<Collider>(true))
+            {
+                if (collider.attachedRigidbody != keyboardBody)
+                    continue;
+                _keyboardCollisionStates.Add((collider, Physics.GetIgnoreCollision(_partCollider, collider)));
+                Physics.IgnoreCollision(_partCollider, collider, true);
+            }
+        }
+
+        /// <summary>
+        /// 본체 결합 시 저장한 Collider 쌍의 충돌 설정을 복원하고 기록을 비운다.
+        /// 분리 부품은 본체와 다시 충돌하며 이미 파괴된 Collider는 건너뛴다.
+        /// </summary>
+        private void RestoreKeyboardCollisions()
+        {
+            foreach (var state in _keyboardCollisionStates)
+                if (state.Collider != null)
+                    Physics.IgnoreCollision(_partCollider, state.Collider, state.WasIgnored);
+            _keyboardCollisionStates.Clear();
         }
 
         /// <summary>

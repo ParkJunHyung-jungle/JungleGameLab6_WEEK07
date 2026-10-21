@@ -106,3 +106,11 @@ Assets/Plugins/FMOD/Cache/Editor/FMODStudioCache.asset
 
 # Player Log Directory
 /PlaytestLogs/
+
+# Editor playtest CSV logs
+/Logs/Playtest_*.csv
+/Logs/Customization_*.csv
+
+# Local upload token configuration
+/Assets/Resources/GameConfig.asset
+/Assets/Resources/GameConfig.asset.meta

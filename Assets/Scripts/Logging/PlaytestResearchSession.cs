@@ -14,6 +14,7 @@ namespace Game.Logging
         private const string SURVEY_URL = "https://docs.google.com/forms/d/e/1FAIpQLScHe8Lc1GgrmsLXcW9egP4cRd9rQ4LMgZx3Db-nZigFXcEW6Q/viewform";
         private static string _fingerprint;
         private static bool _nextCyclePending;
+        private static bool _finishedForUpload;
 
         public static event Action<string, string, string> Observed;
         public static string TestRunId { get; private set; }
@@ -30,9 +31,11 @@ namespace Game.Logging
         public static string ParticipationContext { get; private set; }
         public static string InterventionId { get; private set; }
         public static bool IsCustomizing { get; private set; }
+        public static bool IsUploadConfirmationOpen { get; private set; }
 
         [Header("Runtime")]
         private bool _panelOpen;
+        private bool _uploadConfirmationOpen;
         private string _interventionReason = "OperationHelp";
 
         /// <summary>새 앱 실행의 구독과 식별자를 초기화한다. 이전 실행의 문맥은 재사용하지 않는다.</summary>
@@ -40,6 +43,8 @@ namespace Game.Logging
         private static void ResetSession()
         {
             Observed = null;
+            _finishedForUpload = false;
+            IsUploadConfirmationOpen = false;
             ResetIdentity(null);
         }
 
@@ -64,17 +69,44 @@ namespace Game.Logging
 
         void Start() { Emit("TestStart", "ApplicationLaunch"); }
 
-        void OnDestroy() { SceneManager.sceneLoaded -= HandleSceneLoaded; }
+        void OnDestroy()
+        {
+            SetUploadConfirmationOpen(false);
+            SceneManager.sceneLoaded -= HandleSceneLoaded;
+        }
 
         void OnApplicationQuit()
         {
+            if (_finishedForUpload) return;
             if (!string.IsNullOrEmpty(InterventionId)) Emit("InterventionEnd", "ApplicationQuit");
             Emit("TestEnd", "ApplicationQuit");
         }
 
-        /// <summary>실제 로드가 끝난 scene의 경로를 기록한다. 작업실 복귀 요청과 도착을 구분하며 게임 진행은 변경하지 않는다.</summary>
+        /// <summary>
+        /// 업로드 동의를 기록하고 현재 연구 세션의 마지막 이벤트를 보낸다.
+        /// 이후 앱 종료 콜백에서 TestEnd가 중복 기록되지 않도록 표시한다.
+        /// </summary>
+        public static void FinishForUpload()
+        {
+            if (_finishedForUpload) return;
+            if (!string.IsNullOrEmpty(InterventionId))
+            {
+                Emit("InterventionEnd", "LogUpload");
+                InterventionId = null;
+            }
+            Emit("TestEnd", "LogUpload");
+            _finishedForUpload = true;
+        }
+
+        /// <summary>
+        /// 로드된 scene 경로를 기록하고 Workshop2를 떠날 때 업로드 동의 창을 닫는다.
+        /// scene 이름을 사용해 전환 기록과 입력 잠금 상태를 갱신한다.
+        /// </summary>
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            if (scene.name != "WorkShop2" && _uploadConfirmationOpen)
+                SetUploadConfirmationOpen(false);
+
             Emit(scene.name == "WorkShop2" ? "WorkshopEntered" : "SceneEntered", scene.path);
         }
 
@@ -82,6 +114,14 @@ namespace Game.Logging
         {
             if (Keyboard.current != null && Keyboard.current.f12Key.wasPressedThisFrame)
             {
+                if (SceneManager.GetActiveScene().name == "WorkShop2")
+                {
+                    if (LogUploadCoordinator.Instance != null && LogUploadCoordinator.Instance.IsBusy) return;
+                    _panelOpen = false;
+                    SetUploadConfirmationOpen(!_uploadConfirmationOpen);
+                    Emit("LogUploadPrompt", _uploadConfirmationOpen ? "Opened" : "Closed");
+                    return;
+                }
                 _panelOpen = !_panelOpen;
                 Emit("ResearchPanel", _panelOpen ? "Opened" : "Closed");
             }
@@ -89,6 +129,11 @@ namespace Game.Logging
 
         void OnGUI()
         {
+            if (SceneManager.GetActiveScene().name == "WorkShop2")
+            {
+                if (_uploadConfirmationOpen) DrawUploadConfirmation();
+                return;
+            }
             if (!_panelOpen) return;
             GUILayout.BeginArea(new Rect(12, 12, 370, 410), GUI.skin.box);
             GUILayout.Label("테스트 코드: " + TesterId);
@@ -141,6 +186,59 @@ namespace Game.Logging
             GUI.enabled = true;
             GUILayout.Label("F12: 닫기 · 게임은 일시정지되지 않습니다.");
             GUILayout.EndArea();
+        }
+
+        /// <summary>
+        /// 로그 전송 동의 화면을 표시하고 예 또는 아니오에 따라 업로드를 시작하거나 취소한다.
+        /// 업로드 시작이 거절되면 오류를 표시하고 현재 CSV 기록은 열린 상태로 둔다.
+        /// </summary>
+        private void DrawUploadConfirmation()
+        {
+            float width = 390f;
+            float height = 190f;
+            GUILayout.BeginArea(new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height), GUI.skin.window);
+            GUILayout.Label("로그를 서버로 전송하시겠습니까?");
+            GUILayout.Label("예를 선택하면 현재 세션의 Playtest_ 및 Customization_ CSV 두 개만 마감한 뒤 전송합니다.");
+            GUILayout.Label("전송이 끝나면 앱이 종료됩니다.");
+
+            LogUploadCoordinator coordinator = LogUploadCoordinator.Instance;
+            if (coordinator == null)
+            {
+                GUILayout.Label("업로드 기능을 시작하지 못했습니다. 앱을 다시 실행해 주세요.");
+            }
+            else if (!string.IsNullOrEmpty(coordinator.LastError))
+            {
+                GUILayout.Label(coordinator.LastError);
+            }
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("로그 폴더 열기"))
+            {
+                Emit("LogUploadFolderRequested", "UploadConfirmation");
+                CustomizationLogger.FlushForUpload();
+                KeyboardInputLogger.OpenLogFolder();
+            }
+            if (GUILayout.Button("예, 전송"))
+            {
+                if (coordinator != null && coordinator.BeginUploadAfterConsent()) SetUploadConfirmationOpen(false);
+            }
+            if (GUILayout.Button("아니오"))
+            {
+                Emit("LogUploadConsent", "Declined");
+                SetUploadConfirmationOpen(false);
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+        }
+
+        /// <summary>
+        /// 업로드 동의 창의 열림 상태를 갱신한다.
+        /// isOpen 값을 인스턴스 상태와 플레이어 입력 제어용 공개 상태에 저장한다.
+        /// </summary>
+        private void SetUploadConfirmationOpen(bool isOpen)
+        {
+            _uploadConfirmationOpen = isOpen;
+            IsUploadConfirmationOpen = isOpen;
         }
 
         /// <summary>testerId로 새 참여 구간을 시작한다. 기존 구간을 마감하고 설문 코드와 구성·순환 식별자를 새로 만든다.</summary>

@@ -110,6 +110,9 @@ namespace Game.Logging
         private bool _ownsSession;
 
         public string FilePath { get; private set; }
+        public static string CurrentFilePath => _instance != null && _instance._ownsSession && !_instance._closed && _instance._writer != null
+            ? _instance.FilePath
+            : null;
         public string TesterId => PlaytestResearchSession.TesterId;
 
         void Awake()
@@ -120,7 +123,7 @@ namespace Game.Logging
             DontDestroyOnLoad(gameObject);
             _sessionId = Guid.NewGuid().ToString("N");
 #if UNITY_EDITOR
-            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "PlaytestLogs"));
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Logs"));
 #else
             string folder = Path.Combine(Application.persistentDataPath, "PlaytestLogs");
 #endif
@@ -156,6 +159,15 @@ namespace Game.Logging
         public static void FlushForUpload()
         {
             if (_instance != null && !_instance._closed) _instance.Flush();
+        }
+
+        /// <summary>
+        /// 현재 커스터마이징 로그 세션을 LogUpload 사유로 마감한다.
+        /// 업로드 전에 버퍼를 기록하고 파일과 이벤트 구독을 닫는다.
+        /// </summary>
+        public static void FinishForUpload()
+        {
+            if (_instance != null && _instance._ownsSession) _instance.Finish("LogUpload");
         }
 
         /// <summary>
@@ -476,6 +488,29 @@ namespace Game.Logging
         /// <summary>새 앱 실행의 로거 참조를 초기화하며 이전 실행 인스턴스를 재사용하지 않는다.</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetInstance() { _instance = null; }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Unity Editor의 Play 모드 중지 이벤트를 한 번 등록한다.
+        /// Play 모드가 끝나기 전에 현재 커스터마이징 CSV를 닫을 수 있도록 연결한다.
+        /// </summary>
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void RegisterEditorPlayModeCallback()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged -= HandleEditorPlayModeStateChanged;
+            UnityEditor.EditorApplication.playModeStateChanged += HandleEditorPlayModeStateChanged;
+        }
+
+        /// <summary>
+        /// Unity Editor가 Play 모드를 종료할 때 현재 커스터마이징 세션을 마감한다.
+        /// state가 ExitingPlayMode이면 CSV와 이벤트 구독을 닫는다.
+        /// </summary>
+        private static void HandleEditorPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
+        {
+            if (state != UnityEditor.PlayModeStateChange.ExitingPlayMode || _instance == null || !_instance._ownsSession) return;
+            _instance.Finish("EditorPlayModeStopped");
+        }
+#endif
 
         private sealed class KeyboardIdentity { public string Id { get; } = Guid.NewGuid().ToString("N"); }
     }

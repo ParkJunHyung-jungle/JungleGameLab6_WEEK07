@@ -48,12 +48,39 @@ namespace Game.Logging
         private bool _folderErrorReported;
         private int _focusRecoveryFrame = -1;
 
+        public static string CurrentFilePath => _instance != null && _instance._ownsSession && !_instance._closed && _instance._writer != null
+            ? _instance._writer.FilePath
+            : null;
+
         /// <summary>
         /// 새 앱 실행의 정적 로거 참조를 초기화한다.
         /// 도메인 재로드가 꺼진 에디터에서도 이전 실행 참조를 남기지 않는다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetInstance() { _instance = null; }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Unity Editor의 Play 모드 중지 이벤트를 한 번 등록한다.
+        /// Play 모드가 끝나기 전에 현재 전투 CSV를 닫을 수 있도록 연결한다.
+        /// </summary>
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void RegisterEditorPlayModeCallback()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged -= HandleEditorPlayModeStateChanged;
+            UnityEditor.EditorApplication.playModeStateChanged += HandleEditorPlayModeStateChanged;
+        }
+
+        /// <summary>
+        /// Unity Editor가 Play 모드를 종료할 때 현재 전투 세션을 마감한다.
+        /// state가 ExitingPlayMode이면 CSV와 이벤트 구독을 닫는다.
+        /// </summary>
+        private static void HandleEditorPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
+        {
+            if (state != UnityEditor.PlayModeStateChange.ExitingPlayMode || _instance == null || !_instance._ownsSession) return;
+            _instance.FinishSession("EditorPlayModeStopped", false);
+        }
+#endif
 
         /// <summary>
         /// 최초 씬에 로거가 없으면 실행용 PlaytestLogger를 생성한다.
@@ -89,7 +116,7 @@ namespace Game.Logging
             DontDestroyOnLoad(gameObject);
             string sessionId = Guid.NewGuid().ToString("N");
 #if UNITY_EDITOR
-            string logFolder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "PlaytestLogs"));
+            string logFolder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Logs"));
 #else
             string logFolder = Path.Combine(Application.persistentDataPath, "PlaytestLogs");
 #endif
@@ -672,6 +699,15 @@ namespace Game.Logging
         /// 닫힌 세션은 무시하고 게임 상태는 변경하지 않는다.
         /// </summary>
         public void FlushLog() { if (!_closed) _writer.Flush(); }
+
+        /// <summary>
+        /// 현재 전투 로그 세션을 LogUpload 사유로 마감한다.
+        /// 업로드 전에 버퍼를 기록하고 파일과 이벤트 구독을 닫는다.
+        /// </summary>
+        public static void FinishForUpload()
+        {
+            if (_instance != null && _instance._ownsSession) _instance.FinishSession("LogUpload", true);
+        }
 
         /// <summary>
         /// 현재 기록을 Flush하고 실행의 로그 폴더를 기본 파일 탐색기로 연다.

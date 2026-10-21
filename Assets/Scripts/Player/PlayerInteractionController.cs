@@ -45,6 +45,12 @@ namespace Game.Player
         private Vector2 _interactionPromptDefaultAnchoredPosition;
         private readonly RaycastHit[] _interactionHits = new RaycastHit[32];
 
+        [Header("Upload Confirmation Input")]
+        private bool _uploadConfirmationInputCaptured;
+        private bool _uploadConfirmationCameraInputWasEnabled;
+        private CursorLockMode _uploadConfirmationCursorLockState;
+        private bool _uploadConfirmationCursorWasVisible;
+
         [Header("Keyboard Cover")]
         [SerializeField] private KeyboardProtectionCover _keyboardProtectionCoverPrefab;
 
@@ -192,10 +198,45 @@ namespace Game.Player
 
         void LateUpdate()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            UpdateUploadConfirmationInput();
+            if (Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
+                || Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             UpdateInteractionPrompt();
             CaptureEditingKeyboardMouseDelta();
             UpdateEditingCameraZoom();
+        }
+
+        /// <summary>
+        /// 업로드 동의 창이 열리면 카메라 입력을 끄고 마우스 커서를 해제한다.
+        /// 창을 닫으면 열기 전 카메라 입력과 커서 상태를 복원한다.
+        /// </summary>
+        private void UpdateUploadConfirmationInput()
+        {
+            if (Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen)
+            {
+                if (!_uploadConfirmationInputCaptured)
+                {
+                    _uploadConfirmationInputCaptured = true;
+                    _uploadConfirmationCursorLockState = Cursor.lockState;
+                    _uploadConfirmationCursorWasVisible = Cursor.visible;
+                    _uploadConfirmationCameraInputWasEnabled = _cameraInputAxisController != null
+                        && _cameraInputAxisController.enabled;
+                }
+
+                if (_cameraInputAxisController != null)
+                    _cameraInputAxisController.enabled = false;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                return;
+            }
+
+            if (!_uploadConfirmationInputCaptured) return;
+
+            _uploadConfirmationInputCaptured = false;
+            if (_cameraInputAxisController != null)
+                _cameraInputAxisController.enabled = _uploadConfirmationCameraInputWasEnabled;
+            Cursor.lockState = _uploadConfirmationCursorLockState;
+            Cursor.visible = _uploadConfirmationCursorWasVisible;
         }
 
         /// <summary>
@@ -204,6 +245,7 @@ namespace Game.Player
         /// </summary>
         private void HandleClickStarted(InputAction.CallbackContext context)
         {
+            if (Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen) return;
             if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (_isMonitorFocusMode || _monitorFocusTransition != null)
                 return;

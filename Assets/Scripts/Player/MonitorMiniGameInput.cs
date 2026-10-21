@@ -1,3 +1,5 @@
+using System;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,11 +13,14 @@ namespace Game.Player
         [SerializeField] private PlayerInteractionController _player;
         [SerializeField] private MonitorKeyboardHolder _holder;
         [SerializeField] private MonitorMiniGameManager _manager;
+        [SerializeField] private bool _autoStartOnFocus = true;
         [SerializeField, Min(0)] private int _initialGameIndex;
         private KeyboardInputController _keyboard;
         private Keyboard _textDevice;
         private bool _previousInput;
         private bool _previousAttack;
+        public bool HasFocus => _keyboard != null;
+        public event Action<bool> FocusChanged;
 
         [Header("Backspace Repeat")]
         [SerializeField, Min(0.1f)] private float _backspaceRepeatDelay = 0.4f;
@@ -50,7 +55,7 @@ namespace Game.Player
             }
         }
 
-        /// <summary>포커스된 holder가 연결된 거치대이면 해당 키보드와 문자 입력을 구독하고 등록 게임을 시작한다. 포커스 종료 시 기존 입력 설정을 복원한다.</summary>
+        /// <summary>포커스된 holder의 키보드와 문자 입력을 구독하고 포커스 진입을 알린다. 자동 시작 설정이 켜져 있으면 초기 게임을 실행하고 종료 시 기존 입력 설정을 복원한다.</summary>
         private void HandleFocusChanged(MonitorKeyboardHolder holder)
         {
             Disconnect();
@@ -63,7 +68,8 @@ namespace Game.Player
             _keyboard.KeyPressed += HandleKeyPressed;
             _textDevice = Keyboard.current;
             if (_textDevice != null) _textDevice.onTextInput += HandleTextInput;
-            _manager.StartGame(_initialGameIndex);
+            FocusChanged?.Invoke(true);
+            if (_autoStartOnFocus) _manager.StartGame(_initialGameIndex);
         }
 
         /// <summary>실제 거치 키보드의 key를 현재 게임에 전달하고 Backspace면 반복 삭제 대기를 시작한다. 튜토리얼 또는 일시정지 중 입력은 무시하며 타건 연출은 기존 컨트롤러가 처리한다.</summary>
@@ -98,11 +104,14 @@ namespace Game.Player
             if (_textDevice != null) _textDevice.onTextInput -= HandleTextInput;
             _textDevice = null;
             _manager.StopGame();
-            if (_keyboard == null) return;
-            _keyboard.KeyPressed -= HandleKeyPressed;
-            _keyboard.SetInputEnabled(_previousInput);
-            _keyboard.SetAttackEnabled(_previousAttack);
+            if (_keyboard != null)
+            {
+                _keyboard.KeyPressed -= HandleKeyPressed;
+                _keyboard.SetInputEnabled(_previousInput);
+                _keyboard.SetAttackEnabled(_previousAttack);
+            }
             _keyboard = null;
+            FocusChanged?.Invoke(false);
         }
     }
 }

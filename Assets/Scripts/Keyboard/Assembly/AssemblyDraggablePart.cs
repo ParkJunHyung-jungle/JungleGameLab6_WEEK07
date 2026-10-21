@@ -85,16 +85,13 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// install이 참이면 지정 슬롯에 장착하고 거짓이면 복귀 정책을 적용한다.
+        /// install이 참이면 지정 슬롯에 장착을 시도하고 거짓이거나 점유로 거부되면 복귀 정책을 적용한다.
         /// 기존 키보드 키캡은 이전 상태로 복귀하고 출고 부품과 스위치는 중력으로 떨어진다.
         /// </summary>
         public void EndDrag(bool install)
         {
-            if (install)
-            {
-                _slot.Install(this);
+            if (install && _slot.Install(this))
                 return;
-            }
 
             if (_restoreOnInvalidDrop)
                 RestoreDragOrigin();
@@ -109,11 +106,14 @@ namespace KeyboardModeling.Assembly
         public void RestoreDragOrigin()
         {
             gameObject.SetActive(true);
-            transform.SetPositionAndRotation(_returnPosition, _returnRotation);
             if (_wasInstalled)
-                _returnSlot.Install(this);
+            {
+                if (!_returnSlot.Install(this))
+                    DropWithPhysics();
+            }
             else
             {
+                transform.SetPositionAndRotation(_returnPosition, _returnRotation);
                 SetBodyFrozen(_wasKinematic);
                 if (!_wasKinematic)
                 {

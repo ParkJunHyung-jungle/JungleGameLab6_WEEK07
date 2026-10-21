@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -30,6 +31,7 @@ namespace KeyboardModeling.Assembly
 
         [Header("Appearance")]
         [SerializeField] private Sprite _sprite;
+        [SerializeField] private bool _startCollapsed;
 
         [Header("Catalog Drag")]
         [SerializeField] private AssemblyDragInput _dragInput;
@@ -67,6 +69,10 @@ namespace KeyboardModeling.Assembly
         private readonly List<string> _categoryNames = new List<string>();
 
         public RectTransform ReturnArea => _returnArea;
+        public int CurrentCategory => _currentCategory;
+        public event Action<int> CategorySelected;
+        public event Action<AssemblyCatalogEntry> PartSelected;
+        public event Action PanelOpened;
 
         void Awake()
         {
@@ -78,6 +84,12 @@ namespace KeyboardModeling.Assembly
             BuildChoices();
             ShowCategory(0);
             RefreshInventory();
+            if (_startCollapsed)
+            {
+                _panel.SetActive(false);
+                _toggleLabel.text = "UI 펼치기";
+                _toggleRect.anchoredPosition = new Vector2(20f, -20f);
+            }
         }
 
         void Start()
@@ -221,6 +233,7 @@ namespace KeyboardModeling.Assembly
             _panel.SetActive(isExpanded);
             _toggleLabel.text = isExpanded ? "UI 접기" : "UI 펼치기";
             _toggleRect.anchoredPosition = new Vector2(isExpanded ? 348f : 20f, -20f);
+            if (isExpanded) PanelOpened?.Invoke();
         }
 
         /// <summary>
@@ -487,7 +500,9 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandleTabClicked(AssemblyCatalogButton button)
         {
-            ShowCategory(_tabs.IndexOf(button));
+            int index = _tabs.IndexOf(button);
+            ShowCategory(index);
+            CategorySelected?.Invoke(index);
         }
 
         /// <summary>
@@ -501,6 +516,7 @@ namespace KeyboardModeling.Assembly
                 SetSelected(previous, false);
             _selections[category] = button;
             SetSelected(button, true);
+            if (_cardEntries.TryGetValue(button, out AssemblyCatalogEntry entry)) PartSelected?.Invoke(entry);
         }
 
         /// <summary>

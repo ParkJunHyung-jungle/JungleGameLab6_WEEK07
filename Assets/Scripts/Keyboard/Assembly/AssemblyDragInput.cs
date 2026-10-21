@@ -1,4 +1,5 @@
 using System.Collections;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -53,6 +54,7 @@ namespace KeyboardModeling.Assembly
         public AssemblyPartSlot SwitchSlot => _switchSlot;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _partSlot.transform.position.y + _heightOffset;
+        public event Action<AssemblyDraggablePart> PartPicked;
 
         void Start()
         {
@@ -62,6 +64,11 @@ namespace KeyboardModeling.Assembly
 
         void Update()
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            {
+                CancelDrag();
+                return;
+            }
             Mouse mouse = Mouse.current;
             if (mouse == null)
             {
@@ -158,7 +165,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool TryBeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (_isDragging || !isActiveAndEnabled)
+            if (_isDragging || !isActiveAndEnabled || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
                 return false;
 
             if (_fullerTool != null)
@@ -543,6 +550,7 @@ namespace KeyboardModeling.Assembly
             _fromInventory = false;
             _showingIcon = false;
             _isDragging = true;
+            PartPicked?.Invoke(picked);
         }
 
         /// <summary>

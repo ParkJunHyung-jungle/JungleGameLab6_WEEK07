@@ -2913,6 +2913,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
+      propertyPath: _content
+      value: 
+      objectReference: {fileID: 11400000, guid: 40ea1179b9a88644492d2e90cdccad40, type: 2}
     - target: {fileID: 2347408700237247188, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -5551,6 +5555,8 @@ MonoBehaviour:
   _keyboardEditMinFieldOfView: 40
   _keyboardEditMaxFieldOfView: 100
   _keyboardEditFieldOfViewStep: 2
+  _monitorFocusDistance: 2.5
+  _monitorFocusFieldOfView: 75
 --- !u!114 &7500000002
 MonoBehaviour:
   m_ObjectHideFlags: 0

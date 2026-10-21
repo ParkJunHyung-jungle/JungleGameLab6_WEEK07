@@ -3113,60 +3113,9 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.size
-      value: 6
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[0]._body
-      value: "\uD0A4\uBCF4\uB4DC\uB97C \uC791\uC5C5\uB300\uC5D0 \uC62C\uB9AC\uACE0
-        \uD0A4\uCEA1, \uCD95, \uCF00\uC774\uC2A4\uC640 LED\uB97C \uC790\uC720\uB86D\uAC8C
-        \uAFB8\uBA70 \uBCF4\uC138\uC694.\n\uC644\uC131\uD55C \uD0A4\uBCF4\uB4DC\uB294
-        \uC804\uC2DC\uD558\uAC70\uB098 \uC800\uC7A5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[4]._body
-      value: "\uC544\uD2F0\uC0B0\uC740 1u \uD06C\uAE30\uC758 \uD0A4\uC5D0 \uAC1C\uC218
-        \uC81C\uD55C \uC5C6\uC774 \uC124\uCE58\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\uC804\uCCB4
-        \uC801\uC6A9 \uC2DC \uB098\uBA38\uC9C0 \uD0A4\uB294 \uAE30\uC874 \uD0A4\uCEA1
-        \uB610\uB294 \uBE48 \uC0C1\uD0DC\uB97C \uC720\uC9C0\uD569\uB2C8\uB2E4."
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[5]._body
-      value: "\uC0AC\uC9C4\uC744 \uBD88\uB7EC\uC640 \uD0A4\uCEA1\uC774\uB098 \uCF00\uC774\uC2A4\uC5D0
-        \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\uC704\uCE58\uC640 \uBC94\uC704\uB97C
-        \uC870\uC808\uD558\uACE0 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uD655\uC778\uD55C
-        \uB4A4 \uC801\uC6A9\uD558\uC138\uC694."
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[0]._title
-      value: "\uB098\uB9CC\uC758 \uD0A4\uBCF4\uB4DC \uAFB8\uBBF8\uAE30"
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[4]._title
-      value: "\uC544\uD2F0\uC0B0\uC73C\uB85C \uD0A4\uBCF4\uB4DC \uAFB8\uBBF8\uAE30"
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[4]._topic
-      value: 12
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[5]._title
-      value: "\uC0AC\uC9C4\uC73C\uB85C \uD0A4\uBCF4\uB4DC \uAFB8\uBBF8\uAE30"
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[5]._topic
-      value: 13
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[4]._controls
-      value: "\uC804\uCCB4 \uC801\uC6A9 \uB610\uB294 \uD0A4\uCEA1 \uD55C \uAC1C\uB97C
-        \uC120\uD0DD\uD574 \uC124\uCE58\uD558\uC138\uC694."
-      objectReference: {fileID: 0}
-    - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
-      propertyPath: _cards.Array.data[5]._controls
-      value: "\uC774\uBBF8\uC9C0 \uC120\uD0DD \u2192 \uC801\uC6A9 \uC704\uCE58\xB7\uBC94\uC704
-        \uC120\uD0DD \u2192 \uC801\uC6A9"
-      objectReference: {fileID: 0}
+      propertyPath: _content
+      value: 
+      objectReference: {fileID: 11400000, guid: 9cee647c745975c41a5738e3ba652a62, type: 2}
     - target: {fileID: 2347408700237247188, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -5809,6 +5758,8 @@ MonoBehaviour:
   _keyboardEditMinFieldOfView: 40
   _keyboardEditMaxFieldOfView: 100
   _keyboardEditFieldOfViewStep: 2
+  _monitorFocusDistance: 2.5
+  _monitorFocusFieldOfView: 75
 --- !u!114 &7500000002
 MonoBehaviour:
   m_ObjectHideFlags: 0

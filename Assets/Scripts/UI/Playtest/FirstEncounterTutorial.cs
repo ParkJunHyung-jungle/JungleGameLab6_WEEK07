@@ -15,9 +15,18 @@ namespace Game.Tutorials
 {
     public enum TutorialTopic
     {
-        Welcome, Workbench, EditControls, KeycapEditing, AttackPreview, TournamentEntry,
-        Battle, Replenishment, Shop, KeycapPurchase, Unlock, WholePart, Artisan,
-        Image, Reroll, TournamentEnd
+        // 저장된 카드 연결을 유지하도록 현재 숫자를 고정한다.
+        Welcome = 0, Workbench = 1, EditControls = 2, KeycapEditing = 3, Image = 4,
+        AssemblySwitch = 5, WholePart = 6, Artisan = 7,
+
+        // 조립과 파츠별 편집 안내다.
+        PartsCatalog = 17, PartRemoval = 18, PartReplacement = 19,
+        PartReturn = 20, PartCompatibility = 21,
+        CaseEditing = 22, PlateEditing = 23, PCBEditing = 24, LEDEditing = 25,
+
+        // 전투 안내는 기존 값을 유지한다.
+        Battle = 8, Replenishment = 9, Shop = 10, KeycapPurchase = 11, Unlock = 12,
+        Reroll = 13, TournamentEnd = 14, AttackPreview = 15, TournamentEntry = 16,
     }
 
     [Serializable]
@@ -51,7 +60,9 @@ namespace Game.Tutorials
         [SerializeField] private KeyboardEditButton _previous;
         [SerializeField] private KeyboardEditButton _close;
         [SerializeField] private KeyboardEditButton _help;
-        [SerializeField] private TutorialCard[] _cards;
+
+        [Header("Tutorial Content")]
+        [SerializeField] private TutorialContent _content;
 
         [Header("Runtime")]
         private readonly Queue<PendingCard> _pending = new Queue<PendingCard>();
@@ -68,6 +79,7 @@ namespace Game.Tutorials
         private int _closeFrame;
 
         public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
+        private IReadOnlyList<TutorialCard> Cards => _content.Cards;
 
         private sealed class PendingCard
         {
@@ -174,7 +186,7 @@ namespace Game.Tutorials
         /// <summary>topic의 Inspector 안내 데이터를 찾아 반환한다. 등록되지 않은 항목은 구성 오류로 보고한다.</summary>
         private TutorialCard FindCard(TutorialTopic topic)
         {
-            foreach (TutorialCard card in _cards) if (card.Topic == topic) return card;
+            foreach (TutorialCard card in Cards) if (card.Topic == topic) return card;
             throw new InvalidOperationException("튜토리얼 카드 누락: " + topic);
         }
 
@@ -203,11 +215,11 @@ namespace Game.Tutorials
         /// <summary>card의 제목과 설명 및 조작을 기존 UI에 반영한다. 도움말에서는 페이지 이동 버튼을 표시한다.</summary>
         private void Display(TutorialCard card)
         {
-            _eyebrow.text = _browsing ? "도움말  ·  " + (_page + 1) + " / " + _cards.Length : "처음 만나는 기능";
+            _eyebrow.text = _browsing ? "도움말  ·  " + (_page + 1) + " / " + Cards.Count : "처음 만나는 기능";
             _title.text = card.Title;
             _body.text = card.Body;
             _controls.text = card.Controls;
-            _nextLabel.text = _browsing && _page < _cards.Length - 1 ? "다음" : "계속";
+            _nextLabel.text = _browsing && _page < Cards.Count - 1 ? "다음" : "계속";
             _previous.gameObject.SetActive(_browsing && _page > 0);
             _close.gameObject.SetActive(_browsing);
             _next.interactable = true;
@@ -218,10 +230,10 @@ namespace Game.Tutorials
         private void HandleNext(KeyboardEditButton button)
         {
             if (_closing) return;
-            if (_browsing && _page < _cards.Length - 1)
+            if (_browsing && _page < Cards.Count - 1)
             {
                 _page++;
-                Display(_cards[_page]);
+                Display(Cards[_page]);
                 return;
             }
             if (!_browsing)
@@ -236,7 +248,7 @@ namespace Game.Tutorials
         {
             if (_closing || !_browsing || _page == 0) return;
             _page--;
-            Display(_cards[_page]);
+            Display(Cards[_page]);
         }
 
         /// <summary>button의 닫기 요청으로 도움말을 종료한다. 미열람 첫 조우 카드는 별도로 유지한다.</summary>
@@ -251,7 +263,7 @@ namespace Game.Tutorials
             if (Game.Tournament.TournamentController.IsReturnPaused || IsBlocking || _pending.Count > 0 || Time.timeScale <= 0f) return;
             _page = 0;
             _browsing = true;
-            Open(_cards[0]);
+            Open(Cards[0]);
         }
 
         /// <summary>확인 버튼을 비활성화하고 입력 해제를 기다린다. 닫기 입력이 게임으로 전달되지 않도록 정지 상태를 유지한다.</summary>

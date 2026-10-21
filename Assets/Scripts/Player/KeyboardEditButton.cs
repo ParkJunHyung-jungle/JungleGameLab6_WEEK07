@@ -20,7 +20,7 @@ namespace Game.Player
                 return;
             }
 
-            AudioManager.instance.PlayButtonSound();
+            if (AudioManager.instance != null) AudioManager.instance.PlayButtonSound();
             base.OnPointerClick(eventData);
             Clicked?.Invoke(this);
         }
@@ -36,7 +36,7 @@ namespace Game.Player
                 return;
             }
 
-            AudioManager.instance.PlayButtonSound();
+            if (AudioManager.instance != null) AudioManager.instance.PlayButtonSound();
             base.OnSubmit(eventData);
             Clicked?.Invoke(this);
         }

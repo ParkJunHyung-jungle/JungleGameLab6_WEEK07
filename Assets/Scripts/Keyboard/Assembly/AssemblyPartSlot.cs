@@ -23,6 +23,7 @@ namespace KeyboardModeling.Assembly
         [SerializeField, Min(0.001f)] private float _snapRadius = 0.13f;
         [SerializeField] private bool _startsInstalled;
         [SerializeField] private bool _restoreOnInvalidDrop = true;
+        [SerializeField, Tooltip("이 슬롯의 부품을 분리하기 전에 비워야 하는 슬롯 목록입니다.")] private AssemblyPartSlot[] _removalBlockers = new AssemblyPartSlot[0];
         private AssemblyDraggablePart _originalPart;
         private AssemblyDraggablePart _installedPart;
         private bool _isDragging;
@@ -36,6 +37,18 @@ namespace KeyboardModeling.Assembly
         public bool IsInstalled => _installedPart != null;
         public AssemblyDraggablePart OriginalPart => _originalPart;
         public AssemblyDraggablePart InstalledPart => _installedPart;
+
+        /// <summary>
+        /// removalBlockers의 현재 점유를 검사하여 부품 분리 가능 여부를 반환한다.
+        /// 선행 슬롯 중 하나라도 장착 상태이면 false를 반환하며 점유 상태는 변경하지 않는다.
+        /// </summary>
+        public bool CanRemove()
+        {
+            foreach (AssemblyPartSlot blocker in _removalBlockers)
+                if (blocker.IsInstalled)
+                    return false;
+            return true;
+        }
 
         void Awake()
         {
@@ -56,6 +69,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void BeginDrag()
         {
+            if (!CanRemove())
+                return;
             _originalPart.BeginDrag();
             _isDragging = true;
         }
@@ -99,6 +114,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool Install(AssemblyDraggablePart part)
         {
+            if (_installedPart != null && _installedPart != part && !CanRemove())
+                return false;
             if (!_isSwitch && _installedPart != null && _installedPart != part)
                 return false;
 

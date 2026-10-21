@@ -11,6 +11,7 @@ namespace KeyboardModeling.Assembly
         [Header("Scene References")]
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private Transform _fuller;
+        [SerializeField, Tooltip("활성화하면 키캡 대신 스위치만 분리합니다.")] private bool _extractSwitches;
 
         [Header("Extraction")]
         [SerializeField, Min(1f)] private float _sweepStepPixels = 4f;
@@ -257,7 +258,7 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 화면의 start부터 end까지 일정 픽셀 간격으로 레이캐스트하여 보이는 장착 키캡만 분리한다.
+        /// 화면의 start부터 end까지 레이캐스트하여 extractSwitches와 일치하는 장착 부품만 분리한다.
         /// UI와 복귀 표시 뒤는 건너뛰며 성공한 분리만 지연 회수하고 같은 부품의 반복 분리를 방지한다.
         /// </summary>
         private void ExtractAlongPointer(Vector2 start, Vector2 end)
@@ -274,7 +275,8 @@ namespace KeyboardModeling.Assembly
                     continue;
                 Collider hit = FindVisibleCollider(ray);
                 AssemblyDraggablePart part = hit != null ? hit.GetComponentInParent<AssemblyDraggablePart>() : null;
-                if (part == null || System.Array.IndexOf(_dragInput.Slots, part.Slot) < 0)
+                if (part == null || part.IsSwitch != _extractSwitches
+                    || System.Array.IndexOf(_dragInput.Slots, part.Slot) < 0)
                     continue;
                 Vector2 sideways = Random.insideUnitCircle * _popSideSpeed;
                 if (part.TryPopOff(new Vector3(sideways.x, _popUpSpeed, sideways.y), Random.onUnitSphere * _spinSpeed))

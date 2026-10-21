@@ -20,6 +20,7 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private AssemblyPartSlot _switchSlot;
         [SerializeField] private AssemblyPartSlot[] _slots = new AssemblyPartSlot[0];
         [SerializeField] private AssemblyFullerTool _fullerTool;
+        [SerializeField] private AssemblyFullerTool _switchPullerTool;
         private readonly List<AssemblyDraggablePart> _parts = new List<AssemblyDraggablePart>();
         private AssemblyDraggablePart _activePart;
         private AssemblyCatalogUI _catalog;
@@ -79,6 +80,8 @@ namespace KeyboardModeling.Assembly
             Vector2 screenPosition = mouse.position.ReadValue();
             Ray ray = _camera.ScreenPointToRay(screenPosition);
             if (_fullerTool != null && _fullerTool.ProcessPointer(ray, screenPosition, mouse))
+                return;
+            if (_switchPullerTool != null && _switchPullerTool.ProcessPointer(ray, screenPosition, mouse))
                 return;
             if (!_isDragging && mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI(screenPosition))
                 TryBeginDrag(ray);
@@ -170,6 +173,8 @@ namespace KeyboardModeling.Assembly
 
             if (_fullerTool != null)
                 _fullerTool.ReturnToOrigin();
+            if (_switchPullerTool != null)
+                _switchPullerTool.ReturnToOrigin();
             _inventoryEntry = entry;
             _fromInventory = true;
             _activePart = null;
@@ -193,6 +198,8 @@ namespace KeyboardModeling.Assembly
 
             if (_fullerTool != null)
                 _fullerTool.ReturnToOrigin();
+            if (_switchPullerTool != null)
+                _switchPullerTool.ReturnToOrigin();
             _bulkEntry = entry;
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
             _dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragHeight, 0f));
@@ -531,7 +538,7 @@ namespace KeyboardModeling.Assembly
                     picked = part;
                 }
             }
-            if (picked == null)
+            if (picked == null || (picked.Slot != null && picked.Slot.InstalledPart == picked && !picked.Slot.CanRemove()))
                 return;
 
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
@@ -561,6 +568,8 @@ namespace KeyboardModeling.Assembly
         {
             if (_fullerTool != null)
                 _fullerTool.ReturnToOrigin();
+            if (_switchPullerTool != null)
+                _switchPullerTool.ReturnToOrigin();
             if (!_isDragging)
                 return;
 

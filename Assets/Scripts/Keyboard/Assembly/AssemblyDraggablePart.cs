@@ -74,6 +74,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void BeginDrag()
         {
+            if (_slot != null && _slot.InstalledPart == this && !_slot.CanRemove())
+                return;
             _interactionVersion++;
             _returnPosition = transform.position;
             _returnRotation = transform.rotation;
@@ -171,12 +173,12 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 장착된 키캡만 슬롯에서 분리하고 velocity와 angularVelocity로 튀어 오르게 한다.
-        /// 점유를 해제하고 중력을 활성화하며 이미 분리된 부품이나 스위치이면 false를 반환한다.
+        /// 장착된 부품의 선행 분리 조건을 검사하고 velocity와 angularVelocity로 튀어 오르게 한다.
+        /// 성공하면 점유를 해제하며 미장착 상태 또는 선행 부품이 남아 있으면 false를 반환한다.
         /// </summary>
         public bool TryPopOff(Vector3 velocity, Vector3 angularVelocity)
         {
-            if (_isSwitch || _slot == null || _slot.InstalledPart != this)
+            if (_slot == null || _slot.InstalledPart != this || !_slot.CanRemove())
                 return false;
             DropWithPhysics();
             _body.linearVelocity = velocity;

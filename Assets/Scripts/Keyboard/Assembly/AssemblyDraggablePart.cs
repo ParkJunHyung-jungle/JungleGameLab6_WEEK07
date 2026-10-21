@@ -25,6 +25,7 @@ namespace KeyboardModeling.Assembly
         private Vector3 _returnVelocity;
         private Vector3 _returnAngularVelocity;
         private AssemblyCatalogEntry _catalogEntry;
+        private int _interactionVersion;
 
         public bool IsSwitch => _isSwitch;
         public bool IsAdaptiveKeycap => _isAdaptiveKeycap;
@@ -32,6 +33,7 @@ namespace KeyboardModeling.Assembly
         public Collider PartCollider => _partCollider;
         public AssemblyPartSlot Slot => _slot;
         public AssemblyCatalogEntry CatalogEntry => _catalogEntry;
+        public int InteractionVersion => _interactionVersion;
 
         /// <summary>
         /// entry의 명시적인 카탈로그 연결을 이 실물 부품에 저장한다.
@@ -72,6 +74,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void BeginDrag()
         {
+            _interactionVersion++;
             _returnPosition = transform.position;
             _returnRotation = transform.rotation;
             _returnSlot = _slot;
@@ -85,16 +88,13 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// install이 참이면 지정 슬롯에 장착하고 거짓이면 복귀 정책을 적용한다.
+        /// install이 참이면 지정 슬롯에 장착을 시도하고 거짓이거나 점유로 거부되면 복귀 정책을 적용한다.
         /// 기존 키보드 키캡은 이전 상태로 복귀하고 출고 부품과 스위치는 중력으로 떨어진다.
         /// </summary>
         public void EndDrag(bool install)
         {
-            if (install)
-            {
-                _slot.Install(this);
+            if (install && _slot.Install(this))
                 return;
-            }
 
             if (_restoreOnInvalidDrop)
                 RestoreDragOrigin();
@@ -109,11 +109,14 @@ namespace KeyboardModeling.Assembly
         public void RestoreDragOrigin()
         {
             gameObject.SetActive(true);
-            transform.SetPositionAndRotation(_returnPosition, _returnRotation);
             if (_wasInstalled)
-                _returnSlot.Install(this);
+            {
+                if (!_returnSlot.Install(this))
+                    DropWithPhysics();
+            }
             else
             {
+                transform.SetPositionAndRotation(_returnPosition, _returnRotation);
                 SetBodyFrozen(_wasKinematic);
                 if (!_wasKinematic)
                 {
@@ -129,6 +132,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void StoreInInventory()
         {
+            _interactionVersion++;
             if (_slot != null)
                 _slot.ForgetPart(this);
             if (_originSlot != null && _originSlot != _slot)
@@ -145,6 +149,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void SnapToSlot()
         {
+            _interactionVersion++;
             SetBodyFrozen(true);
             if (_isAdaptiveKeycap)
                 ApplyKeycapShape(_slot.KeycapShape, _catalogEntry.KeycapMaterial);
@@ -163,6 +168,20 @@ namespace KeyboardModeling.Assembly
             if (_slot != null)
                 _slot.Release(this);
             SetBodyFrozen(false);
+        }
+
+        /// <summary>
+        /// 장착된 키캡만 슬롯에서 분리하고 velocity와 angularVelocity로 튀어 오르게 한다.
+        /// 점유를 해제하고 중력을 활성화하며 이미 분리된 부품이나 스위치이면 false를 반환한다.
+        /// </summary>
+        public bool TryPopOff(Vector3 velocity, Vector3 angularVelocity)
+        {
+            if (_isSwitch || _slot == null || _slot.InstalledPart != this)
+                return false;
+            DropWithPhysics();
+            _body.linearVelocity = velocity;
+            _body.angularVelocity = angularVelocity;
+            return true;
         }
 
         /// <summary>

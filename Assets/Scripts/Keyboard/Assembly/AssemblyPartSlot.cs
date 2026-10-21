@@ -94,16 +94,20 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// part를 이 슬롯에 장착하고 기존 점유 부품이 있으면 물리적으로 분리한다.
-        /// 새 점유 참조를 저장하며 새 부품의 위치와 회전을 슬롯 기준으로 정렬한다.
+        /// part를 장착하되 다른 키캡이 점유한 키캡 슬롯이면 상태 변경 없이 false를 반환한다.
+        /// 스위치는 기존 교체 처리를 유지하며 성공 시 점유와 위치 및 회전을 갱신하고 true를 반환한다.
         /// </summary>
-        public void Install(AssemblyDraggablePart part)
+        public bool Install(AssemblyDraggablePart part)
         {
+            if (!_isSwitch && _installedPart != null && _installedPart != part)
+                return false;
+
             if (_installedPart != null && _installedPart != part)
                 _installedPart.DropWithPhysics();
             part.AttachSlot(this);
             _installedPart = part;
             part.SnapToSlot();
+            return true;
         }
 
         /// <summary>

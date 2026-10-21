@@ -17,7 +17,7 @@ namespace Game.Tutorials
     {
         // 저장된 카드 연결을 유지하도록 현재 숫자를 고정한다.
         Welcome = 0, Workbench = 1, EditControls = 2, KeycapEditing = 3, Image = 4,
-        AssemblySwitch = 5, WholePart = 6, Artisan = 7,
+        AssemblySwitch = 5, WholePart = 6, Artisan = 7, KeycapPuller = 26,
 
         // 조립과 파츠별 편집 안내다.
         PartsCatalog = 17, PartRemoval = 18, PartReplacement = 19,

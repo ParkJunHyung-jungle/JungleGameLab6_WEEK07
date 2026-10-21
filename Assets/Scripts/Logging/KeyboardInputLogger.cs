@@ -62,11 +62,23 @@ namespace Game.Logging
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureLogger()
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
+            {
+                // WorkShop0에서는 실행 시작 시 전투 입력 CSV를 생성하지 않는다.
+                // new GameObject("PlaytestLogger").AddComponent<KeyboardInputLogger>();
+                return;
+            }
             if (_instance == null) new GameObject("PlaytestLogger").AddComponent<KeyboardInputLogger>();
         }
 
         void Awake()
         {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
+            {
+                // 씬에 로거가 남아 있어도 전투 기록 초기화를 실행하지 않는다.
+                enabled = false;
+                return;
+            }
             if (_instance != null && _instance != this)
             {
                 Destroy(gameObject);

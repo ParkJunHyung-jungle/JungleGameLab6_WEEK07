@@ -30,6 +30,7 @@ namespace Game.Player
         private bool _canApply;
         private bool _hasPendingMaterial;
         private bool _singleKeyOnly;
+        private bool _artisanSelected;
         private int _selectedKeycapIndex;
 
         [Header("Panel Controls")]
@@ -71,7 +72,7 @@ namespace Game.Player
             _panel.gameObject.AddComponent<Image>().color = _panelColor;
 
             Label(_panel, "키캡 재질 편집", 18f, 16f, 326f, 30f, 21, Color.white, FontStyle.Bold);
-            _instructionLabel = Label(_panel, "적용할 키 범위를 선택하세요.", 18f, 48f, 326f, 20f, 10, _mutedColor);
+            _instructionLabel = Label(_panel, "적용할 키 범위를 선택하세요.", 18f, 48f, 326f, 30f, 10, _mutedColor);
             _allKeysButtonBackground = CreateButton(_panel, "AllKeycaps", "전체 키캡", 16f, 82f, 159f, 42f,
                 _targetColor, 11, HandleAllKeysClicked, out _allKeysButtonLabel);
             _singleKeyButtonBackground = CreateButton(_panel, "SingleKeycap", "키캡 한 개", 183f, 82f, 159f, 42f,
@@ -153,10 +154,12 @@ namespace Game.Player
             RefreshPanel();
         }
 
-        /// <summary>singleKeyOnly가 true면 전체 적용을 막고 단일 키 모드로 전환한다. 기존 단일 키 선택은 유지하며 범위가 바뀔 때만 이벤트를 보낸다.</summary>
+        /// <summary>singleKeyOnly로 아티산 선택 상태와 안내를 갱신한다. WorkShop0에서는 전체 적용을 허용하고 다른 씬에서는 단일 키 모드로 전환한다.</summary>
         public void SetSingleKeyOnly(bool singleKeyOnly)
         {
-            _singleKeyOnly = singleKeyOnly;
+            // WorkShop0에서는 아티산도 일반 키캡처럼 적용 범위를 선택할 수 있다.
+            _artisanSelected = singleKeyOnly;
+            _singleKeyOnly = singleKeyOnly && !Game.Workshop.CustomizationOnlyWorkshop.IsActive;
             if (_singleKeyOnly && _isAllKeys) SetTarget(false);
             else RefreshPanel();
         }
@@ -328,6 +331,8 @@ namespace Game.Player
             _singleKeyButtonLabel.color = _isAllKeys ? _mutedColor : Color.white;
             _instructionLabel.text = _singleKeyOnly
                 ? "아티산은 하나씩, 최대 3개까지 배치할 수 있습니다."
+                : _artisanSelected
+                ? "아티산은 1u 키에만 적용됩니다.\n나머지 키는 기존 키캡 또는 빈 상태를 유지합니다."
                 : _isAllKeys
                 ? "축이 설치된 키에 키캡을 씌우거나 한 개를 선택하세요."
                 : "재질을 선택한 뒤 축이 설치된 키를 누르세요.";

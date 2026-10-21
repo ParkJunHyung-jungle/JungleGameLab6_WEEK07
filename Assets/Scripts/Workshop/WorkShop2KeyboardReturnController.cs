@@ -62,6 +62,13 @@ namespace Game.Workshop
 
         void Start()
         {
+            if (CustomizationOnlyWorkshop.IsActive)
+            {
+                // WorkShop0는 독립 커마 씬이므로 이전 토너먼트 복귀 구성을 가져오지 않는다.
+                // _workshopState.RestorePendingKeyboards();
+                // TournamentKeyboardSession.TryBeginWorkshopReturn(out KeyboardCustomizationState original);
+                return;
+            }
             GameObject keyboard = null;
             try
             {

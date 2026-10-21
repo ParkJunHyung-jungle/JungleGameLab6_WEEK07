@@ -50,6 +50,7 @@ MonoBehaviour:
   _delayOffOn: {x: 0, y: 1}
   _pitchOffOn: {x: 0, y: 1}
   _temporaryKeyboardPitch: 1.2
+  _removeKeyPitchRange: {x: 0.9, y: 1.1}
 --- !u!114 &5644101937113968702
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,6 +140,20 @@ MonoBehaviour:
       Data3: -1633832268
       Data4: -29979577
     Path: event:/SFX/KeyBoard/KeyCaps/BreakKeyCap
+  <PutOnKey>k__BackingField:
+    Guid:
+      Data1: 1550345896
+      Data2: 1328496653
+      Data3: 824294073
+      Data4: -338442839
+    Path: event:/SFX/KeyBoard/Other/PutOn
+  <RemoveKey>k__BackingField:
+    Guid:
+      Data1: -547682682
+      Data2: 1271521387
+      Data3: -331231602
+      Data4: 1787304047
+    Path: event:/SFX/KeyBoard/Other/Remove
   <FootSteps>k__BackingField:
     Guid:
       Data1: -1283923980
@@ -152,21 +167,21 @@ MonoBehaviour:
       Data2: 1312908407
       Data3: -1696525640
       Data4: -1003462232
-    Path: event:/SFX/Other/Throwing
+    Path: event:/SFX/OtherObject/Throwing
   <Trash>k__BackingField:
     Guid:
       Data1: -1402610498
       Data2: 1238348543
       Data3: 1232659857
       Data4: -1504189152
-    Path: event:/SFX/Other/Trash
+    Path: event:/SFX/OtherObject/Trash
   <VendingMachineThud>k__BackingField:
     Guid:
       Data1: -1735314096
       Data2: 1200576674
       Data3: 680881561
       Data4: -507872415
-    Path: event:/SFX/Other/VendingMachineThud
+    Path: event:/SFX/OtherObject/VendingMachineThud
   <ThumpKeyBoard>k__BackingField:
     Guid:
       Data1: -327434940

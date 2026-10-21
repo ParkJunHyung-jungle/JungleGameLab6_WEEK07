@@ -22,6 +22,7 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
         public float Elapsed;
         public bool OffsetApplied;
         public bool Removing;
+        public bool PlaySound;
     }
 
     private sealed class Replacement
@@ -29,13 +30,16 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
         public Transform Keycap;
         public bool HasKeycap;
         public Coroutine Routine;
+        public bool KeycapRemoved;
+        public bool SwitchRemoved;
+        public bool PlaySound;
     }
 
     /// <summary>
     /// keyboardSwitch와 keycap을 키캡 분리, 축 분리, 축 설치, 키캡 설치 순서로 교체한다.
-    /// applyAppearance는 축 분리 후 호출하며 연속 선택 시 진행 중인 연출을 정리하고 재시작한다.
+    /// applyAppearance는 축 분리 후 호출하며 playSound가 참인 실제 단계에만 소리를 재생하고 연속 선택 시 미완료 이동을 취소한다.
     /// </summary>
-    public void ReplaceSwitch(Transform keyboardSwitch, Transform keycap, Action applyAppearance)
+    public void ReplaceSwitch(Transform keyboardSwitch, Transform keycap, Action applyAppearance, bool playSound = true)
     {
         bool hasKeycap = keycap != null && keycap.gameObject.activeSelf;
         if (_replacements.TryGetValue(keyboardSwitch, out Replacement previous))
@@ -45,7 +49,12 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
             CancelMotion(keyboardSwitch);
             if (previous.Keycap != null) CancelMotion(previous.Keycap);
         }
-        var replacement = new Replacement { Keycap = keycap, HasKeycap = hasKeycap };
+        var replacement = new Replacement
+        {
+            Keycap = keycap, HasKeycap = hasKeycap, PlaySound = playSound,
+            KeycapRemoved = previous != null && previous.KeycapRemoved,
+            SwitchRemoved = previous != null && previous.SwitchRemoved
+        };
         _replacements[keyboardSwitch] = replacement;
         replacement.Routine = StartCoroutine(ReplaceRoutine(keyboardSwitch, replacement, applyAppearance));
     }
@@ -63,10 +72,12 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
 
     /// <summary>
     /// part를 현재 위치에서 위로 들어내는 이동으로 등록한다.
-    /// 반환값 없이 기존 오프셋을 정리하고 분리 단계의 표시를 시작한다.
+    /// playSound가 참이면 분리 시작 위치에 제거음을 재생하며 기존 오프셋을 정리하고 분리 표시를 시작한다.
     /// </summary>
-    private void RemovePart(Transform part)
+    private void RemovePart(Transform part, bool playSound)
     {
+        if (playSound && part.gameObject.activeInHierarchy)
+            AudioManager.PlayPartSound(part.position, true);
         CancelMotion(part);
         part.gameObject.SetActive(true);
         _installations[part] = new Installation { BasePosition = part.localPosition, Removing = true };
@@ -80,35 +91,39 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
     {
         if (replacement.HasKeycap)
         {
-            RemovePart(replacement.Keycap);
+            RemovePart(replacement.Keycap, replacement.PlaySound && !replacement.KeycapRemoved);
+            replacement.KeycapRemoved = true;
             while (_installations.ContainsKey(replacement.Keycap)) yield return null;
         }
         if (keyboardSwitch.gameObject.activeSelf)
         {
-            RemovePart(keyboardSwitch);
+            RemovePart(keyboardSwitch, replacement.PlaySound && !replacement.SwitchRemoved);
+            replacement.SwitchRemoved = true;
             while (_installations.ContainsKey(keyboardSwitch)) yield return null;
         }
         applyAppearance();
-        Play(keyboardSwitch);
+        Play(keyboardSwitch, replacement.PlaySound);
         while (_installations.ContainsKey(keyboardSwitch)) yield return null;
+        replacement.SwitchRemoved = false;
         if (replacement.HasKeycap && replacement.Keycap != null)
         {
-            Play(replacement.Keycap);
+            Play(replacement.Keycap, replacement.PlaySound);
             while (_installations.ContainsKey(replacement.Keycap)) yield return null;
+            replacement.KeycapRemoved = false;
         }
         _replacements.Remove(keyboardSwitch);
     }
 
     /// <summary>
     /// part를 활성화하고 키보드 위쪽에서 내려오는 설치 연출을 시작한다.
-    /// 이미 진행 중이면 이전 오프셋을 제거한 뒤 처음부터 재생하며 원래 설치 위치를 유지한다.
+    /// 이전 오프셋을 정리하고 원래 설치 위치를 유지하며 playSound가 참이면 완료 시 설치음을 재생한다.
     /// </summary>
-    public void Play(Transform part)
+    public void Play(Transform part, bool playSound = true)
     {
         if (_installations.TryGetValue(part, out Installation previous)) RestorePosition(part, previous);
         part.gameObject.SetActive(true);
         if (!Application.IsPlaying(gameObject)) return;
-        _installations[part] = new Installation { BasePosition = part.localPosition };
+        _installations[part] = new Installation { BasePosition = part.localPosition, PlaySound = playSound };
     }
 
     void Update()
@@ -145,6 +160,10 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
                 {
                     RestorePosition(part, state);
                     part.gameObject.SetActive(false);
+                }
+                else if (state.PlaySound)
+                {
+                    AudioManager.PlayPartSound(part.position, false);
                 }
                 _finished.Add(part);
             }

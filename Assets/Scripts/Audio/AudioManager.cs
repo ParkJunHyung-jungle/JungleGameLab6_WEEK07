@@ -8,6 +8,7 @@ using FMODUnity;
 
 public class AudioManager : MonoBehaviour
 {
+    private static bool _reportedMissingPartAudio;
     public static event Action<AudioManager> Ready;
 
     [Header("Plate Audio Selection")]
@@ -26,6 +27,9 @@ public class AudioManager : MonoBehaviour
     [Tooltip("피치 효과를 선택한 타건 이벤트에 직접 적용하는 기존 음정 배율입니다.")]
     [SerializeField, Min(0.01f)] private float _temporaryKeyboardPitch = 1.2f;
     private float _keyboardEventPitch = 1f;
+
+    [Header("Part Removal Sound")]
+    [SerializeField] private Vector2 _removeKeyPitchRange = new Vector2(0.9f, 1.1f);
 
     [Header("Event Instances")]
     private List<EventInstance> eventInstances;
@@ -51,6 +55,7 @@ public class AudioManager : MonoBehaviour
     {
         instance = null;
         Ready = null;
+        _reportedMissingPartAudio = false;
     }
 
     void Awake()
@@ -301,6 +306,61 @@ public class AudioManager : MonoBehaviour
     public void PlayButtonSound()
     {
         RuntimeManager.PlayOneShot(FMODEvents.instance.Button);
+    }
+
+    /// <summary>
+    /// worldPosition에서 설치 또는 제거 이벤트를 한 번 재생한다.
+    /// removing이 참이면 인스턴스별 미세 피치를 적용하며 누락 및 실패는 기록하고 조립 처리는 유지한다.
+    /// </summary>
+    public static void PlayPartSound(Vector3 worldPosition, bool removing)
+    {
+        if (!Application.isPlaying) return;
+        if (instance == null || FMODEvents.instance == null)
+        {
+            if (!_reportedMissingPartAudio)
+                Debug.LogWarning("[FMOD] 조립 효과음에 AudioManager와 FMODEvents 연결이 필요합니다.");
+            _reportedMissingPartAudio = true;
+            return;
+        }
+
+        EventReference sound = removing ? FMODEvents.instance.RemoveKey : FMODEvents.instance.PutOnKey;
+        if (sound.IsNull)
+        {
+            if (!_reportedMissingPartAudio)
+                Debug.LogWarning($"[FMOD] FmodManager의 {(removing ? "RemoveKey" : "PutOnKey")} 참조가 비어 있습니다.", instance);
+            _reportedMissingPartAudio = true;
+            return;
+        }
+
+        EventInstance partSound = default;
+        try
+        {
+            partSound = RuntimeManager.CreateInstance(sound);
+            FMOD.RESULT result = partSound.set3DAttributes(RuntimeUtils.To3DAttributes(worldPosition));
+            if (result == FMOD.RESULT.OK && removing)
+            {
+                Vector2 range = instance._removeKeyPitchRange;
+                float low = Mathf.Max(0.01f, Mathf.Min(range.x, range.y));
+                float high = Mathf.Max(low, Mathf.Max(range.x, range.y));
+                result = partSound.setPitch(UnityEngine.Random.Range(low, high));
+            }
+            if (result == FMOD.RESULT.OK) result = partSound.start();
+            if (result != FMOD.RESULT.OK)
+                Debug.LogWarning($"[FMOD] 조립 효과음 재생 실패: {result} ({FMOD.Error.String(result)}).", instance);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"[FMOD] 조립 효과음 생성 실패: {exception.Message}", instance);
+        }
+        finally
+        {
+            if (partSound.isValid())
+            {
+                FMOD.RESULT result = partSound.release();
+                if (result != FMOD.RESULT.OK)
+                    Debug.LogWarning($"[FMOD] 조립 효과음 해제 예약 실패: {result}.", instance);
+            }
+        }
     }
 
     /// <summary>

@@ -1,10 +1,17 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace KeyboardModeling.Assembly
 {
     [DisallowMultipleComponent]
     public sealed class AssemblyPartSlot : MonoBehaviour
     {
+        [Header("Key And Compatibility")]
+        [SerializeField] private Key _key;
+        [SerializeField] private bool _isSwitch;
+        [SerializeField, Tooltip("키캡 규격과 방향의 원본 형상 Prefab입니다. 장착 회전은 슬롯 Transform을 사용합니다.")] private GameObject _keycapShape;
+        [SerializeField, Tooltip("원본 실물의 재질과 데이터로 확인한 인벤토리 항목의 전용 Prefab입니다.")] private AssemblyDraggablePart _inventoryPrefab;
+
         [Header("Part")]
         [SerializeField] private Transform _part;
         [SerializeField] private Collider _partCollider;
@@ -20,6 +27,10 @@ namespace KeyboardModeling.Assembly
         private AssemblyDraggablePart _installedPart;
         private bool _isDragging;
 
+        public Key Key => _key;
+        public bool IsSwitch => _isSwitch;
+        public GameObject KeycapShape => _keycapShape;
+        public AssemblyDraggablePart InventoryPrefab => _inventoryPrefab;
         public Transform Part => _part;
         public Collider PartCollider => _partCollider;
         public bool IsInstalled => _installedPart != null;
@@ -90,8 +101,19 @@ namespace KeyboardModeling.Assembly
         {
             if (_installedPart != null && _installedPart != part)
                 _installedPart.DropWithPhysics();
+            part.AttachSlot(this);
             _installedPart = part;
             part.SnapToSlot();
+        }
+
+        /// <summary>
+        /// part의 종류와 고정 형상 또는 재질형 키캡 여부로 이 슬롯의 호환성을 반환한다.
+        /// 스위치는 스위치 슬롯만 허용하고 고정 키캡은 같은 형상 에셋만 허용한다.
+        /// </summary>
+        public bool IsCompatible(AssemblyDraggablePart part)
+        {
+            return _isSwitch == part.IsSwitch
+                && (_isSwitch || part.IsAdaptiveKeycap || part.KeycapShape == _keycapShape);
         }
 
         /// <summary>
@@ -102,6 +124,22 @@ namespace KeyboardModeling.Assembly
         {
             if (_installedPart == part)
                 _installedPart = null;
+        }
+
+        /// <summary>
+        /// 인벤토리에 보관하는 part의 점유와 원본 실물 참조를 제거한다.
+        /// 슬롯 Transform은 유지하고 숨겨진 원본을 다시 집거나 장착하지 않도록 한다.
+        /// </summary>
+        public void ForgetPart(AssemblyDraggablePart part)
+        {
+            Release(part);
+            if (_originalPart == part)
+            {
+                _originalPart = null;
+                _part = null;
+                _partCollider = null;
+                _isDragging = false;
+            }
         }
     }
 }

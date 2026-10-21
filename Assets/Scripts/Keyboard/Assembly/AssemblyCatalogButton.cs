@@ -13,7 +13,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// eventData의 왼쪽 버튼 Down을 화면 좌표와 함께 C# 이벤트로 전달한다.
-        /// 누른 순간 생성과 드래그를 시작할 수 있도록 Click 이벤트와 구분한다.
+        /// 누른 순간 재고 예약과 아이콘 드래그를 시작할 수 있도록 Click 이벤트와 구분한다.
         /// </summary>
         public override void OnPointerDown(PointerEventData eventData)
         {

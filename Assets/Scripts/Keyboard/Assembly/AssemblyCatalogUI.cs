@@ -35,10 +35,20 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private AssemblyCatalogEntry[] _spawnEntries = new AssemblyCatalogEntry[0];
         private readonly Dictionary<AssemblyCatalogButton, AssemblyCatalogEntry> _cardEntries = new Dictionary<AssemblyCatalogButton, AssemblyCatalogEntry>();
-        private readonly Dictionary<AssemblyCatalogEntry, AssemblyDraggablePart> _spawnedParts = new Dictionary<AssemblyCatalogEntry, AssemblyDraggablePart>();
+        private readonly Dictionary<AssemblyCatalogEntry, Texture2D> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture2D>();
+        private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
+
+        [Header("Original Esc Inventory Mapping")]
+        [SerializeField] private AssemblyDraggablePart _originalKeycapInventoryPrefab;
+        [SerializeField] private AssemblyDraggablePart _originalSwitchInventoryPrefab;
 
         [Header("Runtime UI")]
         private Font _font;
+        private RectTransform _canvasRect;
+        private RectTransform _returnArea;
+        private RawImage _dragIcon;
+        private int _currentCategory;
+
         private ScrollRect _scroll;
         private Text _heading;
         private GameObject _panel;
@@ -53,12 +63,29 @@ namespace KeyboardModeling.Assembly
         private readonly Dictionary<int, AssemblyCatalogButton> _selections = new Dictionary<int, AssemblyCatalogButton>();
         private readonly List<string> _categoryNames = new List<string>();
 
+        public RectTransform ReturnArea => _returnArea;
+
         void Awake()
         {
+            foreach (AssemblyCatalogEntry entry in _spawnEntries)
+                entry.InitializeInventory();
+            _dragInput.ConnectCatalog(this);
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             BuildLayout();
             BuildChoices();
             ShowCategory(0);
+            RefreshInventory();
+        }
+
+        void Start()
+        {
+            foreach (AssemblyPartSlot slot in _dragInput.Slots)
+                slot.OriginalPart.SetCatalogEntry(FindPrefabEntry(slot.InventoryPrefab));
+        }
+
+        void OnDisable()
+        {
+            _dragInput.CancelDrag();
         }
 
         void OnDestroy()
@@ -84,6 +111,7 @@ namespace KeyboardModeling.Assembly
             GameObject canvasObject = new GameObject("AssemblyCatalogCanvas", typeof(RectTransform),
                 typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasObject.transform.SetParent(transform, false);
+            _canvasRect = (RectTransform)canvasObject.transform;
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 20;
@@ -131,6 +159,7 @@ namespace KeyboardModeling.Assembly
             Background(viewport, _panelColor);
             viewport.gameObject.AddComponent<RectMask2D>();
             _scroll.viewport = viewport;
+            _returnArea = viewport;
 
             RectTransform track = Rect("VerticalScrollbar", scrollArea);
             track.anchorMin = new Vector2(1f, 0f);
@@ -147,6 +176,11 @@ namespace KeyboardModeling.Assembly
             scrollbar.navigation = new Navigation { mode = Navigation.Mode.None };
             _scroll.verticalScrollbar = scrollbar;
             _scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+
+            _dragIcon = Rect("InventoryDragIcon", canvasObject.transform).gameObject.AddComponent<RawImage>();
+            _dragIcon.raycastTarget = false;
+            _dragIcon.rectTransform.sizeDelta = new Vector2(105f, 105f);
+            _dragIcon.gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -155,6 +189,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void HandleToggleClicked(AssemblyCatalogButton button)
         {
+            _dragInput.CancelDrag();
             bool isExpanded = !_panel.activeSelf;
             _panel.SetActive(isExpanded);
             _toggleLabel.text = isExpanded ? "UI 접기" : "UI 펼치기";
@@ -242,7 +277,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// category의 목록에 label과 mesh, materials를 표시하는 카드를 생성한다.
-        /// entry가 있으면 Prefab 생성용 Down 이벤트를 연결하고 미리보기 및 선택 이벤트를 저장한다.
+        /// entry가 있으면 재고 예약용 Down 이벤트를 연결하고 미리보기 및 선택 이벤트를 저장한다.
         /// </summary>
         private void AddCard(int category, string label, Mesh mesh, Material[] materials,
             AssemblyCatalogEntry entry = null)
@@ -264,6 +299,11 @@ namespace KeyboardModeling.Assembly
             if (entry != null)
             {
                 _cardEntries.Add(button, entry);
+                _entryTextures.Add(entry, texture);
+                Text quantity = Label(card, "", 14);
+                Place(quantity.rectTransform, 87f, 7f, 38f, 24f);
+                quantity.alignment = TextAnchor.MiddleRight;
+                _quantityLabels.Add(entry, quantity);
                 button.Pressed += HandleCardPressed;
             }
             _cards.Add(button);
@@ -295,20 +335,104 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// button의 Down 시점에 연결된 Prefab을 screenPosition에서 생성하여 즉시 드래그한다.
-        /// 항목별 기존 인스턴스가 남아 있으면 아무 동작도 하지 않으며 실제 삭제된 경우만 재생성한다.
+        /// button의 entry 한 개를 예약하고 screenPosition에서 UI 아이콘 드래그를 시작한다.
+        /// 시작이 거절되면 예약을 취소하며 월드 인스턴스 존재 여부로 수량을 제한하지 않는다.
         /// </summary>
         private void HandleCardPressed(AssemblyCatalogButton button, Vector2 screenPosition)
         {
             AssemblyCatalogEntry entry = _cardEntries[button];
-            if (_spawnedParts.TryGetValue(entry, out AssemblyDraggablePart existing) && existing != null)
+            if (_dragInput.IsDragging || !entry.TryReserve())
                 return;
-            AssemblyPartSlot slot = entry.IsSwitch ? _dragInput.SwitchSlot : _dragInput.KeycapSlot;
-            if (_dragInput.TrySpawnAndBeginDrag(entry.Prefab, slot, screenPosition, out AssemblyDraggablePart instance))
-            {
-                _spawnedParts[entry] = instance;
+            if (!_dragInput.TryBeginInventoryDrag(entry, screenPosition))
+                entry.FinishReservation(false);
+            else
                 HandleCardClicked(button);
+            RefreshInventory();
+        }
+
+        /// <summary>
+        /// prefab의 직접 참조에 대응하는 보유 항목을 반환한다.
+        /// 기존 실물은 슬롯의 Inspector 연결로만 식별하며 잘못된 연결은 설정 오류로 알린다.
+        /// </summary>
+        private AssemblyCatalogEntry FindPrefabEntry(AssemblyDraggablePart prefab)
+        {
+            foreach (AssemblyCatalogEntry entry in _spawnEntries)
+                if (prefab != null && entry.Prefab == prefab)
+                    return entry;
+            throw new System.InvalidOperationException("슬롯의 인벤토리 Prefab 연결을 확인하십시오.");
+        }
+
+        /// <summary>
+        /// screenPosition이 현재 열린 명시적 목록 Viewport 안인지 반환한다.
+        /// 카드 수나 현재 카테고리와 무관하게 빈 목록도 반환 영역으로 취급한다.
+        /// </summary>
+        public bool IsInReturnArea(Vector2 screenPosition)
+        {
+            return isActiveAndEnabled && _panel.activeInHierarchy
+                && RectTransformUtility.RectangleContainsScreenPoint(_returnArea, screenPosition, null);
+        }
+
+        /// <summary>
+        /// entry의 기존 프리뷰를 screenPosition에 포인터를 막지 않는 UI 아이콘으로 표시한다.
+        /// 화면 좌표를 Canvas 좌표로 변환하고 다른 UI 위에 아이콘을 유지한다.
+        /// </summary>
+        public void ShowDragIcon(AssemblyCatalogEntry entry, Vector2 screenPosition)
+        {
+            _dragIcon.texture = _entryTextures[entry];
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screenPosition, null, out Vector2 local);
+            _dragIcon.rectTransform.localPosition = new Vector3(local.x, local.y, 0f);
+            _dragIcon.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// 드래그 종료나 월드 전환 시 임시 UI 아이콘을 숨긴다.
+        /// 별도 입력 없이 기존 프리뷰 텍스처와 재고는 유지한다.
+        /// </summary>
+        public void HideDragIcon()
+        {
+            _dragIcon.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// entry의 한 개 예약을 consumed에 따라 확정하거나 취소한다.
+        /// 초기 수량은 변경하지 않고 목록의 남은 수량 표시만 갱신한다.
+        /// </summary>
+        public void FinishReservation(AssemblyCatalogEntry entry, bool consumed)
+        {
+            entry.FinishReservation(consumed);
+            RefreshInventory();
+        }
+
+        /// <summary>
+        /// 각 항목의 예약을 제외한 재고 수량으로 카드 활성 상태와 수량 문구를 갱신한다.
+        /// 기존 카드 순서와 카테고리를 유지하고 현재 스크롤의 픽셀 위치를 유효 범위 안에서 보존한다.
+        /// </summary>
+        public void RefreshInventory()
+        {
+            Vector2 position = _scroll.content.anchoredPosition;
+            foreach (KeyValuePair<AssemblyCatalogButton, AssemblyCatalogEntry> pair in _cardEntries)
+            {
+                int quantity = pair.Value.AvailableQuantity;
+                pair.Key.gameObject.SetActive(quantity > 0);
+                _quantityLabels[pair.Value].text = "×" + quantity;
             }
+            UpdateHeading();
+            Canvas.ForceUpdateCanvases();
+            float maximum = Mathf.Max(0f, _scroll.content.rect.height - _scroll.viewport.rect.height);
+            _scroll.content.anchoredPosition = new Vector2(position.x, Mathf.Clamp(position.y, 0f, maximum));
+        }
+
+        /// <summary>
+        /// 현재 카테고리에서 표시 중인 카드 수로 제목을 갱신한다.
+        /// 비활성 재고 항목은 제외하며 카테고리와 스크롤은 변경하지 않는다.
+        /// </summary>
+        private void UpdateHeading()
+        {
+            int count = 0;
+            foreach (Transform card in _contents[_currentCategory])
+                if (card.gameObject.activeSelf)
+                    count++;
+            _heading.text = _categoryNames[_currentCategory] + "  ·  " + count;
         }
 
         /// <summary>
@@ -345,7 +469,8 @@ namespace KeyboardModeling.Assembly
                 SetSelected(_tabs[i], i == index);
             }
             _scroll.content = _contents[index];
-            _heading.text = _categoryNames[index] + "  ·  " + _contents[index].childCount;
+            _currentCategory = index;
+            UpdateHeading();
             Canvas.ForceUpdateCanvases();
             _scroll.StopMovement();
             _scroll.verticalNormalizedPosition = 1f;

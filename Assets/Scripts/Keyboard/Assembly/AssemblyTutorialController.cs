@@ -15,6 +15,7 @@ namespace KeyboardModeling.Assembly
             _catalog.CategorySelected += HandleCategorySelected;
             _catalog.PartSelected += HandlePartSelected;
             _catalog.PanelOpened += HandlePanelOpened;
+            _catalog.BulkPlacementSelected += HandleBulkPlacementSelected;
             _dragInput.PartPicked += HandlePartPicked;
         }
 
@@ -28,6 +29,7 @@ namespace KeyboardModeling.Assembly
             _catalog.CategorySelected -= HandleCategorySelected;
             _catalog.PartSelected -= HandlePartSelected;
             _catalog.PanelOpened -= HandlePanelOpened;
+            _catalog.BulkPlacementSelected -= HandleBulkPlacementSelected;
             _dragInput.PartPicked -= HandlePartPicked;
         }
 
@@ -36,6 +38,15 @@ namespace KeyboardModeling.Assembly
         {
             if (!FirstEncounterTutorial.Request(TutorialTopic.PartsCatalog, HandleCurrentCategory))
                 HandleCurrentCategory();
+        }
+
+        /// <summary>
+        /// 일괄 배치 모드 선택 이벤트를 받아 WholePart 안내를 예약한다.
+        /// 입력값과 반환값 없이 안내 상태만 변경하며 이미 본 안내는 다시 표시하지 않는다.
+        /// </summary>
+        private void HandleBulkPlacementSelected()
+        {
+            FirstEncounterTutorial.Request(TutorialTopic.WholePart);
         }
 
         /// <summary>카탈로그의 현재 선택 범주를 읽고 대응하는 파츠 안내를 예약한다. 입력값과 반환값 없이 기본 선택인 키캡도 별도 탭 클릭 없이 안내한다.</summary>

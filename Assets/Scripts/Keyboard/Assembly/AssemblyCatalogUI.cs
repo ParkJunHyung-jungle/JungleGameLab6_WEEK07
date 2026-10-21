@@ -73,6 +73,7 @@ namespace KeyboardModeling.Assembly
         public event Action<int> CategorySelected;
         public event Action<AssemblyCatalogEntry> PartSelected;
         public event Action PanelOpened;
+        public event Action BulkPlacementSelected;
 
         void Awake()
         {
@@ -407,6 +408,8 @@ namespace KeyboardModeling.Assembly
             _bulkPlacement = button == _bulkPlacementButton;
             SetSelected(_singlePlacementButton, !_bulkPlacement);
             SetSelected(_bulkPlacementButton, _bulkPlacement);
+            if (_bulkPlacement)
+                BulkPlacementSelected?.Invoke();
         }
 
         /// <summary>

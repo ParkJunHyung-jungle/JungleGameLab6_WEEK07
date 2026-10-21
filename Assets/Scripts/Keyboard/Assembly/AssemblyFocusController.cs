@@ -61,7 +61,8 @@ namespace KeyboardModeling.Assembly
                 return;
             }
 
-            if (!_pickupController.IsHolding && !_brain.IsBlending && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
+            if (_pickupController.IsPlaced && !_pickupController.PlacementInputConsumed
+                && !_brain.IsBlending && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
                 && IsTargetInCenter())
                 SetFocused(true);
         }

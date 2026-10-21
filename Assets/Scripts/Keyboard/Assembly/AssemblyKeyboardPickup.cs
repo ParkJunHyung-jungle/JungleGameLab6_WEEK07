@@ -18,6 +18,12 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private Rigidbody _keyboardBody;
         [SerializeField] private KeyboardPickupTarget _pickupTarget;
 
+        [Header("Workbench Placement")]
+        [SerializeField] private Collider _placementArea;
+        [SerializeField] private Transform _placementPose;
+        private bool _isPlaced;
+        private int _placementInputFrame = -1;
+
         [Header("Selection")]
         [SerializeField, Min(0.1f)] private float _interactionDistance = 12f;
         [SerializeField] private LayerMask _interactionLayers = ~0;
@@ -40,6 +46,17 @@ namespace KeyboardModeling.Assembly
         private bool _acceptClick;
 
         public bool IsHolding => _isHolding;
+        public bool IsPlaced => _isPlaced && !_isHolding && _keyboardBody.isKinematic
+            && Vector3.Distance(_keyboardBody.position, _placementPose.position) < 0.001f
+            && Quaternion.Angle(_keyboardBody.rotation, _placementPose.rotation) < 0.1f;
+        public bool PlacementInputConsumed => _placementInputFrame == Time.frameCount;
+
+        void Awake()
+        {
+            _isPlaced = _keyboardBody.isKinematic
+                && Vector3.Distance(_keyboardBody.position, _placementPose.position) < 0.001f
+                && Quaternion.Angle(_keyboardBody.rotation, _placementPose.rotation) < 0.1f;
+        }
 
         void OnEnable()
         {
@@ -59,8 +76,15 @@ namespace KeyboardModeling.Assembly
                 return;
             if (!_acceptClick)
             {
-                if (!mouse.leftButton.isPressed)
+                if (!mouse.leftButton.isPressed && !mouse.rightButton.isPressed)
                     _acceptClick = true;
+                return;
+            }
+            if (_isHolding && mouse.rightButton.wasPressedThisFrame)
+            {
+                _placementInputFrame = Time.frameCount;
+                if (IsPlacementAreaInCenter())
+                    PlaceOnWorkbench();
                 return;
             }
             if (!mouse.leftButton.wasPressedThisFrame)
@@ -91,11 +115,57 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
+        /// 화면 중앙 Ray에서 들고 있는 본체와 장착 부품을 제외한 가장 가까운 실체를 검사한다.
+        /// 선택 거리와 레이어 및 명시적인 배치 영역 참조를 사용하여 가려지지 않은 작업대인지 반환한다.
+        /// </summary>
+        private bool IsPlacementAreaInCenter()
+        {
+            Physics.SyncTransforms();
+            Ray ray = _brain.OutputCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            RaycastHit[] hits = Physics.RaycastAll(ray, _interactionDistance, _interactionLayers,
+                QueryTriggerInteraction.Collide);
+            Collider nearest = null;
+            float distance = float.PositiveInfinity;
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.transform.IsChildOf(_keyboardBody.transform)
+                    || (hit.collider.isTrigger && hit.collider != _placementArea))
+                    continue;
+                if (hit.distance < distance)
+                {
+                    nearest = hit.collider;
+                    distance = hit.distance;
+                }
+            }
+            return nearest == _placementArea;
+        }
+
+        /// <summary>
+        /// 명시적인 작업대 기준점의 월드 위치와 회전으로 본체를 내려놓는다.
+        /// 현재 속도를 정리하고 물리를 고정하며 추종을 종료하고 배치 상태를 갱신한다.
+        /// </summary>
+        private void PlaceOnWorkbench()
+        {
+            _isHolding = false;
+            _keyboardBody.isKinematic = false;
+            _keyboardBody.linearVelocity = Vector3.zero;
+            _keyboardBody.angularVelocity = Vector3.zero;
+            _keyboardBody.isKinematic = true;
+            _keyboardBody.useGravity = false;
+            _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            _keyboardBody.position = _placementPose.position;
+            _keyboardBody.rotation = _placementPose.rotation;
+            _keyboardBody.transform.SetPositionAndRotation(_placementPose.position, _placementPose.rotation);
+            _isPlaced = true;
+        }
+
+        /// <summary>
         /// 기존 PickupTarget의 렌더러 중심 계산으로 들기 기준점을 저장한다.
         /// 본체의 원래 물리 상태를 보관하고 속도와 중력을 정지하여 추종 상태로 전환한다.
         /// </summary>
         private void PickUpKeyboard()
         {
+            _isPlaced = false;
             _wasKinematic = _keyboardBody.isKinematic;
             _usedGravity = _keyboardBody.useGravity;
             Vector3 localCenter = _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform);
@@ -133,6 +203,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void ThrowKeyboard()
         {
+            _isPlaced = false;
             _isHolding = false;
             _keyboardBody.isKinematic = false;
             _keyboardBody.useGravity = true;

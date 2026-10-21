@@ -385,7 +385,7 @@ namespace KeyboardModeling.Assembly
             if (!_dragInput.InputAllowed)
                 return;
             AssemblyCatalogEntry entry = _cardEntries[button];
-            if (_bulkPlacement && !entry.IsSwitch)
+            if (_bulkPlacement)
             {
                 if (_dragInput.TryBeginBulkPlacement(entry, screenPosition))
                     HandleCardClicked(button);

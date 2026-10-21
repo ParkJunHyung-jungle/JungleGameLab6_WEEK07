@@ -59,6 +59,17 @@ namespace KeyboardModeling.Assembly
         public float DragWorldHeight => _partSlot.transform.position.y + _heightOffset;
         public event Action<AssemblyDraggablePart> PartPicked;
 
+        void Awake()
+        {
+            var switchSlots = new Dictionary<Key, AssemblyPartSlot>();
+            foreach (AssemblyPartSlot slot in _slots)
+                if (slot.IsSwitch)
+                    switchSlots.Add(slot.Key, slot);
+            foreach (AssemblyPartSlot slot in _slots)
+                if (!slot.IsSwitch)
+                    slot.SetInstallationPrerequisite(switchSlots[slot.Key]);
+        }
+
         void Start()
         {
             foreach (AssemblyPartSlot slot in _slots)
@@ -202,12 +213,12 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// entry의 키캡을 screenPosition에서 일괄 배치할 미리보기로 준비한다.
+        /// entry의 키캡 또는 스위치를 screenPosition에서 일괄 배치할 미리보기로 준비한다.
         /// 재고와 입력 상태를 검사하고 실제 부품 등록이나 슬롯 점유 없이 배치를 시작한다.
         /// </summary>
         public bool TryBeginBulkPlacement(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || entry.IsSwitch || entry.AvailableQuantity <= 0)
+            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || entry.AvailableQuantity <= 0)
                 return false;
 
             if (_fullerTool != null)
@@ -218,8 +229,9 @@ namespace KeyboardModeling.Assembly
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
             _dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragHeight, 0f));
             _bulkPreview = Instantiate(entry.Prefab);
-            _bulkPreview.name = "BulkKeycapPreview";
-            _bulkPreview.Initialize(_partSlot, _bulkPreview.PartCollider, false);
+            _bulkPreview.name = entry.IsSwitch ? "BulkSwitchPreview" : "BulkKeycapPreview";
+            AssemblyPartSlot previewSlot = entry.IsSwitch ? _switchSlot : _partSlot;
+            _bulkPreview.Initialize(previewSlot, _bulkPreview.PartCollider, false);
             _bulkPreview.SetCatalogEntry(entry);
             _bulkPreview.PrepareInventoryPart(entry, _partSlot.KeycapShape);
             foreach (Collider collider in _bulkPreview.GetComponentsInChildren<Collider>(true))
@@ -255,7 +267,7 @@ namespace KeyboardModeling.Assembly
 
             Vector3 position = ray.GetPoint(distance);
             position.y = _dragHeight;
-            _bulkPreview.transform.SetPositionAndRotation(position, _partSlot.transform.rotation);
+            _bulkPreview.transform.SetPositionAndRotation(position, _bulkPreview.Slot.transform.rotation);
             bool overUI = IsPointerOverUI(screenPosition);
             _bulkPreview.gameObject.SetActive(!overUI);
             if (overUI)
@@ -287,8 +299,7 @@ namespace KeyboardModeling.Assembly
             _bulkCandidates.Clear();
             foreach (AssemblyPartSlot slot in _slots)
             {
-                if (slot.IsSwitch || slot.IsInstalled || _bulkVisited.Contains(slot)
-                    || slot.KeycapShape == null || !slot.IsCompatible(_bulkPreview))
+                if (slot.IsInstalled || _bulkVisited.Contains(slot) || !slot.CanInstall(_bulkPreview))
                     continue;
 
                 Vector3 offset = slot.transform.position - start;

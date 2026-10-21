@@ -24,6 +24,7 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private bool _startsInstalled;
         [SerializeField] private bool _restoreOnInvalidDrop = true;
         [SerializeField, Tooltip("이 슬롯의 부품을 분리하기 전에 비워야 하는 슬롯 목록입니다.")] private AssemblyPartSlot[] _removalBlockers = new AssemblyPartSlot[0];
+        private AssemblyPartSlot _installationPrerequisite;
         private AssemblyDraggablePart _originalPart;
         private AssemblyDraggablePart _installedPart;
         private bool _isDragging;
@@ -55,7 +56,10 @@ namespace KeyboardModeling.Assembly
             _originalPart = _part.gameObject.AddComponent<AssemblyDraggablePart>();
             _originalPart.Initialize(this, _partCollider, _restoreOnInvalidDrop);
             if (_startsInstalled)
-                Install(_originalPart);
+            {
+                _installedPart = _originalPart;
+                _originalPart.SnapToSlot();
+            }
             else
             {
                 _part.SetPositionAndRotation(_startPose.position, _startPose.rotation);
@@ -110,14 +114,12 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// part를 장착하되 다른 키캡이 점유한 키캡 슬롯이면 상태 변경 없이 false를 반환한다.
+        /// part의 규격과 선행 장착 및 점유 조건을 검사하고 거부되면 상태 변경 없이 false를 반환한다.
         /// 스위치는 기존 교체 처리를 유지하며 성공 시 점유와 위치 및 회전을 갱신하고 true를 반환한다.
         /// </summary>
         public bool Install(AssemblyDraggablePart part)
         {
-            if (_installedPart != null && _installedPart != part && !CanRemove())
-                return false;
-            if (!_isSwitch && _installedPart != null && _installedPart != part)
+            if (!CanInstall(part))
                 return false;
 
             if (_installedPart != null && _installedPart != part)
@@ -126,6 +128,29 @@ namespace KeyboardModeling.Assembly
             _installedPart = part;
             part.SnapToSlot();
             return true;
+        }
+
+        /// <summary>
+        /// prerequisite를 이 키캡 슬롯의 선행 스위치 슬롯으로 연결한다.
+        /// 기존 키 입력 대응으로 연결하며 슬롯 점유와 배치는 변경하지 않는다.
+        /// </summary>
+        public void SetInstallationPrerequisite(AssemblyPartSlot prerequisite)
+        {
+            _installationPrerequisite = prerequisite;
+        }
+
+        /// <summary>
+        /// part의 종류와 규격, 선행 슬롯 점유 및 기존 점유로 장착 가능 여부를 반환한다.
+        /// 키캡은 스위치가 필요하고 스위치는 키캡이 분리돼 있어야 하며 검사 중 상태는 변경하지 않는다.
+        /// </summary>
+        public bool CanInstall(AssemblyDraggablePart part)
+        {
+            if (!IsCompatible(part))
+                return false;
+            if (_isSwitch)
+                return CanRemove();
+            return _installationPrerequisite != null && _installationPrerequisite.IsInstalled
+                && (_installedPart == null || _installedPart == part);
         }
 
         /// <summary>

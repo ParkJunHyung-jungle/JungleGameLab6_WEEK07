@@ -17,6 +17,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public override void OnPointerDown(PointerEventData eventData)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             base.OnPointerDown(eventData);
             if (eventData.button == PointerEventData.InputButton.Left && IsActive() && IsInteractable())
                 Pressed?.Invoke(this, eventData.position);
@@ -28,6 +29,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public override void OnPointerClick(PointerEventData eventData)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (eventData.button != PointerEventData.InputButton.Left || eventData.dragging
                 || !IsActive() || !IsInteractable())
                 return;
@@ -41,6 +43,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public override void OnSubmit(BaseEventData eventData)
         {
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
             if (IsActive() && IsInteractable())
                 Clicked?.Invoke(this);
         }

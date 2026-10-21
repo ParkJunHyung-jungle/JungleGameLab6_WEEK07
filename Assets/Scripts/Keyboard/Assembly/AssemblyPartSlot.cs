@@ -60,6 +60,7 @@ namespace KeyboardModeling.Assembly
             {
                 _part.SetPositionAndRotation(_startPose.position, _startPose.rotation);
                 _part.localScale = transform.localScale;
+                _part.SetParent(null, true);
             }
         }
 

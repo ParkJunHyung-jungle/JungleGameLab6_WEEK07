@@ -70,7 +70,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// 현재 위치, 회전과 슬롯 점유 상태를 저장하고 드래그를 시작한다.
-        /// 기존 슬롯 점유를 해제하고 물리 시뮬레이션을 일시 정지한다.
+        /// 기존 슬롯 점유와 부모 결합을 해제하고 월드 자세를 유지하며 물리 시뮬레이션을 일시 정지한다.
         /// </summary>
         public void BeginDrag()
         {
@@ -87,6 +87,7 @@ namespace KeyboardModeling.Assembly
             if (_slot != null)
                 _slot.Release(this);
             SetBodyFrozen(true);
+            transform.SetParent(null, true);
         }
 
         /// <summary>
@@ -130,7 +131,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// 실물 부품을 재고 보관 상태로 전환한다.
-        /// 슬롯의 점유 및 원본 참조를 해제하고 물리를 고정한 뒤 오브젝트를 숨긴다.
+        /// 슬롯의 점유 및 원본 참조와 부모 결합을 해제하고 물리를 고정한 뒤 오브젝트를 숨긴다.
         /// </summary>
         public void StoreInInventory()
         {
@@ -142,11 +143,12 @@ namespace KeyboardModeling.Assembly
             _slot = null;
             _originSlot = null;
             SetBodyFrozen(true);
+            transform.SetParent(null, true);
             gameObject.SetActive(false);
         }
 
         /// <summary>
-        /// 연결된 슬롯의 위치와 회전으로 부품을 정렬한다.
+        /// 연결된 슬롯의 자식으로 부품을 결합하고 슬롯 기준 자세로 정렬한다.
         /// 재질형 키캡에는 슬롯의 기존 형상을 적용하고 원본 규격의 크기와 고정 상태를 유지한다.
         /// </summary>
         public void SnapToSlot()
@@ -155,20 +157,20 @@ namespace KeyboardModeling.Assembly
             SetBodyFrozen(true);
             if (_isAdaptiveKeycap)
                 ApplyKeycapShape(_slot.KeycapShape, _catalogEntry.KeycapMaterial);
-            transform.SetPositionAndRotation(_slot.transform.position, _slot.transform.rotation);
-            Vector3 scale = _slot.transform.lossyScale;
-            Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
-            transform.localScale = new Vector3(scale.x / parentScale.x, scale.y / parentScale.y, scale.z / parentScale.z);
+            transform.SetParent(_slot.transform, true);
+            transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            transform.localScale = Vector3.one;
         }
 
         /// <summary>
         /// 현재 부품의 슬롯 점유를 해제하고 중력 낙하를 시작한다.
-        /// 현재 위치와 회전은 유지하며 Rigidbody를 동적 상태로 전환한다.
+        /// 부모 결합을 해제하되 월드 자세와 크기는 유지하며 Rigidbody를 동적 상태로 전환한다.
         /// </summary>
         public void DropWithPhysics()
         {
             if (_slot != null)
                 _slot.Release(this);
+            transform.SetParent(null, true);
             SetBodyFrozen(false);
         }
 

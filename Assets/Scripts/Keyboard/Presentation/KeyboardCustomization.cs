@@ -69,6 +69,7 @@ public sealed class KeyboardCustomization : MonoBehaviour
     /// 저장된 _caseMaterialIndex를 UI 선택 표시에 제공한다.
     /// </summary>
     public int CaseMaterialIndex => _caseMaterialIndex;
+    public Material CaseMaterial => _caseMaterial;
 
     [Header("Keycaps")]
     [SerializeField] private MeshRenderer[] _keycapRenderers = new MeshRenderer[0];

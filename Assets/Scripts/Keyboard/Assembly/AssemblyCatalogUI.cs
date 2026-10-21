@@ -29,6 +29,13 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private Material[] _caseMaterials;
         [SerializeField] private PlateData[] _plateData;
 
+        [Header("Assembly Material Targets")]
+        [SerializeField] private MeshRenderer[] _caseRenderers = new MeshRenderer[0];
+        [SerializeField] private MeshRenderer _plateRenderer;
+        private readonly Dictionary<AssemblyCatalogButton, Material> _surfaceMaterials = new Dictionary<AssemblyCatalogButton, Material>();
+        private int _caseCategory = -1;
+        private int _plateCategory = -1;
+
         [Header("Appearance")]
         [SerializeField] private Sprite _sprite;
         [SerializeField] private bool _startCollapsed;
@@ -266,19 +273,21 @@ namespace KeyboardModeling.Assembly
                     FindSwitchEntry(data));
 
             KeyboardCustomization keyboard = _referenceKeyboardPrefab.GetComponent<KeyboardCustomization>();
-            if (_caseMaterials.Length > 0)
+            if (_keycapMaterials.Length > 0)
             {
                 category = AddCategory("케이스");
+                _caseCategory = category;
                 Mesh caseMesh = keyboard.CaseRenderers[0].GetComponent<MeshFilter>().sharedMesh;
-                foreach (Material material in _caseMaterials)
+                foreach (Material material in _keycapMaterials)
                     AddCard(category, material.name, caseMesh, new[] { material });
             }
-            if (_plateData.Length > 0)
+            if (_keycapMaterials.Length > 0)
             {
                 category = AddCategory("보강판");
+                _plateCategory = category;
                 Mesh plateMesh = keyboard.PlateRenderer.GetComponent<MeshFilter>().sharedMesh;
-                foreach (PlateData data in _plateData)
-                    AddCard(category, PlateName(data.Type), plateMesh, new[] { data.Material });
+                foreach (Material material in _keycapMaterials)
+                    AddCard(category, material.name, plateMesh, new[] { material });
             }
         }
 
@@ -325,6 +334,8 @@ namespace KeyboardModeling.Assembly
         {
             RectTransform card = Rect(label, _contents[category]);
             AssemblyCatalogButton button = CreateButton(card);
+            if (category == _caseCategory || category == _plateCategory)
+                _surfaceMaterials.Add(button, materials[0]);
             Texture2D texture = AssemblyCatalogPreview.Render(mesh, materials);
             _textures.Add(texture);
             RawImage icon = Rect("PartIcon", card).gameObject.AddComponent<RawImage>();
@@ -510,7 +521,7 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// button이 속한 카테고리의 이전 선택을 해제하고 새 카드를 강조한다.
-        /// UI 선택 참조만 변경하고 실제 키보드와 재질은 변경하지 않는다.
+        /// 케이스와 보강판 카드는 연결된 씬 렌더러에 재질을 적용하고 키캡과 축은 기존 선택 이벤트를 유지한다.
         /// </summary>
         private void HandleCardClicked(AssemblyCatalogButton button)
         {
@@ -519,6 +530,16 @@ namespace KeyboardModeling.Assembly
                 SetSelected(previous, false);
             _selections[category] = button;
             SetSelected(button, true);
+            if (_surfaceMaterials.TryGetValue(button, out Material material))
+            {
+                if (category == _caseCategory)
+                {
+                    foreach (MeshRenderer renderer in _caseRenderers)
+                        renderer.sharedMaterial = material;
+                }
+                else
+                    _plateRenderer.sharedMaterial = material;
+            }
             if (_cardEntries.TryGetValue(button, out AssemblyCatalogEntry entry)) PartSelected?.Invoke(entry);
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -90,17 +90,32 @@ namespace Game.Player
         public void OnPointerDown(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect, eventData.position, eventData.pressEventCamera, out Vector2 point);
-            point = (point - _rect.rect.center) / _rect.rect.width;
-            float radius = point.magnitude;
-            if (radius >= INNER_RADIUS - 12f / 516f && radius <= OUTER_RADIUS + 12f / 516f)
-                _dragMode = 0;
-            else if (Mathf.Abs(point.x) <= SQUARE_SIZE * 0.5f && Mathf.Abs(point.y) <= SQUARE_SIZE * 0.5f)
-                _dragMode = 1;
-            else
-                return;
+            _dragMode = GetPointerDragMode(eventData.position, eventData.pressEventCamera);
+            if (_dragMode < 0) return;
             EventSystem.current.SetSelectedGameObject(gameObject, eventData);
             UpdateFromPointer(eventData);
+        }
+
+        /// <summary>position과 camera로 실제 색조 링 또는 채도·명도 드래그 모드를 반환한다. 유효 영역 밖은 -1이며 색상은 변경하지 않는다.</summary>
+        private int GetPointerDragMode(Vector2 position, Camera camera)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect, position, camera, out Vector2 point);
+            point = (point - _rect.rect.center) / _rect.rect.width;
+            float radius = point.magnitude;
+            if (radius >= INNER_RADIUS - 12f / 516f && radius <= OUTER_RADIUS + 12f / 516f) return 0;
+            return Mathf.Abs(point.x) <= SQUARE_SIZE * 0.5f && Mathf.Abs(point.y) <= SQUARE_SIZE * 0.5f ? 1 : -1;
+        }
+
+        /// <summary>position의 유효 색상 영역과 현재 선택 상태로 state에 LED 조작을 추가한다. 실제 입력 처리와 동일한 드래그 모드를 조회한다.</summary>
+        public void CollectControlHints(WorkshopControlHintState state, Vector2 position)
+        {
+            if (_dragMode >= 0 || GetPointerDragMode(position, null) >= 0)
+                state.Add("좌클릭 드래그", "LED 색상 조절");
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject == gameObject)
+            {
+                state.Add("방향키", "색조 조절");
+                state.Add("Shift + 방향키", "색조 크게 조절");
+            }
         }
 
         /// <summary>

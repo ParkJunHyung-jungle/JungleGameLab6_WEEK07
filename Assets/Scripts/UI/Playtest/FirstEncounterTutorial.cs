@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -79,6 +79,8 @@ namespace Game.Tutorials
         private int _closeFrame;
 
         public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
+        public bool CanOpenHelp => !Game.Tournament.TournamentController.IsReturnPaused && !IsBlocking
+            && _pending.Count == 0 && Time.timeScale > 0f;
         private IReadOnlyList<TutorialCard> Cards => _content.Cards;
 
         private sealed class PendingCard
@@ -260,7 +262,7 @@ namespace Game.Tutorials
         /// <summary>button의 도움말 요청으로 첫 페이지를 연다. 다른 안내나 입력 해제 대기 중에는 중복으로 열지 않는다.</summary>
         private void HandleHelp(KeyboardEditButton button)
         {
-            if (Game.Tournament.TournamentController.IsReturnPaused || IsBlocking || _pending.Count > 0 || Time.timeScale <= 0f) return;
+            if (!CanOpenHelp) return;
             _page = 0;
             _browsing = true;
             Open(Cards[0]);

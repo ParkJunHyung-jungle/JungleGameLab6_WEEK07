@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -621,6 +621,25 @@ namespace Game.Player
                     _plateEffectSelectionIndicators[index],
                     _plateEffects[index] == _plateCustomization.CurrentPlateEffect);
             }
+        }
+
+        public string ControlHintTitle => _pickerMode switch
+        {
+            PickerMode.Keycap => "키캡 카탈로그",
+            PickerMode.SwitchSound => "스위치 카탈로그",
+            PickerMode.CaseMaterial => "케이스 재질",
+            PickerMode.Plate => "보강판 편집",
+            PickerMode.Photo => "이미지 편집",
+            PickerMode.Led => "LED 편집",
+            _ => "키보드 편집"
+        };
+
+        /// <summary>현재 사진 편집 입력이 점유 중이면 state에 크롭 조작을 추가하고 true를 반환한다. 다른 편집 상태는 변경하지 않는다.</summary>
+        public bool CollectControlHints(WorkshopControlHintState state)
+        {
+            if (!isActiveAndEnabled) return false;
+            _keycapUI.CollectControlHints(state);
+            return _photoUI.CollectControlHints(state);
         }
 
         /// <summary>

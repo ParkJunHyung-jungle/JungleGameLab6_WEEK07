@@ -192,6 +192,13 @@ namespace Game.Player
             return RectTransformUtility.RectangleContainsScreenPoint(_panel, screenPosition, camera);
         }
 
+        /// <summary>현재 단일 키 재질 입력 대기 상태로 state에 대상 키 선택을 추가한다. 재질이나 선택 인덱스는 변경하지 않는다.</summary>
+        public void CollectControlHints(WorkshopControlHintState state)
+        {
+            if (_isOpen && !_isAllKeys && _hasPendingMaterial && Keyboard.current != null)
+                state.Add("키보드 입력", "재질 적용 키 선택");
+        }
+
         void Update()
         {
             if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;

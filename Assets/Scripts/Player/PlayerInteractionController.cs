@@ -38,6 +38,7 @@ namespace Game.Player
         [SerializeField] private float _interactionDistance = 3f;
         [SerializeField] private LayerMask _interactionLayers = ~0;
         [SerializeField] private Text _interactionPrompt;
+        private bool _contextHintsEnabled;
         private RectTransform _interactionPromptRectTransform;
         private Vector2 _interactionPromptDefaultAnchorMin;
         private Vector2 _interactionPromptDefaultAnchorMax;
@@ -429,6 +430,7 @@ namespace Game.Player
         /// </summary>
         private void UpdateInteractionPrompt()
         {
+            if (_contextHintsEnabled) { _interactionPrompt.enabled = false; return; }
             string prompt = string.Empty;
             if (_isMonitorFocusMode)
             {
@@ -462,6 +464,71 @@ namespace Game.Player
             _interactionPrompt.text = prompt;
             _interactionPrompt.enabled = prompt.Length > 0;
             UpdateInteractionPromptPosition();
+        }
+
+        /// <summary>enabled가 true이면 기존 위치의 안내만 숨긴다. 다른 씬은 기존 표시를 계속 사용한다.</summary>
+        public void SetContextHintsEnabled(bool enabled)
+        {
+            _contextHintsEnabled = enabled;
+            if (enabled) _interactionPrompt.enabled = false;
+        }
+
+        /// <summary>현재 입력 차단과 전환 상태로 안내 표시 가능 여부를 반환한다. 시스템 창과 팝업 중에는 false이다.</summary>
+        public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && Time.timeScale > 0f
+            && InGameCursor.CanProcessPointer && !Game.Tutorials.FirstEncounterTutorial.IsBlocking
+            && !Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
+            && _cameraTransition == null && _monitorFocusTransition == null;
+
+        /// <summary>state에 실제 필드 대상과 편집 입력의 조작을 추가한다. 기존 중앙 조준 레이와 회전 가능 판정을 재사용한다.</summary>
+        public void CollectControlHints(WorkshopControlHintState state)
+        {
+            if (!CanShowControlHints) return;
+            if (_isKeyboardEditMode)
+            {
+                state.Title = "키보드 편집";
+                bool occupied = _keyboardPullers != null && _keyboardPullers.IsManipulatingPart;
+                if (!occupied && (_isDraggingEditingKeyboard || CanRotateEditingKeyboard()))
+                    state.Add(_isDraggingEditingKeyboard ? "우클릭 놓기" : "우클릭 드래그", _isDraggingEditingKeyboard ? "회전 종료" : "키보드 회전");
+                if (!occupied && _keyboardResetInput.enabled) state.Add("휠 클릭", "키보드 초기화");
+                if (InGameCursor.CanProcessVirtualPointer && !_keyboardEditOverlayUI.IsPointerOverUI(InGameCursor.Position))
+                    state.Add("마우스 휠", "키보드 확대·축소");
+                if (_editingKeyboard != null && _editingKeyboard.InputEnabled)
+                    state.Add("키보드 입력", _editingKeyboard.AttackEnabled ? "타건·공격 미리보기" : "타건");
+                state.Add("Esc", "편집 종료");
+                return;
+            }
+            if (_isMonitorFocusMode)
+            {
+                state.Title = "모니터 집중";
+                if (_coverInput.action.enabled) state.Add("우클릭", "모니터 집중 해제");
+                return;
+            }
+            state.Title = _heldKeyboardBody != null ? "키보드 운반" : "작업실 둘러보기";
+            if (_cameraInputAxisController.enabled) state.Add("마우스 이동", "둘러보기");
+            if (_heldKeyboardBody != null)
+            {
+                bool trash = TryGetInteractionHit(out RaycastHit trashHit) && trashHit.collider.GetComponentInParent<KeyboardTrashCan>() != null;
+                if (_clickInput.action.enabled) state.Add("좌클릭", trash ? "키보드 버리기" : "키보드 던지기");
+                if (_coverInput.action.enabled) state.Add("우클릭", _heldKeyboardBody.GetComponentInChildren<KeyboardProtectionCover>() == null ? "커버 덮기" : "커버 벗기기");
+                return;
+            }
+            if (!TryGetInteractionHit(out RaycastHit hit)) return;
+            KeyboardDispenser dispenser = hit.collider.GetComponentInParent<KeyboardDispenser>();
+            if (dispenser != null)
+            {
+                if (_clickInput.action.enabled && dispenser.CanDispense) state.Add("좌클릭", "키보드 받기");
+                return;
+            }
+            WorkbenchKeyboardHolder workbench = hit.collider.GetComponentInParent<WorkbenchKeyboardHolder>();
+            MonitorKeyboardHolder monitor = hit.collider.GetComponentInParent<MonitorKeyboardHolder>();
+            KeyboardPickupTarget pickup = hit.collider.GetComponentInParent<KeyboardPickupTarget>();
+            bool canPickup = workbench != null && workbench.KeyboardBody != null
+                || monitor != null && monitor.KeyboardBody != null
+                || pickup != null && (hit.collider.attachedRigidbody != null || pickup.GetComponentInChildren<Rigidbody>() != null);
+            if (_clickInput.action.enabled && canPickup) state.Add("좌클릭", "키보드 집기");
+            if (!_coverInput.action.enabled) return;
+            if (monitor != null && monitor.KeyboardBody != null) state.Add("우클릭", "모니터 집중");
+            else if (TryGetWorkbenchKeyboard(hit, out _, out _, out _)) state.Add("우클릭", "작업대 집중");
         }
 
         /// <summary>
@@ -904,13 +971,21 @@ namespace Game.Player
         /// </summary>
         private void TryBeginEditingKeyboardRotation()
         {
+            if (!CanRotateEditingKeyboard()) return;
+            _isDraggingEditingKeyboard = true;
+            _pendingKeyboardRotationDelta = Vector2.zero;
+        }
+
+        /// <summary>현재 공통 커서와 UI 차단 및 키보드 경계로 회전 시작 가능 여부를 반환한다. 입력과 자세는 변경하지 않는다.</summary>
+        private bool CanRotateEditingKeyboard()
+        {
             Mouse mouse = Mouse.current;
             if (mouse == null || !InGameCursor.CanProcessVirtualPointer || _editingKeyboardBody == null)
-                return;
+                return false;
 
             Vector2 pointerPosition = InGameCursor.Position;
             if (_keyboardEditOverlayUI != null && _keyboardEditOverlayUI.IsPointerOverUI(pointerPosition))
-                return;
+                return false;
 
             EventSystem eventSystem = EventSystem.current;
             if (eventSystem != null)
@@ -920,7 +995,7 @@ namespace Game.Player
                 for (int i = 0; i < _uiRaycastResults.Count; i++)
                 {
                     if (_uiRaycastResults[i].gameObject != _keyboardEditOverlay)
-                        return;
+                        return false;
                 }
             }
 
@@ -942,7 +1017,7 @@ namespace Game.Player
             if (nearestKeyboardHitDistance > maximumKeyboardHitDistance
                 || float.IsPositiveInfinity(nearestKeyboardHitDistance))
             {
-                return;
+                return false;
             }
 
             if (Physics.Raycast(
@@ -953,11 +1028,10 @@ namespace Game.Player
                     QueryTriggerInteraction.Ignore)
                 && obstructionHit.distance < nearestKeyboardHitDistance)
             {
-                return;
+                return false;
             }
 
-            _isDraggingEditingKeyboard = true;
-            _pendingKeyboardRotationDelta = Vector2.zero;
+            return true;
         }
 
         /// <summary>

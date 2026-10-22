@@ -28,6 +28,8 @@ namespace Game.Player
 
         public bool InputAllowed => _interaction.IsKeyboardEditing && _interaction.EditingKeyboard != null
             && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && InGameCursor.CanProcessVirtualPointer;
+        public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
+            || (_keycapPlacement != null && _keycapPlacement.IsDragging);
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
 
@@ -185,6 +187,38 @@ namespace Game.Player
             Ray ray = _camera.ScreenPointToRay(screenPosition);
             return _keycapPuller.IsSelected || _switchPuller.IsSelected
                 || _keycapPuller.IsPointerOverTool(ray) || _switchPuller.IsPointerOverTool(ray);
+        }
+
+        /// <summary>state에 현재 풀러 사용과 실제 제거 대상의 조작을 추가한다. 기존 도구 가림 검사와 키보드 분리 조건을 읽는다.</summary>
+        public bool CollectControlHints(WorkshopControlHintState state)
+        {
+            if (!InputAllowed || (_keycapPlacement != null && _keycapPlacement.IsDragging)) return false;
+            Vector2 pointer = InGameCursor.Position;
+            AssemblyFullerTool selected = _keycapPuller.IsSelected ? _keycapPuller : _switchPuller.IsSelected ? _switchPuller : null;
+            Ray ray = _camera.ScreenPointToRay(pointer);
+            if (selected != null)
+            {
+                state.Title = selected.ExtractsSwitches ? "스위치 Puller" : "키캡 Puller";
+                Collider target = selected.GetExtractionTarget(pointer);
+                KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+                if (target != null && customization.TryGetRemovablePart(target.transform, out _, out bool isSwitch)
+                    && isSwitch == selected.ExtractsSwitches)
+                    state.Add("좌클릭 유지·이동", isSwitch ? "스위치 연속 분리" : "키캡 연속 분리");
+                state.Add("좌클릭 놓기", "Puller 복귀");
+                return true;
+            }
+            if (IsPointerOverUI(pointer)) return false;
+            AssemblyFullerTool tool = _keycapPuller.IsPointerOverTool(ray) ? _keycapPuller
+                : _switchPuller.IsPointerOverTool(ray) ? _switchPuller : null;
+            if (tool != null)
+            {
+                state.Title = tool.ExtractsSwitches ? "스위치 Puller" : "키캡 Puller";
+                state.Add("좌클릭 유지", "Puller 집기·사용");
+                return true;
+            }
+            if (!TryGetPartHit(ray, out _, out bool extractSwitches)) return false;
+            state.Add("좌클릭 드래그", extractSwitches ? "스위치 분리·집기" : "키캡 분리·집기");
+            return true;
         }
 
         /// <summary>현재 포인터가 풀러 선택이나 사용에 해당하는지 반환한다. 기존 키보드 드래그 회전과 입력을 구분한다.</summary>

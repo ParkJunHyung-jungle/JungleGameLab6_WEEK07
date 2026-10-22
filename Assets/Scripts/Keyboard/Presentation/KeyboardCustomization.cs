@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -177,7 +177,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public bool InstallSwitchFromInventory(int index, SwitchType type)
     {
         if (_keycaps == null) CacheKeycaps();
-        if (index < 0 || index >= _switches.Length || HasSwitchForKeycap(index) || IsKeycapInstalled(index)) return false;
+        if (!CanInstallSwitchFromInventory(index, type)) return false;
         KeyboardSwitch keyboardSwitch = _switches[index];
         if (!keyboardSwitch.ChangeSwitch(type)) return false;
         PlayPartInstallation(keyboardSwitch.transform);
@@ -193,8 +193,29 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public bool InstallKeycapFromInventory(int index, Material material, Game.Tournament.KeycapDefinition definition)
     {
         if (_keycaps == null) CacheKeycaps();
-        return index >= 0 && index < _keycaps.Length && !IsKeycapInstalled(index)
+        return CanInstallKeycapFromInventory(index, material, definition)
             && ApplyKeycapMaterialToKey(index, material, true, definition);
+    }
+
+    /// <summary>index의 축 슬롯 점유와 type 데이터로 설치 가능 여부를 반환한다. 외형, 재고와 효과음은 변경하지 않는다.</summary>
+    public bool CanInstallSwitchFromInventory(int index, SwitchType type)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return index >= 0 && index < _switches.Length && !HasSwitchForKeycap(index)
+            && !IsKeycapInstalled(index) && _switches[index].HasSwitchType(type);
+    }
+
+    /// <summary>index의 점유와 축 및 material, definition 규격으로 설치 가능 여부를 반환한다. 실제 설치는 수행하지 않는다.</summary>
+    public bool CanInstallKeycapFromInventory(int index, Material material, Game.Tournament.KeycapDefinition definition)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (index < 0 || index >= _keycaps.Length || IsKeycapInstalled(index) || material == null
+            || !HasSwitchForKeycap(index) || _keycaps[index] == null) return false;
+        Transform keycap = _keycaps[index];
+        if (definition != null && definition.OneUnitOnly && !_keycapModels[keycap].IsOneUnit) return false;
+        foreach (MeshRenderer renderer in _keycapRenderers)
+            if (renderer != null && renderer.transform.IsChildOf(keycap)) return true;
+        return false;
     }
 
     /// <summary>

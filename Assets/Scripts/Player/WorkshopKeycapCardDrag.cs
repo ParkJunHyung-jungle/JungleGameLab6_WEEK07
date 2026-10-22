@@ -20,6 +20,14 @@ namespace Game.Player
             _entry = entry;
         }
 
+        /// <summary>state에 이 카드의 가능한 출고 드래그를 추가한다. 재고 부족이나 입력 중단 상태에는 false를 반환한다.</summary>
+        public bool CollectControlHints(WorkshopControlHintState state)
+        {
+            if (!_placement.CanBeginInventoryDrag(_entry)) return false;
+            state.Add("좌클릭 드래그", _entry.IsSwitch ? "스위치 꺼내기" : "키캡 꺼내기");
+            return true;
+        }
+
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;

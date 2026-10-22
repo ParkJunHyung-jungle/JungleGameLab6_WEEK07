@@ -111,6 +111,8 @@ namespace Game.Player
         private bool _monitorMoveInputWasEnabled;
         private bool _monitorCameraInputWasEnabled;
         private bool _isMonitorFocusMode;
+        private MonitorKeyboardHolder _focusedMonitorHolder;
+        public event System.Action<MonitorKeyboardHolder> MonitorFocusChanged;
 
         void Awake()
         {
@@ -680,6 +682,7 @@ namespace Game.Player
             _monitorMoveInputWasEnabled = _moveInput.action.enabled;
             _monitorCameraInputWasEnabled = _cameraInputAxisController.enabled;
             _isMonitorFocusMode = true;
+            _focusedMonitorHolder = holder;
 
             _moveInput.action.Disable();
             _cameraInputAxisController.enabled = false;
@@ -714,6 +717,8 @@ namespace Game.Player
         private void ExitMonitorFocusMode()
         {
             _isMonitorFocusMode = false;
+            _focusedMonitorHolder = null;
+            MonitorFocusChanged?.Invoke(null);
             BeginMonitorFocusTransition(
                 _monitorSavedCameraRotation,
                 _monitorSavedPlayerPosition,
@@ -774,6 +779,8 @@ namespace Game.Player
             _monitorFocusTransition = null;
             if (restoreInput)
                 RestoreMonitorFocusInput();
+            else if (_isMonitorFocusMode)
+                MonitorFocusChanged?.Invoke(_focusedMonitorHolder);
         }
 
         /// <summary>
@@ -810,6 +817,8 @@ namespace Game.Player
             }
 
             _isMonitorFocusMode = false;
+            _focusedMonitorHolder = null;
+            MonitorFocusChanged?.Invoke(null);
             transform.position = _monitorSavedPlayerPosition;
             if (_camera != null && _cameraPanTilt != null)
                 _cameraPanTilt.ForceCameraPosition(_camera.transform.position, _monitorSavedCameraRotation);

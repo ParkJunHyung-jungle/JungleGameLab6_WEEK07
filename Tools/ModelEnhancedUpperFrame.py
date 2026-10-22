@@ -1,5 +1,6 @@
 """Keyboard_Enhanced의 기존 보강판 위에 TKL 구역형 상단 프레임을 만든다."""
 import re
+import sys
 
 import FitEnhancedKeyboardPCB as fit
 
@@ -11,7 +12,8 @@ OPENINGS = {
     'function_9_12': (10.90, 15.10, 5.12, 6.20),
     'utility': (15.34, 18.50, 5.12, 6.20),
     'editing': (15.38, 18.50, 2.85, 4.96),
-    'arrows': (15.38, 18.50, -.18, 1.92),
+    'arrows_bottom': (15.38, 18.50, -.18, .92),
+    'arrow_up': (16.38, 17.42, .92, 1.92),
 }
 
 
@@ -26,7 +28,8 @@ def main():
     """기존 하우징 윤곽과 87키 배치를 읽어 전용 상단 메시와 프리팹 자식을 저장한다."""
     source = fit.PREFAB.read_bytes().decode('utf-8')
     blocks = fit.assembly.blocks(source)
-    if 'm_Name: CNC_UpperFrame' in source:
+    mesh_only = '--mesh-only' in sys.argv
+    if 'm_Name: CNC_UpperFrame' in source and not mesh_only:
         raise ValueError('상단 프레임이 이미 존재합니다.')
     lower, _ = fit.decode(fit.ROOT / 'Assets/Resource/Meshes/LowerCase_TKL87.asset')
     outline = [(v[0], v[2]) for v in lower[300:400]]
@@ -35,9 +38,16 @@ def main():
     fit.surface(frame, outline, holes, .062, True)
     fit.surface(frame, outline, holes, 0, False)
     fit.walls(frame, outline, 0, .062)
-    for hole in holes:
+    for hole in holes[:-2]:
         fit.walls(frame, hole, 0, .062, True)
+    arrows = [(15.38, -.18), (18.50, -.18), (18.50, .92),
+              (17.42, .92), (17.42, 1.92), (16.38, 1.92),
+              (16.38, .92), (15.38, .92)]
+    fit.walls(frame, [(x - 9.25, z - 2.8) for x, z in arrows], 0, .062, True)
     mesh_guid = fit.save(frame, 'UpperFrame_Enhanced_TKL87')
+    if mesh_only:
+        print('Updated upper frame mesh:', mesh_guid, OPENINGS)
+        return
 
     template = fit.assembly.blocks(fit.assembly.read(fit.PCB.parent / 'PCB_TKL_87.prefab'))
     new_ids = ['8852000000000000001', '8852000000000000002',

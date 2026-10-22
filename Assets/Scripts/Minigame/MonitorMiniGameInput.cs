@@ -13,10 +13,12 @@ namespace Game.Player
         [SerializeField] private PlayerInteractionController _player;
         [SerializeField] private MonitorKeyboardHolder _holder;
         [SerializeField] private MonitorMiniGameManager _manager;
-        [SerializeField] private bool _autoStartOnFocus = true;
+        [SerializeField] private Canvas _canvas;
+        [SerializeField] private bool _autoStartOnFocus;
         [SerializeField, Min(0)] private int _initialGameIndex;
         private KeyboardInputController _keyboard;
         private Keyboard _textDevice;
+        private PlayerInteractionController _subscribedPlayer;
         private bool _previousInput;
         private bool _previousAttack;
         public bool HasFocus => _keyboard != null;
@@ -28,15 +30,76 @@ namespace Game.Player
         private bool _backspaceHeld;
         private float _backspaceRepeatRemaining;
 
+        void Reset()
+        {
+            SetSceneReferences();
+        }
+
         void OnEnable()
         {
-            _player.MonitorFocusChanged += HandleFocusChanged;
+            SetSceneReferences();
+        }
+
+        void Start()
+        {
+            SetSceneReferences();
         }
 
         void OnDisable()
         {
-            _player.MonitorFocusChanged -= HandleFocusChanged;
+            if (_subscribedPlayer != null)
+                _subscribedPlayer.MonitorFocusChanged -= HandleFocusChanged;
+            _subscribedPlayer = null;
             Disconnect();
+        }
+
+        /// <summary>
+        /// 모니터 계층의 매니저와 Canvas 및 거치대를 찾고 같은 씬의 플레이어와 메인 카메라를 연결한다.
+        /// 모니터 계층과 현재 씬의 루트 오브젝트를 사용해 Inspector 참조를 할당하며 실행 중에는 포커스 이벤트 구독도 갱신한다.
+        /// </summary>
+        [ContextMenu("Auto Assign References")]
+        public void SetSceneReferences()
+        {
+            _manager = GetComponentInChildren<MonitorMiniGameManager>(true);
+            _canvas = GetComponentInChildren<Canvas>(true);
+            for (Transform parent = transform; parent != null; parent = parent.parent)
+            {
+                _holder = parent.GetComponentInChildren<MonitorKeyboardHolder>(true);
+                if (_holder != null) break;
+            }
+            if (_canvas == null || !gameObject.scene.IsValid()) return;
+
+            if (gameObject.scene.isLoaded)
+            {
+                Camera sceneCamera = null;
+                foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+                {
+                    if (_player == null)
+                        _player = root.GetComponentInChildren<PlayerInteractionController>(true);
+                    foreach (Camera candidate in root.GetComponentsInChildren<Camera>(true))
+                    {
+                        if (candidate.CompareTag("MainCamera"))
+                        {
+                            sceneCamera = candidate;
+                            break;
+                        }
+                    }
+                }
+                _canvas.worldCamera = sceneCamera;
+            }
+
+            if (!Application.isPlaying || !isActiveAndEnabled
+                || (_player != null && _subscribedPlayer == _player)) return;
+            if (_subscribedPlayer != null)
+            {
+                _subscribedPlayer.MonitorFocusChanged -= HandleFocusChanged;
+                Disconnect();
+            }
+            _subscribedPlayer = _player;
+            if (_subscribedPlayer != null)
+                _subscribedPlayer.MonitorFocusChanged += HandleFocusChanged;
+            else
+                Debug.LogWarning("모니터와 같은 씬에 PlayerInteractionController를 배치하세요.", this);
         }
 
         void Update()

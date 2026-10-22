@@ -8,6 +8,7 @@ namespace Game.Player
         [Header("Connections")]
         [SerializeField] private MonitorMiniGameManager _manager;
         [SerializeField] private MonitorMiniGameInput _input;
+        [SerializeField] private MonitorKeyboardHolder _holder;
 
         [Header("Desktop")]
         [SerializeField] private Canvas _canvas;
@@ -40,6 +41,8 @@ namespace Game.Player
             _manager.GameChanged += HandleGameChanged;
             _input.FocusChanged += HandleFocusChanged;
             _closeButton.Clicked += HandleCloseClicked;
+            _holder.KeyboardChanged += HandleKeyboardChanged;
+            HandleKeyboardChanged(_holder.KeyboardBody != null);
             HandleFocusChanged(_input.HasFocus);
             HandleGameChanged(_manager.CurrentGame);
         }
@@ -49,7 +52,20 @@ namespace Game.Player
             _manager.GameChanged -= HandleGameChanged;
             _input.FocusChanged -= HandleFocusChanged;
             _closeButton.Clicked -= HandleCloseClicked;
+            _holder.KeyboardChanged -= HandleKeyboardChanged;
+            _canvas.enabled = false;
             HandleFocusChanged(false);
+        }
+
+        /// <summary>
+        /// installed에 따라 모니터 화면의 전원을 변경한다.
+        /// 키보드 거치 상태를 사용하며 제거 시 현재 앱을 종료하고 Canvas 표시를 끈다.
+        /// </summary>
+        private void HandleKeyboardChanged(bool installed)
+        {
+            if (!installed) _manager.StopGame();
+            _canvas.enabled = installed;
+            HandleFocusChanged(installed && _input.HasFocus);
         }
 
         /// <summary>button에 할당된 SO를 매니저로 실행한다. 모니터 포커스가 없으면 무시하며 화면 생성과 종료는 매니저에 맡긴다.</summary>
@@ -74,12 +90,11 @@ namespace Game.Player
             _taskbarTitle.text = running ? game.DisplayName : "아이콘을 더블클릭하여 실행하세요";
         }
 
-        /// <summary>focused로 모니터 UI의 클릭 허용 여부를 변경한다. 바탕화면 표시는 유지하고 포커스 진입 시 이벤트 카메라를 현재 메인 카메라로 연결한다.</summary>
+        /// <summary>focused로 모니터 UI의 클릭 허용 여부를 변경한다. 바탕화면과 연결된 씬 카메라는 유지한다.</summary>
         private void HandleFocusChanged(bool focused)
         {
             _interactionGroup.interactable = focused;
             _interactionGroup.blocksRaycasts = focused;
-            if (focused) _canvas.worldCamera = Camera.main;
         }
     }
 }

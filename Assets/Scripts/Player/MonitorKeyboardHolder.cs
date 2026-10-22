@@ -1,3 +1,5 @@
+using System;
+
 using UnityEngine;
 
 using KeyboardModeling;
@@ -25,7 +27,23 @@ namespace Game.Player
         /// </summary>
         public Rigidbody KeyboardBody => _keyboardBody;
 
+        public event Action<bool> KeyboardChanged;
+
         void OnTriggerEnter(Collider other)
+        {
+            TryStoreKeyboard(other);
+        }
+
+        void OnTriggerStay(Collider other)
+        {
+            TryStoreKeyboard(other);
+        }
+
+        /// <summary>
+        /// 감지 영역의 other에서 손을 놓은 키보드를 찾아 모니터 책상에 고정한다.
+        /// Collider의 Rigidbody와 KeyboardPickupTarget을 사용하며 거치 상태와 키보드 위치 및 물리 상태를 변경한다.
+        /// </summary>
+        private void TryStoreKeyboard(Collider other)
         {
             if (_keyboardBody != null)
                 return;
@@ -55,6 +73,8 @@ namespace Game.Player
             KeyboardProtectionCover cover = body.GetComponentInChildren<KeyboardProtectionCover>();
             if (cover != null)
                 cover.RemoveFrom(body.transform);
+
+            KeyboardChanged?.Invoke(true);
         }
 
         /// <summary>
@@ -64,7 +84,10 @@ namespace Game.Player
         public void ReleaseKeyboard(Rigidbody body)
         {
             if (_keyboardBody == body)
+            {
                 _keyboardBody = null;
+                KeyboardChanged?.Invoke(false);
+            }
         }
     }
 }

@@ -32,10 +32,13 @@ namespace Game.Player
         [SerializeField] private Shader _placementDepthShader;
         private WorkshopKeyboardPlacementPreview _placementPreview;
 
+        [Header("Drag Plane")]
+        [SerializeField, Tooltip("본체를 운반할 수평면의 절대 월드 Y 높이입니다.")]
+        private float _dragWorldHeight = 0.145f;
+
         [Header("Drag State")]
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
-        private float _dragDepth;
-        private Vector2 _pointerOffset;
+        private Vector3 _pointerOffset;
         private Vector3 _centerOffset;
         private Quaternion _dragRotation;
         private bool _isDragging;
@@ -94,8 +97,12 @@ namespace Game.Player
                 return;
 
             Quaternion rotation = _outputCamera.transform.rotation * _dragRotation;
-            if (!TryGetDragPosition(rotation, out Vector3 position))
+            if (!TryGetDragPosition(out Vector3 position))
+            {
+                if (_releasePending && !_brain.IsBlending)
+                    DropKeyboard();
                 return;
+            }
 
             // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
             _keyboardBody.position = position;
@@ -163,7 +170,7 @@ namespace Game.Player
 
         /// <summary>
         /// 출력 카메라와 커서 Ray의 가장 가까운 실체가 지정 본체 또는 장착 자식인지 검사한다.
-        /// 시각 중심의 깊이와 화면 오프셋 및 카메라 상대 회전을 저장하고 속도를 정리한 뒤 운반 물리를 고정한다.
+        /// 수평면의 집기 오프셋과 시각 중심 및 카메라 상대 회전을 저장하고 속도를 정리한 뒤 운반 물리를 고정한다.
         /// </summary>
         private void TryBeginDrag()
         {
@@ -179,15 +186,18 @@ namespace Game.Player
             if (part != null && (part.Slot == null || part.Slot.InstalledPart != part))
                 return;
 
+            var dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragWorldHeight, 0f));
+            if (!dragPlane.Raycast(ray, out float distance))
+                return;
+
             _workbenchHolder.ReleaseKeyboard(_keyboardBody);
             if (_keyboardBody.transform.parent == _workbenchHolder.transform)
                 _keyboardBody.transform.SetParent(null, true);
 
             Vector3 center = _keyboardBody.transform.TransformPoint(
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
-            Vector3 screenCenter = _outputCamera.WorldToScreenPoint(center);
-            _dragDepth = screenCenter.z;
-            _pointerOffset = (Vector2)screenCenter - InGameCursor.Position;
+            _pointerOffset = _keyboardBody.position - ray.GetPoint(distance);
+            _pointerOffset.y = 0f;
             _centerOffset = Quaternion.Inverse(_keyboardBody.rotation) * (center - _keyboardBody.position);
             _dragRotation = Quaternion.Inverse(_outputCamera.transform.rotation) * _keyboardBody.rotation;
             if (!_keyboardBody.isKinematic)
@@ -204,19 +214,18 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 출력 카메라 정면의 평면과 커서 Ray로 본체 목표 위치를 계산한다.
-        /// 저장한 깊이와 화면 오프셋 및 목표 rotation으로 보정한 중심을 사용하여 position을 반환하며 교차 실패 시 false를 반환한다.
+        /// 현재 커서 Ray와 지정한 절대 월드 높이의 수평면으로 본체 목표 위치를 계산한다.
+        /// 집기 시 X/Z 오프셋을 유지하고 position의 Y를 dragWorldHeight로 고정하며 교차 실패 시 false를 반환한다.
         /// </summary>
-        private bool TryGetDragPosition(Quaternion rotation, out Vector3 position)
+        private bool TryGetDragPosition(out Vector3 position)
         {
-            Transform cameraTransform = _outputCamera.transform;
-            var dragPlane = new Plane(cameraTransform.forward,
-                cameraTransform.position + cameraTransform.forward * _dragDepth);
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position + _pointerOffset);
+            var dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragWorldHeight, 0f));
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
             position = _keyboardBody.position;
             if (!dragPlane.Raycast(ray, out float distance))
                 return false;
-            position = ray.GetPoint(distance) - rotation * _centerOffset;
+            position = ray.GetPoint(distance) + _pointerOffset;
+            position.y = _dragWorldHeight;
             return true;
         }
 

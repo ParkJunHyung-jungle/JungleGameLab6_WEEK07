@@ -13,7 +13,7 @@ using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
-    [DefaultExecutionOrder(-110)]
+    [DefaultExecutionOrder(200)]
     [DisallowMultipleComponent]
     public sealed class WorkshopKeyboardDragController : MonoBehaviour
     {
@@ -26,14 +26,14 @@ namespace Game.Player
 
         [Header("Drag State")]
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
-        private Plane _dragPlane;
-        private Vector3 _pointerOffset;
+        private float _dragDepth;
+        private Vector2 _pointerOffset;
         private Vector3 _centerOffset;
         private Quaternion _dragRotation;
         private bool _isDragging;
         private bool _inputAllowed = true;
         private bool _acceptPress;
-        private bool _viewSwitchingWasAllowed;
+        private bool _releasePending;
 
         public bool IsDragging => _isDragging;
 
@@ -56,12 +56,8 @@ namespace Game.Player
 
             if (_isDragging)
             {
-                if (!mouse.leftButton.isPressed)
-                {
-                    if (TryGetDragPosition(out Vector3 position))
-                        _keyboardBody.position = position;
-                    DropKeyboard();
-                }
+                if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
+                    _releasePending = true;
                 return;
             }
 
@@ -76,13 +72,20 @@ namespace Game.Player
                 TryBeginDrag();
         }
 
-        void FixedUpdate()
+        void LateUpdate()
         {
-            if (!_isDragging || !TryGetDragPosition(out Vector3 position))
+            if (!_isDragging)
                 return;
 
-            _keyboardBody.MovePosition(position);
-            _keyboardBody.MoveRotation(_dragRotation);
+            Quaternion rotation = _outputCamera.transform.rotation * _dragRotation;
+            if (!TryGetDragPosition(rotation, out Vector3 position))
+                return;
+
+            // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
+            _keyboardBody.position = position;
+            _keyboardBody.rotation = rotation;
+            if (_releasePending && !_brain.IsBlending)
+                DropKeyboard();
         }
 
         /// <summary>
@@ -113,7 +116,7 @@ namespace Game.Player
 
         /// <summary>
         /// 출력 카메라와 커서 Ray의 가장 가까운 실체가 지정 본체 또는 장착 자식인지 검사한다.
-        /// 시각 중심과 최초 교점을 저장하고 속도를 정리한 뒤 물리를 고정하며 뷰 전환을 막는다.
+        /// 시각 중심의 깊이와 화면 오프셋 및 카메라 상대 회전을 저장하고 속도를 정리한 뒤 운반 물리를 고정한다.
         /// </summary>
         private void TryBeginDrag()
         {
@@ -131,13 +134,11 @@ namespace Game.Player
 
             Vector3 center = _keyboardBody.transform.TransformPoint(
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
-            _dragPlane = new Plane(_outputCamera.transform.forward, center);
-            if (!_dragPlane.Raycast(ray, out float distance))
-                return;
-
-            _pointerOffset = center - ray.GetPoint(distance);
-            _centerOffset = center - _keyboardBody.position;
-            _dragRotation = _keyboardBody.rotation;
+            Vector3 screenCenter = _outputCamera.WorldToScreenPoint(center);
+            _dragDepth = screenCenter.z;
+            _pointerOffset = (Vector2)screenCenter - InGameCursor.Position;
+            _centerOffset = Quaternion.Inverse(_keyboardBody.rotation) * (center - _keyboardBody.position);
+            _dragRotation = Quaternion.Inverse(_outputCamera.transform.rotation) * _keyboardBody.rotation;
             if (!_keyboardBody.isKinematic)
             {
                 _keyboardBody.linearVelocity = Vector3.zero;
@@ -146,41 +147,44 @@ namespace Game.Player
             _keyboardBody.isKinematic = true;
             _keyboardBody.useGravity = false;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            _viewSwitchingWasAllowed = _viewController.ViewSwitchingAllowed;
-            _viewController.SetViewSwitchingAllowed(false);
+            _releasePending = false;
             _isDragging = true;
         }
 
         /// <summary>
-        /// 현재 커서 Ray와 집기 시 고정한 평면 및 오프셋으로 본체 목표 위치를 계산한다.
-        /// position에 최초 깊이와 집기 위치 차이를 유지한 월드 좌표를 반환하며 실패 시 false를 반환한다.
+        /// 현재 출력 카메라 정면의 평면과 커서 Ray로 본체 목표 위치를 계산한다.
+        /// 저장한 깊이와 화면 오프셋 및 목표 rotation으로 보정한 중심을 사용하여 position을 반환하며 교차 실패 시 false를 반환한다.
         /// </summary>
-        private bool TryGetDragPosition(out Vector3 position)
+        private bool TryGetDragPosition(Quaternion rotation, out Vector3 position)
         {
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Transform cameraTransform = _outputCamera.transform;
+            var dragPlane = new Plane(cameraTransform.forward,
+                cameraTransform.position + cameraTransform.forward * _dragDepth);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position + _pointerOffset);
             position = _keyboardBody.position;
-            if (!_dragPlane.Raycast(ray, out float distance))
+            if (!dragPlane.Raycast(ray, out float distance))
                 return false;
-            position = ray.GetPoint(distance) + _pointerOffset - _centerOffset;
+            position = ray.GetPoint(distance) - rotation * _centerOffset;
             return true;
         }
 
         /// <summary>
         /// 운반 중인 본체를 현재 위치에서 중력 낙하 상태로 전환한다.
-        /// 속도와 각속도를 비우고 이전 뷰 전환 허용 상태를 복원하며 슬롯과 재고는 변경하지 않는다.
+        /// 해제 보류와 클릭 허용을 초기화하고 속도와 각속도를 비우며 외부 전환 차단과 슬롯 및 재고는 변경하지 않는다.
         /// </summary>
         private void DropKeyboard()
         {
             if (!_isDragging)
                 return;
             _isDragging = false;
+            _releasePending = false;
+            _acceptPress = false;
             _keyboardBody.isKinematic = false;
             _keyboardBody.useGravity = true;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             _keyboardBody.linearVelocity = Vector3.zero;
             _keyboardBody.angularVelocity = Vector3.zero;
             _keyboardBody.WakeUp();
-            _viewController.SetViewSwitchingAllowed(_viewSwitchingWasAllowed);
         }
 
         /// <summary>

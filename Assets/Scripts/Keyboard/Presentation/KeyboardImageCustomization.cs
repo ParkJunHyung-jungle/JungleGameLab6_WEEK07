@@ -104,6 +104,25 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
     }
 
     /// <summary>
+    /// keycaps 중 새로 조립된 외피를 사진 대상으로 등록한다.
+    /// 기존 사진과 캔버스 경계는 유지하고 새 렌더러의 사진 상태만 초기화한다.
+    /// </summary>
+    public void RegisterKeycapRenderers(IEnumerable<MeshRenderer> keycaps)
+    {
+        var shells = new List<MeshRenderer>(_shells);
+        foreach (MeshRenderer renderer in keycaps)
+            if (renderer != null && renderer.name == "PBT_SculptedShell" && !shells.Contains(renderer))
+                shells.Add(renderer);
+        int previousCount = _shells.Length;
+        _shells = shells.ToArray();
+        Array.Resize(ref _keycapImages, _shells.Length);
+        Array.Resize(ref _individualImages, _shells.Length);
+        Array.Resize(ref _keycapOffsets, _shells.Length);
+        Array.Resize(ref _keycapZooms, _shells.Length);
+        for (int index = previousCount; index < _shells.Length; index++) _keycapZooms[index] = 1f;
+    }
+
+    /// <summary>
     /// image를 전체 키캡 캔버스에 적용하거나 keycapIndex 한 곳에 개별 사진으로 적용한다.
     /// 성공 여부를 반환하며 전체 적용은 이전 개별 사진 배치를 덮어쓴다.
     /// </summary>
@@ -230,6 +249,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         MeshRenderer[] targets = keycapIndex >= 0 ? new[] { _shells[keycapIndex] } : _shells;
         foreach (MeshRenderer renderer in targets)
         {
+            if (renderer != null && !_hasSwitchForKeycap(Array.IndexOf(_shells, renderer))) continue;
             if (renderer == null)
             {
                 if (keycapIndex >= 0) return false;
@@ -242,6 +262,7 @@ public sealed class KeyboardImageCustomization : MonoBehaviour
         foreach (MeshRenderer renderer in targets)
         {
             if (renderer == null) continue;
+            if (!_hasSwitchForKeycap(Array.IndexOf(_shells, renderer))) continue;
             HideAppliedImage(renderer);
             Bounds canvas = keycapIndex >= 0 ? GetCanvasBounds(new[] { renderer }) : _keycapCanvas;
             ApplyImage(renderer, image, canvas, offset, zoom, _previewOverlays);

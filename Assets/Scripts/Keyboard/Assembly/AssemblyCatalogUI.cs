@@ -42,6 +42,12 @@ namespace KeyboardModeling.Assembly
         private KeyboardLEDPanelUI _ledUI;
         private int _ledCategory = -1;
 
+        [Header("Image Customization")]
+        [SerializeField] private AssemblyImageCustomization _imageCustomization;
+        [SerializeField] private AssemblyCustomizationStorage _customizationStorage;
+        private int _imageCategory = -1;
+        private KeyboardCustomizationTestUI _imageUI;
+
         [Header("Appearance")]
         [SerializeField] private Sprite _sprite;
         [SerializeField] private bool _startCollapsed;
@@ -83,6 +89,11 @@ namespace KeyboardModeling.Assembly
 
         public RectTransform ReturnArea => _returnArea;
         public int CurrentCategory => _currentCategory;
+        public IReadOnlyList<AssemblyCatalogEntry> Entries => _spawnEntries;
+        public IReadOnlyList<Material> Materials => _keycapMaterials;
+        public IReadOnlyList<MeshRenderer> CaseRenderers => _caseRenderers;
+        public MeshRenderer PlateRenderer => _plateRenderer;
+        public AssemblyLEDSettings LEDSettings => _ledSettings;
         public event Action<int> CategorySelected;
         public event Action<AssemblyCatalogEntry> PartSelected;
         public event Action PanelOpened;
@@ -117,12 +128,14 @@ namespace KeyboardModeling.Assembly
             bool canChangeMode = !_dragInput.IsDragging;
             _singlePlacementButton.interactable = canChangeMode;
             _bulkPlacementButton.interactable = canChangeMode;
+
         }
 
         void OnDisable()
         {
             _dragInput.CancelDrag();
             if (_ledUI != null) _ledUI.Close();
+            if (_imageUI != null) _imageUI.HideEmbedded();
         }
 
         void OnDestroy()
@@ -256,6 +269,11 @@ namespace KeyboardModeling.Assembly
                 else _ledUI.Close();
             }
             if (isExpanded) PanelOpened?.Invoke();
+            if (_imageUI != null)
+            {
+                if (isExpanded && _currentCategory == _imageCategory) _imageUI.BeginCustomization();
+                else _imageUI.HideEmbedded();
+            }
         }
 
         /// <summary>
@@ -315,6 +333,23 @@ namespace KeyboardModeling.Assembly
                 float height = _ledUI.InitializeEmbedded(content, 272f);
                 content.sizeDelta = new Vector2(0f, height);
             }
+            if (_imageCustomization != null) BuildImagePanel();
+        }
+
+        /// <summary>기존 사진 편집 UI를 왼쪽 목록의 이미지 탭에 구성한다. 입력값 없이 편집 대상과 닫기 이벤트를 연결한다.</summary>
+        private void BuildImagePanel()
+        {
+            _imageCategory = AddCategory("이미지");
+            RectTransform content = _contents[_imageCategory];
+            content.GetComponent<GridLayoutGroup>().enabled = false;
+            content.GetComponent<ContentSizeFitter>().enabled = false;
+            RectTransform host = Rect("ImageCustomization", content);
+            Place(host, 0f, 0f, 272f, 802f);
+            _imageUI = host.gameObject.AddComponent<KeyboardCustomizationTestUI>();
+            _customizationStorage.Initialize();
+            float height = _imageUI.InitializeAssemblyEmbedded(_imageCustomization, host, 272f, _customizationStorage.Storage);
+            host.sizeDelta = new Vector2(272f, height);
+            content.sizeDelta = new Vector2(0f, height);
         }
 
         /// <summary>
@@ -608,9 +643,15 @@ namespace KeyboardModeling.Assembly
             _scroll.content = _contents[index];
             _currentCategory = index;
             bool isLED = index == _ledCategory;
+            bool isImage = index == _imageCategory;
+            if (_imageUI != null)
+            {
+                if (isImage) _imageUI.BeginCustomization();
+                else _imageUI.HideEmbedded();
+            }
             _scroll.gameObject.SetActive(true);
-            _singlePlacementButton.gameObject.SetActive(!isLED);
-            _bulkPlacementButton.gameObject.SetActive(!isLED);
+            _singlePlacementButton.gameObject.SetActive(!isLED && !isImage);
+            _bulkPlacementButton.gameObject.SetActive(!isLED && !isImage);
             if (_ledUI != null)
             {
                 if (isLED) _ledUI.OpenAssembly(_ledSettings);

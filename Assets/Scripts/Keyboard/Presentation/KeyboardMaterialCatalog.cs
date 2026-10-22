@@ -8,6 +8,8 @@ public sealed class KeyboardMaterialCatalog : ScriptableObject
     [SerializeField] private string[] _ids = new string[0];
     [SerializeField] private Game.Tournament.KeycapDefinition[] _keycapDefinitions = new Game.Tournament.KeycapDefinition[0];
     [SerializeField, HideInInspector] private string _defaultStateJson;
+    public System.Collections.Generic.IReadOnlyList<Material> Materials => _materials;
+    public System.Collections.Generic.IReadOnlyList<string> Ids => _ids;
 
     /// <summary>
     /// 기본 프리팹에서 수집한 완성 구성을 독립된 객체로 반환한다.

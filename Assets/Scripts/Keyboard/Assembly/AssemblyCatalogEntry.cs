@@ -26,6 +26,8 @@ namespace KeyboardModeling.Assembly
 
         public AssemblyDraggablePart Prefab => _prefab;
         public Material KeycapMaterial => _keycapMaterial;
+        public KeycapDefinition KeycapDefinition => _keycapDefinition;
+        public SwitchData SwitchData => _switchData;
         public bool IsArtisan => _keycapDefinition != null && _keycapDefinition.IsArtisan;
         public bool IsSwitch => _switchData != null;
         public int AvailableQuantity => _quantity - _reservedQuantity;

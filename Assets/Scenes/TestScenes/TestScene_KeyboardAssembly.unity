@@ -246,6 +246,8 @@ MonoBehaviour:
   - {fileID: 1186391430}
   _plateRenderer: {fileID: 1215104936}
   _ledSettings: {fileID: 1340925034}
+  _imageCustomization: {fileID: 1885668290}
+  _customizationStorage: {fileID: 1885668291}
   _sprite: {fileID: 0}
   _startCollapsed: 1
   _dragInput: {fileID: 1055555871}
@@ -1897,6 +1899,146 @@ Rigidbody:
   m_CorrespondingSourceObject: {fileID: 9119643164805234818, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
   m_PrefabInstance: {fileID: 4248216447086206701}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1885668290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1340925031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61c0f4721690abc4799b9b44d526dc39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.AssemblyImageCustomization
+  _caseRenderers:
+  - {fileID: 1143542930}
+  - {fileID: 1671179970}
+  - {fileID: 978784771}
+  - {fileID: 1472191607}
+  - {fileID: 1186391430}
+  _keycapSlots:
+  - {fileID: 3946349001033484382}
+  - {fileID: 4248216447086206873}
+  - {fileID: 4248216447086206871}
+  - {fileID: 4248216447086206869}
+  - {fileID: 4248216447086206867}
+  - {fileID: 4248216447086206865}
+  - {fileID: 4248216447086206863}
+  - {fileID: 4248216447086206861}
+  - {fileID: 4248216447086206859}
+  - {fileID: 4248216447086206857}
+  - {fileID: 4248216447086206855}
+  - {fileID: 4248216447086206853}
+  - {fileID: 4248216447086206851}
+  - {fileID: 4248216447086206849}
+  - {fileID: 4248216447086206847}
+  - {fileID: 4248216447086206845}
+  - {fileID: 4248216447086206843}
+  - {fileID: 4248216447086206841}
+  - {fileID: 4248216447086206839}
+  - {fileID: 4248216447086206837}
+  - {fileID: 4248216447086206835}
+  - {fileID: 4248216447086206833}
+  - {fileID: 4248216447086206831}
+  - {fileID: 4248216447086206829}
+  - {fileID: 4248216447086206827}
+  - {fileID: 4248216447086206825}
+  - {fileID: 4248216447086206823}
+  - {fileID: 4248216447086206821}
+  - {fileID: 4248216447086206819}
+  - {fileID: 4248216447086206817}
+  - {fileID: 4248216447086206815}
+  - {fileID: 4248216447086206813}
+  - {fileID: 4248216447086206811}
+  - {fileID: 4248216447086206809}
+  - {fileID: 4248216447086206807}
+  - {fileID: 4248216447086206805}
+  - {fileID: 4248216447086206803}
+  - {fileID: 4248216447086206801}
+  - {fileID: 4248216447086206799}
+  - {fileID: 4248216447086206797}
+  - {fileID: 4248216447086206795}
+  - {fileID: 4248216447086206793}
+  - {fileID: 4248216447086206791}
+  - {fileID: 4248216447086206789}
+  - {fileID: 4248216447086206787}
+  - {fileID: 4248216447086206785}
+  - {fileID: 4248216447086206783}
+  - {fileID: 4248216447086206781}
+  - {fileID: 4248216447086206779}
+  - {fileID: 4248216447086206777}
+  - {fileID: 4248216447086206775}
+  - {fileID: 4248216447086206773}
+  - {fileID: 4248216447086206771}
+  - {fileID: 4248216447086206769}
+  - {fileID: 4248216447086206767}
+  - {fileID: 4248216447086206765}
+  - {fileID: 4248216447086206763}
+  - {fileID: 4248216447086206761}
+  - {fileID: 4248216447086206759}
+  - {fileID: 4248216447086206757}
+  - {fileID: 4248216447086206755}
+  - {fileID: 4248216447086206753}
+  - {fileID: 4248216447086206751}
+  - {fileID: 4248216447086206749}
+  - {fileID: 4248216447086206747}
+  - {fileID: 4248216447086206745}
+  - {fileID: 4248216447086206743}
+  - {fileID: 4248216447086206741}
+  - {fileID: 4248216447086206739}
+  - {fileID: 4248216447086206737}
+  - {fileID: 4248216447086206735}
+  - {fileID: 4248216447086206733}
+  - {fileID: 4248216447086206731}
+  - {fileID: 4248216447086206729}
+  - {fileID: 4248216447086206727}
+  - {fileID: 4248216447086206725}
+  - {fileID: 4248216447086206723}
+  - {fileID: 4248216447086206721}
+  - {fileID: 4248216447086206719}
+  - {fileID: 4248216447086206717}
+  - {fileID: 4248216447086206715}
+  - {fileID: 4248216447086206713}
+  - {fileID: 4248216447086206711}
+  - {fileID: 4248216447086206709}
+  - {fileID: 4248216447086206707}
+  - {fileID: 4248216447086206705}
+  - {fileID: 4248216447086206703}
+  _photoMaterialTemplate: {fileID: 2100000, guid: 4a96a34eedb48104fa0dffe02c1580f0, type: 2}
+--- !u!114 &1885668291
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1340925031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 272c6ace667f08c4eadbad2b9759d655, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.AssemblyCustomizationStorage
+  _storage: {fileID: 1885668292}
+  _materialCatalog: {fileID: 11400000, guid: 067fd65342d9d114ba14af37cab52dc3, type: 2}
+  _catalog: {fileID: 9900102}
+  _dragInput: {fileID: 1055555871}
+  _images: {fileID: 1885668290}
+--- !u!114 &1885668292
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1340925031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89e1d2440af59244ba58f7663b574ad6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomizationStorage
+  _customization: {fileID: 0}
+  _catalog: {fileID: 0}
+  _materialCatalog: []
+  _materialIds: []
 --- !u!1 &1949275070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2062,6 +2204,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1885668287}
+    - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1885668290}
+    - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1885668292}
+    - targetCorrespondingSourceObject: {fileID: 987670696490926945, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1885668291}
     - targetCorrespondingSourceObject: {fileID: 7420572367496054787, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1368413148}

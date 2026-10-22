@@ -59,6 +59,12 @@ namespace KeyboardModeling.Assembly
         public float DragWorldHeight => _partSlot.transform.position.y + _heightOffset;
         public event Action<AssemblyDraggablePart> PartPicked;
 
+        /// <summary>불러온 part를 기존 집기 대상에 등록한다. 중복 등록 없이 입력 대상 목록만 갱신한다.</summary>
+        public void RegisterRestoredPart(AssemblyDraggablePart part)
+        {
+            if (!_parts.Contains(part)) _parts.Add(part);
+        }
+
         void Awake()
         {
             var switchSlots = new Dictionary<Key, AssemblyPartSlot>();

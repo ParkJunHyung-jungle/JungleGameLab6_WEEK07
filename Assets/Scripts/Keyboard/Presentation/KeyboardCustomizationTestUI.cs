@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -945,6 +945,22 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             : "미리보기 중 · 아직 적용되지 않음";
         _imageStateLabel.color = applied ? new Color32(59, 217, 196, 255)
             : previewed ? new Color32(255, 200, 96, 255) : new Color32(140, 155, 170, 255);
+    }
+
+    /// <summary>현재 이미지와 크롭 입력 상태를 조회해 state에 실행 가능한 이동 및 확대 조작을 추가한다. 이미지를 변경하지 않고 표시 여부를 반환한다.</summary>
+    public bool CollectControlHints(Game.Player.WorkshopControlHintState state)
+    {
+        if (_isCustomizing && _isWaitingForKeyInput && Keyboard.current != null)
+            state.Add("키보드 입력", "사진 적용 키 선택");
+        if (!_isCustomizing || !_hasSelectedImage || _cropInput == null || !_cropInput.isActiveAndEnabled) return false;
+        bool over = RectTransformUtility.RectangleContainsScreenPoint(_cropFrame, InGameCursor.Position,
+            null);
+        if (!_cropInput.IsDragging && !over) return false;
+        state.Title = "이미지 크롭";
+        state.Add(_cropInput.IsDragging ? "좌클릭 유지·이동" : "좌클릭 드래그", "이미지 위치 조절");
+        if (over) state.Add("마우스 휠", "이미지 확대·축소");
+        if (_cropInput.IsDragging) state.Add("좌클릭 놓기", "크롭 이동 종료");
+        return true;
     }
 
     /// <summary>

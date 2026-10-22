@@ -248,8 +248,7 @@ namespace Game.Player
         /// </summary>
         public void BeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 point)
         {
-            if (!_pullers.InputAllowed || Mouse.current == null || !Mouse.current.leftButton.isPressed
-                || IsDragging || entry.AvailableQuantity <= 0) return;
+            if (!CanBeginInventoryDrag(entry) || !Mouse.current.leftButton.isPressed) return;
             if (!_bulkPlacement && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
@@ -476,10 +475,7 @@ namespace Game.Player
             else
             {
                 KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
-                int index = customization.FindKeycapSlot(InputCamera.ScreenPointToRay(point), _entry.IsSwitch);
-                if (Physics.Raycast(InputCamera.ScreenPointToRay(point), out RaycastHit obstruction,
-                    InputCamera.farClipPlane, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
-                    && !obstruction.transform.IsChildOf(customization.transform)) index = -1;
+                int index = FindInstallSlot(point);
                 bool installed = InstallEntry(customization, index);
                 if (_fromInventory) _entry.FinishReservation(true);
                 if (installed)
@@ -532,6 +528,60 @@ namespace Game.Player
             _fromInventory = false;
             _dragIcon.gameObject.SetActive(false);
             RefreshInventory();
+        }
+
+        /// <summary>point의 설치 레이와 가림 검사를 수행해 슬롯 인덱스를 반환한다. 설치 확정과 안내가 같은 대상을 조회한다.</summary>
+        private int FindInstallSlot(Vector2 point)
+        {
+            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            Ray ray = InputCamera.ScreenPointToRay(point);
+            if (Physics.Raycast(ray, out RaycastHit obstruction, InputCamera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                && !obstruction.transform.IsChildOf(customization.transform)) return -1;
+            return customization.FindKeycapSlot(ray, _entry.IsSwitch);
+        }
+
+        /// <summary>현재 entry와 index의 실제 설치 조건을 조회한다. 수량 예약과 효과음 및 부품 상태는 변경하지 않는다.</summary>
+        private bool CanInstallEntry(int index)
+        {
+            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            if (_entry.IsSwitch) return customization.CanInstallSwitchFromInventory(index, _entry.SwitchData.Type);
+            Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
+            return customization.CanInstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
+        }
+
+        /// <summary>현재 카드의 entry가 출고 가능한지 반환한다. 배치 입력과 같은 수량 및 드래그 조건만 읽는다.</summary>
+        public bool CanBeginInventoryDrag(AssemblyCatalogEntry entry)
+        {
+            return _pullers.InputAllowed && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0;
+        }
+
+        /// <summary>state에 현재 부품 드래그나 바닥 부품 집기의 실행 가능한 조작을 추가한다. 포인터는 공통 커서를 사용한다.</summary>
+        public bool CollectControlHints(WorkshopControlHintState state)
+        {
+            if (!_pullers.InputAllowed) return false;
+            Vector2 point = InGameCursor.Position;
+            if (!IsDragging)
+            {
+                if (_pullers.IsPullerInteraction(point) || _pullers.IsPointerOverUI(point)
+                    || !IsPointerOverLoosePart(InputCamera.ScreenPointToRay(point))) return false;
+                state.Title = "바닥 부품";
+                state.Add("좌클릭 드래그", "부품 집기");
+                return true;
+            }
+            state.Title = _isBulkDragging ? "일괄 배치" : _entry.IsSwitch ? "스위치 드래그" : "키캡 드래그";
+            state.Add("마우스 이동", "부품 이동");
+            if (_isBulkDragging)
+            {
+                if (!_pullers.IsPointerOverUI(point) && _entry.AvailableQuantity > 0 && CanInstallEntry(FindInstallSlot(point)))
+                    state.Add("좌클릭 유지", "키캡·스위치 연속 설치");
+                state.Add("좌클릭 놓기", "일괄 배치 종료");
+            }
+            else if (IsInReturnArea(point)) state.Add("좌클릭 놓기", "목록에 반환");
+            else if (_dragOriginPart != null) state.Add("좌클릭 놓기", "부품 내려놓기");
+            else if (_pullers.IsPointerOverUI(point)) state.Add("좌클릭 놓기", "드래그 취소·복원");
+            else state.Add("좌클릭 놓기", CanInstallEntry(FindInstallSlot(point)) ? "슬롯에 설치" : "부품 내려놓기");
+            return true;
         }
 
         /// <summary>

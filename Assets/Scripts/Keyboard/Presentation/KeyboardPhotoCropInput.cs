@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -9,6 +9,7 @@ public sealed class KeyboardPhotoCropInput : MonoBehaviour, IBeginDragHandler, I
     private Vector2 _previousPointerPosition;
     private bool _isDragging;
 
+    public bool IsDragging => _isDragging;
     public event Action<Vector2> Dragged;
     public event Action<Vector2, float> Zoomed;
 

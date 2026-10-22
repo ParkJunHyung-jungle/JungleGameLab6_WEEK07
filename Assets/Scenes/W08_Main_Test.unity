@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -10985,10 +10985,81 @@ MonoBehaviour:
   _checkInterval: 0.1
   _returnDelay: 2
   _flightDuration: 0.6
+--- !u!224 &9919000001 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 4516601102664388646, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
+  m_PrefabInstance: {fileID: 1131221712}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &9919000002 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
+  m_PrefabInstance: {fileID: 1131221712}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 393b7319461cd884b9625a07cd5c5be4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Tutorials.FirstEncounterTutorial
+--- !u!1 &9919000003
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9919000004}
+  - component: {fileID: 9919000005}
+  m_Layer: 5
+  m_Name: WorkshopControlHints
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &9919000004
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9919000003}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!114 &9919000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9919000003}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c082151779d14cc4b817955735bbd4cd, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopControlHints
+  _interaction: {fileID: 7500000001}
+  _placement: {fileID: 2019032720}
+  _pullers: {fileID: 500387865}
+  _editOverlay: {fileID: 9911000090}
+  _tutorial: {fileID: 9919000002}
+  _helpButton: {fileID: 9919000001}
+  _legacyControlBar: {fileID: 9911000074}
+  _width: 370
+  _helpGap: 14
+  _fontSize: 18
+  _rowGap: 8
+  _background: {r: 0.094, g: 0.145, b: 0.188, a: 0.88}
+  _border: {r: 0.271, g: 0.357, b: 0.439, a: 0.86}
+  _textColor: {r: 0.925, g: 0.906, b: 0.839, a: 1}
+  _accent: {r: 0.451, g: 0.863, b: 0.89, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 9919000004}
   - {fileID: 8800100002}
   - {fileID: 4985257}
   - {fileID: 26574864}

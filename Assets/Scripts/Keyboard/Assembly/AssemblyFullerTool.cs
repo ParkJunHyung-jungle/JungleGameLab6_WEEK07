@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -18,6 +18,7 @@ namespace KeyboardModeling.Assembly
         private bool _followCameraPlane;
         private IKeyboardPullerContext Context => _context ?? _dragInput;
         public bool IsSelected => _selected;
+        public bool ExtractsSwitches => _extractSwitches;
         public Transform ToolTransform => _fuller;
         public event System.Action<Transform> HeldToolChanged;
 
@@ -36,6 +37,15 @@ namespace KeyboardModeling.Assembly
         {
             Collider hit = FindVisibleCollider(ray);
             return hit != null && hit.transform.IsChildOf(_fuller);
+        }
+
+        /// <summary>screenPosition에서 실제 분리 경로와 같은 UI, 복귀 표시 및 가림 검사를 한 대상을 반환한다. 분리와 도구 상태는 변경하지 않는다.</summary>
+        public Collider GetExtractionTarget(Vector2 screenPosition)
+        {
+            if (Context.IsPointerOverUI(screenPosition)) return null;
+            Ray ray = Context.InputCamera.ScreenPointToRay(screenPosition);
+            if (_returnCollider != null && _returnCollider.Raycast(ray, out _, Context.InputCamera.farClipPlane)) return null;
+            return FindVisibleCollider(ray);
         }
 
         [Header("Extraction")]
@@ -333,12 +343,7 @@ namespace KeyboardModeling.Assembly
             for (int index = 0; index <= steps; index++)
             {
                 Vector2 position = Vector2.Lerp(start, end, (float)index / steps);
-                if (Context.IsPointerOverUI(position))
-                    continue;
-                Ray ray = Context.InputCamera.ScreenPointToRay(position);
-                if (_returnCollider.Raycast(ray, out RaycastHit returnHit, Context.InputCamera.farClipPlane))
-                    continue;
-                Collider hit = FindVisibleCollider(ray);
+                Collider hit = GetExtractionTarget(position);
                 Vector2 sideways = Random.insideUnitCircle * _popSideSpeed;
                 Context.TryExtractPart(hit, _extractSwitches, new Vector3(sideways.x, _popUpSpeed, sideways.y), Random.onUnitSphere * _spinSpeed);
             }

@@ -11,6 +11,10 @@ namespace Game.Player
     {
         private const float ROTATION_DURATION = 0.35f;
 
+        [Header("Placement Pose")]
+        [SerializeField] private Vector3 _placementCenterOffset;
+        [SerializeField] private Vector3 _placementEulerAngles = new Vector3(-57f, 0f, 0f);
+
         [Header("Keyboard")]
         private Rigidbody _keyboardBody;
         private Quaternion _initialKeyboardRotation;
@@ -28,13 +32,13 @@ namespace Game.Player
         public Quaternion InitialKeyboardRotation => _initialKeyboardRotation;
 
         /// <summary>
-        /// 본체 기준의 시각 중심 오프셋을 받아 기존 작업대 기울기와 중심 정렬 정책의 최종 자세를 반환한다.
+        /// 본체의 시각 중심 오프셋과 Inspector의 배치 중심 및 회전으로 최종 자세를 반환한다.
         /// centerOffset은 배율을 포함하며 Holder나 본체의 실제 상태는 변경하지 않는다.
         /// </summary>
         public Pose GetPlacementPose(Vector3 centerOffset)
         {
-            Quaternion rotation = transform.rotation * Quaternion.Euler(-57f, 0f, 0f);
-            return new Pose(transform.position - rotation * centerOffset, rotation);
+            Quaternion rotation = transform.rotation * Quaternion.Euler(_placementEulerAngles);
+            return new Pose(transform.TransformPoint(_placementCenterOffset) - rotation * centerOffset, rotation);
         }
 
         /// <summary>
@@ -60,6 +64,7 @@ namespace Game.Player
             body.transform.SetParent(transform, true);
             body.position = pose.position;
             body.rotation = pose.rotation;
+            body.transform.SetPositionAndRotation(pose.position, pose.rotation);
             return true;
         }
 

@@ -323,7 +323,27 @@ namespace Game.Player
         /// </summary>
         public void SetCaseCustomization(KeyboardCustomization customization)
         {
+            if (_caseCustomization == customization)
+                return;
+            if (isActiveAndEnabled)
+                foreach (KeyboardEditButton button in _casePreviewButtons)
+                    button.Clicked -= HandleCasePreviewClicked;
             _caseCustomization = customization;
+            if (isActiveAndEnabled)
+            {
+                CreateCaseMaterialPicker();
+                foreach (KeyboardEditButton button in _casePreviewButtons)
+                    button.Clicked += HandleCasePreviewClicked;
+            }
+        }
+
+        /// <summary>
+        /// visible에 따라 기존 작업실 목록을 열거나 닫고 진행 중인 UI 미리보기를 정리한다.
+        /// GameObject는 비활성화하지 않아 재고와 분리 부품 회수 코루틴을 유지한다.
+        /// </summary>
+        public void SetWorkshopVisible(bool visible)
+        {
+            SetPickerMode(visible && _showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
         }
 
         /// <summary>

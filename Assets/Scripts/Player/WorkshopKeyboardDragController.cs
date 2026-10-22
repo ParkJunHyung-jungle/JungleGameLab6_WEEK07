@@ -45,6 +45,8 @@ namespace Game.Player
         private bool _inputAllowed = true;
         private bool _acceptPress;
         private bool _releasePending;
+        private bool _clickCandidate;
+        private Vector2 _pressPosition;
 
         public bool IsDragging => _isDragging;
 
@@ -80,6 +82,32 @@ namespace Game.Player
                 return;
             }
 
+            if (_clickCandidate)
+            {
+                if (!IsPlaced || !_viewController.CanEnterKeyboardFocus)
+                {
+                    _clickCandidate = false;
+                    _acceptPress = false;
+                    return;
+                }
+                float threshold = EventSystem.current.pixelDragThreshold;
+                if (((Vector2)InGameCursor.Position - _pressPosition).sqrMagnitude > threshold * threshold)
+                {
+                    _clickCandidate = false;
+                    _acceptPress = false;
+                    if (!IsPointerOverUI() && TryBeginDrag(false) && !mouse.leftButton.isPressed)
+                        _releasePending = true;
+                }
+                else if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
+                {
+                    _clickCandidate = false;
+                    _acceptPress = false;
+                    if (!IsPointerOverUI() && IsKeyboardUnderCursor())
+                        _viewController.TryEnterKeyboardFocus(_keyboardBody);
+                }
+                return;
+            }
+
             if (!_acceptPress)
             {
                 _acceptPress = !mouse.leftButton.isPressed;
@@ -88,7 +116,15 @@ namespace Game.Player
 
             if (mouse.leftButton.wasPressedThisFrame && !_brain.IsBlending
                 && _viewController.ViewSwitchingAllowed && !IsPointerOverUI())
-                TryBeginDrag();
+            {
+                if (IsPlaced && _viewController.CanEnterKeyboardFocus && IsKeyboardUnderCursor())
+                {
+                    _clickCandidate = true;
+                    _pressPosition = InGameCursor.Position;
+                }
+                else if (!IsPlaced)
+                    TryBeginDrag(true);
+            }
         }
 
         void LateUpdate()
@@ -97,24 +133,23 @@ namespace Game.Player
                 return;
 
             Quaternion rotation = _outputCamera.transform.rotation * _dragRotation;
-            if (!TryGetDragPosition(out Vector3 position))
-            {
-                if (_releasePending && !_brain.IsBlending)
-                    DropKeyboard();
-                return;
-            }
-
             // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
-            _keyboardBody.position = position;
+            if (TryGetDragPosition(out Vector3 position))
+                _keyboardBody.position = position;
             _keyboardBody.rotation = rotation;
             bool hasHolder = IsHolderUnderCursor();
             if (hasHolder && !_releasePending)
                 _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset));
             if (_releasePending && !_brain.IsBlending)
             {
-                DropKeyboard();
-                if (hasHolder)
-                    _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset);
+                if (hasHolder && _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset))
+                {
+                    _isDragging = false;
+                    _releasePending = false;
+                    _acceptPress = false;
+                }
+                else
+                    DropKeyboard();
             }
         }
 
@@ -170,9 +205,9 @@ namespace Game.Player
 
         /// <summary>
         /// 출력 카메라와 커서 Ray의 가장 가까운 실체가 지정 본체 또는 장착 자식인지 검사한다.
-        /// 수평면의 집기 오프셋과 시각 중심 및 카메라 상대 회전을 저장하고 속도를 정리한 뒤 운반 물리를 고정한다.
+        /// 분리 부품과 제거 도구를 제외하고 선택 가능 여부를 반환하며 물체 상태는 변경하지 않는다.
         /// </summary>
-        private void TryBeginDrag()
+        private bool IsKeyboardUnderCursor()
         {
             Physics.SyncTransforms();
             Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
@@ -180,15 +215,25 @@ namespace Game.Player
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                 || !hit.transform.IsChildOf(_keyboardBody.transform)
                 || hit.collider.GetComponentInParent<AssemblyFullerTool>() != null)
-                return;
+                return false;
 
             AssemblyDraggablePart part = hit.collider.GetComponentInParent<AssemblyDraggablePart>();
-            if (part != null && (part.Slot == null || part.Slot.InstalledPart != part))
-                return;
+            return part == null || (part.Slot != null && part.Slot.InstalledPart == part);
+        }
+
+        /// <summary>
+        /// requireHit이 true면 본체 선택을 검사하고 현재 커서에서 수평면 운반을 시작한다.
+        /// 오프셋과 상대 회전을 저장하고 기존 Holder 점유를 해제하며 시작 성공 여부를 반환한다.
+        /// </summary>
+        private bool TryBeginDrag(bool requireHit)
+        {
+            if (requireHit && !IsKeyboardUnderCursor())
+                return false;
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
 
             var dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragWorldHeight, 0f));
             if (!dragPlane.Raycast(ray, out float distance))
-                return;
+                return false;
 
             _workbenchHolder.ReleaseKeyboard(_keyboardBody);
             if (_keyboardBody.transform.parent == _workbenchHolder.transform)
@@ -207,10 +252,14 @@ namespace Game.Player
             }
             _keyboardBody.isKinematic = true;
             _keyboardBody.useGravity = false;
+            Vector3 position = _keyboardBody.position;
+            position.y = _dragWorldHeight;
+            _keyboardBody.position = position;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             _releasePending = false;
             _placementPreview.Prepare(_keyboardBody.transform);
             _isDragging = true;
+            return true;
         }
 
         /// <summary>
@@ -254,6 +303,7 @@ namespace Game.Player
         /// </summary>
         private void HandlePointerCanceled()
         {
+            _clickCandidate = false;
             DropKeyboard();
             _acceptPress = false;
         }

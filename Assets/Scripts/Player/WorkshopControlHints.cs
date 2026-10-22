@@ -15,6 +15,7 @@ namespace Game.Player
     {
         [Header("Scene References")]
         [SerializeField] private PlayerInteractionController _interaction;
+        [SerializeField] private WorkshopViewController _workshopView;
         [SerializeField] private WorkshopKeycapPlacement _placement;
         [SerializeField] private WorkshopKeyboardPullerController _pullers;
         [SerializeField] private KeyboardEditOverlayUI _editOverlay;
@@ -77,7 +78,8 @@ namespace Game.Player
             _title = CreateText("StateTitle", _panel, _accent);
             _title.fontStyle = FontStyle.Bold;
             _title.rectTransform.anchoredPosition = new Vector2(16f, -14f);
-            _interaction.SetContextHintsEnabled(true);
+            if (_interaction != null)
+                _interaction.SetContextHintsEnabled(true);
             _legacyControlBar.SetActive(false);
             _panel.gameObject.SetActive(false);
         }
@@ -85,25 +87,31 @@ namespace Game.Player
         void OnEnable()
         {
             InGameCursor.PointerCanceled += HandlePointerCanceled;
-            if (_panel != null) _interaction.SetContextHintsEnabled(true);
+            if (_panel != null && _interaction != null) _interaction.SetContextHintsEnabled(true);
         }
 
         void LateUpdate()
         {
-            if (!_interaction.CanShowControlHints)
+            bool canShow = _workshopView != null ? _workshopView.CanShowControlHints
+                : _interaction != null && _interaction.CanShowControlHints;
+            if (!canShow)
             {
                 HandlePointerCanceled();
                 return;
             }
             _state.Clear();
             _common.Clear();
-            _interaction.CollectControlHints(_common);
+            if (_workshopView != null)
+                _workshopView.CollectControlHints(_common);
+            else
+                _interaction.CollectControlHints(_common);
             if (_common.Rows.Count == 0) { Hide(); return; }
-            _state.Title = _interaction.IsKeyboardEditing ? _editOverlay.ControlHintTitle : _common.Title;
-            if (InGameCursor.CanProcessVirtualPointer)
+            bool isEditing = _workshopView != null ? _workshopView.IsKeyboardEditing : _interaction.IsKeyboardEditing;
+            _state.Title = isEditing ? _editOverlay.ControlHintTitle : _common.Title;
+            if (InGameCursor.CanProcessVirtualPointer && (!isEditing || _pullers.EditingKeyboard != null))
             {
-                bool owned = _placement.CollectControlHints(_state) || _pullers.CollectControlHints(_state)
-                    || _editOverlay.CollectControlHints(_state);
+                bool owned = isEditing && (_placement.CollectControlHints(_state) || _pullers.CollectControlHints(_state)
+                    || _editOverlay.CollectControlHints(_state));
                 if (!owned) CollectUIHints();
             }
             bool choosingKey = false;
@@ -275,7 +283,8 @@ namespace Game.Player
         void OnDisable()
         {
             InGameCursor.PointerCanceled -= HandlePointerCanceled;
-            _interaction.SetContextHintsEnabled(false);
+            if (_interaction != null)
+                _interaction.SetContextHintsEnabled(false);
             Hide();
         }
 

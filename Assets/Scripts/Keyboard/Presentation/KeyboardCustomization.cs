@@ -1160,6 +1160,58 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     }
 
     /// <summary>
+    /// hit의 장착 파츠를 extractSwitches 종류에 맞춰 제거하고 removed에 원본 Transform을 반환한다.
+    /// 미리보기와 설치 연출을 정리하며 키캡이 남은 축은 거부하고 실제 설치 상태와 타건음을 동기화한다.
+    /// </summary>
+    public bool TryRemovePart(Transform hit, bool extractSwitches, out Transform removed)
+    {
+        removed = null;
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            Transform keyboardSwitch = index < _switches.Length && _switches[index] != null ? _switches[index].transform : null;
+            Transform part = extractSwitches ? keyboardSwitch : _keycaps[index];
+            if (part == null || !part.gameObject.activeInHierarchy || !hit.IsChildOf(part)) continue;
+            CancelKeycapMaterialPreview();
+            ClearPhotoImagePreview();
+            if (extractSwitches ? IsKeycapInstalled(index) : !IsKeycapInstalled(index)) return false;
+            if (_partInstallation != null) _partInstallation.CancelForRemoval(keyboardSwitch, _keycaps[index]);
+            part.gameObject.SetActive(false);
+            if (extractSwitches && !HasAnySwitchForKeycaps()) GetComponent<KeyboardInputController>().DisableSwitchSound();
+            removed = part;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// hit가 가리키는 설치된 키캡 또는 제거 가능한 축을 찾아 part와 extractSwitches로 반환한다.
+    /// 키캡이 덮고 있는 축은 제외하며 설치 상태는 변경하지 않는다. 발견하면 true를 반환한다.
+    /// </summary>
+    public bool TryGetRemovablePart(Transform hit, out Transform part, out bool extractSwitches)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        part = null;
+        extractSwitches = false;
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            bool hasKeycap = IsKeycapInstalled(index);
+            if (hasKeycap && hit.IsChildOf(_keycaps[index]))
+            {
+                part = _keycaps[index];
+                return true;
+            }
+            if (!hasKeycap && HasSwitchForKeycap(index) && hit.IsChildOf(_switches[index].transform))
+            {
+                part = _switches[index].transform;
+                extractSwitches = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// 키캡 대상 중 축이 설치된 키가 하나라도 있는지 반환한다.
     /// 캐시된 키캡 인덱스와 각 인덱스의 축 활성 상태를 확인한다.
     /// </summary>

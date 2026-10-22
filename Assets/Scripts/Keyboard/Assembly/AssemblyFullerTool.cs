@@ -12,6 +12,28 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private Transform _fuller;
         [SerializeField, Tooltip("활성화하면 키캡 대신 스위치만 분리합니다.")] private bool _extractSwitches;
+        private IKeyboardPullerContext _context;
+        private bool _followCameraPlane;
+        private IKeyboardPullerContext Context => _context ?? _dragInput;
+        public bool IsSelected => _selected;
+        public Transform ToolTransform => _fuller;
+
+        /// <summary>
+        /// context를 도구 입력과 분리 동작의 대상으로 연결한다.
+        /// followCameraPlane이 true이면 카메라와 평행한 평면에서 풀러 중심이 포인터를 따라간다. 반환값은 없다.
+        /// </summary>
+        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false)
+        {
+            _context = context;
+            _followCameraPlane = followCameraPlane;
+        }
+
+        /// <summary>ray가 현재 도구에 가장 먼저 닿는지 반환한다. 선택 및 물리 상태는 변경하지 않는다.</summary>
+        public bool IsPointerOverTool(Ray ray)
+        {
+            Collider hit = FindVisibleCollider(ray);
+            return hit != null && hit.transform.IsChildOf(_fuller);
+        }
 
         [Header("Extraction")]
         [SerializeField, Min(1f)] private float _sweepStepPixels = 4f;
@@ -50,11 +72,11 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool ProcessPointer(Ray ray, Vector2 screenPosition, Mouse mouse)
         {
-            if (!_dragInput.InputAllowed || !isActiveAndEnabled || _fuller == null)
+            if (!Context.InputAllowed || !isActiveAndEnabled || _fuller == null)
                 return false;
 
             Physics.SyncTransforms();
-            bool overUI = _dragInput.IsPointerOverUI(screenPosition);
+            bool overUI = Context.IsPointerOverUI(screenPosition);
             if (!_selected)
             {
                 if (!overUI && mouse.leftButton.wasPressedThisFrame)
@@ -74,7 +96,7 @@ namespace KeyboardModeling.Assembly
 
             if (_followPlane.Raycast(ray, out float distance))
                 _fuller.position = ray.GetPoint(distance) + _grabOffset;
-            bool overReturn = _returnCollider.Raycast(ray, out RaycastHit returnHit, _dragInput.InputCamera.farClipPlane);
+            bool overReturn = _returnCollider.Raycast(ray, out RaycastHit returnHit, Context.InputCamera.farClipPlane);
             if (!overUI && overReturn && mouse.leftButton.wasPressedThisFrame)
             {
                 ReturnToOrigin();
@@ -102,20 +124,34 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// ray와 드래그 높이로 Fuller의 원래 자세와 집기 오프셋을 보관하고 즉시 일괄 분리를 활성화한다.
+        /// ray와 이동 평면 설정으로 Fuller의 원래 자세와 집기 오프셋을 보관하고 즉시 일괄 분리를 활성화한다.
         /// 진행 중 배치를 기존 정책으로 취소하고 물리 충돌을 해제하며 선택 클릭으로 뒤쪽 키캡은 분리하지 않는다.
         /// </summary>
         private bool SelectFuller(Ray ray)
         {
-            _followPlane = new Plane(Vector3.up, new Vector3(0f, _dragInput.DragWorldHeight, 0f));
+            Bounds bounds = new Bounds(_fuller.position, Vector3.zero);
+            if (_followCameraPlane)
+                foreach (MeshRenderer renderer in _fuller.GetComponentsInChildren<MeshRenderer>())
+                    if (renderer.enabled) bounds.Encapsulate(renderer.bounds);
+            _followPlane = _followCameraPlane
+                ? new Plane(Context.InputCamera.transform.forward, bounds.center)
+                : new Plane(Vector3.up, new Vector3(0f, Context.DragWorldHeight, 0f));
             if (!_followPlane.Raycast(ray, out float distance))
                 return false;
-            _dragInput.CancelDrag();
+            Context.CancelDrag();
             _originPosition = _fuller.position;
             _originRotation = _fuller.rotation;
             Vector3 lifted = _originPosition;
-            lifted.y = _dragInput.DragWorldHeight;
-            _grabOffset = lifted - ray.GetPoint(distance);
+            if (_followCameraPlane)
+            {
+                _grabOffset = _originPosition - bounds.center;
+                lifted = ray.GetPoint(distance) + _grabOffset;
+            }
+            else
+            {
+                lifted.y = Context.DragWorldHeight;
+                _grabOffset = lifted - ray.GetPoint(distance);
+            }
             CreateReturnMarker();
             _colliders = _fuller.GetComponentsInChildren<Collider>(true);
             _colliderStates = new bool[_colliders.Length];
@@ -242,7 +278,7 @@ namespace KeyboardModeling.Assembly
         private Collider FindVisibleCollider(Ray ray)
         {
             Collider nearest = null;
-            float distance = _dragInput.InputCamera.farClipPlane;
+            float distance = Context.InputCamera.farClipPlane;
             foreach (RaycastHit hit in Physics.RaycastAll(ray, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 if ((_selected && hit.transform.IsChildOf(_fuller))
@@ -268,19 +304,14 @@ namespace KeyboardModeling.Assembly
             for (int index = 0; index <= steps; index++)
             {
                 Vector2 position = Vector2.Lerp(start, end, (float)index / steps);
-                if (_dragInput.IsPointerOverUI(position))
+                if (Context.IsPointerOverUI(position))
                     continue;
-                Ray ray = _dragInput.InputCamera.ScreenPointToRay(position);
-                if (_returnCollider.Raycast(ray, out RaycastHit returnHit, _dragInput.InputCamera.farClipPlane))
+                Ray ray = Context.InputCamera.ScreenPointToRay(position);
+                if (_returnCollider.Raycast(ray, out RaycastHit returnHit, Context.InputCamera.farClipPlane))
                     continue;
                 Collider hit = FindVisibleCollider(ray);
-                AssemblyDraggablePart part = hit != null ? hit.GetComponentInParent<AssemblyDraggablePart>() : null;
-                if (part == null || part.IsSwitch != _extractSwitches
-                    || System.Array.IndexOf(_dragInput.Slots, part.Slot) < 0)
-                    continue;
                 Vector2 sideways = Random.insideUnitCircle * _popSideSpeed;
-                if (part.TryPopOff(new Vector3(sideways.x, _popUpSpeed, sideways.y), Random.onUnitSphere * _spinSpeed))
-                    _dragInput.ScheduleExtractedReturn(part);
+                Context.TryExtractPart(hit, _extractSwitches, new Vector3(sideways.x, _popUpSpeed, sideways.y), Random.onUnitSphere * _spinSpeed);
             }
         }
 

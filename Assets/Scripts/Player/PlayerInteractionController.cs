@@ -74,6 +74,7 @@ namespace Game.Player
         [SerializeField] private CinemachineInputAxisController _cameraInputAxisController;
         [SerializeField, Min(0.01f)] private float _cameraTransitionDuration = 0.45f;
         [SerializeField] private GameObject _keyboardEditOverlay;
+        [SerializeField] private WorkshopKeyboardPullerController _keyboardPullers;
         [SerializeField] private GameObject _centerReticle;
         [SerializeField, Range(1f, 179f)] private float _keyboardEditMinFieldOfView = 40f;
         [SerializeField, Range(1f, 179f)] private float _keyboardEditMaxFieldOfView = 100f;
@@ -88,6 +89,8 @@ namespace Game.Player
         private bool _cameraInputWasEnabled;
         private bool _editingKeyboardAttackWasEnabled;
         private bool _isKeyboardEditMode;
+        public bool IsKeyboardEditing => _isKeyboardEditMode && _cameraTransition == null;
+        public KeyboardInputController EditingKeyboard => _editingKeyboard;
         private Rigidbody _editingKeyboardBody;
         private float _savedCameraFieldOfView;
         private InputAction _keyboardResetInput;
@@ -896,6 +899,7 @@ namespace Game.Player
         /// </summary>
         private void TryBeginEditingKeyboardRotation()
         {
+            if (_keyboardPullers != null && _keyboardPullers.ConsumesPointer()) return;
             Mouse mouse = Mouse.current;
             if (mouse == null || _editingKeyboardBody == null)
                 return;

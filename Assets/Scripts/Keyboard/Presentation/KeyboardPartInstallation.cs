@@ -59,6 +59,18 @@ public sealed class KeyboardPartInstallation : MonoBehaviour
         replacement.Routine = StartCoroutine(ReplaceRoutine(keyboardSwitch, replacement, applyAppearance));
     }
 
+    /// <summary>풀러로 제거할 keyboardSwitch와 keycap의 진행 중 연출을 취소하고 기준 위치를 복원한다. 반환값은 없다.</summary>
+    public void CancelForRemoval(Transform keyboardSwitch, Transform keycap)
+    {
+        if (keyboardSwitch != null && _replacements.TryGetValue(keyboardSwitch, out Replacement replacement))
+        {
+            StopCoroutine(replacement.Routine);
+            _replacements.Remove(keyboardSwitch);
+        }
+        if (keyboardSwitch != null) CancelMotion(keyboardSwitch);
+        if (keycap != null) CancelMotion(keycap);
+    }
+
     /// <summary>
     /// part의 현재 연출 오프셋을 제거하고 해당 이동을 취소한다.
     /// 반환값 없이 원래 위치를 복원하며 활성 상태는 유지한다.

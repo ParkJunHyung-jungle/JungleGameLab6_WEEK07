@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace KeyboardModeling.Assembly
 {
     [DisallowMultipleComponent]
-    public sealed class AssemblyDragInput : MonoBehaviour
+    public sealed class AssemblyDragInput : MonoBehaviour, IKeyboardPullerContext
     {
         private const float EXTRACTED_RETURN_DELAY = 2f;
 
@@ -99,6 +99,16 @@ namespace KeyboardModeling.Assembly
             _parts.Remove(part);
             part.CatalogEntry.StorePart(part, true);
             _catalog.RefreshInventory();
+        }
+
+        /// <summary>hit에서 현재 슬롯에 등록된 지정 종류 파츠를 찾아 속도값으로 분리하고 지연 회수를 예약한다. 성공 여부를 반환한다.</summary>
+        public bool TryExtractPart(Collider hit, bool extractSwitches, Vector3 velocity, Vector3 angularVelocity)
+        {
+            AssemblyDraggablePart part = hit != null ? hit.GetComponentInParent<AssemblyDraggablePart>() : null;
+            if (part == null || part.IsSwitch != extractSwitches || Array.IndexOf(_slots, part.Slot) < 0
+                || !part.TryPopOff(velocity, angularVelocity)) return false;
+            ScheduleExtractedReturn(part);
+            return true;
         }
 
         /// <summary>불러온 part를 기존 집기 대상에 등록한다. 중복 등록 없이 입력 대상 목록만 갱신한다.</summary>

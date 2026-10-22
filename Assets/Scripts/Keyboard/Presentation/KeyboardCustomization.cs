@@ -76,6 +76,8 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     [SerializeField] private Material _keycapMaterial;
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
     private Transform[] _keycaps;
+    private MeshRenderer[] _keycapSlotShells;
+    private MeshRenderer[] _switchSlotShells;
     private KeyboardImageCustomization _imageCustomization;
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
     private KeycapMaterialPreviewSnapshot _keycapMaterialPreviewSnapshot;
@@ -94,6 +96,105 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
             if (_keycaps == null) CacheKeycaps();
             return _keycaps.Length;
         }
+    }
+
+    /// <summary>
+    /// index 위치의 키캡 Transform을 반환한다. 키캡 캐시를 준비하며 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public Transform GetKeycapSlotTransform(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return _keycaps[index];
+    }
+
+    /// <summary>
+    /// ray가 통과하는 슬롯 중 가장 가까운 위치의 인덱스를 반환한다.
+    /// switchSlot이 true이면 축 경계를, 아니면 키캡 경계를 검사하며 슬롯이 없으면 -1을 반환한다.
+    /// </summary>
+    public int FindKeycapSlot(Ray ray, bool switchSlot = false)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        float nearest = float.PositiveInfinity;
+        int result = -1;
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            Bounds bounds = switchSlot ? GetSwitchSlotBounds(index) : GetKeycapSlotBounds(index);
+            if (bounds.IntersectRay(ray, out float distance) && distance < nearest)
+            {
+                nearest = distance;
+                result = index;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// index에 캐시한 외피 참조로 현재 월드 슬롯 경계를 반환한다.
+    /// 전체 렌더러를 다시 검색하지 않으며 비활성 슬롯도 같은 좌표로 계산한다. 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public Bounds GetKeycapSlotBounds(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return GetRendererSlotBounds(_keycapSlotShells[index]);
+    }
+
+    /// <summary>
+    /// index에 캐시한 축 하우징의 월드 경계를 반환한다.
+    /// 비활성 축도 검사하고 스태빌라이저를 설치 범위에서 제외한다. 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public Bounds GetSwitchSlotBounds(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return GetRendererSlotBounds(_switchSlotShells[index]);
+    }
+
+    /// <summary>
+    /// renderer의 로컬 메시 경계를 현재 Transform으로 변환해 월드 슬롯 경계로 반환한다.
+    /// renderer가 없으면 빈 경계를 반환하고 오브젝트 상태는 변경하지 않는다.
+    /// </summary>
+    private static Bounds GetRendererSlotBounds(MeshRenderer renderer)
+    {
+        if (renderer == null) return new Bounds();
+        Bounds bounds = renderer.localBounds;
+        Vector3 center = renderer.transform.TransformPoint(bounds.center);
+        Vector3 x = renderer.transform.TransformVector(Vector3.right * bounds.extents.x);
+        Vector3 y = renderer.transform.TransformVector(Vector3.up * bounds.extents.y);
+        Vector3 z = renderer.transform.TransformVector(Vector3.forward * bounds.extents.z);
+        Vector3 extents = new Vector3(Mathf.Abs(x.x) + Mathf.Abs(y.x) + Mathf.Abs(z.x),
+            Mathf.Abs(x.y) + Mathf.Abs(y.y) + Mathf.Abs(z.y), Mathf.Abs(x.z) + Mathf.Abs(y.z) + Mathf.Abs(z.z));
+        return new Bounds(center, extents * 2f);
+    }
+
+    /// <summary>
+    /// index에 해당하는 축 루트 Transform을 반환한다. 배율과 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public Transform GetSwitchSlotTransform(int index) => _switches[index].transform;
+
+    /// <summary>
+    /// index의 빈 축 슬롯에 type을 설치하고 성공 여부를 반환한다.
+    /// 키캡이나 축이 이미 있으면 거부하고 성공 시 외형과 타건음을 갱신하며 설치 연출을 재생한다.
+    /// </summary>
+    public bool InstallSwitchFromInventory(int index, SwitchType type)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (index < 0 || index >= _switches.Length || HasSwitchForKeycap(index) || IsKeycapInstalled(index)) return false;
+        KeyboardSwitch keyboardSwitch = _switches[index];
+        if (!keyboardSwitch.ChangeSwitch(type)) return false;
+        PlayPartInstallation(keyboardSwitch.transform);
+        _switchType = type;
+        GetComponent<KeyboardInputController>().SetSwitchSound(type);
+        return true;
+    }
+
+    /// <summary>
+    /// index의 빈 키캡 슬롯에 material과 definition을 설치하고 성공 여부를 반환한다.
+    /// 축 설치와 키캡 규격을 검사하며 재고는 호출자가 관리한다. 성공 시 외형과 설치 상태를 갱신한다.
+    /// </summary>
+    public bool InstallKeycapFromInventory(int index, Material material, Game.Tournament.KeycapDefinition definition)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return index >= 0 && index < _keycaps.Length && !IsKeycapInstalled(index)
+            && ApplyKeycapMaterialToKey(index, material, true, definition);
     }
 
     /// <summary>
@@ -1160,6 +1261,127 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     }
 
     /// <summary>
+    /// 현재 인스턴스의 축에 클릭 충돌체가 없으면 렌더 메시 범위로 BoxCollider를 생성한다.
+    /// 비활성 축도 준비하되 활성 상태와 프리팹 에셋은 변경하지 않는다. 반환값은 없다.
+    /// </summary>
+    public void PrepareSwitchRemovalTargets()
+    {
+        foreach (KeyboardSwitch keyboardSwitch in _switches)
+        {
+            if (keyboardSwitch.GetComponentInChildren<Collider>(true) != null) continue;
+            Transform root = keyboardSwitch.transform;
+            Bounds total = new Bounds();
+            bool found = false;
+            foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (!renderer.enabled) continue;
+                Transform branch = renderer.transform;
+                while (branch.parent != root) branch = branch.parent;
+                if (branch.name.StartsWith("Stabilizer_", StringComparison.Ordinal)
+                    || renderer.name == "AbilityUnlockOutline") continue;
+                Bounds bounds = renderer.localBounds;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 sign = new Vector3((corner & 1) == 0 ? -1f : 1f,
+                        (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f);
+                    Vector3 point = root.InverseTransformPoint(renderer.transform.TransformPoint(
+                        bounds.center + Vector3.Scale(bounds.extents, sign)));
+                    if (found) total.Encapsulate(point);
+                    else { total = new Bounds(point, Vector3.zero); found = true; }
+                }
+            }
+            if (!found) continue;
+            BoxCollider collider = keyboardSwitch.gameObject.AddComponent<BoxCollider>();
+            collider.center = total.center;
+            collider.size = total.size;
+        }
+    }
+
+    /// <summary>
+    /// keyboardSwitch의 현재 데이터 타입을 반환하고 아직 데이터가 없으면 키보드의 기본 축 타입을 반환한다.
+    /// 외형과 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public SwitchType GetInstalledSwitchType(KeyboardSwitch keyboardSwitch)
+    {
+        return keyboardSwitch.CurrentData != null ? keyboardSwitch.CurrentData.Type : _switchType;
+    }
+
+    /// <summary>
+    /// hit의 장착 파츠를 extractSwitches 종류에 맞춰 제거하고 removed에 원본 Transform을 반환한다.
+    /// 미리보기와 설치 연출을 정리하며 키캡이 남은 축은 거부하고 실제 설치 상태와 타건음을 동기화한다.
+    /// </summary>
+    public bool TryRemovePart(Transform hit, bool extractSwitches, out Transform removed)
+    {
+        removed = null;
+        if (_keycaps == null) CacheKeycaps();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            Transform keyboardSwitch = index < _switches.Length && _switches[index] != null ? _switches[index].transform : null;
+            Transform part = extractSwitches ? keyboardSwitch : _keycaps[index];
+            if (part == null || !part.gameObject.activeInHierarchy || !hit.IsChildOf(part)) continue;
+            CancelKeycapMaterialPreview();
+            ClearPhotoImagePreview();
+            if (extractSwitches ? IsKeycapInstalled(index) : !IsKeycapInstalled(index)) return false;
+            if (_partInstallation != null) _partInstallation.CancelForRemoval(keyboardSwitch, _keycaps[index]);
+            if (extractSwitches) KeepSwitchStabilizers(keyboardSwitch);
+            part.gameObject.SetActive(false);
+            if (extractSwitches && !HasAnySwitchForKeycaps()) GetComponent<KeyboardInputController>().DisableSwitchSound();
+            removed = part;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// keyboardSwitch 아래의 스태빌라이저를 키보드에 고정된 별도 루트로 옮긴다.
+    /// 현재 위치와 회전 및 크기를 유지하며 중앙 축 제거 시 보조 부품이 숨거나 떨어지지 않게 한다. 반환값은 없다.
+    /// </summary>
+    private void KeepSwitchStabilizers(Transform keyboardSwitch)
+    {
+        Transform fixedRoot = null;
+        for (int index = keyboardSwitch.childCount - 1; index >= 0; index--)
+        {
+            Transform child = keyboardSwitch.GetChild(index);
+            if (!child.name.StartsWith("Stabilizer_", StringComparison.Ordinal)) continue;
+            if (fixedRoot == null)
+            {
+                fixedRoot = new GameObject(keyboardSwitch.name + "_Stabilizers").transform;
+                fixedRoot.SetParent(keyboardSwitch.parent, false);
+                fixedRoot.SetLocalPositionAndRotation(keyboardSwitch.localPosition, keyboardSwitch.localRotation);
+                fixedRoot.localScale = keyboardSwitch.localScale;
+            }
+            child.SetParent(fixedRoot, true);
+        }
+    }
+
+    /// <summary>
+    /// hit가 가리키는 설치된 키캡 또는 제거 가능한 축을 찾아 part와 extractSwitches로 반환한다.
+    /// 키캡이 덮고 있는 축은 제외하며 설치 상태는 변경하지 않는다. 발견하면 true를 반환한다.
+    /// </summary>
+    public bool TryGetRemovablePart(Transform hit, out Transform part, out bool extractSwitches)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        part = null;
+        extractSwitches = false;
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            bool hasKeycap = IsKeycapInstalled(index);
+            if (hasKeycap && hit.IsChildOf(_keycaps[index]))
+            {
+                part = _keycaps[index];
+                return true;
+            }
+            if (!hasKeycap && HasSwitchForKeycap(index) && hit.IsChildOf(_switches[index].transform))
+            {
+                part = _switches[index].transform;
+                extractSwitches = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// 키캡 대상 중 축이 설치된 키가 하나라도 있는지 반환한다.
     /// 캐시된 키캡 인덱스와 각 인덱스의 축 활성 상태를 확인한다.
     /// </summary>
@@ -1347,23 +1569,29 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     }
 
     /// <summary>
-    /// 등록된 렌더러 배열의 PBT_SculptedShell을 사용해 키캡별 루트를 순서대로 저장한다.
-    /// 입력과 반환값 없이 키캡 인덱스를 고정해 파괴 이후에도 다른 키의 인덱스를 유지한다.
+    /// 등록된 렌더러 배열의 PBT_SculptedShell로 키캡 루트와 대응하는 축 하우징을 캐시한다.
+    /// 입력과 반환값 없이 슬롯 인덱스를 고정해 파괴 이후에도 다른 키의 인덱스를 유지한다.
     /// </summary>
     private void CacheKeycaps()
     {
         var keycaps = new List<Transform>();
+        var shells = new List<MeshRenderer>();
         foreach (MeshRenderer renderer in _keycapRenderers)
         {
             if (renderer != null && renderer.name == "PBT_SculptedShell")
             {
                 keycaps.Add(renderer.transform.parent);
+                shells.Add(renderer);
                 if (!_keycapModels.ContainsKey(renderer.transform.parent))
                     _keycapModels.Add(renderer.transform.parent, new KeycapModelAppearance(renderer));
             }
         }
 
         _keycaps = keycaps.ToArray();
+        _keycapSlotShells = shells.ToArray();
+        _switchSlotShells = new MeshRenderer[_switches.Length];
+        for (int index = 0; index < _switches.Length; index++)
+            _switchSlotShells[index] = _switches[index].transform.Find("Switch_BottomHousing").GetComponent<MeshRenderer>();
     }
 
     /// <summary>keycap 외피에 definition의 모델을 적용하거나 원본으로 복원한다. 1u 제한과 재질 슬롯을 검증하고 현재 모델 연결을 갱신한다.</summary>

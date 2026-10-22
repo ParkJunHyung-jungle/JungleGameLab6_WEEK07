@@ -139,6 +139,15 @@ namespace Game.Player
         public float InitializeEmbedded(RectTransform parent, float width)
         {
             Initialize();
+            return EmbedControls(parent, width);
+        }
+
+        /// <summary>
+        /// 이미 생성한 LED 조작 항목을 parent의 공통 목록 안으로 옮긴다.
+        /// width에 맞춰 배치하고 독립 카드 장식과 머리말을 숨긴 뒤 콘텐츠 높이를 반환한다.
+        /// </summary>
+        public float EmbedControls(RectTransform parent, float width)
+        {
             _panel.SetParent(parent, false);
             _panel.anchorMin = _panel.anchorMax = _panel.pivot = new Vector2(0f, 1f);
             _panel.anchoredPosition = Vector2.zero;

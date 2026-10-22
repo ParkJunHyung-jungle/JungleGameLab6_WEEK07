@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -901,7 +901,7 @@ namespace Game.Player
         {
             if (_keyboardPullers != null && _keyboardPullers.ConsumesPointer()) return;
             Mouse mouse = Mouse.current;
-            if (mouse == null || _editingKeyboardBody == null)
+            if (mouse == null || !InGameCursor.CanProcessVirtualPointer || _editingKeyboardBody == null)
                 return;
 
             Vector2 pointerPosition = InGameCursor.Position;
@@ -966,7 +966,7 @@ namespace Game.Player
                 return;
 
             Mouse mouse = Mouse.current;
-            if (mouse == null || !InGameCursor.CanProcessPointer)
+            if (mouse == null || !InGameCursor.CanProcessVirtualPointer)
             {
                 StopEditingKeyboardRotation();
                 return;
@@ -985,7 +985,7 @@ namespace Game.Player
                 return;
 
             Mouse mouse = Mouse.current;
-            if (mouse == null || !InGameCursor.CanProcessPointer)
+            if (mouse == null || !InGameCursor.CanProcessVirtualPointer)
                 return;
 
             float scrollDelta = mouse.scroll.y.ReadValue();

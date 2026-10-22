@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -51,6 +51,7 @@ public sealed class InGameCursor : MonoBehaviour
     public static InGameCursor Instance => _instance;
     public static Vector2 Position => _instance != null && _instance.IsActive ? _instance._position : Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
     public static bool CanProcessPointer => _instance == null || (_instance._hasFocus && _instance._dialogDepth == 0 && !_instance._waitRelease && Time.frameCount > _instance._blockedFrame);
+    public static bool CanProcessVirtualPointer => _instance != null && _instance.IsActive && CanProcessPointer;
     public float Sensitivity => _sensitivity;
     public event Action<float> SensitivityChanged;
 

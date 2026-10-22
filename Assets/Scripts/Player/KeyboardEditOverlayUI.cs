@@ -46,6 +46,7 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _caseButton;
         [SerializeField] private KeyboardEditButton _plateButton;
         [SerializeField] private KeyboardEditButton _customButton;
+        [SerializeField] private bool _showKeycapsOnOpen;
 
         [Header("Mode Buttons")]
         [SerializeField] private KeyboardEditButton _generalModeButton;
@@ -223,7 +224,7 @@ namespace Game.Player
 
             SetPlatePickerEventBindings(true);
 
-            SetPickerMode(PickerMode.None);
+            SetPickerMode(_showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
         }
 
         void OnDisable()

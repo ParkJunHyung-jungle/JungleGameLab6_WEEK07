@@ -33,6 +33,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private bool _previousInput;
     private GameObject _canvas;
     private GameObject _customizationPanel;
+    private float _catalogWidth;
     private GameObject _startPanel;
     private bool _embedded;
     private bool _isCustomizing;
@@ -324,6 +325,36 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             if (divider.name == "ToolsDivider") divider.gameObject.AddComponent<LayoutElement>().preferredHeight = 1f;
         _imageDividerRect.gameObject.AddComponent<LayoutElement>().preferredHeight = 1f;
         LayoutRebuilder.ForceRebuildLayoutImmediate(_embeddedContentRect);
+    }
+
+    /// <summary>
+    /// 이미 생성한 이미지 조작 항목만 parent의 공통 목록으로 옮긴다.
+    /// width를 사용해 세로 레이아웃을 구성하고 기존 프레임과 중첩 스크롤을 제거한 콘텐츠를 반환한다.
+    /// </summary>
+    public RectTransform EmbedControls(RectTransform parent, float width)
+    {
+        GameObject frame = _customizationPanel;
+        bool visible = frame.activeSelf;
+        _catalogWidth = width;
+        _assemblyListContent = parent;
+        _embeddedContentRect.SetParent(parent, false);
+        _embeddedContentRect.anchorMin = _embeddedContentRect.anchorMax = _embeddedContentRect.pivot = Vector2.up;
+        _embeddedContentRect.anchoredPosition = Vector2.zero;
+        _embeddedContentRect.localScale = Vector3.one;
+        _embeddedContentRect.sizeDelta = new Vector2(width, 802f);
+        foreach (Text label in _embeddedContentRect.GetComponentsInChildren<Text>(true))
+        {
+            label.fontSize = Mathf.Max(16, label.fontSize);
+            label.resizeTextForBestFit = false;
+        }
+        ConfigureAssemblyPhotoLayout();
+        _customizationPanel = _embeddedContentRect.gameObject;
+        _embeddedPanelRect = null;
+        _embeddedViewportRect = null;
+        frame.SetActive(false);
+        Destroy(frame);
+        _customizationPanel.SetActive(visible);
+        return _embeddedContentRect;
     }
 
     /// <summary>
@@ -760,7 +791,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _targetSection.sizeDelta = new Vector2(326f, targetHeight);
         float toolsTop = targetTop + targetHeight + 8f;
         _toolsSection.anchoredPosition = new Vector2(16f, -toolsTop);
-        _embeddedContentRect.sizeDelta = new Vector2(_assemblyPhotoTarget != null ? 366f : 0f, toolsTop + _toolsSection.rect.height + 16f);
+        _embeddedContentRect.sizeDelta = new Vector2(_catalogWidth > 0f ? _catalogWidth : (_assemblyPhotoTarget != null ? 366f : 0f), toolsTop + _toolsSection.rect.height + 16f);
         if (_assemblyListContent != null)
             _assemblyListContent.sizeDelta = new Vector2(0f, _embeddedContentRect.sizeDelta.y * _embeddedContentRect.localScale.y);
         _path.gameObject.SetActive(_pathExpanded);
@@ -783,7 +814,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         else
             _scopeNote.text = "전체 적용 시 기존에 개별 설정한 키캡 이미지가 덮어써집니다.";
         RefreshKeyInputControls();
-        if (_assemblyPhotoTarget != null && _embeddedContentRect.GetComponent<VerticalLayoutGroup>() != null)
+        if ((_assemblyPhotoTarget != null || _catalogWidth > 0f) && _embeddedContentRect.GetComponent<VerticalLayoutGroup>() != null)
         {
             LayoutRebuilder.ForceRebuildLayoutImmediate(_embeddedContentRect);
             _assemblyListContent.sizeDelta = new Vector2(0f, _embeddedContentRect.rect.height * _embeddedContentRect.localScale.y);

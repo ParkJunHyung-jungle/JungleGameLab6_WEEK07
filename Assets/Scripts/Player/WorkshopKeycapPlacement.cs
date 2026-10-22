@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -611,9 +611,9 @@ namespace Game.Player
                     state.Add("좌클릭 유지", "키캡·스위치 연속 설치");
                 state.Add("좌클릭 놓기", "일괄 배치 종료");
             }
-            else if (IsInReturnArea(point)) state.Add("좌클릭 놓기", "목록에 반환");
+            else if (IsInReturnArea(point)) state.Add("좌클릭 놓기", "보관함에 넣기");
             else if (_dragOriginPart != null) state.Add("좌클릭 놓기", "부품 내려놓기");
-            else if (_pullers.IsPointerOverUI(point)) state.Add("좌클릭 놓기", "드래그 취소·복원");
+            else if (_pullers.IsPointerOverUI(point)) state.Add("좌클릭 놓기", "취소");
             else state.Add("좌클릭 놓기", CanInstallEntry(FindInstallSlot(point)) ? "슬롯에 설치" : "부품 내려놓기");
             return true;
         }

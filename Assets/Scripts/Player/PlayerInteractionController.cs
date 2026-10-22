@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -499,8 +499,9 @@ namespace Game.Player
             }
             if (_isMonitorFocusMode)
             {
-                state.Title = "모니터 집중";
-                if (_coverInput.action.enabled) state.Add("우클릭", "모니터 집중 해제");
+                state.Title = "모니터 보기";
+                state.Add("좌클릭", "프로그램 실행");
+                if (_coverInput.action.enabled) state.Add("우클릭", "모니터 보기 종료");
                 return;
             }
             state.Title = _heldKeyboardBody != null ? "키보드 운반" : "작업실 둘러보기";
@@ -527,8 +528,8 @@ namespace Game.Player
                 || pickup != null && (hit.collider.attachedRigidbody != null || pickup.GetComponentInChildren<Rigidbody>() != null);
             if (_clickInput.action.enabled && canPickup) state.Add("좌클릭", "키보드 집기");
             if (!_coverInput.action.enabled) return;
-            if (monitor != null && monitor.KeyboardBody != null) state.Add("우클릭", "모니터 집중");
-            else if (TryGetWorkbenchKeyboard(hit, out _, out _, out _)) state.Add("우클릭", "작업대 집중");
+            if (monitor != null && monitor.KeyboardBody != null) state.Add("우클릭", "모니터 보기");
+            else if (TryGetWorkbenchKeyboard(hit, out _, out _, out _)) state.Add("우클릭", "작업대 보기");
         }
 
         /// <summary>

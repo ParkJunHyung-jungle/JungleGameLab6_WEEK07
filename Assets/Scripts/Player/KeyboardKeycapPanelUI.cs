@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -196,7 +196,7 @@ namespace Game.Player
         public void CollectControlHints(WorkshopControlHintState state)
         {
             if (_isOpen && !_isAllKeys && _hasPendingMaterial && Keyboard.current != null)
-                state.Add("키보드 입력", "재질 적용 키 선택");
+                state.Add("키보드 입력", "적용할 키 입력");
         }
 
         void Update()

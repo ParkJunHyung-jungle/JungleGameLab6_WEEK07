@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -199,13 +199,13 @@ namespace Game.Player
             Ray ray = _camera.ScreenPointToRay(pointer);
             if (selected != null)
             {
-                state.Title = selected.ExtractsSwitches ? "스위치 Puller" : "키캡 Puller";
+                state.Title = selected.ExtractsSwitches ? "스위치 풀러" : "키캡 풀러";
                 Collider target = selected.GetExtractionTarget(pointer);
                 KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
                 if (target != null && customization.TryGetRemovablePart(target.transform, out _, out bool isSwitch)
                     && isSwitch == selected.ExtractsSwitches)
-                    state.Add("좌클릭 유지·이동", isSwitch ? "스위치 연속 분리" : "키캡 연속 분리");
-                state.Add("좌클릭 놓기", "Puller 복귀");
+                    state.Add("좌클릭 유지·이동", isSwitch ? "스위치 연속 뽑기" : "키캡 연속 뽑기");
+                state.Add("좌클릭 놓기", "풀러 내려놓기");
                 return true;
             }
             if (IsPointerOverUI(pointer)) return false;
@@ -213,12 +213,12 @@ namespace Game.Player
                 : _switchPuller.IsPointerOverTool(ray) ? _switchPuller : null;
             if (tool != null)
             {
-                state.Title = tool.ExtractsSwitches ? "스위치 Puller" : "키캡 Puller";
-                state.Add("좌클릭 유지", "Puller 집기·사용");
+                state.Title = tool.ExtractsSwitches ? "스위치 풀러" : "키캡 풀러";
+                state.Add("좌클릭 유지", "풀러 집기");
                 return true;
             }
             if (!TryGetPartHit(ray, out _, out bool extractSwitches)) return false;
-            state.Add("좌클릭 드래그", extractSwitches ? "스위치 분리·집기" : "키캡 분리·집기");
+            state.Add("좌클릭 드래그", extractSwitches ? "스위치 뽑기" : "키캡 뽑기");
             return true;
         }
 

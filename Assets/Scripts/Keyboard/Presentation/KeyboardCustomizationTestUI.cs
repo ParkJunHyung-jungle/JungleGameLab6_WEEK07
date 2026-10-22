@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -951,7 +951,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     public bool CollectControlHints(Game.Player.WorkshopControlHintState state)
     {
         if (_isCustomizing && _isWaitingForKeyInput && Keyboard.current != null)
-            state.Add("키보드 입력", "사진 적용 키 선택");
+            state.Add("키보드 입력", "적용할 키 입력");
         if (!_isCustomizing || !_hasSelectedImage || _cropInput == null || !_cropInput.isActiveAndEnabled) return false;
         bool over = RectTransformUtility.RectangleContainsScreenPoint(_cropFrame, InGameCursor.Position,
             null);

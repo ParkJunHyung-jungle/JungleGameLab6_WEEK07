@@ -36,11 +36,26 @@ namespace KeyboardModeling.Assembly
         private float _dragHeight;
         private bool _isDragging;
 
+        [Header("Pointer Tracking")]
+        [SerializeField, Min(0.1f), Tooltip("드래그 중 실제 부품의 시각 중심을 배치할 카메라 전방 깊이입니다.")] private float _pointerDepth = 0.5f;
+        private AssemblyDraggablePart _trackedPart;
+        private Vector3 _trackingCenter;
+        private Vector3 _trackingScale;
+        private Quaternion _visualRotation;
+        private float _visualDepth;
+        private float _visualProjectionSize;
+        private Vector3 _freeWorldPosition;
+        private readonly Dictionary<Collider, bool> _heldColliders = new Dictionary<Collider, bool>();
+
         [Header("Bulk Placement")]
         private bool _isBulkPlacing;
         private AssemblyCatalogEntry _bulkEntry;
         private AssemblyDraggablePart _bulkPreview;
-        private Vector3 _previousBulkPosition;
+        private Vector2 _previousBulkPosition;
+        private AssemblyPartSlot _hoverSlot;
+        private Vector3 _freeScale;
+        private Quaternion _freeRotation;
+        private readonly HashSet<AssemblyPartSlot> _pathSlots = new HashSet<AssemblyPartSlot>();
         private bool _hasPreviousBulkPosition;
         private readonly HashSet<AssemblyPartSlot> _bulkVisited = new HashSet<AssemblyPartSlot>();
         private readonly List<KeyValuePair<float, AssemblyPartSlot>> _bulkCandidates = new List<KeyValuePair<float, AssemblyPartSlot>>();
@@ -116,6 +131,7 @@ namespace KeyboardModeling.Assembly
                 return;
             }
 
+            _hoverSlot = null;
             bool overUI = IsPointerOverUI(screenPosition);
             bool inReturnArea = _catalog != null && _catalog.IsInReturnArea(screenPosition);
             if (_inventoryEntry != null && (overUI || inReturnArea))
@@ -214,6 +230,7 @@ namespace KeyboardModeling.Assembly
             _dragHeight = _partSlot.transform.position.y + _heightOffset;
             _dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragHeight, 0f));
             _isDragging = true;
+            _freeWorldPosition = new Vector3(_partSlot.transform.position.x, _dragHeight, _partSlot.transform.position.z);
             _catalog.ShowDragIcon(entry, screenPosition);
             return true;
         }
@@ -240,9 +257,11 @@ namespace KeyboardModeling.Assembly
             _bulkPreview.Initialize(previewSlot, _bulkPreview.PartCollider, false);
             _bulkPreview.SetCatalogEntry(entry);
             _bulkPreview.PrepareInventoryPart(entry, _partSlot.KeycapShape);
-            foreach (Collider collider in _bulkPreview.GetComponentsInChildren<Collider>(true))
-                collider.enabled = false;
             _bulkPreview.gameObject.SetActive(false);
+            _freeScale = _bulkPreview.transform.localScale;
+            _freeRotation = _bulkPreview.transform.rotation;
+            _freeWorldPosition = new Vector3(_partSlot.transform.position.x, _dragHeight, _partSlot.transform.position.z);
+            BeginPointerTracking(_bulkPreview);
             _bulkVisited.Clear();
             _hasPreviousBulkPosition = false;
             _isBulkPlacing = true;
@@ -263,61 +282,53 @@ namespace KeyboardModeling.Assembly
                 return;
             }
 
-            if (!_dragPlane.Raycast(ray, out float distance))
+            if (_dragPlane.Raycast(ray, out float distance))
             {
-                _bulkPreview.gameObject.SetActive(false);
-                _catalog.ShowDragIcon(_bulkEntry, screenPosition);
-                _hasPreviousBulkPosition = false;
-                return;
+                _freeWorldPosition = ray.GetPoint(distance);
+                _freeWorldPosition.y = _dragHeight;
             }
-
-            Vector3 position = ray.GetPoint(distance);
-            position.y = _dragHeight;
-            _bulkPreview.transform.SetPositionAndRotation(position, _bulkPreview.Slot.transform.rotation);
+            Vector2 pointer = screenPosition;
+            _hoverSlot = IsPointerOverUI(pointer) ? null : FindPointerSlot(ray, _bulkPreview);
             bool overUI = IsPointerOverUI(screenPosition);
             _bulkPreview.gameObject.SetActive(!overUI);
+            if (!overUI)
+                UpdatePointerTracking(ray);
             if (overUI)
                 _catalog.ShowDragIcon(_bulkEntry, screenPosition);
             else
                 _catalog.HideDragIcon();
-            InstallAlongBulkPath(_hasPreviousBulkPosition ? _previousBulkPosition : position, position);
+            InstallAlongBulkPath(_hasPreviousBulkPosition ? _previousBulkPosition : pointer, pointer);
             if (_bulkEntry.AvailableQuantity <= 0)
             {
                 EndBulkPlacement();
                 return;
             }
-            _previousBulkPosition = position;
+            _previousBulkPosition = pointer;
             _hasPreviousBulkPosition = true;
         }
 
         /// <summary>
-        /// start와 end 사이 XZ 선분에 닿는 호환 빈 슬롯을 이동 순서대로 장착한다.
+        /// 화면 start와 end 사이 커서 경로를 검사하여 유효한 빈 슬롯을 이동 순서대로 장착한다.
         /// UI에 가려진 지점과 이미 방문한 슬롯을 제외하고 성공한 설치마다 재고 한 개를 소비한다.
         /// </summary>
-        private void InstallAlongBulkPath(Vector3 start, Vector3 end)
+        private void InstallAlongBulkPath(Vector2 start, Vector2 end)
         {
             if (_bulkEntry.AvailableQuantity <= 0)
                 return;
 
-            Vector3 direction = end - start;
-            direction.y = 0f;
-            float lengthSquared = direction.sqrMagnitude;
             _bulkCandidates.Clear();
-            foreach (AssemblyPartSlot slot in _slots)
+            _pathSlots.Clear();
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(start, end) / 3f));
+            for (int index = 0; index <= steps; index++)
             {
-                if (slot.IsInstalled || _bulkVisited.Contains(slot) || !slot.CanInstall(_bulkPreview))
+                float progress = (float)index / steps;
+                Vector2 pointer = Vector2.Lerp(start, end, progress);
+                if (IsPointerOverUI(pointer))
                     continue;
-
-                Vector3 offset = slot.transform.position - start;
-                offset.y = 0f;
-                float progress = lengthSquared > 0f ? Mathf.Clamp01(Vector3.Dot(offset, direction) / lengthSquared) : 0f;
-                Vector3 closest = start + direction * progress;
-                if (!slot.IsInsideSlot(closest))
-                    continue;
-                Vector3 screen = _camera.WorldToScreenPoint(closest);
-                if (screen.z <= 0f || IsPointerOverUI(new Vector2(screen.x, screen.y)))
-                    continue;
-                _bulkCandidates.Add(new KeyValuePair<float, AssemblyPartSlot>(progress, slot));
+                AssemblyPartSlot slot = index == steps ? _hoverSlot
+                    : FindPointerSlot(_camera.ScreenPointToRay(pointer), _bulkPreview);
+                if (slot != null && !slot.IsInstalled && !_bulkVisited.Contains(slot) && _pathSlots.Add(slot))
+                    _bulkCandidates.Add(new KeyValuePair<float, AssemblyPartSlot>(progress, slot));
             }
 
             _bulkCandidates.Sort(CompareBulkCandidates);
@@ -372,6 +383,7 @@ namespace KeyboardModeling.Assembly
             if (!_isBulkPlacing)
                 return;
 
+            EndPointerTracking();
             _bulkPreview.gameObject.SetActive(false);
             Destroy(_bulkPreview.gameObject);
             _catalog.HideDragIcon();
@@ -385,16 +397,17 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// ray와 고정 드래그 평면의 교점에서 같은 실물 부품을 표시하고 이동한다.
-        /// 첫 출고에서만 보관 인스턴스나 Prefab을 사용하며 교점이 없으면 false를 반환한다.
+        /// ray로 월드 Drop 위치와 설치 대상을 계산하고 같은 실물 부품을 카메라 앞에서 추적한다.
+        /// 첫 출고에서만 보관 인스턴스나 Prefab을 사용하며 교점이 없으면 마지막 월드 위치를 유지한다.
         /// </summary>
         private bool TryShowWorldPart(Ray ray)
         {
-            if (!_dragPlane.Raycast(ray, out float distance))
-                return false;
-
-            Vector3 position = ray.GetPoint(distance) + _grabOffset;
-            position.y = _dragHeight;
+            if (_dragPlane.Raycast(ray, out float distance))
+            {
+                _freeWorldPosition = ray.GetPoint(distance) + _grabOffset;
+                _freeWorldPosition.y = _dragHeight;
+            }
+            Vector3 position = _freeWorldPosition;
             if (_activePart == null)
             {
                 if (!_fromInventory)
@@ -410,10 +423,99 @@ namespace KeyboardModeling.Assembly
                 _activePart.transform.SetPositionAndRotation(position, slot.transform.rotation);
                 _activePart.BeginDrag();
                 _parts.Add(_activePart);
+                _freeScale = _activePart.transform.localScale;
+                _freeRotation = _activePart.transform.rotation;
+                BeginPointerTracking(_activePart);
             }
             _activePart.gameObject.SetActive(true);
-            _activePart.transform.position = position;
+            _hoverSlot = FindPointerSlot(ray, _activePart);
+            UpdatePointerTracking(ray);
             return true;
+        }
+
+        /// <summary>
+        /// part의 실제 형상 중심과 카메라 기준 자세를 저장하고 충돌체를 잠시 비활성화한다.
+        /// 별도 표시 모델을 만들지 않으며 월드 Drop 좌표와 원본 스케일을 별도로 유지한다.
+        /// </summary>
+        private void BeginPointerTracking(AssemblyDraggablePart part)
+        {
+            _trackedPart = part;
+            _visualRotation = Quaternion.Inverse(_camera.transform.rotation) * _freeRotation;
+            float referenceDepth = Mathf.Max(_camera.nearClipPlane + 0.1f,
+                Vector3.Dot(_partSlot.transform.position - _camera.transform.position, _camera.transform.forward));
+            _visualDepth = Mathf.Max(_camera.nearClipPlane + 0.1f, _pointerDepth);
+            _trackingScale = _freeScale * (_camera.orthographic ? 1f : _visualDepth / referenceDepth);
+            _visualProjectionSize = _camera.orthographic ? _camera.orthographicSize
+                : Mathf.Tan(_camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            Bounds total = new Bounds();
+            bool hasBounds = false;
+            foreach (Renderer renderer in part.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!renderer.enabled)
+                    continue;
+                bool active = true;
+                for (Transform child = renderer.transform; child != part.transform; child = child.parent)
+                    active &= child.gameObject.activeSelf;
+                if (!active)
+                    continue;
+                Bounds bounds = renderer.localBounds;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 sign = new Vector3((corner & 1) == 0 ? -1f : 1f,
+                        (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f);
+                    Vector3 point = part.transform.InverseTransformPoint(renderer.transform.TransformPoint(
+                        bounds.center + Vector3.Scale(bounds.extents, sign)));
+                    if (hasBounds)
+                        total.Encapsulate(point);
+                    else
+                    {
+                        total = new Bounds(point, Vector3.zero);
+                        hasBounds = true;
+                    }
+                }
+            }
+            _trackingCenter = total.center;
+            foreach (Collider collider in part.GetComponentsInChildren<Collider>(true))
+            {
+                _heldColliders.Add(collider, collider.enabled);
+                collider.enabled = false;
+            }
+        }
+
+        /// <summary>
+        /// ray를 현재 카메라 전방의 일정 깊이 평면에 투영해 실물 부품의 시각 중심을 맞춘다.
+        /// 투영 변화만 임시 스케일에 반영하며 슬롯 형상이나 점유 및 재고는 변경하지 않는다.
+        /// </summary>
+        private void UpdatePointerTracking(Ray ray)
+        {
+            Plane plane = new Plane(_camera.transform.forward,
+                _camera.transform.position + _camera.transform.forward * _visualDepth);
+            if (!plane.Raycast(ray, out float distance))
+                return;
+            float projectionSize = _camera.orthographic ? _camera.orthographicSize
+                : Mathf.Tan(_camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            Transform part = _trackedPart.transform;
+            part.rotation = _camera.transform.rotation * _visualRotation;
+            part.localScale = _trackingScale * (projectionSize / _visualProjectionSize);
+            part.position += ray.GetPoint(distance) - part.TransformPoint(_trackingCenter);
+        }
+
+        /// <summary>
+        /// 실제 부품을 마지막 유효한 월드 Drop 위치와 원래 회전 및 크기로 되돌린다.
+        /// 임시로 비활성화한 Collider 상태를 복구하고 추적 참조를 해제한다.
+        /// </summary>
+        private void EndPointerTracking()
+        {
+            if (_trackedPart != null)
+            {
+                _trackedPart.transform.SetPositionAndRotation(_freeWorldPosition, _freeRotation);
+                _trackedPart.transform.localScale = _freeScale;
+            }
+            foreach (KeyValuePair<Collider, bool> state in _heldColliders)
+                if (state.Key != null)
+                    state.Key.enabled = state.Value;
+            _heldColliders.Clear();
+            _trackedPart = null;
         }
 
         /// <summary>
@@ -422,6 +524,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void CompleteDrag(bool inReturnArea, bool overUI)
         {
+            EndPointerTracking();
             _isDragging = false;
             if (_inventoryEntry != null && inReturnArea)
                 ReturnHeldPart();
@@ -429,7 +532,7 @@ namespace KeyboardModeling.Assembly
                 RestoreHeldPart();
             else if (_activePart != null)
             {
-                AssemblyPartSlot target = FindNearestSlot(_activePart);
+                AssemblyPartSlot target = _hoverSlot != null && _hoverSlot.CanInstall(_activePart) ? _hoverSlot : null;
                 if (target != null)
                     _activePart.AttachSlot(target);
                 _activePart.EndDrag(target != null);
@@ -442,26 +545,44 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// part와 호환되며 반경 안에 있는 슬롯 중 XZ 거리가 가장 가까운 슬롯을 반환한다.
-        /// 빈 슬롯과 점유 슬롯을 동일하게 비교하며 후보가 없으면 null을 반환한다.
+        /// ray가 통과하는 가장 가까운 슬롯 영역과 part의 장착 조건을 검사한다.
+        /// 도구와 들고 있는 부품을 제외한 장애물에 가리거나 유효하지 않으면 null을 반환한다.
         /// </summary>
-        private AssemblyPartSlot FindNearestSlot(AssemblyDraggablePart part)
+        private AssemblyPartSlot FindPointerSlot(Ray ray, AssemblyDraggablePart part)
         {
+            Physics.SyncTransforms();
             AssemblyPartSlot nearest = null;
             float distance = float.PositiveInfinity;
             foreach (AssemblyPartSlot slot in _slots)
             {
-                if (!slot.IsCompatible(part) || !slot.IsInsideSlot(part.transform.position))
+                if (slot.IsSwitch != part.IsSwitch || !slot.TryGetPointerHit(ray, out float hitDistance))
                     continue;
-                Vector3 offset = slot.transform.position - part.transform.position;
-                offset.y = 0f;
-                if (offset.sqrMagnitude < distance)
+                if (hitDistance < distance)
                 {
-                    distance = offset.sqrMagnitude;
+                    distance = hitDistance;
                     nearest = slot;
                 }
             }
+            if (nearest == null || !nearest.CanInstall(part))
+                return null;
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.transform.IsChildOf(part.transform) || IsToolCollider(hit.collider))
+                    continue;
+                if (hit.distance < distance - 0.001f)
+                    return null;
+            }
             return nearest;
+        }
+
+        /// <summary>
+        /// collider가 연결된 Puller나 복귀 표시의 충돌체인지 반환한다.
+        /// 표시용 도구를 슬롯과 표면 레이캐스트에서 제외한다.
+        /// </summary>
+        public bool IsToolCollider(Collider collider)
+        {
+            return (_fullerTool != null && _fullerTool.OwnsCollider(collider))
+                || (_switchPullerTool != null && _switchPullerTool.OwnsCollider(collider));
         }
 
         /// <summary>
@@ -502,9 +623,11 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void ClearDrag()
         {
+            EndPointerTracking();
             if (_catalog != null)
                 _catalog.HideDragIcon();
             _activePart = null;
+            _hoverSlot = null;
             _inventoryEntry = null;
             _fromInventory = false;
             _showingIcon = false;
@@ -582,7 +705,11 @@ namespace KeyboardModeling.Assembly
             _grabOffset = liftedPosition - ray.GetPoint(distance);
             _grabOffset.y = 0f;
             picked.BeginDrag();
-            picked.transform.position = liftedPosition;
+            _freeScale = picked.transform.localScale;
+            _freeRotation = picked.transform.rotation;
+            _freeWorldPosition = liftedPosition;
+            BeginPointerTracking(picked);
+            UpdatePointerTracking(ray);
             _activePart = picked;
             _inventoryEntry = picked.CatalogEntry;
             _fromInventory = false;
@@ -611,6 +738,7 @@ namespace KeyboardModeling.Assembly
             }
 
             _isDragging = false;
+            EndPointerTracking();
             if (_showingIcon)
                 RestoreHeldPart();
             else

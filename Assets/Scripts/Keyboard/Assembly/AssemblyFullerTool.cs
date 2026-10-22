@@ -11,6 +11,8 @@ namespace KeyboardModeling.Assembly
         [Header("Scene References")]
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private Transform _fuller;
+        [SerializeField, Tooltip("도구 로컬 공간의 집게 끝 중심입니다.")] private Transform _gripPoint;
+        [SerializeField] private Vector3 _heldEulerAngles;
         [SerializeField, Tooltip("활성화하면 키캡 대신 스위치만 분리합니다.")] private bool _extractSwitches;
 
         [Header("Extraction")]
@@ -32,7 +34,6 @@ namespace KeyboardModeling.Assembly
         private bool _extracting;
         private Vector3 _originPosition;
         private Quaternion _originRotation;
-        private Vector3 _grabOffset;
         private Plane _followPlane;
         private Vector2 _previousPointer;
         private bool _hasPreviousPointer;
@@ -72,8 +73,7 @@ namespace KeyboardModeling.Assembly
                 return true;
             }
 
-            if (_followPlane.Raycast(ray, out float distance))
-                _fuller.position = ray.GetPoint(distance) + _grabOffset;
+            UpdateToolPose(ray);
             bool overReturn = _returnCollider.Raycast(ray, out RaycastHit returnHit, _dragInput.InputCamera.farClipPlane);
             if (!overUI && overReturn && mouse.leftButton.wasPressedThisFrame)
             {
@@ -113,9 +113,6 @@ namespace KeyboardModeling.Assembly
             _dragInput.CancelDrag();
             _originPosition = _fuller.position;
             _originRotation = _fuller.rotation;
-            Vector3 lifted = _originPosition;
-            lifted.y = _dragInput.DragWorldHeight;
-            _grabOffset = lifted - ray.GetPoint(distance);
             CreateReturnMarker();
             _colliders = _fuller.GetComponentsInChildren<Collider>(true);
             _colliderStates = new bool[_colliders.Length];
@@ -138,11 +135,43 @@ namespace KeyboardModeling.Assembly
                 _bodies[index].isKinematic = true;
                 _bodies[index].useGravity = false;
             }
-            _fuller.position = lifted;
             _selected = true;
+            UpdateToolPose(ray);
             ResetHold();
             _extracting = true;
             return true;
+        }
+
+        /// <summary>
+        /// ray가 맞힌 실제 표면에 gripPoint를 일치시키고 손잡이를 카메라 위쪽 방향으로 배치한다.
+        /// 표면이 없을 때만 기존 작업 높이 평면을 사용하며 픽셀 오프셋은 적용하지 않는다.
+        /// </summary>
+        private void UpdateToolPose(Ray ray)
+        {
+            Vector3 localGrip = _fuller.InverseTransformPoint(_gripPoint.position);
+            Vector3 position;
+            Collider surface = FindVisibleCollider(ray);
+            if (surface != null && surface.Raycast(ray, out RaycastHit hit, _dragInput.InputCamera.farClipPlane))
+                position = hit.point;
+            else
+            {
+                _followPlane = new Plane(Vector3.up, new Vector3(0f, _dragInput.DragWorldHeight, 0f));
+                if (!_followPlane.Raycast(ray, out float distance))
+                    return;
+                position = ray.GetPoint(distance);
+            }
+            _fuller.rotation = _dragInput.InputCamera.transform.rotation * Quaternion.Euler(_heldEulerAngles);
+            _fuller.position += position - _fuller.TransformPoint(localGrip);
+        }
+
+        /// <summary>
+        /// collider가 이 도구 또는 동적 복귀 표시의 자식인지 반환한다.
+        /// 다른 조립 입력이 도구 외형에 가로막히지 않도록 한다.
+        /// </summary>
+        public bool OwnsCollider(Collider collider)
+        {
+            return collider.transform.IsChildOf(_fuller)
+                || (_returnMarker != null && collider.transform.IsChildOf(_returnMarker.transform));
         }
 
         /// <summary>
@@ -245,7 +274,7 @@ namespace KeyboardModeling.Assembly
             float distance = _dragInput.InputCamera.farClipPlane;
             foreach (RaycastHit hit in Physics.RaycastAll(ray, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
-                if ((_selected && hit.transform.IsChildOf(_fuller))
+                if ((_selected && _dragInput.IsToolCollider(hit.collider))
                     || (_returnMarker != null && hit.transform.IsChildOf(_returnMarker.transform)))
                     continue;
                 if (hit.distance < distance)

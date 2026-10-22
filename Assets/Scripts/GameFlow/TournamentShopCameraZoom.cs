@@ -29,7 +29,7 @@ namespace Game.Tournament
         void Update()
         {
             Mouse mouse = Mouse.current;
-            if (mouse == null)
+            if (mouse == null || !InGameCursor.CanProcessPointer)
                 return;
 
             float scrollDelta = mouse.scroll.y.ReadValue();

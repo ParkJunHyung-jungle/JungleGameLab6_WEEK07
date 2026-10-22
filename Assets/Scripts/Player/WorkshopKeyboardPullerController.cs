@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -30,7 +30,7 @@ namespace Game.Player
         private Vector3 _partGrabOffset;
 
         public bool InputAllowed => _interaction.IsKeyboardEditing && _interaction.EditingKeyboard != null
-            && !Game.Tutorials.FirstEncounterTutorial.IsBlocking;
+            && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && InGameCursor.CanProcessVirtualPointer;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
 
@@ -49,6 +49,11 @@ namespace Game.Player
             _switchPuller.SetContext(this, true);
         }
 
+        void OnEnable()
+        {
+            InGameCursor.PointerCanceled += CancelDrag;
+        }
+
         void Update()
         {
             KeyboardInputController target = _interaction.IsKeyboardEditing ? _interaction.EditingKeyboard : null;
@@ -61,7 +66,7 @@ namespace Game.Player
             }
             if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
             if (_keycapPlacement != null && _keycapPlacement.IsDragging) return;
-            Vector2 pointer = Mouse.current.position.ReadValue();
+            Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);
             if (_draggedPart != null)
             {
@@ -213,7 +218,7 @@ namespace Game.Player
             if (!InputAllowed || Mouse.current == null) return false;
             if (_keycapPlacement != null && _keycapPlacement.IsDragging) return true;
             if (_draggedPart != null) return true;
-            Vector2 pointer = Mouse.current.position.ReadValue();
+            Vector2 pointer = InGameCursor.Position;
             if (IsPointerOverUI(pointer)) return false;
             Ray ray = _camera.ScreenPointToRay(pointer);
             return _keycapPuller.IsSelected || _switchPuller.IsSelected
@@ -314,6 +319,7 @@ namespace Game.Player
 
         void OnDisable()
         {
+            InGameCursor.PointerCanceled -= CancelDrag;
             CancelDrag();
             _editingKeyboard = null;
             UpdateDragHeight();

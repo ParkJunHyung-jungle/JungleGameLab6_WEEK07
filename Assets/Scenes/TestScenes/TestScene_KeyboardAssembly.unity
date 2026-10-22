@@ -1031,10 +1031,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: 4404381145749828778, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1441128160}
+    m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
 --- !u!1 &961761713
@@ -1609,37 +1606,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 971d2f55cffc34b4693c7432701f0af3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardLED
---- !u!1 &1441128159
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1441128160}
-  m_Layer: 0
-  m_Name: KeyboardPlacementPose
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1441128160
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1441128159}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.3875, y: 1.636, z: -1.124}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 243852841}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &1472191607 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 5718502229770142375, guid: 08396c0d0c3fe804d8372c931d4951aa, type: 3}
@@ -1995,7 +1961,6 @@ MonoBehaviour:
   _keyboardBody: {fileID: 1885668288}
   _pickupTarget: {fileID: 1885668287}
   _placementArea: {fileID: 284298855}
-  _placementPose: {fileID: 1441128160}
   _interactionDistance: 12
   _interactionLayers:
     serializedVersion: 2

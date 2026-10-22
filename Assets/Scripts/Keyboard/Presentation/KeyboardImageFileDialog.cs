@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 public static class KeyboardImageFileDialog
@@ -71,6 +71,13 @@ public static class KeyboardImageFileDialog
     /// 취소하면 빈 문자열을 반환하고 지원하지 않는 플랫폼이나 대화상자 오류는 예외로 알린다.
     /// </summary>
     public static string ChooseImage()
+    {
+        using (InGameCursor.SuspendForSystemDialog())
+            return ChooseImageInternal();
+    }
+
+    /// <summary>현재 플랫폼의 파일 선택창을 열어 선택 경로를 반환한다. 취소와 오류에서도 운영체제 입력 차단을 복구한다.</summary>
+    private static string ChooseImageInternal()
     {
 #if UNITY_EDITOR
         return UnityEditor.EditorUtility.OpenFilePanel("Choose keyboard photo", "", "png,jpg,jpeg");

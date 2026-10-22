@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -69,6 +69,11 @@ namespace Game.Player
             _previewRenderer.Initialize(InputCamera);
         }
 
+        void OnEnable()
+        {
+            InGameCursor.PointerCanceled += CancelDrag;
+        }
+
         void Update()
         {
             foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging;
@@ -78,7 +83,7 @@ namespace Game.Player
                 CancelDrag();
                 return;
             }
-            Vector2 point = Mouse.current.position.ReadValue();
+            Vector2 point = InGameCursor.Position;
             if (!IsDragging && Mouse.current.leftButton.wasPressedThisFrame && !_pullers.IsPointerOverUI(point))
             {
                 AssemblyDraggablePart part = FindLoosePart(InputCamera.ScreenPointToRay(point));
@@ -236,7 +241,8 @@ namespace Game.Player
         /// </summary>
         public void BeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 point)
         {
-            if (!_pullers.InputAllowed || IsDragging || entry.AvailableQuantity <= 0) return;
+            if (!_pullers.InputAllowed || Mouse.current == null || !Mouse.current.leftButton.isPressed
+                || IsDragging || entry.AvailableQuantity <= 0) return;
             if (!_bulkPlacement && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
@@ -317,6 +323,7 @@ namespace Game.Player
         public void MoveDrag(Vector2 point)
         {
             if (!IsDragging) return;
+            if (!_pullers.InputAllowed) { CancelDrag(); return; }
             if (_isBulkDragging && _lastBulkFrame == Time.frameCount) return;
             if (_isBulkDragging) _lastBulkFrame = Time.frameCount;
             bool overUI = _pullers.IsPointerOverUI(point);
@@ -432,6 +439,7 @@ namespace Game.Player
         public void EndDrag(Vector2 point)
         {
             if (!IsDragging) return;
+            if (!_pullers.InputAllowed) { CancelDrag(); return; }
             if (Mouse.current == null || Mouse.current.leftButton.isPressed) return;
             if (_isBulkDragging) { EndBulkPlacement(); return; }
             _previewRenderer.Hide();
@@ -577,7 +585,7 @@ namespace Game.Player
                 body.angularVelocity = angularVelocity;
                 StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
             }
-            else BeginWorldDrag(part, Mouse.current.position.ReadValue());
+            else BeginWorldDrag(part, InGameCursor.Position);
         }
 
         /// <summary>
@@ -607,7 +615,11 @@ namespace Game.Player
             foreach (var label in _quantityLabels) label.Value.text = "×" + label.Key.AvailableQuantity;
         }
 
-        void OnDisable() { CancelDrag(); }
+        void OnDisable()
+        {
+            InGameCursor.PointerCanceled -= CancelDrag;
+            CancelDrag();
+        }
         void OnApplicationFocus(bool focused) { if (!focused) CancelDrag(); }
         void OnDestroy()
         {

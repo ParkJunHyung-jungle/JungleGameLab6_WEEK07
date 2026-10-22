@@ -100,7 +100,11 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         scaler.referenceResolution = new Vector2(1600, 900);
         scaler.matchWidthOrHeight = 1;
         if (EventSystem.current == null)
-            new GameObject("PhotoTestEventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule)).transform.SetParent(_canvas.transform);
+        {
+            GameObject events = new GameObject("PhotoTestEventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            events.transform.SetParent(_canvas.transform);
+            InGameCursor.ConfigureUI(events.GetComponent<InputSystemUIInputModule>());
+        }
         CreatePanel(_canvas.transform);
         var startPanel = Rect("Customization start", _canvas.transform, 20, 20, 340, 82);
         _startPanel = startPanel.gameObject;

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
 using KeyboardModeling.Assembly;
@@ -29,12 +29,12 @@ namespace Game.Player
 
         public void OnDrag(PointerEventData eventData)
         {
-            _placement.MoveDrag(eventData.position);
+            // 이동은 Update에서 같은 프레임의 공통 커서 좌표로 한 번만 처리한다.
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            _placement.EndDrag(eventData.position);
+            // UI 밖의 버튼 해제도 Update에서 처리하며 중단 이벤트는 설치를 확정하지 않는다.
         }
     }
 }

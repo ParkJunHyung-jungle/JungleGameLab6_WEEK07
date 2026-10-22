@@ -590,7 +590,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3821287447738897894, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
       propertyPath: _placementCenterOffset.y
-      value: -0.2
+      value: -0.5
       objectReference: {fileID: 0}
     - target: {fileID: 3821287447738897894, guid: 7a5ab7a371b543b48a5f9a2a8147ca24, type: 3}
       propertyPath: _placementCenterOffset.z
@@ -11400,7 +11400,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 3.9109, y: 1, z: 1.9854}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7000000000000000503}

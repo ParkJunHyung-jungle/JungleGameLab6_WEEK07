@@ -131,193 +131,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb5b88b94beb1605d3d2f1a741d6d20c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardPartDropController
-  _storage: {fileID: 9911000150}
-  _camera: {fileID: 4985256}
-  _switches:
-  - {fileID: 11400000, guid: 861a81df95ba62f4baa0a937b5b75f3a, type: 2}
-  - {fileID: 11400000, guid: 26a139ba317bcbb43804bf12a608e2ba, type: 2}
-  - {fileID: 11400000, guid: aa7398e71d187e14481d9a55c2e74581, type: 2}
-  - {fileID: 11400000, guid: 9853aa6392209dc499418f1beb5a43fb, type: 2}
-  - {fileID: 11400000, guid: e6749129210a24d4994d3ee244ab7cb4, type: 2}
-  - {fileID: 11400000, guid: 3ffb758e76d72224ba66f4a440925fbc, type: 2}
-  - {fileID: 11400000, guid: 5b1f640d63149dc4399a76d501184f28, type: 2}
-  - {fileID: 11400000, guid: 963f322bc845e694b9bcd79c59717f6a, type: 2}
-  _slots:
-  - _key: 60
-    _switchPath: Keys_87_SharedPrefabs/Switch_0
-  - _key: 94
-    _switchPath: Keys_87_SharedPrefabs/Switch_1
-  - _key: 95
-    _switchPath: Keys_87_SharedPrefabs/Switch_2
-  - _key: 96
-    _switchPath: Keys_87_SharedPrefabs/Switch_3
-  - _key: 97
-    _switchPath: Keys_87_SharedPrefabs/Switch_4
-  - _key: 98
-    _switchPath: Keys_87_SharedPrefabs/Switch_5
-  - _key: 99
-    _switchPath: Keys_87_SharedPrefabs/Switch_6
-  - _key: 100
-    _switchPath: Keys_87_SharedPrefabs/Switch_7
-  - _key: 101
-    _switchPath: Keys_87_SharedPrefabs/Switch_8
-  - _key: 102
-    _switchPath: Keys_87_SharedPrefabs/Switch_9
-  - _key: 103
-    _switchPath: Keys_87_SharedPrefabs/Switch_10
-  - _key: 104
-    _switchPath: Keys_87_SharedPrefabs/Switch_11
-  - _key: 105
-    _switchPath: Keys_87_SharedPrefabs/Switch_12
-  - _key: 74
-    _switchPath: Keys_87_SharedPrefabs/Switch_13
-  - _key: 75
-    _switchPath: Keys_87_SharedPrefabs/Switch_14
-  - _key: 76
-    _switchPath: Keys_87_SharedPrefabs/Switch_15
-  - _key: 4
-    _switchPath: Keys_87_SharedPrefabs/Switch_16
-  - _key: 41
-    _switchPath: Keys_87_SharedPrefabs/Switch_17
-  - _key: 42
-    _switchPath: Keys_87_SharedPrefabs/Switch_18
-  - _key: 43
-    _switchPath: Keys_87_SharedPrefabs/Switch_19
-  - _key: 44
-    _switchPath: Keys_87_SharedPrefabs/Switch_20
-  - _key: 45
-    _switchPath: Keys_87_SharedPrefabs/Switch_21
-  - _key: 46
-    _switchPath: Keys_87_SharedPrefabs/Switch_22
-  - _key: 47
-    _switchPath: Keys_87_SharedPrefabs/Switch_23
-  - _key: 48
-    _switchPath: Keys_87_SharedPrefabs/Switch_24
-  - _key: 49
-    _switchPath: Keys_87_SharedPrefabs/Switch_25
-  - _key: 50
-    _switchPath: Keys_87_SharedPrefabs/Switch_26
-  - _key: 13
-    _switchPath: Keys_87_SharedPrefabs/Switch_27
-  - _key: 14
-    _switchPath: Keys_87_SharedPrefabs/Switch_28
-  - _key: 65
-    _switchPath: Keys_87_SharedPrefabs/Switch_29
-  - _key: 3
-    _switchPath: Keys_87_SharedPrefabs/Switch_30
-  - _key: 31
-    _switchPath: Keys_87_SharedPrefabs/Switch_31
-  - _key: 37
-    _switchPath: Keys_87_SharedPrefabs/Switch_32
-  - _key: 19
-    _switchPath: Keys_87_SharedPrefabs/Switch_33
-  - _key: 32
-    _switchPath: Keys_87_SharedPrefabs/Switch_34
-  - _key: 34
-    _switchPath: Keys_87_SharedPrefabs/Switch_35
-  - _key: 39
-    _switchPath: Keys_87_SharedPrefabs/Switch_36
-  - _key: 35
-    _switchPath: Keys_87_SharedPrefabs/Switch_37
-  - _key: 23
-    _switchPath: Keys_87_SharedPrefabs/Switch_38
-  - _key: 29
-    _switchPath: Keys_87_SharedPrefabs/Switch_39
-  - _key: 30
-    _switchPath: Keys_87_SharedPrefabs/Switch_40
-  - _key: 11
-    _switchPath: Keys_87_SharedPrefabs/Switch_41
-  - _key: 12
-    _switchPath: Keys_87_SharedPrefabs/Switch_42
-  - _key: 10
-    _switchPath: Keys_87_SharedPrefabs/Switch_43
-  - _key: 72
-    _switchPath: Keys_87_SharedPrefabs/Switch_44
-  - _key: 15
-    _switchPath: Keys_87_SharedPrefabs/Switch_45
-  - _key: 33
-    _switchPath: Keys_87_SharedPrefabs/Switch_46
-  - _key: 18
-    _switchPath: Keys_87_SharedPrefabs/Switch_47
-  - _key: 20
-    _switchPath: Keys_87_SharedPrefabs/Switch_48
-  - _key: 21
-    _switchPath: Keys_87_SharedPrefabs/Switch_49
-  - _key: 22
-    _switchPath: Keys_87_SharedPrefabs/Switch_50
-  - _key: 24
-    _switchPath: Keys_87_SharedPrefabs/Switch_51
-  - _key: 25
-    _switchPath: Keys_87_SharedPrefabs/Switch_52
-  - _key: 26
-    _switchPath: Keys_87_SharedPrefabs/Switch_53
-  - _key: 6
-    _switchPath: Keys_87_SharedPrefabs/Switch_54
-  - _key: 5
-    _switchPath: Keys_87_SharedPrefabs/Switch_55
-  - _key: 2
-    _switchPath: Keys_87_SharedPrefabs/Switch_56
-  - _key: 51
-    _switchPath: Keys_87_SharedPrefabs/Switch_57
-  - _key: 40
-    _switchPath: Keys_87_SharedPrefabs/Switch_58
-  - _key: 38
-    _switchPath: Keys_87_SharedPrefabs/Switch_59
-  - _key: 17
-    _switchPath: Keys_87_SharedPrefabs/Switch_60
-  - _key: 36
-    _switchPath: Keys_87_SharedPrefabs/Switch_61
-  - _key: 16
-    _switchPath: Keys_87_SharedPrefabs/Switch_62
-  - _key: 28
-    _switchPath: Keys_87_SharedPrefabs/Switch_63
-  - _key: 27
-    _switchPath: Keys_87_SharedPrefabs/Switch_64
-  - _key: 7
-    _switchPath: Keys_87_SharedPrefabs/Switch_65
-  - _key: 8
-    _switchPath: Keys_87_SharedPrefabs/Switch_66
-  - _key: 9
-    _switchPath: Keys_87_SharedPrefabs/Switch_67
-  - _key: 52
-    _switchPath: Keys_87_SharedPrefabs/Switch_68
-  - _key: 55
-    _switchPath: Keys_87_SharedPrefabs/Switch_69
-  - _key: 57
-    _switchPath: Keys_87_SharedPrefabs/Switch_70
-  - _key: 53
-    _switchPath: Keys_87_SharedPrefabs/Switch_71
-  - _key: 1
-    _switchPath: Keys_87_SharedPrefabs/Switch_72
-  - _key: 54
-    _switchPath: Keys_87_SharedPrefabs/Switch_73
-  - _key: 58
-    _switchPath: Keys_87_SharedPrefabs/Switch_74
-  - _key: 59
-    _switchPath: Keys_87_SharedPrefabs/Switch_75
-  - _key: 56
-    _switchPath: Keys_87_SharedPrefabs/Switch_76
-  - _key: 70
-    _switchPath: Keys_87_SharedPrefabs/Switch_77
-  - _key: 68
-    _switchPath: Keys_87_SharedPrefabs/Switch_78
-  - _key: 67
-    _switchPath: Keys_87_SharedPrefabs/Switch_79
-  - _key: 71
-    _switchPath: Keys_87_SharedPrefabs/Switch_80
-  - _key: 69
-    _switchPath: Keys_87_SharedPrefabs/Switch_81
-  - _key: 66
-    _switchPath: Keys_87_SharedPrefabs/Switch_82
-  - _key: 63
-    _switchPath: Keys_87_SharedPrefabs/Switch_83
-  - _key: 61
-    _switchPath: Keys_87_SharedPrefabs/Switch_84
-  - _key: 64
-    _switchPath: Keys_87_SharedPrefabs/Switch_85
-  - _key: 62
-    _switchPath: Keys_87_SharedPrefabs/Switch_86
-  _lastMessage: 
 --- !u!1 &4985254
 GameObject:
   m_ObjectHideFlags: 0
@@ -1854,6 +1667,63 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 587475305}
   m_CullTransparentMesh: 1
+--- !u!1001 &598681493
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3556338316569575869, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_Name
+      value: KeycapPuller_Clip
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 5.238691
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.26945046
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -1.6244066
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6601263853907738747, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 644cb436b58fffb47ba0c6b6de1893fa, type: 3}
 --- !u!1 &652121432
 GameObject:
   m_ObjectHideFlags: 0
@@ -10565,3 +10435,4 @@ SceneRoots:
   - {fileID: 764380574}
   - {fileID: 1910225325}
   - {fileID: 1131221712}
+  - {fileID: 598681493}

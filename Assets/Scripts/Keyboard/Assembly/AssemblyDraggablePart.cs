@@ -19,10 +19,12 @@ namespace KeyboardModeling.Assembly
         private bool _isSwitch;
         private bool _isAdaptiveKeycap;
         private GameObject _generatedShape;
+        private readonly Dictionary<GameObject, GameObject> _shapeVisuals = new Dictionary<GameObject, GameObject>();
         private bool _restoreOnInvalidDrop;
         private bool _wasInstalled;
         private bool _wasKinematic;
         private Vector3 _returnPosition;
+        private Vector3 _returnScale;
         private Quaternion _returnRotation;
         private Vector3 _returnVelocity;
         private Vector3 _returnAngularVelocity;
@@ -82,6 +84,7 @@ namespace KeyboardModeling.Assembly
                 return;
             _interactionVersion++;
             _returnPosition = transform.position;
+            _returnScale = transform.localScale;
             _returnRotation = transform.rotation;
             _returnSlot = _slot;
             _wasInstalled = _slot != null && _slot.InstalledPart == this;
@@ -126,6 +129,7 @@ namespace KeyboardModeling.Assembly
             else
             {
                 transform.SetPositionAndRotation(_returnPosition, _returnRotation);
+                transform.localScale = _returnScale;
                 SetBodyFrozen(_wasKinematic);
                 if (!_wasKinematic)
                 {
@@ -227,35 +231,39 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// source의 기존 렌더 메시와 상대 배치를 복사하고 shellMaterial을 외피에 적용한다.
-        /// 게임 컴포넌트 없이 형상만 교체하며 부품 수량과 식별 정보는 유지한다.
+        /// 형상별 표시 모델을 재사용하며 부품 수량과 식별 정보는 유지한다.
         /// </summary>
         private void ApplyKeycapShape(GameObject source, Material shellMaterial)
         {
             foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
                 renderer.enabled = false;
             if (_generatedShape != null)
-            {
                 _generatedShape.SetActive(false);
-                Destroy(_generatedShape);
-            }
-            _generatedShape = new GameObject("InstalledKeycapShape");
-            _generatedShape.transform.SetParent(transform, false);
-            foreach (MeshFilter filter in source.GetComponentsInChildren<MeshFilter>(true))
+            if (!_shapeVisuals.TryGetValue(source, out _generatedShape))
             {
-                MeshRenderer original = filter.GetComponent<MeshRenderer>();
-                if (original == null || !original.enabled || !original.gameObject.activeSelf)
-                    continue;
-                GameObject visual = new GameObject(filter.name);
-                visual.transform.SetParent(_generatedShape.transform, false);
-                visual.transform.localPosition = source.transform.InverseTransformPoint(filter.transform.position);
-                visual.transform.localRotation = Quaternion.Inverse(source.transform.rotation) * filter.transform.rotation;
-                Vector3 scale = filter.transform.lossyScale;
-                Vector3 rootScale = source.transform.lossyScale;
-                visual.transform.localScale = new Vector3(scale.x / rootScale.x, scale.y / rootScale.y, scale.z / rootScale.z);
-                visual.AddComponent<MeshFilter>().sharedMesh = filter.sharedMesh;
-                MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
-                renderer.sharedMaterials = filter.name == "PBT_SculptedShell" ? new[] { shellMaterial } : original.sharedMaterials;
+                _generatedShape = new GameObject("InstalledKeycapShape");
+                _generatedShape.transform.SetParent(transform, false);
+                _shapeVisuals.Add(source, _generatedShape);
+                foreach (MeshFilter filter in source.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    MeshRenderer original = filter.GetComponent<MeshRenderer>();
+                    if (original == null || !original.enabled || !original.gameObject.activeSelf)
+                        continue;
+                    GameObject visual = new GameObject(filter.name);
+                    visual.transform.SetParent(_generatedShape.transform, false);
+                    visual.transform.localPosition = source.transform.InverseTransformPoint(filter.transform.position);
+                    visual.transform.localRotation = Quaternion.Inverse(source.transform.rotation) * filter.transform.rotation;
+                    Vector3 scale = filter.transform.lossyScale;
+                    Vector3 rootScale = source.transform.lossyScale;
+                    visual.transform.localScale = new Vector3(scale.x / rootScale.x, scale.y / rootScale.y, scale.z / rootScale.z);
+                    visual.AddComponent<MeshFilter>().sharedMesh = filter.sharedMesh;
+                    MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterials = filter.name == "PBT_SculptedShell" ? new[] { shellMaterial } : original.sharedMaterials;
+                }
             }
+            _generatedShape.SetActive(true);
+            foreach (Renderer renderer in _generatedShape.GetComponentsInChildren<Renderer>())
+                renderer.enabled = true;
             BoxCollider bounds = source.GetComponent<BoxCollider>();
             BoxCollider collider = (BoxCollider)_partCollider;
             collider.center = bounds.center;

@@ -101,6 +101,25 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
+        /// ray를 슬롯 로컬 공간으로 변환해 실제 규격 모델의 장착 영역과 교차하는지 검사한다.
+        /// 임의의 주변 반경 대신 모델 Collider를 사용하며 교차점의 월드 레이 거리를 반환한다.
+        /// </summary>
+        public bool TryGetPointerHit(Ray ray, out float distance)
+        {
+            BoxCollider shape = _isSwitch ? _inventoryPrefab.PartCollider as BoxCollider
+                : _keycapShape != null ? _keycapShape.GetComponent<BoxCollider>() : null;
+            distance = 0f;
+            if (shape == null)
+                return false;
+            Ray localRay = new Ray(transform.InverseTransformPoint(ray.origin), transform.InverseTransformVector(ray.direction));
+            if (!new Bounds(shape.center, shape.size).IntersectRay(localRay, out float localDistance))
+                return false;
+            Vector3 point = transform.TransformPoint(localRay.GetPoint(localDistance));
+            distance = Vector3.Dot(point - ray.origin, ray.direction);
+            return distance >= 0f;
+        }
+
+        /// <summary>
         /// install 값에 따라 슬롯에 장착하거나 집기 전의 유효한 위치로 복귀한다.
         /// 드래그를 종료하고 기존 부품의 위치, 회전과 장착 상태를 갱신한다.
         /// </summary>

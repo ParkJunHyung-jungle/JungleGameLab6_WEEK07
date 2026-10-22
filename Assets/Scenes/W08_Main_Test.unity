@@ -119,18 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!114 &829991
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9911000020}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cb5b88b94beb1605d3d2f1a741d6d20c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardPartDropController
 --- !u!1 &4985254
 GameObject:
   m_ObjectHideFlags: 0
@@ -5621,7 +5609,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopKeycapPlacement
   _interaction: {fileID: 7500000001}
   _pullers: {fileID: 500387865}
-  _spawnEntries:
+  _keycapEntries:
   - _keycapMaterial: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
     _keycapDefinition: {fileID: 11400000, guid: 04f71214712b4ca9b7fffc6bfe22f0c4, type: 2}
     _switchData: {fileID: 0}
@@ -5742,6 +5730,7 @@ MonoBehaviour:
     _switchData: {fileID: 0}
     _prefab: {fileID: 4601907876376872105, guid: f41327af30ef40b4db784f41590d9e86, type: 3}
     _initialQuantity: 1
+  _switchEntries:
   - _keycapMaterial: {fileID: 0}
     _keycapDefinition: {fileID: 0}
     _switchData: {fileID: 11400000, guid: 26a139ba317bcbb43804bf12a608e2ba, type: 2}
@@ -5782,6 +5771,7 @@ MonoBehaviour:
     _switchData: {fileID: 11400000, guid: 963f322bc845e694b9bcd79c59717f6a, type: 2}
     _prefab: {fileID: 2389093803382289243, guid: 6ff119df42b41a94e873ec2ada47af39, type: 3}
     _initialQuantity: 1
+  _spawnEntries: []
 --- !u!1 &2044699887
 GameObject:
   m_ObjectHideFlags: 0
@@ -7853,7 +7843,6 @@ GameObject:
   - component: {fileID: 9911000094}
   - component: {fileID: 9911000095}
   - component: {fileID: 9911000150}
-  - component: {fileID: 829991}
   - component: {fileID: 1019286140}
   - component: {fileID: 2019032720}
   m_Layer: 5

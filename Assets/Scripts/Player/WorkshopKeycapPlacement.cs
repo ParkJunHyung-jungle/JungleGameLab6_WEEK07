@@ -20,8 +20,11 @@ namespace Game.Player
         [SerializeField] private PlayerInteractionController _interaction;
         [SerializeField] private WorkshopKeyboardPullerController _pullers;
 
-        [Header("Assembly Inventory")]
-        [SerializeField] private AssemblyCatalogEntry[] _spawnEntries = new AssemblyCatalogEntry[0];
+        [Header("Keycap Inventory")]
+        [SerializeField] private AssemblyCatalogEntry[] _keycapEntries = new AssemblyCatalogEntry[0];
+
+        [Header("Switch Inventory")]
+        [SerializeField] private AssemblyCatalogEntry[] _switchEntries = new AssemblyCatalogEntry[0];
         private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
         private readonly List<AssemblyDraggablePart> _ownedParts = new List<AssemblyDraggablePart>();
@@ -31,10 +34,12 @@ namespace Game.Player
         private bool _fromInventory;
         private Plane _dragPlane;
         private RectTransform _returnArea;
+        private RectTransform _switchReturnArea;
         private RectTransform _canvasRect;
         private RawImage _dragIcon;
-        private KeyboardEditButton _singlePlacementButton;
-        private KeyboardEditButton _bulkPlacementButton;
+        private WorkshopDragPreviewRenderer _previewRenderer;
+        private readonly List<KeyboardEditButton> _singlePlacementButtons = new List<KeyboardEditButton>();
+        private readonly List<KeyboardEditButton> _bulkPlacementButtons = new List<KeyboardEditButton>();
         private bool _bulkPlacement;
         private bool _isBulkDragging;
         private bool _hasPreviousBulkPosition;
@@ -47,7 +52,8 @@ namespace Game.Player
 
         void Awake()
         {
-            foreach (AssemblyCatalogEntry entry in _spawnEntries) entry.InitializeInventory();
+            foreach (AssemblyCatalogEntry entry in _keycapEntries) entry.InitializeInventory();
+            foreach (AssemblyCatalogEntry entry in _switchEntries) entry.InitializeInventory();
         }
 
         void Start()
@@ -59,11 +65,14 @@ namespace Game.Player
             _dragIcon.rectTransform.sizeDelta = new Vector2(80f, 80f);
             _dragIcon.raycastTarget = false;
             _dragIcon.gameObject.SetActive(false);
+            _previewRenderer = gameObject.AddComponent<WorkshopDragPreviewRenderer>();
+            _previewRenderer.Initialize(InputCamera);
         }
 
         void Update()
         {
-            _singlePlacementButton.interactable = _bulkPlacementButton.interactable = !IsDragging;
+            foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging;
+            foreach (KeyboardEditButton button in _bulkPlacementButtons) button.interactable = !IsDragging;
             if (!_pullers.InputAllowed || Mouse.current == null)
             {
                 CancelDrag();
@@ -96,6 +105,33 @@ namespace Game.Player
             if (match == null) { button.interactable = false; return; }
             button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, match);
             _entryTextures[match] = button.GetComponentInChildren<RawImage>().texture;
+            BindQuantityLabel(button, match);
+        }
+
+        /// <summary>
+        /// type에 대응하는 원본 축 재고와 수량 표시를 button에 연결한다.
+        /// viewport를 반환 영역으로 저장하고 재고 카드 드래그와 배치 모드를 연결한다. 반환값은 없다.
+        /// </summary>
+        public void BindSwitchCard(KeyboardEditButton button, SwitchType type, RectTransform viewport)
+        {
+            if (_switchReturnArea == null) CreatePlacementModes(viewport);
+            _switchReturnArea = viewport;
+            foreach (AssemblyCatalogEntry entry in _switchEntries)
+            {
+                if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
+                button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry);
+                BindQuantityLabel(button, entry);
+                return;
+            }
+            button.interactable = false;
+        }
+
+        /// <summary>
+        /// button 오른쪽 위에 entry의 사용 가능 수량을 표시하는 Text를 생성한다.
+        /// 재고를 변경하지 않고 갱신 대상에 등록한다. 반환값은 없다.
+        /// </summary>
+        private void BindQuantityLabel(KeyboardEditButton button, AssemblyCatalogEntry entry)
+        {
             Text quantity = new GameObject("Quantity", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             quantity.transform.SetParent(button.transform, false);
             quantity.rectTransform.anchorMin = quantity.rectTransform.anchorMax = quantity.rectTransform.pivot = Vector2.one;
@@ -105,7 +141,7 @@ namespace Game.Player
             quantity.fontSize = 14;
             quantity.alignment = TextAnchor.MiddleRight;
             quantity.raycastTarget = false;
-            _quantityLabels[match] = quantity;
+            _quantityLabels[entry] = quantity;
             RefreshInventory();
         }
 
@@ -127,8 +163,8 @@ namespace Game.Player
             layout.spacing = 8f;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = true;
-            _singlePlacementButton = CreatePlacementButton(row, "한 개 배치");
-            _bulkPlacementButton = CreatePlacementButton(row, "일괄 배치");
+            _singlePlacementButtons.Add(CreatePlacementButton(row, "한 개 배치"));
+            _bulkPlacementButtons.Add(CreatePlacementButton(row, "일괄 배치"));
             RefreshPlacementModes();
         }
 
@@ -163,7 +199,7 @@ namespace Game.Player
         private void HandlePlacementModeClicked(KeyboardEditButton button)
         {
             if (IsDragging) return;
-            _bulkPlacement = button == _bulkPlacementButton;
+            _bulkPlacement = _bulkPlacementButtons.Contains(button);
             RefreshPlacementModes();
         }
 
@@ -173,10 +209,12 @@ namespace Game.Player
         /// </summary>
         private void RefreshPlacementModes()
         {
-            _singlePlacementButton.GetComponent<Image>().color = !_bulkPlacement
-                ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
-            _bulkPlacementButton.GetComponent<Image>().color = _bulkPlacement
-                ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+            foreach (KeyboardEditButton button in _singlePlacementButtons)
+                button.GetComponent<Image>().color = !_bulkPlacement
+                    ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+            foreach (KeyboardEditButton button in _bulkPlacementButtons)
+                button.GetComponent<Image>().color = _bulkPlacement
+                    ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
         }
 
         /// <summary>
@@ -185,7 +223,7 @@ namespace Game.Player
         /// </summary>
         private AssemblyCatalogEntry FindEntry(Material material, KeycapDefinition definition)
         {
-            foreach (AssemblyCatalogEntry entry in _spawnEntries)
+            foreach (AssemblyCatalogEntry entry in _keycapEntries)
                 if (!entry.IsSwitch && (entry.MatchesKeycap(material, definition)
                     || (definition != null && entry.KeycapDefinition == definition)
                     || (definition == null && !entry.IsArtisan && entry.KeycapMaterial == material))) return entry;
@@ -193,8 +231,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// entry의 한 개를 예약하고 point에서 실물 키캡 드래그를 시작한다.
-        /// 재고가 없거나 편집 중이 아니면 상태를 유지하며 반환값은 없다.
+        /// entry의 키캡 또는 축을 point에서 드래그하며 한 개 배치에서는 재고 한 개를 예약한다.
+        /// 일괄 배치에서는 표시용 실물만 준비하고 재고가 없으면 시작하지 않는다. 반환값은 없다.
         /// </summary>
         public void BeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 point)
         {
@@ -207,22 +245,39 @@ namespace Game.Player
             _bulkVisited.Clear();
             _hasPreviousBulkPosition = false;
             _lastBulkFrame = -1;
-            _activePart = CreatePart(entry, _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>().GetKeycapSlotTransform(0));
+            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            _activePart = CreatePart(entry, entry.IsSwitch ? customization.GetSwitchSlotTransform(0) : customization.GetKeycapSlotTransform(0));
             BeginWorldDrag(_activePart, point);
             RefreshInventory();
         }
 
         /// <summary>
         /// entry의 보관 부품이나 프리팹을 꺼내 shape의 크기와 회전에 맞춘 실물을 반환한다.
-        /// 생성한 부품은 종료 시 정리 대상에 등록하며 재고 수량은 변경하지 않는다.
+        /// preserveSwitchAppearance가 true이면 제거된 축의 현재 외형을 사용하며 재고 수량은 변경하지 않는다.
         /// </summary>
-        private AssemblyDraggablePart CreatePart(AssemblyCatalogEntry entry, Transform shape)
+        private AssemblyDraggablePart CreatePart(AssemblyCatalogEntry entry, Transform shape, bool preserveSwitchAppearance = false)
         {
             AssemblyDraggablePart part = entry.TakeStoredPart();
+            if (entry.IsSwitch && preserveSwitchAppearance)
+            {
+                if (part != null) { _ownedParts.Remove(part); Destroy(part.gameObject); }
+                Rigidbody body = _pullers.CreateDetachedVisual(shape, Vector3.zero, Vector3.zero, false);
+                part = body.gameObject.AddComponent<AssemblyDraggablePart>();
+                part.InitializeLoosePart(entry, true);
+                _ownedParts.Add(part);
+                _looseParts.Add(part);
+                return part;
+            }
             if (part == null) { part = Instantiate(entry.Prefab); _ownedParts.Add(part); }
             part.InitializeLoosePart(entry);
             part.gameObject.SetActive(true);
             part.transform.SetPositionAndRotation(shape.position, shape.rotation);
+            if (entry.IsSwitch)
+            {
+                part.transform.localScale = shape.lossyScale;
+                if (!_looseParts.Contains(part)) _looseParts.Add(part);
+                return part;
+            }
             Bounds bounds = new Bounds();
             bool found = false;
             foreach (MeshRenderer renderer in part.GetComponentsInChildren<MeshRenderer>())
@@ -251,6 +306,7 @@ namespace Game.Player
             part.BeginDrag();
             _dragPlane = new Plane(InputCamera.transform.forward, part.transform.position);
             foreach (Collider collider in part.GetComponentsInChildren<Collider>()) collider.enabled = false;
+            _previewRenderer.Show(part.transform);
             MoveDrag(point);
         }
 
@@ -269,7 +325,10 @@ namespace Game.Player
             if (overUI)
             {
                 _entryTextures.TryGetValue(_entry, out Texture texture);
-                _dragIcon.texture = texture;
+                _dragIcon.texture = texture != null ? texture : Texture2D.whiteTexture;
+                _dragIcon.color = _entry.IsSwitch && _entry.SwitchData.StemMaterial != null
+                    && _entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
+                    ? _entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, point, null, out Vector2 local);
                 _dragIcon.rectTransform.localPosition = local;
             }
@@ -291,14 +350,13 @@ namespace Game.Player
         private void InstallAlongBulkPath(Vector2 start, Vector2 end)
         {
             KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
-            Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
             Vector2 direction = end - start;
             float lengthSquared = direction.sqrMagnitude;
             _bulkCandidates.Clear();
             for (int index = 0; index < customization.KeycapCount; index++)
             {
                 if (_bulkVisited.Contains(index)) continue;
-                Bounds bounds = customization.GetKeycapSlotBounds(index);
+                Bounds bounds = _entry.IsSwitch ? customization.GetSwitchSlotBounds(index) : customization.GetKeycapSlotBounds(index);
                 Vector3 projected = InputCamera.WorldToScreenPoint(bounds.center);
                 if (projected.z <= 0f) continue;
                 float progress = lengthSquared > 0f
@@ -319,13 +377,24 @@ namespace Game.Player
                     && !obstruction.transform.IsChildOf(customization.transform)) continue;
                 int index = candidate.Value;
                 if (!_entry.TryReserve()) break;
-                bool installed = customization.InstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
+                bool installed = InstallEntry(customization, index);
                 _entry.FinishReservation(installed);
                 if (installed) { _bulkVisited.Add(index); changed = true; }
                 if (_entry.AvailableQuantity <= 0) break;
             }
             if (changed) RefreshInventory();
             if (_entry.AvailableQuantity <= 0) EndBulkPlacement();
+        }
+
+        /// <summary>
+        /// customization의 index 슬롯에 현재 재고 파츠 종류에 맞는 설치 함수를 호출한다.
+        /// 축 타입 또는 키캡 재질과 모델을 전달하고 설치 성공 여부를 반환한다. 재고 수량은 변경하지 않는다.
+        /// </summary>
+        private bool InstallEntry(KeyboardCustomization customization, int index)
+        {
+            if (_entry.IsSwitch) return customization.InstallSwitchFromInventory(index, _entry.SwitchData.Type);
+            Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
+            return customization.InstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
         }
 
         /// <summary>
@@ -343,6 +412,7 @@ namespace Game.Player
         /// </summary>
         private void EndBulkPlacement()
         {
+            _previewRenderer.Hide();
             _looseParts.Remove(_activePart);
             _entry.StorePart(_activePart, false);
             _entry = null;
@@ -364,6 +434,7 @@ namespace Game.Player
             if (!IsDragging) return;
             if (Mouse.current == null || Mouse.current.leftButton.isPressed) return;
             if (_isBulkDragging) { EndBulkPlacement(); return; }
+            _previewRenderer.Hide();
             if (IsInReturnArea(point))
             {
                 _looseParts.Remove(_activePart);
@@ -374,12 +445,11 @@ namespace Game.Player
             else
             {
                 KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
-                int index = customization.FindKeycapSlot(InputCamera.ScreenPointToRay(point));
+                int index = customization.FindKeycapSlot(InputCamera.ScreenPointToRay(point), _entry.IsSwitch);
                 if (Physics.Raycast(InputCamera.ScreenPointToRay(point), out RaycastHit obstruction,
                     InputCamera.farClipPlane, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                     && !obstruction.transform.IsChildOf(customization.transform)) index = -1;
-                Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
-                bool installed = customization.InstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
+                bool installed = InstallEntry(customization, index);
                 if (_fromInventory) _entry.FinishReservation(true);
                 if (installed)
                 {
@@ -408,6 +478,7 @@ namespace Game.Player
         {
             if (!IsDragging) return;
             if (_isBulkDragging) { EndBulkPlacement(); return; }
+            _previewRenderer.Hide();
             if (_fromInventory)
             {
                 _looseParts.Remove(_activePart);
@@ -433,8 +504,10 @@ namespace Game.Player
         /// </summary>
         private bool IsInReturnArea(Vector2 point)
         {
-            return _returnArea != null && _returnArea.gameObject.activeInHierarchy
-                && RectTransformUtility.RectangleContainsScreenPoint(_returnArea, point, null);
+            return (_returnArea != null && _returnArea.gameObject.activeInHierarchy
+                && RectTransformUtility.RectangleContainsScreenPoint(_returnArea, point, null))
+                || (_switchReturnArea != null && _switchReturnArea.gameObject.activeInHierarchy
+                && RectTransformUtility.RectangleContainsScreenPoint(_switchReturnArea, point, null));
         }
 
         /// <summary>
@@ -467,7 +540,35 @@ namespace Game.Player
             if (index < 0) return false;
             AssemblyCatalogEntry entry = FindEntry(customization.GetKeycapMaterial(index), customization.GetKeycapDefinition(index));
             if (entry == null) return false;
-            AssemblyDraggablePart part = CreatePart(entry, removed);
+            TakeRemovedPart(entry, removed, returnToInventory, velocity, angularVelocity);
+            return true;
+        }
+
+        /// <summary>
+        /// removed의 축 타입에 대응하는 원본 재고를 찾아 실물 분리를 연결한다.
+        /// returnToInventory와 속도값으로 직접 집기 또는 풀러 지연 반환을 선택한다. 연결 성공 여부를 반환한다.
+        /// </summary>
+        public bool TakeRemovedSwitch(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
+        {
+            KeyboardSwitch keyboardSwitch = removed.GetComponent<KeyboardSwitch>();
+            SwitchType type = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>().GetInstalledSwitchType(keyboardSwitch);
+            foreach (AssemblyCatalogEntry entry in _switchEntries)
+            {
+                if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
+                TakeRemovedPart(entry, removed, returnToInventory, velocity, angularVelocity);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// entry와 removed로 실물 파츠를 준비하고 직접 드래그 또는 속도값을 가진 풀러 제거로 전환한다.
+        /// returnToInventory가 true이면 조작되지 않은 실물의 2초 뒤 재고 반환을 예약한다. 반환값은 없다.
+        /// </summary>
+        private void TakeRemovedPart(AssemblyCatalogEntry entry, Transform removed, bool returnToInventory,
+            Vector3 velocity, Vector3 angularVelocity)
+        {
+            AssemblyDraggablePart part = CreatePart(entry, removed, true);
             if (returnToInventory)
             {
                 part.DropWithPhysics();
@@ -477,7 +578,6 @@ namespace Game.Player
                 StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
             }
             else BeginWorldDrag(part, Mouse.current.position.ReadValue());
-            return true;
         }
 
         /// <summary>
@@ -511,8 +611,8 @@ namespace Game.Player
         void OnApplicationFocus(bool focused) { if (!focused) CancelDrag(); }
         void OnDestroy()
         {
-            if (_singlePlacementButton != null) _singlePlacementButton.Clicked -= HandlePlacementModeClicked;
-            if (_bulkPlacementButton != null) _bulkPlacementButton.Clicked -= HandlePlacementModeClicked;
+            foreach (KeyboardEditButton button in _singlePlacementButtons) button.Clicked -= HandlePlacementModeClicked;
+            foreach (KeyboardEditButton button in _bulkPlacementButtons) button.Clicked -= HandlePlacementModeClicked;
             if (_dragIcon != null) Destroy(_dragIcon.gameObject);
             foreach (AssemblyDraggablePart part in _ownedParts) if (part != null) Destroy(part.gameObject);
         }

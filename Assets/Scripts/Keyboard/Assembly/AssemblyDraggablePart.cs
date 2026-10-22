@@ -50,9 +50,10 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// entry의 출고 부품을 작업대의 독립 드래그 대상으로 초기화한다.
-        /// 기존 재고와 형상 처리를 재사용하고 슬롯 연결 없이 물리를 고정한다. 반환값은 없다.
+        /// preserveAppearance가 true이면 현재 메시와 배율을 유지하고, 아니면 출고 형상으로 초기화한다.
+        /// 슬롯 연결 없이 물리를 고정하며 반환값은 없다.
         /// </summary>
-        public void InitializeLoosePart(AssemblyCatalogEntry entry)
+        public void InitializeLoosePart(AssemblyCatalogEntry entry, bool preserveAppearance = false)
         {
             _catalogEntry = entry;
             _slot = null;
@@ -63,7 +64,12 @@ namespace KeyboardModeling.Assembly
             if (_body == null) _body = gameObject.AddComponent<Rigidbody>();
             _body.mass = 0.02f;
             _body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            PrepareInventoryPart(entry, entry.Prefab.gameObject);
+            if (preserveAppearance)
+            {
+                _isSwitch = entry.IsSwitch;
+                _isAdaptiveKeycap = !entry.IsSwitch && !entry.IsArtisan;
+            }
+            else PrepareInventoryPart(entry, entry.Prefab.gameObject);
             SetBodyFrozen(true);
         }
 

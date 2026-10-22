@@ -281,6 +281,10 @@ namespace KeyboardModeling.Assembly
             float distance = Context.InputCamera.farClipPlane;
             foreach (RaycastHit hit in Physics.RaycastAll(ray, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
+                if (_followCameraPlane && hit.rigidbody != null
+                    && hit.rigidbody.GetComponent<KeyboardInputController>() != null
+                    && hit.collider.GetComponentInParent<KeycapHealth>() == null
+                    && hit.collider.GetComponentInParent<KeyboardSwitch>() == null) continue;
                 if ((_selected && hit.transform.IsChildOf(_fuller))
                     || (_returnMarker != null && hit.transform.IsChildOf(_returnMarker.transform)))
                     continue;

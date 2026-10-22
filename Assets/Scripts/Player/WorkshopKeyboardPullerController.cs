@@ -47,6 +47,7 @@ namespace Game.Player
             {
                 CancelDrag();
                 _editingKeyboard = target;
+                if (target != null) target.GetComponent<KeyboardCustomization>().PrepareSwitchRemovalTargets();
                 UpdateDragHeight();
             }
             if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
@@ -104,6 +105,12 @@ namespace Game.Player
             if (!customization.TryRemovePart(hit.transform, extractSwitches, out Transform removed)) return;
             if (!extractSwitches && _keycapPlacement != null
                 && _keycapPlacement.TakeRemovedKeycap(removed, false, Vector3.zero, Vector3.zero))
+            {
+                AudioManager.PlayPartSound(removed.position, true);
+                return;
+            }
+            if (extractSwitches && _keycapPlacement != null
+                && _keycapPlacement.TakeRemovedSwitch(removed, false, Vector3.zero, Vector3.zero))
             {
                 AudioManager.PlayPartSound(removed.position, true);
                 return;
@@ -227,6 +234,12 @@ namespace Game.Player
                 AudioManager.PlayPartSound(removed.position, true);
                 return true;
             }
+            if (extractSwitches && _keycapPlacement != null
+                && _keycapPlacement.TakeRemovedSwitch(removed, true, velocity, angularVelocity))
+            {
+                AudioManager.PlayPartSound(removed.position, true);
+                return true;
+            }
             CreateDetachedVisual(removed, velocity, angularVelocity);
             AudioManager.PlayPartSound(removed.position, true);
             return true;
@@ -236,7 +249,7 @@ namespace Game.Player
         /// removed의 메시와 재질을 복사하고 velocity와 angularVelocity를 적용한 Rigidbody를 반환한다.
         /// scheduleRemoval이 true이면 지연 제거를 예약하며 복사할 메시가 없으면 null을 반환한다.
         /// </summary>
-        private Rigidbody CreateDetachedVisual(Transform removed, Vector3 velocity, Vector3 angularVelocity,
+        public Rigidbody CreateDetachedVisual(Transform removed, Vector3 velocity, Vector3 angularVelocity,
             bool scheduleRemoval = true)
         {
             GameObject visual = new GameObject("Removed_" + removed.name);

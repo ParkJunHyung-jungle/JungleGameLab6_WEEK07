@@ -708,6 +708,7 @@ namespace Game.Player
         /// </summary>
         private void HandleSwitchSoundClicked(KeyboardEditButton button)
         {
+            if (_keycapPlacement != null) return;
             SwitchSoundSelected?.Invoke(_switchSoundTypes[_switchSoundButtons.IndexOf(button)]);
         }
 
@@ -1467,6 +1468,8 @@ namespace Game.Player
                 _selectionIndicators[index].gameObject.SetActive(false);
                 placement.BindCard(_previewButtons[index], _previewMaterials[index], _previewDefinitions[index], _viewport);
             }
+            for (int index = 0; index < _switchSoundButtons.Count; index++)
+                placement.BindSwitchCard(_switchSoundButtons[index], _switchSoundTypes[index], _switchSoundViewport);
             _keycapUI.Close();
         }
 

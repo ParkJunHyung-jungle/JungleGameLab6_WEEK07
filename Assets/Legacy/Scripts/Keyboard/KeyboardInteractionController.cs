@@ -216,8 +216,8 @@ public class KeyboardInteractionController : MonoBehaviour
 
         _padCollider.isTrigger = true;
         _fixedCam.Priority = 0;
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        InGameCursor.LockState = CursorLockMode.Locked;
+        InGameCursor.Visible = false;
     }
 
     protected virtual void Start()
@@ -258,7 +258,7 @@ public class KeyboardInteractionController : MonoBehaviour
         if (_resumeSmashInput)
         {
             bool tabPressedOrHeld = Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.tabKey.isPressed);
-            bool mousePressedOrHeld = Mouse.current != null && Mouse.current.leftButton.isPressed;
+            bool mousePressedOrHeld = InGameCursor.CanProcessPointer && Mouse.current != null && Mouse.current.leftButton.isPressed;
 
             if (tabPressedOrHeld || mousePressedOrHeld)
             {
@@ -286,7 +286,7 @@ public class KeyboardInteractionController : MonoBehaviour
 
             return;
         }
-        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null) return;
+        if (IsSmashMode || IsMiniGameBlockingWorldInput || Mouse.current == null || !InGameCursor.CanProcessPointer) return;
         if (Mouse.current.rightButton.wasPressedThisFrame)
         {
             PickUpKeyboardIntoHands();
@@ -865,7 +865,7 @@ public class KeyboardInteractionController : MonoBehaviour
     private void RefreshGuideState()
     {
         if (!Application.isFocused || IsSmashMode || _isShopFocused || _viewingAutomaticStation != null
-            || _isPlacingKeyboard || IsMiniGameBlockingWorldInput || Mouse.current == null)
+            || _isPlacingKeyboard || IsMiniGameBlockingWorldInput || Mouse.current == null || !InGameCursor.CanProcessPointer)
         {
             SetGuideState(KeyboardGuideState.Hidden);
             return;
@@ -1428,8 +1428,8 @@ public class KeyboardInteractionController : MonoBehaviour
             SetKeyboardInput(_placedKeyboard, false);
         }
 
-        Cursor.lockState = isOpen ? CursorLockMode.None : CursorLockMode.Locked;
-        Cursor.visible = isOpen;
+        InGameCursor.LockState = isOpen ? CursorLockMode.None : CursorLockMode.Locked;
+        InGameCursor.Visible = isOpen;
     }
 
     public sealed class KeyboardState

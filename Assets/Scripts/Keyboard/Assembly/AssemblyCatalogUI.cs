@@ -175,6 +175,7 @@ namespace KeyboardModeling.Assembly
             {
                 GameObject events = new GameObject("AssemblyCatalogEventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
                 events.transform.SetParent(canvasObject.transform, false);
+                InGameCursor.ConfigureUI(events.GetComponent<InputSystemUIInputModule>());
             }
 
             RectTransform panel = Rect("CustomizationPanel", canvasObject.transform);

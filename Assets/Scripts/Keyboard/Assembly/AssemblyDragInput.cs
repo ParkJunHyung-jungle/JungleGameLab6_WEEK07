@@ -142,13 +142,13 @@ namespace KeyboardModeling.Assembly
                 return;
             }
             Mouse mouse = Mouse.current;
-            if (mouse == null)
+            if (mouse == null || !InGameCursor.CanProcessPointer)
             {
                 CancelDrag();
                 return;
             }
 
-            Vector2 screenPosition = mouse.position.ReadValue();
+            Vector2 screenPosition = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(screenPosition);
             if (_fullerTool != null && _fullerTool.ProcessPointer(ray, screenPosition, mouse))
                 return;

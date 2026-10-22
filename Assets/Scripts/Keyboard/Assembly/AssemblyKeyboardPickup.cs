@@ -20,7 +20,8 @@ namespace KeyboardModeling.Assembly
 
         [Header("Workbench Placement")]
         [SerializeField] private Collider _placementArea;
-        [SerializeField] private Transform _placementPose;
+        private Vector3 _placementPosition;
+        private Quaternion _placementRotation;
         private bool _isPlaced;
         private int _placementInputFrame = -1;
 
@@ -47,15 +48,15 @@ namespace KeyboardModeling.Assembly
 
         public bool IsHolding => _isHolding;
         public bool IsPlaced => _isPlaced && !_isHolding && _keyboardBody.isKinematic
-            && Vector3.Distance(_keyboardBody.position, _placementPose.position) < 0.001f
-            && Quaternion.Angle(_keyboardBody.rotation, _placementPose.rotation) < 0.1f;
+            && Vector3.Distance(_keyboardBody.position, _placementPosition) < 0.001f
+            && Quaternion.Angle(_keyboardBody.rotation, _placementRotation) < 0.1f;
         public bool PlacementInputConsumed => _placementInputFrame == Time.frameCount;
 
         void Awake()
         {
-            _isPlaced = _keyboardBody.isKinematic
-                && Vector3.Distance(_keyboardBody.position, _placementPose.position) < 0.001f
-                && Quaternion.Angle(_keyboardBody.rotation, _placementPose.rotation) < 0.1f;
+            _placementPosition = _keyboardBody.position;
+            _placementRotation = _keyboardBody.rotation;
+            _isPlaced = _keyboardBody.isKinematic;
         }
 
         void OnEnable()
@@ -66,7 +67,7 @@ namespace KeyboardModeling.Assembly
 
         void Update()
         {
-            if (!_hasFocus || _focusController.IsFocused || _brain.IsBlending
+            if (!InGameCursor.CanProcessPointer || !_hasFocus || _focusController.IsFocused || _brain.IsBlending
                 || _brain.ActiveVirtualCamera != (ICinemachineCamera)_inputCamera
                 || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
                 return;
@@ -141,7 +142,7 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 명시적인 작업대 기준점의 월드 위치와 회전으로 본체를 내려놓는다.
+        /// 씬 시작 시 보관한 본체의 월드 위치와 회전으로 키보드를 내려놓는다.
         /// 현재 속도를 정리하고 물리를 고정하며 추종을 종료하고 배치 상태를 갱신한다.
         /// </summary>
         private void PlaceOnWorkbench()
@@ -153,9 +154,9 @@ namespace KeyboardModeling.Assembly
             _keyboardBody.isKinematic = true;
             _keyboardBody.useGravity = false;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            _keyboardBody.position = _placementPose.position;
-            _keyboardBody.rotation = _placementPose.rotation;
-            _keyboardBody.transform.SetPositionAndRotation(_placementPose.position, _placementPose.rotation);
+            _keyboardBody.position = _placementPosition;
+            _keyboardBody.rotation = _placementRotation;
+            _keyboardBody.transform.SetPositionAndRotation(_placementPosition, _placementRotation);
             _isPlaced = true;
         }
 

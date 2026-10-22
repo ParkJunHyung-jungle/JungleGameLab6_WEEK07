@@ -17,6 +17,23 @@ public sealed class KeyboardPhotoCropInput : MonoBehaviour, IBeginDragHandler, I
         _rectTransform = transform as RectTransform;
     }
 
+    void OnEnable()
+    {
+        InGameCursor.PointerCanceled += CancelPointerDrag;
+    }
+
+    void OnDisable()
+    {
+        InGameCursor.PointerCanceled -= CancelPointerDrag;
+        CancelPointerDrag();
+    }
+
+    /// <summary>창 포커스나 커서 모드 전환 시 크롭 드래그 상태를 비운다. 다음 드래그는 새 포인터 기준으로 시작한다.</summary>
+    private void CancelPointerDrag()
+    {
+        _isDragging = false;
+    }
+
     /// <summary>
     /// 왼쪽 버튼 드래그 시작 위치를 crop 영역 좌표로 기록한다.
     /// eventData의 화면 좌표와 crop 영역 크기를 사용하며 드래그 상태를 갱신한다.

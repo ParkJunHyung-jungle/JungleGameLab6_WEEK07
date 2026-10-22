@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text;
 
 using UnityEngine;
@@ -343,7 +343,7 @@ namespace Game.Tournament
         {
             if (_shopFrame.activeInHierarchy) SlideFrames();
             if (!_tooltipPanel.activeSelf || Mouse.current == null) return;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(_panelRect, Mouse.current.position.ReadValue(), null, out Vector2 point);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_panelRect, InGameCursor.Position, null, out Vector2 point);
             Vector2 size = _tooltipRect.rect.size;
             Rect bounds = _panelRect.rect;
             _tooltipRect.anchoredPosition = new Vector2(

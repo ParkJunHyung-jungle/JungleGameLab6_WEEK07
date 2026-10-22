@@ -143,8 +143,8 @@ namespace Game.Player
 
         void OnEnable()
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            InGameCursor.LockState = CursorLockMode.Locked;
+            InGameCursor.Visible = false;
             if (_keyboardEditOverlayUI != null)
             {
                 _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
@@ -184,8 +184,8 @@ namespace Game.Player
             ResetMonitorFocusMode();
             ResetKeyboardEditMode();
             DropHeldKeyboard();
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
         }
 
         void FixedUpdate()
@@ -220,16 +220,16 @@ namespace Game.Player
                 if (!_uploadConfirmationInputCaptured)
                 {
                     _uploadConfirmationInputCaptured = true;
-                    _uploadConfirmationCursorLockState = Cursor.lockState;
-                    _uploadConfirmationCursorWasVisible = Cursor.visible;
+                    _uploadConfirmationCursorLockState = InGameCursor.LockState;
+                    _uploadConfirmationCursorWasVisible = InGameCursor.Visible;
                     _uploadConfirmationCameraInputWasEnabled = _cameraInputAxisController != null
                         && _cameraInputAxisController.enabled;
                 }
 
                 if (_cameraInputAxisController != null)
                     _cameraInputAxisController.enabled = false;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                InGameCursor.LockState = CursorLockMode.None;
+                InGameCursor.Visible = true;
                 return;
             }
 
@@ -238,8 +238,8 @@ namespace Game.Player
             _uploadConfirmationInputCaptured = false;
             if (_cameraInputAxisController != null)
                 _cameraInputAxisController.enabled = _uploadConfirmationCameraInputWasEnabled;
-            Cursor.lockState = _uploadConfirmationCursorLockState;
-            Cursor.visible = _uploadConfirmationCursorWasVisible;
+            InGameCursor.LockState = _uploadConfirmationCursorLockState;
+            InGameCursor.Visible = _uploadConfirmationCursorWasVisible;
         }
 
         /// <summary>
@@ -563,8 +563,8 @@ namespace Game.Player
 
             _moveInput.action.Disable();
             _cameraInputAxisController.enabled = false;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
             _editingKeyboardAttackWasEnabled = keyboard.AttackEnabled;
             keyboard.SetAttackEnabled(false);
             _keyboardEditOverlayUI?.SetSelectedAttackMode(false);
@@ -613,8 +613,8 @@ namespace Game.Player
 
             _moveInput.action.Disable();
             _cameraInputAxisController.enabled = false;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
             if (_centerReticle != null)
                 _centerReticle.SetActive(false);
 
@@ -718,8 +718,8 @@ namespace Game.Player
                 _moveInput.action.Disable();
 
             _cameraInputAxisController.enabled = _monitorCameraInputWasEnabled;
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            InGameCursor.LockState = CursorLockMode.Locked;
+            InGameCursor.Visible = false;
             if (_centerReticle != null)
                 _centerReticle.SetActive(true);
         }
@@ -856,8 +856,8 @@ namespace Game.Player
             else
                 _moveInput.action.Disable();
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            InGameCursor.LockState = CursorLockMode.Locked;
+            InGameCursor.Visible = false;
             if (_cameraInputAxisController != null)
                 _cameraInputAxisController.enabled = _cameraInputWasEnabled;
         }
@@ -904,7 +904,7 @@ namespace Game.Player
             if (mouse == null || _editingKeyboardBody == null)
                 return;
 
-            Vector2 pointerPosition = mouse.position.ReadValue();
+            Vector2 pointerPosition = InGameCursor.Position;
             if (_keyboardEditOverlayUI != null && _keyboardEditOverlayUI.IsPointerOverUI(pointerPosition))
                 return;
 
@@ -966,7 +966,7 @@ namespace Game.Player
                 return;
 
             Mouse mouse = Mouse.current;
-            if (mouse == null)
+            if (mouse == null || !InGameCursor.CanProcessPointer)
             {
                 StopEditingKeyboardRotation();
                 return;
@@ -985,12 +985,12 @@ namespace Game.Player
                 return;
 
             Mouse mouse = Mouse.current;
-            if (mouse == null)
+            if (mouse == null || !InGameCursor.CanProcessPointer)
                 return;
 
             float scrollDelta = mouse.scroll.y.ReadValue();
             if (scrollDelta == 0f
-                || (_keyboardEditOverlayUI != null && _keyboardEditOverlayUI.IsPointerOverUI(mouse.position.ReadValue())))
+                || (_keyboardEditOverlayUI != null && _keyboardEditOverlayUI.IsPointerOverUI(InGameCursor.Position)))
             {
                 return;
             }

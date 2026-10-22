@@ -127,8 +127,8 @@ namespace Game.Tutorials
                 HandleHelp(_help);
             if (!_paused) return;
             Time.timeScale = 0f;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
             if (_closing && Time.frameCount > _closeFrame && InputsReleased()) FinishClose();
         }
 
@@ -194,8 +194,8 @@ namespace Game.Tutorials
         private void Open(TutorialCard card)
         {
             _savedTimeScale = Time.timeScale;
-            _savedCursorLock = Cursor.lockState;
-            _savedCursorVisible = Cursor.visible;
+            _savedCursorLock = InGameCursor.LockState;
+            _savedCursorVisible = InGameCursor.Visible;
             _paused = true;
             _actions.Clear();
             foreach (InputAction action in InputSystem.ListEnabledActions())
@@ -205,8 +205,8 @@ namespace Game.Tutorials
                 action.Disable();
             }
             Time.timeScale = 0f;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
             _overlay.SetActive(true);
             Display(card);
             PlaytestResearchSession.Emit("TutorialShown", (_browsing ? "Help:" : "First:") + card.Topic);
@@ -304,8 +304,8 @@ namespace Game.Tutorials
             Time.timeScale = _savedTimeScale;
             foreach (InputAction action in _actions) action.Enable();
             _actions.Clear();
-            Cursor.lockState = _savedCursorLock;
-            Cursor.visible = _savedCursorVisible;
+            InGameCursor.LockState = _savedCursorLock;
+            InGameCursor.Visible = _savedCursorVisible;
             _paused = false;
             _closing = false;
         }

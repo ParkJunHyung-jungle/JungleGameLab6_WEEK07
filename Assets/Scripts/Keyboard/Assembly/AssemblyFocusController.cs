@@ -65,7 +65,7 @@ namespace KeyboardModeling.Assembly
             }
 
             if (_pickupController.IsPlaced && !_pickupController.PlacementInputConsumed
-                && !_brain.IsBlending && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
+                && !_brain.IsBlending && InGameCursor.CanProcessPointer && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
                 && IsTargetInCenter())
                 SetFocused(true);
         }
@@ -108,8 +108,8 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void ApplyCursor()
         {
-            Cursor.lockState = _isFocused ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = _isFocused;
+            InGameCursor.LockState = _isFocused ? CursorLockMode.None : CursorLockMode.Locked;
+            InGameCursor.Visible = _isFocused;
         }
 
         void OnApplicationFocus(bool hasFocus)
@@ -138,8 +138,8 @@ namespace KeyboardModeling.Assembly
                 _inputCamera.enabled = true;
             if (_focusCamera != null)
                 _focusCamera.enabled = false;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
         }
     }
 }

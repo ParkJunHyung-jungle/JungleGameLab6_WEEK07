@@ -41,6 +41,10 @@ namespace KeyboardModeling
         private KeycapHealth[] _keycapHealths;
         private MeshRenderer[] _keycapShellRenderers;
         private KeyboardSpawnProfile _spawnProfile;
+        private readonly Dictionary<Transform, KeyboardSwitch> _switchesByKeycap = new Dictionary<Transform, KeyboardSwitch>();
+        private readonly Dictionary<Key, KeyboardSwitch> _switchesByKey = new Dictionary<Key, KeyboardSwitch>();
+        private bool _switchBindingsCached;
+        private bool _usesLegacySwitchSound;
 
         [Header("Battle Manual Input")]
         private readonly HashSet<Key> _manualHeldKeys = new HashSet<Key>();
@@ -119,8 +123,8 @@ namespace KeyboardModeling
         public KeyboardSpawnProfile SpawnProfile => _spawnProfile;
 
         /// <summary>
-        /// 현재 FMOD 타건음에 대응하는 축 타입을 반환한다.
-        /// 저장된 사운드 설정을 사용하며 FMOD 타건음이 꺼져 있으면 null을 반환한다.
+        /// UI와 기본 설정에 사용할 공통 선택 타입을 반환한다.
+        /// 개별 키의 실제 타건음과 분리된 선택값이며 Disabled이면 null을 반환한다.
         /// </summary>
         public SwitchType? CurrentSwitchSound => _fmodSwitchSound switch
         {
@@ -234,6 +238,7 @@ namespace KeyboardModeling
 
         void Awake()
         {
+            CacheSwitchBindings();
             if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
             {
                 // WorkShop0에서는 타건을 유지하고 공격 입력만 비활성화한다.
@@ -323,7 +328,7 @@ namespace KeyboardModeling
                 if (acceptedPress)
                 {
                     PlaytestKeyProcessing?.Invoke(this, _bindings[index].Key);
-                    PlayPressSound(_keycapHealths[index]);
+                    PlayPressSound(_bindings[index].Keycap, _keycapHealths[index]);
 
                     KeycapPressed?.Invoke(_bindings[index].Keycap);
                     KeyPressed?.Invoke(_bindings[index].Key);
@@ -412,29 +417,83 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// 선택한 FMOD 스위치 이벤트를 키보드 위치에서 AudioManager로 재생한다.
-        /// 그 외에는 health의 재질별 눌림음이나 기본 클립을 사용하며 파괴된 키캡의 볼륨을 5%로 낮춘다.
+        /// keycap에 명시적으로 연결된 활성 축의 현재 데이터로 FMOD 이벤트를 선택한다.
+        /// health로 기본 타격음의 파괴 볼륨을 유지하며 실물 축이 있는 키보드의 빈 위치에는 공통 축 소리를 사용하지 않는다.
         /// </summary>
-        private void PlayPressSound(KeycapHealth health)
+        private void PlayPressSound(Transform keycap, KeycapHealth health)
         {
-            if (_fmodSwitchSound != FmodSwitchSound.Disabled)
+            SwitchType? type = null;
+            if (TryGetSwitch(keycap, out KeyboardSwitch keyboardSwitch) &&
+                keyboardSwitch.gameObject.activeInHierarchy && keyboardSwitch.CurrentData != null)
+                type = keyboardSwitch.CurrentData.Type;
+            else if (_usesLegacySwitchSound)
+                type = CurrentSwitchSound;
+
+            if (type.HasValue)
             {
-                var sound = _fmodSwitchSound switch
+                var sound = type.Value switch
                 {
-                    FmodSwitchSound.Brown => FMODEvents.instance.BrownSwitch,
-                    FmodSwitchSound.Sans => FMODEvents.instance.SansSwitch,
-                    FmodSwitchSound.Red => FMODEvents.instance.RedSwitch,
-                    FmodSwitchSound.Pop =>FMODEvents.instance.PopSwitch,
-                    FmodSwitchSound.Typewriter =>FMODEvents.instance.TypewriterSwitch,
-                    FmodSwitchSound.FireWorks => FMODEvents.instance.FireWorksSwitch,
-                    FmodSwitchSound.Animal => FMODEvents.instance.AnimalSwitch,
-                    _ => FMODEvents.instance.BlueSwitch
+                    SwitchType.Blue => FMODEvents.instance.BlueSwitch,
+                    SwitchType.Brown => FMODEvents.instance.BrownSwitch,
+                    SwitchType.Sans => FMODEvents.instance.SansSwitch,
+                    SwitchType.Red => FMODEvents.instance.RedSwitch,
+                    SwitchType.Pop => FMODEvents.instance.PopSwitch,
+                    SwitchType.Typewriter => FMODEvents.instance.TypewriterSwitch,
+                    SwitchType.FireWorks => FMODEvents.instance.FireWorksSwitch,
+                    SwitchType.Animal => FMODEvents.instance.AnimalSwitch,
+                    _ => default(FMODUnity.EventReference)
                 };
-                AudioManager.instance.PlayKeyboardOneShot(sound, transform.position, gameObject);
+                if (!sound.IsNull) AudioManager.instance.PlayKeyboardOneShot(sound, transform.position, gameObject);
                 return;
             }
             float volume = health != null && health.CurrentHP == 0 ? 0.05f : 1f;
             _audioSource.PlayOneShot(_pressSound, volume);
+        }
+
+        /// <summary>
+        /// 명시적인 키 바인딩 참조를 읽어 키와 키캡별 스위치 조회 사전을 한 번 생성한다.
+        /// 축 종류는 저장하지 않아 교체와 복원 후 최신 데이터를 사용하며 실물 축이 없는 구형 키보드만 공통 설정을 허용한다.
+        /// </summary>
+        private void CacheSwitchBindings()
+        {
+            if (_switchBindingsCached) return;
+            _switchesByKey.Clear();
+            _switchesByKeycap.Clear();
+            foreach (KeyBinding binding in _bindings)
+            {
+                if (binding.Keycap == null || binding.KeyboardSwitch == null) continue;
+                _switchesByKey[binding.Key] = binding.KeyboardSwitch;
+                _switchesByKeycap[binding.Keycap] = binding.KeyboardSwitch;
+            }
+            bool hasCustomization = GetComponent<KeyboardCustomization>() != null;
+            _usesLegacySwitchSound = !hasCustomization && _switchesByKeycap.Count == 0
+                && GetComponentsInChildren<KeyboardSwitch>(true).Length == 0;
+            if (hasCustomization && _switchesByKeycap.Count != _bindings.Length)
+                Debug.LogWarning($"[Keyboard] {name}: 키별 스위치 연결을 확인하십시오 ({_switchesByKeycap.Count}/{_bindings.Length}).", this);
+            _switchBindingsCached = true;
+        }
+
+        /// <summary>
+        /// 물리 입력 key에 명시적으로 연결된 스위치를 keyboardSwitch에 전달하고 연결 여부를 반환한다.
+        /// 설치 여부와 관계없이 참조만 제공하며 호출자가 현재 활성 상태와 데이터를 확인한다.
+        /// </summary>
+        public bool TryGetSwitch(Key key, out KeyboardSwitch keyboardSwitch)
+        {
+            CacheSwitchBindings();
+            return _switchesByKey.TryGetValue(key, out keyboardSwitch) && keyboardSwitch != null;
+        }
+
+        /// <summary>
+        /// keycap 또는 그 하위 타격 대상으로부터 바인딩된 스위치를 반환한다.
+        /// 현재 키보드 내부의 부모 경로만 확인하며 거리나 별도 배열 순서로 축을 추정하지 않는다.
+        /// </summary>
+        public bool TryGetSwitch(Transform keycap, out KeyboardSwitch keyboardSwitch)
+        {
+            CacheSwitchBindings();
+            for (Transform current = keycap; current != null && current != transform; current = current.parent)
+                if (_switchesByKeycap.TryGetValue(current, out keyboardSwitch) && keyboardSwitch != null) return true;
+            keyboardSwitch = null;
+            return false;
         }
 
         /// <summary>
@@ -447,7 +506,7 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// type 입력을 대응하는 FMOD 사운드 종류로 변환해 이후 눌림음에 사용한다.
+        /// type 입력을 UI와 기본 설정의 공통 선택값으로 변환한다. 실제 타건은 키별 축 데이터를 사용한다.
         /// 변경 성공 여부를 반환하며 알 수 없는 타입은 기존 사운드를 유지한다.
         /// </summary>
         public bool SetSwitchSound(SwitchType type)
@@ -485,7 +544,7 @@ namespace KeyboardModeling
         /// </summary>
         public void NotifyAreaKeycapHit(Transform keycap)
         {
-            PlayPressSound(keycap.GetComponent<KeycapHealth>());
+            PlayPressSound(keycap, keycap.GetComponent<KeycapHealth>());
             AreaKeycapHit?.Invoke(keycap);
         }
 
@@ -495,7 +554,7 @@ namespace KeyboardModeling
         /// </summary>
         public void NotifyAutomaticKeycapHit(Transform keycap)
         {
-            PlayPressSound(keycap.GetComponent<KeycapHealth>());
+            PlayPressSound(keycap, keycap.GetComponent<KeycapHealth>());
             AutomaticKeycapHit?.Invoke(keycap);
         }
 
@@ -764,9 +823,11 @@ namespace KeyboardModeling
             [Header("Physical Key")]
             [SerializeField] private Key _key;
             [SerializeField] private Transform _keycap;
+            [SerializeField] private KeyboardSwitch _keyboardSwitch;
 
             public Key Key => _key;
             public Transform Keycap => _keycap;
+            public KeyboardSwitch KeyboardSwitch => _keyboardSwitch;
 
             /// <summary>
             /// keycap을 이 물리 키의 새 입력 대상으로 저장한다.

@@ -87164,178 +87164,265 @@ MonoBehaviour:
   _bindings:
   - _key: 60
     _keycap: {fileID: 6878679669565113979}
+    _keyboardSwitch: {fileID: 1927684077526527268}
   - _key: 94
     _keycap: {fileID: 9096163547725178596}
+    _keyboardSwitch: {fileID: 3871779480709502322}
   - _key: 95
     _keycap: {fileID: 4114095901749548971}
+    _keyboardSwitch: {fileID: 7427452124109928527}
   - _key: 96
     _keycap: {fileID: 1532956150412453940}
+    _keyboardSwitch: {fileID: 5787823606982440994}
   - _key: 97
     _keycap: {fileID: 1808945575788830636}
+    _keyboardSwitch: {fileID: 1015977328106639350}
   - _key: 98
     _keycap: {fileID: 5403476799913815271}
+    _keyboardSwitch: {fileID: 2278903683937451246}
   - _key: 99
     _keycap: {fileID: 6243182597872399672}
+    _keyboardSwitch: {fileID: 2734396542364271542}
   - _key: 100
     _keycap: {fileID: 4902889484656963121}
+    _keyboardSwitch: {fileID: 4021314162061104848}
   - _key: 101
     _keycap: {fileID: 6777223552227799652}
+    _keyboardSwitch: {fileID: 8302372201088838631}
   - _key: 102
     _keycap: {fileID: 1847611147533045230}
+    _keyboardSwitch: {fileID: 5181729724433550835}
   - _key: 103
     _keycap: {fileID: 5905972744540994402}
+    _keyboardSwitch: {fileID: 8353989558689698021}
   - _key: 104
     _keycap: {fileID: 7679843128815156514}
+    _keyboardSwitch: {fileID: 7803865005767905844}
   - _key: 105
     _keycap: {fileID: 7443833392141245094}
+    _keyboardSwitch: {fileID: 6589074383085241621}
   - _key: 74
     _keycap: {fileID: 7570663330519816028}
+    _keyboardSwitch: {fileID: 6344172557618247149}
   - _key: 75
     _keycap: {fileID: 8666538452907734859}
+    _keyboardSwitch: {fileID: 3856045996456072359}
   - _key: 76
     _keycap: {fileID: 527796861957430451}
+    _keyboardSwitch: {fileID: 453834215206378066}
   - _key: 4
     _keycap: {fileID: 1370057676132304759}
+    _keyboardSwitch: {fileID: 8895471847332666485}
   - _key: 41
     _keycap: {fileID: 6686168283804500430}
+    _keyboardSwitch: {fileID: 1802991559465322468}
   - _key: 42
     _keycap: {fileID: 4611957872695683657}
+    _keyboardSwitch: {fileID: 5494639769477076425}
   - _key: 43
     _keycap: {fileID: 6721865010409387531}
+    _keyboardSwitch: {fileID: 8573316500381785828}
   - _key: 44
     _keycap: {fileID: 8801596465970716084}
+    _keyboardSwitch: {fileID: 1022977853258436780}
   - _key: 45
     _keycap: {fileID: 1260987074757987675}
+    _keyboardSwitch: {fileID: 6526432536067865310}
   - _key: 46
     _keycap: {fileID: 5123684745377810506}
+    _keyboardSwitch: {fileID: 4118010782635108237}
   - _key: 47
     _keycap: {fileID: 1972750124444861994}
+    _keyboardSwitch: {fileID: 501793154210359467}
   - _key: 48
     _keycap: {fileID: 9116171233413680556}
+    _keyboardSwitch: {fileID: 3389154167707905976}
   - _key: 49
     _keycap: {fileID: 2313829913826250674}
+    _keyboardSwitch: {fileID: 4785351683427579290}
   - _key: 50
     _keycap: {fileID: 1390017294777675316}
+    _keyboardSwitch: {fileID: 1261031722609138276}
   - _key: 13
     _keycap: {fileID: 9064783663955105890}
+    _keyboardSwitch: {fileID: 8541254735750761378}
   - _key: 14
     _keycap: {fileID: 2171701695514453008}
+    _keyboardSwitch: {fileID: 1320972619752198506}
   - _key: 65
     _keycap: {fileID: 8546179000756811870}
+    _keyboardSwitch: {fileID: 7414423682987990329}
   - _key: 3
     _keycap: {fileID: 498623178751617825}
+    _keyboardSwitch: {fileID: 4360232754169458154}
   - _key: 31
     _keycap: {fileID: 1055624031306561926}
+    _keyboardSwitch: {fileID: 2789998355330584056}
   - _key: 37
     _keycap: {fileID: 784059253891318311}
+    _keyboardSwitch: {fileID: 2293664137541791214}
   - _key: 19
     _keycap: {fileID: 6051112768671997041}
+    _keyboardSwitch: {fileID: 3681955158996935013}
   - _key: 32
     _keycap: {fileID: 1612406178312894448}
+    _keyboardSwitch: {fileID: 5435664858592082594}
   - _key: 34
     _keycap: {fileID: 2210150334437986933}
+    _keyboardSwitch: {fileID: 4874524918736292138}
   - _key: 39
     _keycap: {fileID: 3822916885593518144}
+    _keyboardSwitch: {fileID: 8710744553732494954}
   - _key: 35
     _keycap: {fileID: 3889663448266188861}
+    _keyboardSwitch: {fileID: 1514416799059482946}
   - _key: 23
     _keycap: {fileID: 5293578371252676324}
+    _keyboardSwitch: {fileID: 6480014106617817353}
   - _key: 29
     _keycap: {fileID: 6522237444810616010}
+    _keyboardSwitch: {fileID: 2626024766956984314}
   - _key: 30
     _keycap: {fileID: 8898120531520854838}
+    _keyboardSwitch: {fileID: 6762915084785899958}
   - _key: 11
     _keycap: {fileID: 4486378721738736850}
+    _keyboardSwitch: {fileID: 1245679683001869924}
   - _key: 12
     _keycap: {fileID: 4465389359560985557}
+    _keyboardSwitch: {fileID: 4809251193365440015}
   - _key: 10
     _keycap: {fileID: 5796738473112722830}
+    _keyboardSwitch: {fileID: 193589294436258292}
   - _key: 72
     _keycap: {fileID: 5148247127931237428}
+    _keyboardSwitch: {fileID: 273432609864442558}
   - _key: 15
     _keycap: {fileID: 5409394492546679461}
+    _keyboardSwitch: {fileID: 7965910238815381973}
   - _key: 33
     _keycap: {fileID: 1166547774141225755}
+    _keyboardSwitch: {fileID: 5156515541622170869}
   - _key: 18
     _keycap: {fileID: 1192630948711212312}
+    _keyboardSwitch: {fileID: 4094663818696932591}
   - _key: 20
     _keycap: {fileID: 3293955185549125989}
+    _keyboardSwitch: {fileID: 4799598066854408699}
   - _key: 21
     _keycap: {fileID: 3212183688914733541}
+    _keyboardSwitch: {fileID: 515417368778036651}
   - _key: 22
     _keycap: {fileID: 2135746583448511970}
+    _keyboardSwitch: {fileID: 7245770971148717817}
   - _key: 24
     _keycap: {fileID: 6314024187258349245}
+    _keyboardSwitch: {fileID: 4038763125240504212}
   - _key: 25
     _keycap: {fileID: 4628794318286687993}
+    _keyboardSwitch: {fileID: 4743386324403505066}
   - _key: 26
     _keycap: {fileID: 1149714706246278115}
+    _keyboardSwitch: {fileID: 4802128327428878508}
   - _key: 6
     _keycap: {fileID: 7256273732180684843}
+    _keyboardSwitch: {fileID: 51317100522092619}
   - _key: 5
     _keycap: {fileID: 7811639821787932267}
+    _keyboardSwitch: {fileID: 443479919599958476}
   - _key: 2
     _keycap: {fileID: 293623663200131789}
+    _keyboardSwitch: {fileID: 6306928887156698381}
   - _key: 51
     _keycap: {fileID: 8240549222638829859}
+    _keyboardSwitch: {fileID: 9087476901984033107}
   - _key: 40
     _keycap: {fileID: 3170721681260038294}
+    _keyboardSwitch: {fileID: 3559456278677943326}
   - _key: 38
     _keycap: {fileID: 4056806650121931564}
+    _keyboardSwitch: {fileID: 3796987005092698140}
   - _key: 17
     _keycap: {fileID: 9206560594596818818}
+    _keyboardSwitch: {fileID: 7185215976821711950}
   - _key: 36
     _keycap: {fileID: 1815302374062658372}
+    _keyboardSwitch: {fileID: 6700854899023871682}
   - _key: 16
     _keycap: {fileID: 2308208429222512043}
+    _keyboardSwitch: {fileID: 1440718472385703810}
   - _key: 28
     _keycap: {fileID: 273865735063903200}
+    _keyboardSwitch: {fileID: 5395892119688716586}
   - _key: 27
     _keycap: {fileID: 7872185364023199089}
+    _keyboardSwitch: {fileID: 1357266809068056825}
   - _key: 7
     _keycap: {fileID: 8106160821573357092}
+    _keyboardSwitch: {fileID: 6973859305268084430}
   - _key: 8
     _keycap: {fileID: 7423110609800809496}
+    _keyboardSwitch: {fileID: 1717877332990018671}
   - _key: 9
     _keycap: {fileID: 7483429489675337992}
+    _keyboardSwitch: {fileID: 3054824295700754460}
   - _key: 52
     _keycap: {fileID: 1807525216166388356}
+    _keyboardSwitch: {fileID: 1157752661444121319}
   - _key: 55
     _keycap: {fileID: 7980355490702819094}
+    _keyboardSwitch: {fileID: 8652021641689392856}
   - _key: 57
     _keycap: {fileID: 3507416420541268498}
+    _keyboardSwitch: {fileID: 1515034701469126102}
   - _key: 53
     _keycap: {fileID: 5975092655141665732}
+    _keyboardSwitch: {fileID: 2512583983986827234}
   - _key: 1
     _keycap: {fileID: 1871740172493480110}
+    _keyboardSwitch: {fileID: 3749459868271393102}
   - _key: 54
     _keycap: {fileID: 4188612523660345634}
+    _keyboardSwitch: {fileID: 6723911715495763129}
   - _key: 58
     _keycap: {fileID: 1493747014632407864}
+    _keyboardSwitch: {fileID: 6749208069476736098}
   - _key: 59
     _keycap: {fileID: 6939187723994530206}
+    _keyboardSwitch: {fileID: 3429945430186421231}
   - _key: 56
     _keycap: {fileID: 8573962085797136111}
+    _keyboardSwitch: {fileID: 8698128085280656002}
   - _key: 70
     _keycap: {fileID: 2191998783653828537}
+    _keyboardSwitch: {fileID: 2319035761653974176}
   - _key: 68
     _keycap: {fileID: 2501975868870511441}
+    _keyboardSwitch: {fileID: 8402695520629534777}
   - _key: 67
     _keycap: {fileID: 7358666724522163329}
+    _keyboardSwitch: {fileID: 1835654024191837429}
   - _key: 71
     _keycap: {fileID: 6007740876678972295}
+    _keyboardSwitch: {fileID: 4697328029222910219}
   - _key: 69
     _keycap: {fileID: 8549036622876102819}
+    _keyboardSwitch: {fileID: 7509365950204433895}
   - _key: 66
     _keycap: {fileID: 8910380049036004602}
+    _keyboardSwitch: {fileID: 6438669597044916035}
   - _key: 63
     _keycap: {fileID: 37401961215312024}
+    _keyboardSwitch: {fileID: 5889925226748381338}
   - _key: 61
     _keycap: {fileID: 6863689986434786722}
+    _keyboardSwitch: {fileID: 1781038041667074301}
   - _key: 64
     _keycap: {fileID: 1599184547916774144}
+    _keyboardSwitch: {fileID: 872230547305929313}
   - _key: 62
     _keycap: {fileID: 1640682126926312509}
+    _keyboardSwitch: {fileID: 8664602989658992375}
   _pressDistance: 0.15
   _animationSpeed: 18
   _stemHeightOffset: 0

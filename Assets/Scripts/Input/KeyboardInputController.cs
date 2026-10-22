@@ -664,15 +664,12 @@ namespace KeyboardModeling
         }
 
         /// <summary>
-        /// index의 키캡이 미설치, 비표시 또는 파괴 상태이면 현재 눌림량으로 스위치 축을 아래로 이동한다.
-        /// 외피의 활성 상태와 체력, 추가 높이, 눌림 거리와 길이 배율로 축 위치와 세로 크기를 갱신한다.
+        /// index의 현재 눌림량으로 키캡 유무와 관계없이 스위치 축을 아래로 이동한다.
+        /// 추가 높이, 눌림 거리와 길이 배율로 축 위치와 세로 크기를 갱신한다.
         /// </summary>
         private void UpdateSwitchStems(int index)
         {
-            MeshRenderer shell = _keycapShellRenderers[index];
-            bool hasVisibleKeycap = shell.gameObject.activeInHierarchy && shell.enabled
-                && (_keycapHealths[index] == null || _keycapHealths[index].CurrentHP > 0);
-            float amount = hasVisibleKeycap ? 0f : _pressAmounts[index];
+            float amount = _pressAmounts[index];
             Vector3 offset = Vector3.up * (_stemHeightOffset - _stemPressDistance * amount);
             for (int stemIndex = 0; stemIndex < _switchStems[index].Length; stemIndex++)
             {

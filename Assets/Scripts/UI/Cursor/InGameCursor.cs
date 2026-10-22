@@ -234,11 +234,12 @@ public sealed class InGameCursor : MonoBehaviour
         ApplyPresentation();
     }
 
-    /// <summary>현재 모드와 디자인으로 시스템 커서와 인게임 이미지 중 하나만 표시한다. 이미지 pivot만 변경해 클릭 좌표는 유지한다.</summary>
+    /// <summary>현재 모드와 디자인으로 커서를 표시하고 게임 조작 중에는 마우스를 창 안에 가둔다. 포커스 상실과 시스템 창에서는 잠금을 해제한다.</summary>
     private void ApplyPresentation()
     {
         bool external = !_hasFocus || _dialogDepth > 0;
-        Cursor.lockState = external ? CursorLockMode.None : _requestedLock;
+        Cursor.lockState = external ? CursorLockMode.None
+            : _requestedLock == CursorLockMode.Locked ? CursorLockMode.Locked : CursorLockMode.Confined;
         Cursor.visible = external;
         if (_graphic == null) return;
         _graphic.enabled = IsActive;

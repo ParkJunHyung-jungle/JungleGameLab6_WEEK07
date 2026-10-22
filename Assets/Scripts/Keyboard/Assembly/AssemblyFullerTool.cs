@@ -19,6 +19,7 @@ namespace KeyboardModeling.Assembly
         private IKeyboardPullerContext Context => _context ?? _dragInput;
         public bool IsSelected => _selected;
         public Transform ToolTransform => _fuller;
+        public event System.Action<Transform> HeldToolChanged;
 
         /// <summary>
         /// context를 도구 입력과 분리 동작의 대상으로 연결한다.
@@ -167,19 +168,20 @@ namespace KeyboardModeling.Assembly
             }
             _selected = true;
             UpdateToolPose(ray);
+            HeldToolChanged?.Invoke(_fuller);
             ResetHold();
             _extracting = true;
             return true;
         }
 
         /// <summary>
-        /// ray가 맞힌 실제 표면에 보관한 집기 지점을 일치시키고 카메라와 heldEulerAngles를 기준으로 회전한다.
-        /// 표면이 없으면 선택한 이동 평면을 사용하며 도구 위치와 회전을 갱신한다. 반환값은 없다.
+        /// ray와 보관한 집기 지점으로 도구 자세를 갱신하고 카메라와 heldEulerAngles를 기준으로 회전한다.
+        /// 카메라 평행 모드에서는 고정 평면으로 화면 크기를 유지하며 기존 모드에서는 실제 표면을 따른다. 반환값은 없다.
         /// </summary>
         private void UpdateToolPose(Ray ray)
         {
             Vector3 position;
-            Collider surface = FindVisibleCollider(ray);
+            Collider surface = _followCameraPlane ? null : FindVisibleCollider(ray);
             if (surface != null && surface.Raycast(ray, out RaycastHit hit, Context.InputCamera.farClipPlane))
                 position = hit.point;
             else
@@ -362,6 +364,7 @@ namespace KeyboardModeling.Assembly
             if (!_selected)
                 return;
             _selected = false;
+            HeldToolChanged?.Invoke(null);
             _fuller.SetPositionAndRotation(_originPosition, _originRotation);
             for (int index = 0; index < _bodies.Length; index++)
             {

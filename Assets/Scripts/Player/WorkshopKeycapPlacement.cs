@@ -309,6 +309,16 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// tool이 있으면 파츠와 같은 전용 카메라로 풀러를 앞에 표시하고 null이면 표시를 복원한다.
+        /// 공통 렌더러를 재사용하며 도구 위치와 제거 판정 및 재고는 변경하지 않는다.
+        /// </summary>
+        public void ShowToolPreview(Transform tool)
+        {
+            if (tool != null) _previewRenderer.Show(tool);
+            else _previewRenderer.Hide();
+        }
+
+        /// <summary>
         /// part의 현재 자세를 저장하고 point를 통과하는 카메라 평행 평면에서 집기를 시작한다.
         /// 슬롯과 재고를 유지하며 부품 충돌체를 임시 비활성화한다. 반환값은 없다.
         /// </summary>

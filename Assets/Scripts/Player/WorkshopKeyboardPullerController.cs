@@ -49,6 +49,17 @@ namespace Game.Player
         void OnEnable()
         {
             InGameCursor.PointerCanceled += CancelDrag;
+            _keycapPuller.HeldToolChanged += HandleHeldToolChanged;
+            _switchPuller.HeldToolChanged += HandleHeldToolChanged;
+        }
+
+        /// <summary>
+        /// tool의 집기와 복귀 알림으로 기존 파츠 렌더러의 풀러 표시를 갱신한다.
+        /// null이면 원래 레이어로 복원하며 실제 도구 위치와 제거 동작은 변경하지 않는다.
+        /// </summary>
+        private void HandleHeldToolChanged(Transform tool)
+        {
+            _keycapPlacement.ShowToolPreview(tool);
         }
 
         void Update()
@@ -283,6 +294,8 @@ namespace Game.Player
         {
             InGameCursor.PointerCanceled -= CancelDrag;
             CancelDrag();
+            _keycapPuller.HeldToolChanged -= HandleHeldToolChanged;
+            _switchPuller.HeldToolChanged -= HandleHeldToolChanged;
             _editingKeyboard = null;
             UpdateDragHeight();
         }

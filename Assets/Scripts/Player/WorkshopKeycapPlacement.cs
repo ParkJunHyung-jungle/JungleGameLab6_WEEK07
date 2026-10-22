@@ -77,7 +77,11 @@ namespace Game.Player
             }
             if (!IsDragging) return;
             MoveDrag(point);
-            if (Mouse.current.leftButton.wasReleasedThisFrame || !Mouse.current.leftButton.isPressed) EndDrag(point);
+            if (!Mouse.current.leftButton.isPressed)
+            {
+                if (Mouse.current.leftButton.wasReleasedThisFrame) EndDrag(point);
+                else CancelDrag();
+            }
         }
 
         /// <summary>
@@ -353,11 +357,12 @@ namespace Game.Player
 
         /// <summary>
         /// point의 반환 영역과 슬롯 조건에 따라 재고 반환, 설치 또는 물리 낙하를 확정한다.
-        /// UI 출고 예약은 실제 월드 출고 시에만 소모하며 드래그 상태를 해제한다. 반환값은 없다.
+        /// 왼쪽 버튼이 실제 해제된 경우에만 확정하며 UI 출고 예약은 월드 출고 시 소모한다. 반환값은 없다.
         /// </summary>
         public void EndDrag(Vector2 point)
         {
             if (!IsDragging) return;
+            if (Mouse.current == null || Mouse.current.leftButton.isPressed) return;
             if (_isBulkDragging) { EndBulkPlacement(); return; }
             if (IsInReturnArea(point))
             {

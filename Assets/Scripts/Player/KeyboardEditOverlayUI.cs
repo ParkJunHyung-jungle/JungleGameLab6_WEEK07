@@ -47,6 +47,7 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _plateButton;
         [SerializeField] private KeyboardEditButton _customButton;
         [SerializeField] private bool _showKeycapsOnOpen;
+        [SerializeField] private WorkshopKeyboardPullerController _pullerController;
 
         [Header("Mode Buttons")]
         [SerializeField] private KeyboardEditButton _generalModeButton;
@@ -122,6 +123,7 @@ namespace Game.Player
         private KeyboardCustomizationTestUI _photoUI;
         private KeyboardKeycapPanelUI _keycapUI;
         private WorkshopKeycapPlacement _keycapPlacement;
+        private WorkshopVerticalCatalogLayout _catalogLayout;
         private bool _hasPendingKeycapMaterial;
         private bool _hasActiveKeycapMaterialPreview;
         private float _appliedPhotoWheelZoomSensitivity;
@@ -157,6 +159,7 @@ namespace Game.Player
         void Awake()
         {
             _keycapPlacement = GetComponent<WorkshopKeycapPlacement>();
+            _catalogLayout = GetComponent<WorkshopVerticalCatalogLayout>();
             _canvas = GetComponentInParent<Canvas>();
             _pickerSprite = (_keycapButton.targetGraphic as Image).sprite;
             _pickerFont = _switchAxisButton.GetComponentInChildren<Text>().font;
@@ -274,11 +277,13 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 편집 UI의 빈 영역을 왼쪽 클릭하면 열린 선택 목록을 닫는다.
-        /// eventData의 위치를 사용하며 목록 안에서 시작한 입력은 유지한다.
+        /// 접기 버튼을 사용하는 세로 목록은 빈 영역 클릭에도 현재 표시 상태를 유지한다.
+        /// 기존 가로 UI는 eventData 위치로 외부 클릭을 검사해 선택 목록을 닫는다. 반환값은 없다.
         /// </summary>
         public void OnPointerDown(PointerEventData eventData)
         {
+            if (_catalogLayout != null) return;
+            if (_pullerController != null && _pullerController.IsPullerInteraction(eventData.position)) return;
             if (eventData.button == PointerEventData.InputButton.Left
                 && !ContainsPointer(_viewport, eventData.position)
                 && !ContainsPointer(_switchSoundViewport, eventData.position)

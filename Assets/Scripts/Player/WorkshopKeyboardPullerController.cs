@@ -179,6 +179,18 @@ namespace Game.Player
             return false;
         }
 
+        /// <summary>
+        /// screenPosition이 풀러를 가리키거나 이미 풀러를 들고 있는지 반환한다.
+        /// 현재 입력 허용 상태와 카메라 레이를 사용하며 UI 선택과 도구 상태는 변경하지 않는다.
+        /// </summary>
+        public bool IsPullerInteraction(Vector2 screenPosition)
+        {
+            if (!InputAllowed) return false;
+            Ray ray = _camera.ScreenPointToRay(screenPosition);
+            return _keycapPuller.IsSelected || _switchPuller.IsSelected
+                || _keycapPuller.IsPointerOverTool(ray) || _switchPuller.IsPointerOverTool(ray);
+        }
+
         /// <summary>현재 포인터가 풀러 선택이나 사용에 해당하는지 반환한다. 기존 키보드 드래그 회전과 입력을 구분한다.</summary>
         public bool ConsumesPointer()
         {

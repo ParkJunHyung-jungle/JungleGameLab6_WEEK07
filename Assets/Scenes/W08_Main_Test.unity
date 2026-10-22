@@ -9113,6 +9113,7 @@ MonoBehaviour:
   _plateButton: {fileID: 9911000174}
   _customButton: {fileID: 9911000138}
   _showKeycapsOnOpen: 1
+  _pullerController: {fileID: 500387865}
   _generalModeButton: {fileID: 9911000156}
   _attackModeButton: {fileID: 9911000151}
   _modeStatus: {fileID: 9911000073}

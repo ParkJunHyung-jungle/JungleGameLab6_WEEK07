@@ -7,6 +7,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+using Game.Logging;
+
 namespace KeyboardModeling.Assembly
 {
     [DisallowMultipleComponent]
@@ -101,14 +103,43 @@ namespace KeyboardModeling.Assembly
             _catalog.RefreshInventory();
         }
 
-        /// <summary>hit에서 현재 슬롯에 등록된 지정 종류 파츠를 찾아 속도값으로 분리하고 지연 회수를 예약한다. 성공 여부를 반환한다.</summary>
-        public bool TryExtractPart(Collider hit, bool extractSwitches, Vector3 velocity, Vector3 angularVelocity)
+        /// <summary>hit에서 현재 슬롯의 지정 종류 파츠를 interactionId로 기록하고 속도값으로 분리한다. 성공 여부를 반환한다.</summary>
+        public bool TryExtractPart(Collider hit, bool extractSwitches, Vector3 velocity, Vector3 angularVelocity, string interactionId)
         {
             AssemblyDraggablePart part = hit != null ? hit.GetComponentInParent<AssemblyDraggablePart>() : null;
             if (part == null || part.IsSwitch != extractSwitches || Array.IndexOf(_slots, part.Slot) < 0
-                || !part.TryPopOff(velocity, angularVelocity)) return false;
+                || !part.Slot.IsInstalled || part.Slot.InstalledPart != part) return false;
+            bool removed = part.TryPopOff(velocity, angularVelocity);
+            string targetId = part.Slot.Key.ToString();
+            CustomizationTelemetry.Emit(CustomizationLogger.CurrentTarget, "PartRemoveAttempted",
+                extractSwitches ? "Switch" : "Keycap", GetCatalogPartId(part), success: removed,
+                targetId: targetId, actionSource: "Tool", interactionId: interactionId,
+                outcomeReason: removed ? "" : "RemovalBlocked");
+            if (!removed) return false;
             ScheduleExtractedReturn(part);
             return true;
+        }
+
+        /// <summary>
+        /// 현재 도구 집기나 내려놓기 행동을 열린 제작 회차에 전달한다.
+        /// type, toolId와 interactionId를 기록하며 슬롯 설치 상태는 변경하지 않는다.
+        /// </summary>
+        public void RecordToolEvent(string type, string toolId, string interactionId)
+        {
+            CustomizationTelemetry.Emit(CustomizationLogger.CurrentTarget, type, "Tool", toolId,
+                interactionId: interactionId, actionSource: "Tool");
+        }
+
+        /// <summary>
+        /// part의 카탈로그 에셋에서 안정된 파츠 ID를 가져와 반환한다.
+        /// 항목 데이터가 없으면 부품 종류를 나타내는 고정 ID를 반환한다.
+        /// </summary>
+        private static string GetCatalogPartId(AssemblyDraggablePart part)
+        {
+            AssemblyCatalogEntry entry = part.CatalogEntry;
+            if (entry == null) return part.IsSwitch ? "Switch" : "Keycap";
+            if (entry.IsSwitch) return entry.SwitchData.Type.ToString();
+            return entry.KeycapDefinition != null ? entry.KeycapDefinition.Id : "Keycap";
         }
 
         /// <summary>불러온 part를 기존 집기 대상에 등록한다. 중복 등록 없이 입력 대상 목록만 갱신한다.</summary>
@@ -193,7 +224,7 @@ namespace KeyboardModeling.Assembly
             }
 
             if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
-                CompleteDrag(inReturnArea, overUI);
+                CompleteDrag(inReturnArea, overUI, ray);
         }
 
         /// <summary>
@@ -400,6 +431,9 @@ namespace KeyboardModeling.Assembly
                     _parts.Add(part);
                     _bulkVisited.Add(slot);
                     inventoryChanged = true;
+                    CustomizationTelemetry.Emit(CustomizationLogger.CurrentTarget, "PartInstallAttempted",
+                        part.IsSwitch ? "Switch" : "Keycap", GetCatalogPartId(part), success: true, changed: true,
+                        targetId: slot.Key.ToString(), actionSource: "BulkPlacement");
                 }
                 else
                 {
@@ -568,7 +602,7 @@ namespace KeyboardModeling.Assembly
         /// inReturnArea와 overUI에 따라 반환, 취소 또는 기존 월드 Drop을 확정한다.
         /// 실물과 예약을 한 번만 처리하고 아이콘과 드래그 상태를 해제한다.
         /// </summary>
-        private void CompleteDrag(bool inReturnArea, bool overUI)
+        private void CompleteDrag(bool inReturnArea, bool overUI, Ray ray)
         {
             EndPointerTracking();
             _isDragging = false;
@@ -578,7 +612,17 @@ namespace KeyboardModeling.Assembly
                 RestoreHeldPart();
             else if (_activePart != null)
             {
-                AssemblyPartSlot target = _hoverSlot != null && _hoverSlot.CanInstall(_activePart) ? _hoverSlot : null;
+                AssemblyPartSlot candidate = FindPointerCandidateSlot(ray, _activePart);
+                AssemblyPartSlot target = candidate != null && candidate.CanInstall(_activePart) ? candidate : null;
+                if (candidate != null)
+                {
+                    bool changed = target != null && target.InstalledPart != _activePart;
+                    CustomizationTelemetry.Emit(CustomizationLogger.CurrentTarget, "PartInstallAttempted",
+                        _activePart.IsSwitch ? "Switch" : "Keycap", GetCatalogPartId(_activePart),
+                        success: target != null, changed: changed, targetId: candidate.Key.ToString(),
+                        actionSource: _fromInventory ? "InventoryDrag" : "WorldDrag",
+                        outcomeReason: target != null ? "" : candidate.GetInstallFailureReason(_activePart));
+                }
                 if (target != null)
                     _activePart.AttachSlot(target);
                 _activePart.EndDrag(target != null);
@@ -596,6 +640,16 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private AssemblyPartSlot FindPointerSlot(Ray ray, AssemblyDraggablePart part)
         {
+            AssemblyPartSlot nearest = FindPointerCandidateSlot(ray, part);
+            return nearest != null && nearest.CanInstall(part) ? nearest : null;
+        }
+
+        /// <summary>
+        /// ray가 가리키는 가장 가까운 슬롯 후보를 찾고 가림 여부를 검사한다.
+        /// 부품 호환성이나 설치 가능 여부는 판정하지 않아 놓기 순간의 실패 원인을 보존한다.
+        /// </summary>
+        private AssemblyPartSlot FindPointerCandidateSlot(Ray ray, AssemblyDraggablePart part)
+        {
             Physics.SyncTransforms();
             AssemblyPartSlot nearest = null;
             float distance = float.PositiveInfinity;
@@ -609,8 +663,7 @@ namespace KeyboardModeling.Assembly
                     nearest = slot;
                 }
             }
-            if (nearest == null || !nearest.CanInstall(part))
-                return null;
+            if (nearest == null) return null;
             foreach (RaycastHit hit in Physics.RaycastAll(ray, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 if (hit.transform.IsChildOf(part.transform) || IsToolCollider(hit.collider))

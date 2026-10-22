@@ -132,7 +132,6 @@ namespace Game.Player
         private KeyboardCustomization _ledCustomization;
         private KeyboardLEDPanelUI _ledUI;
 
-        public event Action<Material, Material, bool, int> KeycapMaterialSelected;
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<Material> CaseMaterialSelected;
         public event Action<Material> PlateMaterialSelected;
@@ -480,19 +479,44 @@ namespace Game.Player
                 return;
 
             KeyboardCustomization customization = _photoStorage.Customization;
-            Material previousMaterial = customization.GetCommittedKeycapMaterial(allKeys, keycapIndex);
             var before = new List<string[]>(customization.GetKeycapLogValues());
             bool success = customization.CommitKeycapMaterialPreview(_selectedMaterial, allKeys, keycapIndex, _selectedKeycapDefinition);
             bool changed = false;
+            string selectedId = Game.Logging.CustomizationTelemetry.GetKeycapElementId(_selectedKeycapDefinition, _selectedMaterial);
             if (success)
             {
                 var after = new List<string[]>(customization.GetKeycapLogValues());
                 for (int index = 0; index < before.Count; index++)
                     if ((allKeys || index == keycapIndex) && (before[index][1] != after[index][1]
                         || before[index][4] != after[index][4] || before[index][5] != after[index][5])) changed = true;
+
+                string previousSelection = allKeys
+                    ? before.Count > 0 ? before[0][1] : ""
+                    : keycapIndex >= 0 && keycapIndex < before.Count ? before[keycapIndex][1] : "";
+                if (previousSelection != selectedId)
+                    Game.Logging.CustomizationTelemetry.Emit(customization, "OptionSelected", "Keycap", selectedId,
+                        previousSelection, changed: true, scope: allKeys ? "AllKeycaps" : "SingleKeycap",
+                        key: allKeys ? "" : keycapIndex.ToString());
+
+                for (int index = 0; index < before.Count; index++)
+                {
+                    bool slotChanged = before[index][1] != after[index][1]
+                        || before[index][4] != after[index][4] || before[index][5] != after[index][5];
+                    if (allKeys && slotChanged)
+                    {
+                        Game.Logging.CustomizationTelemetry.Emit(customization, "PartInstallAttempted", "Keycap", after[index][1],
+                            before[index][1], true, true, "AllKeycaps", index.ToString(), targetId: customization.GetKeycapSlotId(index),
+                            actionSource: "BulkPlacement", keycapKind: after[index][3], materialId: after[index][4]);
+                    }
+                }
             }
             string previous = !allKeys && keycapIndex >= 0 && keycapIndex < before.Count ? before[keycapIndex][1] : "";
-            ObserveKeycap("KeycapApply", _selectedKeycapDefinition, _selectedMaterial, allKeys, keycapIndex, success, previous, changed);
+            if (!allKeys && keycapIndex >= 0 && keycapIndex < before.Count)
+                Game.Logging.CustomizationTelemetry.Emit(customization, "PartInstallAttempted", "Keycap", selectedId,
+                    previous, success, changed, "SingleKeycap", keycapIndex.ToString(), targetId: customization.GetKeycapSlotId(keycapIndex),
+                    actionSource: "MaterialPicker", outcomeReason: success ? "" : "PlacementRejected",
+                    keycapKind: Game.Logging.CustomizationTelemetry.GetKeycapKind(_selectedKeycapDefinition, _selectedMaterial),
+                    materialId: _selectedKeycapDefinition != null ? _selectedKeycapDefinition.MaterialId : _selectedMaterial != null ? _selectedMaterial.name : "");
             if (!success)
             {
                 customization.CancelKeycapMaterialPreview();
@@ -502,7 +526,6 @@ namespace Game.Player
                 return;
             }
 
-            KeycapMaterialSelected?.Invoke(_selectedMaterial, previousMaterial, allKeys, keycapIndex);
             _hasPendingKeycapMaterial = retainMaterialSelection;
             _hasActiveKeycapMaterialPreview = false;
             _keycapUI.SetCanApply(false, _hasPendingKeycapMaterial);
@@ -2126,7 +2149,8 @@ namespace Game.Player
             if (_pickerMode == PickerMode.Led)
                 _ledUI.Open(_ledCustomization);
             if (previous != _pickerMode)
-                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode));
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode),
+                    previous: GetLogPart(previous));
         }
 
         /// <summary>

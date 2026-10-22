@@ -82,22 +82,6 @@ namespace Game.Logging
         }
 #endif
 
-        /// <summary>
-        /// 최초 씬에 로거가 없으면 실행용 PlaytestLogger를 생성한다.
-        /// 직접 테스트 씬을 실행한 경우에도 Start 이전에 기록을 준비한다.
-        /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureLogger()
-        {
-            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)
-            {
-                // WorkShop0에서는 실행 시작 시 전투 입력 CSV를 생성하지 않는다.
-                // new GameObject("PlaytestLogger").AddComponent<KeyboardInputLogger>();
-                return;
-            }
-            if (_instance == null) new GameObject("PlaytestLogger").AddComponent<KeyboardInputLogger>();
-        }
-
         void Awake()
         {
             if (Game.Workshop.CustomizationOnlyWorkshop.IsActive)

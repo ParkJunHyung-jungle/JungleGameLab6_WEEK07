@@ -148,7 +148,6 @@ namespace Game.Player
             InGameCursor.Visible = false;
             if (_keyboardEditOverlayUI != null)
             {
-                _keyboardEditOverlayUI.KeycapMaterialSelected += HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected += HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected += HandleCaseMaterialSelected;
                 _keyboardEditOverlayUI.PlateMaterialSelected += HandlePlateMaterialSelected;
@@ -169,7 +168,6 @@ namespace Game.Player
         {
             if (_keyboardEditOverlayUI != null)
             {
-                _keyboardEditOverlayUI.KeycapMaterialSelected -= HandleKeycapMaterialSelected;
                 _keyboardEditOverlayUI.SwitchSoundSelected -= HandleSwitchSoundSelected;
                 _keyboardEditOverlayUI.CaseMaterialSelected -= HandleCaseMaterialSelected;
                 _keyboardEditOverlayUI.PlateMaterialSelected -= HandlePlateMaterialSelected;
@@ -1130,30 +1128,6 @@ namespace Game.Player
         {
             _isDraggingEditingKeyboard = false;
             _pendingKeyboardRotationDelta = Vector2.zero;
-        }
-
-        /// <summary>
-        /// 확정된 키캡 재질과 적용 범위의 변경 기록을 남긴다.
-        /// material, previousMaterial, allKeys, keycapIndex와 _editingKeyboard를 사용한다.
-        /// </summary>
-        private void HandleKeycapMaterialSelected(
-            Material material,
-            Material previousMaterial,
-            bool allKeys,
-            int keycapIndex)
-        {
-            if (_editingKeyboard == null || material == null)
-                return;
-
-            KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
-            if (customization != null)
-            {
-                string previous = previousMaterial != null ? previousMaterial.name : "";
-                Game.Logging.CustomizationTelemetry.Emit(customization, "ElementSelected", "Keycap", material.name,
-                    previous, changed: previous != material.name,
-                    scope: allKeys ? "AllKeycaps" : "SingleKeycap",
-                    key: allKeys ? "" : keycapIndex.ToString());
-            }
         }
 
         /// <summary>

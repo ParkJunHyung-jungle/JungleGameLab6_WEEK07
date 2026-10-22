@@ -32,16 +32,18 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// target의 실제 UI 동작과 part, element, previous 및 적용 결과를 관찰자에게 전달한다.
-        /// scope와 key 및 details는 추가 문맥이며 게임 설정과 저장 상태는 변경하지 않는다.
+        /// target, type, 부품·선택 ID와 적용 결과를 제작 행동 관찰자에게 전달한다.
+        /// interactionId, targetId, actionSource 및 outcomeReason도 포함하며 게임 상태는 변경하지 않는다.
         /// </summary>
         public static void Emit(KeyboardCustomization target, string type, string part = "", string element = "",
-            string previous = "", bool success = true, bool changed = false, string scope = "", string key = "", string details = "", string keycapKind = "", string materialId = "")
+            string previous = "", bool success = true, bool changed = false, string scope = "", string key = "", string details = "", string keycapKind = "", string materialId = "",
+            string interactionId = "", string targetId = "", string actionSource = "", string outcomeReason = "")
         {
             if (!Application.isPlaying) return;
-            // WorkShop0에서도 커마 조작은 기록하며 전투 로거 차단과 분리한다.
+            // 허용된 제작 씬에서만 로거를 보장한다.
             CustomizationLogger.EnsureLogger();
-            Observed?.Invoke(new CustomizationObservation(target, type, part, element, previous, success, changed, scope, key, details, keycapKind, materialId));
+            Observed?.Invoke(new CustomizationObservation(target, type, part, element, previous, success, changed, scope, key, details, keycapKind, materialId,
+                interactionId, targetId, actionSource, outcomeReason));
         }
 
         /// <summary>
@@ -66,24 +68,30 @@ namespace Game.Logging
         public string Details { get; }
         public string KeycapKind { get; }
         public string MaterialId { get; }
+        public string InteractionId { get; }
+        public string TargetId { get; }
+        public string ActionSource { get; }
+        public string OutcomeReason { get; }
 
         /// <summary>
         /// 대상과 동작, 요소 및 적용 결과를 불변 관찰값으로 보관한다.
         /// 전달된 scope, key와 details를 포함하며 게임 상태는 변경하지 않는다.
         /// </summary>
         public CustomizationObservation(KeyboardCustomization target, string type, string part, string element,
-            string previous, bool success, bool changed, string scope, string key, string details, string keycapKind = "", string materialId = "")
+            string previous, bool success, bool changed, string scope, string key, string details, string keycapKind = "", string materialId = "",
+            string interactionId = "", string targetId = "", string actionSource = "", string outcomeReason = "")
         {
             Target = target; Type = type; Part = part; Element = element; Previous = previous;
             Success = success; Changed = changed; Scope = scope; Key = key; Details = details;
             KeycapKind = keycapKind; MaterialId = materialId;
+            InteractionId = interactionId; TargetId = targetId; ActionSource = actionSource; OutcomeReason = outcomeReason;
         }
     }
 
     [DisallowMultipleComponent]
     public sealed class CustomizationLogger : MonoBehaviour
     {
-        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed,test_run_id,cycle_id,cycle_index,configuration_id,parent_configuration_id,configuration_origin,linked_tournament_run_id,previous_tournament_run_id,tournament_index,participation_context,intervention_id,research_event_id";
+        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed,test_run_id,cycle_id,cycle_index,configuration_id,parent_configuration_id,configuration_origin,linked_tournament_run_id,previous_tournament_run_id,tournament_index,participation_context,intervention_id,research_event_id,interaction_id,target_id,action_source,outcome_reason";
         private static CustomizationLogger _instance;
 
         [Header("Runtime")]
@@ -93,23 +101,16 @@ namespace Game.Logging
         private string _runId;
         private string _keyboardId;
         private string _scenePath;
-        private string _part;
-        private string _visitId;
         private KeyboardCustomization _target;
         private long _sequence;
         private double _runStart;
-        private double _partStart;
-        private double _lastTime;
-        private double _runFocused;
-        private double _partFocused;
         private double _nextFlush;
-        private bool _focused;
-        private bool _externalDialog;
         private bool _closed;
         private bool _failed;
         private bool _ownsSession;
 
         public string FilePath { get; private set; }
+        public static KeyboardCustomization CurrentTarget => _instance != null ? _instance._target : null;
         public static string CurrentFilePath => _instance != null && _instance._ownsSession && !_instance._closed && _instance._writer != null
             ? _instance.FilePath
             : null;
@@ -135,8 +136,6 @@ namespace Game.Logging
                 _writer.WriteLine(HEADER);
             }
             catch (Exception exception) { Fail(exception); }
-            _lastTime = Time.realtimeSinceStartupAsDouble;
-            _focused = HasFocus();
             CustomizationTelemetry.Observed += Observe;
             PlaytestResearchSession.Observed += HandleResearchEvent;
             SceneManager.sceneUnloaded += HandleSceneUnloaded;
@@ -151,8 +150,24 @@ namespace Game.Logging
         /// </summary>
         public static void EnsureLogger()
         {
-            if (_instance == null)
+            string sceneName = SceneManager.GetActiveScene().name;
+            if (_instance == null && (sceneName == "WorkShop2" || sceneName == "W08_Main_Test"))
                 new GameObject("CustomizationLogger").AddComponent<CustomizationLogger>();
+        }
+
+        /// <summary>
+        /// 현재 실행 환경의 Customization 로그 폴더를 연다.
+        /// 에디터에서는 프로젝트 Logs, 빌드에서는 persistentDataPath 아래 PlaytestLogs를 사용한다.
+        /// </summary>
+        public static void OpenLogFolder()
+        {
+#if UNITY_EDITOR
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Logs"));
+#else
+            string folder = Path.Combine(Application.persistentDataPath, "PlaytestLogs");
+#endif
+            Directory.CreateDirectory(folder);
+            Application.OpenURL(new Uri(folder + Path.DirectorySeparatorChar).AbsoluteUri);
         }
 
         /// <summary>현재 커스터마이징 CSV의 버퍼를 디스크에 반영한다. 업로드 직전 파일을 읽어도 최신 이벤트가 포함되도록 한다.</summary>
@@ -171,20 +186,19 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 최초 실행 씬이 WorkShop2 또는 WorkShop0이면 로거의 존재를 보장한다.
+        /// 최초 실행 씬이 WorkShop2 또는 W08_Main_Test이면 로거의 존재를 보장한다.
         /// 이미 씬에 연결된 인스턴스는 그대로 사용하고 중복 파일을 생성하지 않는다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureWorkshopLogger()
         {
-            if (SceneManager.GetActiveScene().name == "WorkShop2" || Game.Workshop.CustomizationOnlyWorkshop.IsActive) EnsureLogger();
+            string sceneName = SceneManager.GetActiveScene().name;
+            if (sceneName == "WorkShop2" || sceneName == "W08_Main_Test") EnsureLogger();
         }
 
         void Update()
         {
             if (!_ownsSession || _closed) return;
-            Accumulate();
-            _focused = HasFocus();
             if (Time.realtimeSinceStartupAsDouble >= _nextFlush)
             {
                 Flush();
@@ -192,13 +206,12 @@ namespace Game.Logging
             }
         }
 
-        void OnApplicationFocus(bool focused) { if (_ownsSession && !_closed) { Accumulate(); _focused = focused && HasFocus(); } }
         void OnApplicationQuit() { if (_ownsSession) Finish("ApplicationQuit"); }
         void OnDestroy() { if (_ownsSession) { Finish("LoggerDestroyed"); if (_instance == this) _instance = null; } }
 
         /// <summary>
-        /// 작업실의 편집 종료 상태에서 testerId로 새 참여자를 시작한다.
-        /// 두 CSV의 식별자를 함께 변경하며 게임 설정과 저장 파일은 유지한다.
+        /// 편집이 끝난 상태에서 testerId로 새 연구 참여자를 시작한다.
+        /// PlaytestResearchSession의 식별자 문맥을 갱신하며 게임 설정과 저장 파일은 유지한다.
         /// </summary>
         public void SetTesterId(string testerId)
         {
@@ -206,30 +219,13 @@ namespace Game.Logging
             PlaytestResearchSession.StartParticipant(testerId);
         }
 
-        /// <summary>연구 이벤트를 eventId로 전투 CSV와 연결한다. 참여자 종료 전에 열린 편집을 마감하고 reason을 기록한다.</summary>
-        private void HandleResearchEvent(string type, string reason, string eventId)
-        {
-            if (_closed) return;
-            if (type == "TestEnd") EndRun(reason, false);
-            string[] row = CreateRow(type);
-            row[4] = PlaytestResearchSession.CustomizationRunId;
-            row[6] = SceneManager.GetActiveScene().path;
-            row[22] = reason;
-            row[40] = eventId;
-            if (type == "TournamentFinished" || type == "TournamentInterrupted") row[23] = Bool(type == "TournamentFinished");
-            WriteRow(row);
-            Flush();
-        }
-
         /// <summary>
-        /// observation의 실제 UI 이벤트를 열린 회차에 기록한다.
-        /// 진입, 항목 이동, 선택 및 이미지 동작을 분리하고 전투 진입 시 열린 편집 회차를 정상 마감한다.
-        /// 전투 진입 이외에는 다른 키보드의 이벤트를 제외한다.
+        /// observation에서 허용한 메뉴, 선택, 설치·제거 및 도구 행동을 열린 제작 회차에 기록한다.
+        /// target과 type을 확인하고 중복 선택은 제외하며, 제작 종료 신호가 오면 회차 요약을 기록한다.
         /// </summary>
         private void Observe(CustomizationObservation observation)
         {
             if (_closed) return;
-            Accumulate();
             if (observation.Type == "CustomizationStart")
             {
                 EndRun("Reentered", false);
@@ -239,11 +235,9 @@ namespace Game.Logging
                 _keyboardId = _keyboards.GetValue(_target, CreateIdentity).Id;
                 _scenePath = _target.gameObject.scene.path;
                 _runStart = Time.realtimeSinceStartupAsDouble;
-                _runFocused = 0d;
-                _externalDialog = false;
                 PlaytestResearchSession.BeginCustomization(_runId);
                 Write("CustomizationStart");
-                Snapshot("Initial");
+                CaptureConfiguration("Initial");
             }
             else if (_runId == null) return;
             else if (observation.Type == "CustomizationEnd" && observation.Success && observation.Details == "NextScene")
@@ -252,61 +246,52 @@ namespace Game.Logging
             else if (observation.Type == "CustomizationEnd") EndRun(observation.Details, observation.Success);
             else if (observation.Type == "PartChanged")
             {
-                EndPart("PartChanged", true);
-                if (!string.IsNullOrEmpty(observation.Part))
-                {
-                    _part = observation.Part;
-                    _visitId = Guid.NewGuid().ToString("N");
-                    _partStart = Time.realtimeSinceStartupAsDouble;
-                    _partFocused = 0d;
-                    Write("PartVisitStart");
-                }
+                WriteObservation(observation, "PartMenuChanged");
             }
-            else if (observation.Type == "ExternalDialogStart") _externalDialog = true;
-            else if (observation.Type == "ExternalDialogEnd") { _externalDialog = false; _focused = HasFocus(); }
             else
             {
-                string[] row = CreateRow(observation.Type);
-                row[10] = observation.Part;
-                row[12] = observation.Element; row[13] = observation.Previous;
-                row[14] = Bool(observation.Success); row[15] = Bool(observation.Changed);
-                row[16] = observation.Scope; row[17] = observation.Key; row[24] = observation.Details;
-                row[25] = observation.KeycapKind; row[26] = observation.MaterialId;
-                WriteRow(row);
-                if (observation.Success && (observation.Type == "Save" || observation.Type == "Load" || observation.Type == "KeycapApply"
-                    || observation.Type == "ImageAction" && (observation.Element == "Apply" || observation.Element == "Replace" || observation.Element == "Remove")))
-                    Snapshot(observation.Type + ":" + observation.Element);
+                string recordType = observation.Type == "ElementSelected" ? "OptionSelected" : observation.Type;
+                if (IsSupportedRecordType(recordType) && (recordType != "OptionSelected" || observation.Changed))
+                    WriteObservation(observation, recordType);
             }
             Flush();
         }
 
         /// <summary>
-        /// 현재 실제 설정을 reason 스냅샷으로 저장한다.
-        /// 이미지 바이트나 사용자 파일 경로를 포함하지 않고 공개된 파츠 상태만 읽는다.
+        /// PlaytestResearchSession의 세션 종료 신호를 받아 열린 제작 회차를 닫는다.
+        /// type과 reason을 사용하며 TestEnd가 전달되면 실패로 간주하지 않고 미완료 상태로 마감한다.
         /// </summary>
-        private void Snapshot(string reason)
+        private void HandleResearchEvent(string type, string reason, string eventId)
         {
-            if (_target == null) return;
-            if (reason == "Initial" || reason == "Final" || reason == "Interrupted") CaptureConfiguration(reason);
-            string snapshotId = Guid.NewGuid().ToString("N");
-            foreach (string[] value in _target.GetCustomizationLogValues())
-            {
-                string[] row = CreateRow("CustomizationSnapshot");
-                row[10] = value[0]; row[12] = value[1]; row[22] = reason;
-                row[27] = snapshotId;
-                if (reason != "Initial" && reason != "Final" && reason != "Interrupted")
-                {
-                    row[32] = null;
-                    row[33] = PlaytestResearchSession.ConfigurationId;
-                    row[34] = "UncommittedWorkshopSnapshot";
-                }
-                if (value.Length > 2)
-                {
-                    row[17] = value[2]; row[25] = value[3]; row[26] = value[4]; row[28] = value[5];
-                    row[16] = "SingleKeycap";
-                }
-                WriteRow(row);
-            }
+            if (type == "TestEnd") EndRun(reason, false);
+        }
+
+        /// <summary>
+        /// observation의 측정 이벤트를 CSV 한 행으로 기록한다.
+        /// recordType을 사용하고 이전 스키마 열과 v4 추가 열에 식별값 및 결과를 저장한다.
+        /// </summary>
+        private void WriteObservation(CustomizationObservation observation, string recordType)
+        {
+            string[] row = CreateRow(recordType);
+            row[10] = observation.Part;
+            row[12] = observation.Element; row[13] = observation.Previous;
+            row[14] = Bool(observation.Success); row[15] = Bool(observation.Changed);
+            row[16] = observation.Scope; row[17] = observation.Key; row[24] = observation.Details;
+            row[25] = observation.KeycapKind; row[26] = observation.MaterialId;
+            row[41] = observation.InteractionId; row[42] = observation.TargetId;
+            row[43] = observation.ActionSource; row[44] = observation.OutcomeReason;
+            WriteRow(row);
+        }
+
+        /// <summary>
+        /// 새 행동 로그에 포함할 recordType인지 반환한다.
+        /// 정의된 메뉴, 선택, 설치·제거 시도 및 도구 이벤트만 통과시킨다.
+        /// </summary>
+        private static bool IsSupportedRecordType(string recordType)
+        {
+            return recordType == "OptionSelected" || recordType == "PartInstallAttempted"
+                || recordType == "PartRemoveAttempted" || recordType == "ToolPickedUp"
+                || recordType == "ToolPutDown";
         }
 
         /// <summary>편집 대상에 연결된 storage에서 실제 구성을 읽어 식별자를 갱신한다. 실패는 품질 이벤트로 남기며 편집은 유지한다.</summary>
@@ -329,37 +314,19 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 열린 파츠 방문을 reason과 complete로 한 번 마감한다.
-        /// 실제 경과 시간과 포커스 시간을 저장하고 방문 상태를 비운다.
-        /// </summary>
-        private void EndPart(string reason, bool complete)
-        {
-            if (_visitId == null) return;
-            Accumulate();
-            string[] row = CreateRow("PartVisitEnd");
-            double now = Time.realtimeSinceStartupAsDouble;
-            row[18] = Number(_partStart); row[19] = Number(now); row[20] = Number(now - _partStart);
-            row[21] = Number(_partFocused); row[22] = reason; row[23] = Bool(complete);
-            WriteRow(row);
-            _visitId = null; _part = null;
-        }
-
-        /// <summary>
         /// 열린 회차를 reason과 complete로 마감한다.
-        /// 마지막 파츠와 실제 최종 설정 및 회차 시간을 기록하고 식별자를 비운다.
+        /// 실제 최종 설정과 회차 시간을 기록하고 식별자를 비운다.
         /// </summary>
         private void EndRun(string reason, bool complete)
         {
             if (_runId == null) return;
-            Accumulate();
-            EndPart(reason, complete);
-            Snapshot(complete ? "Final" : "Interrupted");
+            CaptureConfiguration(complete ? "Final" : "Interrupted");
             string[] row = CreateRow("CustomizationEnd");
             double now = Time.realtimeSinceStartupAsDouble;
             row[18] = Number(_runStart); row[19] = Number(now); row[20] = Number(now - _runStart);
-            row[21] = Number(_runFocused); row[22] = reason; row[23] = Bool(complete);
+            row[22] = reason; row[23] = Bool(complete);
             WriteRow(row);
-            _runId = null; _target = null; _keyboardId = null; _externalDialog = false;
+            _runId = null; _target = null; _keyboardId = null;
             PlaytestResearchSession.EndCustomization();
             Flush();
         }
@@ -371,46 +338,16 @@ namespace Game.Logging
         private void HandleSceneUnloaded(Scene scene) { if (scene.path == _scenePath) EndRun("SceneExit", false); }
 
         /// <summary>
-        /// 이전 관찰 이후 실시간을 현재 포커스 상태에 따라 누적한다.
-        /// 파일 선택 대화상자 시간은 포커스 체류에서 제외하며 전체 시간은 유지한다.
-        /// </summary>
-        private void Accumulate()
-        {
-            double now = Time.realtimeSinceStartupAsDouble;
-            double delta = Math.Max(0d, now - _lastTime);
-            if (_runId != null && _focused && !_externalDialog)
-            {
-                _runFocused += delta;
-                if (_visitId != null) _partFocused += delta;
-            }
-            _lastTime = now;
-        }
-
-        /// <summary>
-        /// 실제 게임 창의 포커스 여부를 반환한다.
-        /// 에디터에서는 GameView와 일시정지 상태를 함께 확인한다.
-        /// </summary>
-        private bool HasFocus()
-        {
-#if UNITY_EDITOR
-            var window = UnityEditor.EditorWindow.focusedWindow;
-            return Application.isFocused && !UnityEditor.EditorApplication.isPaused && window != null && window.GetType().Name == "GameView";
-#else
-            return Application.isFocused;
-#endif
-        }
-
-        /// <summary>
         /// type의 이벤트 행에 현재 식별자와 순번 및 실시간을 설정하여 반환한다.
         /// 해당하지 않는 열은 빈 값으로 유지한다.
         /// </summary>
         private string[] CreateRow(string type)
         {
-            string[] row = new string[41];
-            row[0] = "3"; row[1] = Application.version; row[2] = TesterId; row[3] = _sessionId;
+            string[] row = new string[45];
+            row[0] = "4"; row[1] = Application.version; row[2] = TesterId; row[3] = _sessionId;
             row[4] = _runId; row[5] = _keyboardId; row[6] = _scenePath;
             row[7] = (++_sequence).ToString(CultureInfo.InvariantCulture); row[8] = type;
-            row[9] = Number(Time.realtimeSinceStartupAsDouble); row[10] = _part; row[11] = _visitId;
+            row[9] = Number(Time.realtimeSinceStartupAsDouble);
             row[29] = PlaytestResearchSession.TestRunId;
             row[30] = PlaytestResearchSession.CycleId;
             row[31] = PlaytestResearchSession.CycleIndex.ToString(CultureInfo.InvariantCulture);

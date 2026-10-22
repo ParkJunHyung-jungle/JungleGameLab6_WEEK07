@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
+using Game.Logging;
 using KeyboardModeling;
 using KeyboardModeling.Assembly;
 
@@ -243,12 +244,22 @@ namespace Game.Player
             _switchPuller.ReturnToOrigin();
         }
 
-        /// <summary>hit가 현재 편집 키보드의 제거 가능한 파츠이면 비활성화하고 속도값을 가진 시각 파츠를 생성한다. 성공 여부를 반환한다.</summary>
-        public bool TryExtractPart(Collider hit, bool extractSwitches, Vector3 velocity, Vector3 angularVelocity)
+        /// <summary>hit가 현재 편집 키보드의 파츠이면 interactionId와 제거 결과를 기록하고 분리한다. 성공 여부를 반환한다.</summary>
+        public bool TryExtractPart(Collider hit, bool extractSwitches, Vector3 velocity, Vector3 angularVelocity, string interactionId)
         {
             if (!InputAllowed || hit == null || _editingKeyboard == null) return false;
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
-            if (!customization.TryRemovePart(hit.transform, extractSwitches, out Transform removed)) return false;
+            int index = FindTargetIndex(customization, hit.transform, extractSwitches);
+            if (index < 0) return false;
+            bool removedSuccessfully = customization.TryRemovePart(hit.transform, extractSwitches, out Transform removed);
+            string partId = extractSwitches
+                ? customization.GetInstalledSwitchType(customization.GetSwitchSlotTransform(index).GetComponent<KeyboardSwitch>()).ToString()
+                : GetKeycapPartId(customization, index);
+            CustomizationTelemetry.Emit(customization, "PartRemoveAttempted", extractSwitches ? "Switch" : "Keycap", partId,
+                success: removedSuccessfully, targetId: customization.GetKeycapSlotId(index),
+                actionSource: "Tool", interactionId: interactionId,
+                outcomeReason: removedSuccessfully ? "" : extractSwitches ? "KeycapBlocksSwitchRemoval" : "RemovalRejected");
+            if (!removedSuccessfully) return false;
             if (!extractSwitches && _keycapPlacement != null
                 && _keycapPlacement.TakeRemovedKeycap(removed, true, velocity, angularVelocity))
             {
@@ -264,6 +275,43 @@ namespace Game.Player
             CreateDetachedVisual(removed, velocity, angularVelocity);
             AudioManager.PlayPartSound(removed.position, true);
             return true;
+        }
+
+        /// <summary>
+        /// 현재 도구 집기나 내려놓기 행동을 열린 제작 회차에 전달한다.
+        /// type, toolId와 interactionId를 기록하며 키보드 상태는 변경하지 않는다.
+        /// </summary>
+        public void RecordToolEvent(string type, string toolId, string interactionId)
+        {
+            CustomizationTelemetry.Emit(CustomizationLogger.CurrentTarget, type, "Tool", toolId,
+                interactionId: interactionId, actionSource: "Tool");
+        }
+
+        /// <summary>
+        /// hit가 지정 종류 슬롯의 장착 파츠 자식인지 확인하고 슬롯 인덱스를 반환한다.
+        /// 일치하는 활성 파츠가 없으면 -1을 반환하며 설치 상태는 변경하지 않는다.
+        /// </summary>
+        private static int FindTargetIndex(KeyboardCustomization customization, Transform hit, bool extractSwitches)
+        {
+            for (int index = 0; index < customization.KeycapCount; index++)
+            {
+                Transform target = extractSwitches
+                    ? customization.GetSwitchSlotTransform(index)
+                    : customization.GetKeycapSlotTransform(index);
+                if (target != null && target.gameObject.activeInHierarchy && hit.IsChildOf(target)) return index;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// index 키캡의 현재 정의 ID 또는 material ID를 반환한다.
+        /// 해당 슬롯의 로그 정보를 사용하며 값이 없으면 Keycap을 반환한다.
+        /// </summary>
+        private static string GetKeycapPartId(KeyboardCustomization customization, int index)
+        {
+            foreach (string[] value in customization.GetKeycapLogValues())
+                if (value[2] == index.ToString()) return value[1];
+            return "Keycap";
         }
 
         /// <summary>

@@ -178,6 +178,21 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
+        /// part를 이 슬롯에 장착할 수 없는 고정 사유 코드를 반환한다.
+        /// 현재 호환성, 선행 파츠와 슬롯 점유를 검사하며 장착 상태는 변경하지 않는다.
+        /// </summary>
+        public string GetInstallFailureReason(AssemblyDraggablePart part)
+        {
+            if (part == null) return "InvalidPart";
+            if (!IsCompatible(part)) return "IncompatiblePart";
+            if (_isSwitch && !CanRemove()) return "SlotBlocked";
+            if (!_isSwitch && (_installationPrerequisite == null || !_installationPrerequisite.IsInstalled))
+                return "PrerequisiteMissing";
+            if (!_isSwitch && _installedPart != null && _installedPart != part) return "SlotOccupied";
+            return "InstallationRejected";
+        }
+
+        /// <summary>
         /// part의 종류와 고정 형상 또는 재질형 키캡 여부로 이 슬롯의 호환성을 반환한다.
         /// 스위치는 스위치 슬롯만 허용하고 고정 키캡은 같은 형상 에셋만 허용한다.
         /// </summary>

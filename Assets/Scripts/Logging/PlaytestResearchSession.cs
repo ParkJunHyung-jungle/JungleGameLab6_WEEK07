@@ -36,6 +36,7 @@ namespace Game.Logging
         [Header("Runtime")]
         private bool _panelOpen;
         private bool _uploadConfirmationOpen;
+        private IDisposable _uploadConfirmationCursorDialog;
         private string _interventionReason = "OperationHelp";
 
         /// <summary>새 앱 실행의 구독과 식별자를 초기화한다. 이전 실행의 문맥은 재사용하지 않는다.</summary>
@@ -104,7 +105,7 @@ namespace Game.Logging
         /// </summary>
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (scene.name != "WorkShop2" && _uploadConfirmationOpen)
+            if (!IsUploadScene(scene.name) && _uploadConfirmationOpen)
                 SetUploadConfirmationOpen(false);
 
             Emit(scene.name == "WorkShop2" ? "WorkshopEntered" : "SceneEntered", scene.path);
@@ -114,7 +115,7 @@ namespace Game.Logging
         {
             if (Keyboard.current != null && Keyboard.current.f12Key.wasPressedThisFrame)
             {
-                if (SceneManager.GetActiveScene().name == "WorkShop2")
+                if (IsUploadScene(SceneManager.GetActiveScene().name))
                 {
                     if (LogUploadCoordinator.Instance != null && LogUploadCoordinator.Instance.IsBusy) return;
                     _panelOpen = false;
@@ -129,7 +130,7 @@ namespace Game.Logging
 
         void OnGUI()
         {
-            if (SceneManager.GetActiveScene().name == "WorkShop2")
+            if (IsUploadScene(SceneManager.GetActiveScene().name))
             {
                 if (_uploadConfirmationOpen) DrawUploadConfirmation();
                 return;
@@ -142,15 +143,15 @@ namespace Game.Logging
             {
                 Emit("LogUploadFolderRequested", "OperatorPanel");
                 CustomizationLogger.FlushForUpload();
-                KeyboardInputLogger.OpenLogFolder();
+                CustomizationLogger.OpenLogFolder();
             }
-            GUILayout.Label("Customization_ / Playtest_ CSV 두 개를 첨부해 주세요.");
+            GUILayout.Label("Customization_ CSV 한 개를 확인해 주세요.");
             if (GUILayout.Button("테스트 코드 복사하고 사후 설문 열기"))
             {
                 GUIUtility.systemCopyBuffer = TesterId;
                 Emit("SurveyOpened", "OperatorPanel");
                 CustomizationLogger.FlushForUpload();
-                KeyboardInputLogger.OpenLogFolder();
+                CustomizationLogger.OpenLogFolder();
                 Application.OpenURL(SURVEY_URL);
             }
             GUILayout.Label("반복 기회·진행 구분: " + ParticipationContext);
@@ -198,7 +199,7 @@ namespace Game.Logging
             float height = 190f;
             GUILayout.BeginArea(new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height), GUI.skin.window);
             GUILayout.Label("로그를 서버로 전송하시겠습니까?");
-            GUILayout.Label("예를 선택하면 현재 세션의 Playtest_ 및 Customization_ CSV 두 개만 마감한 뒤 전송합니다.");
+            GUILayout.Label("예를 선택하면 현재 세션의 Customization_ CSV 한 개만 마감한 뒤 전송합니다.");
             GUILayout.Label("전송이 끝나면 앱이 종료됩니다.");
 
             LogUploadCoordinator coordinator = LogUploadCoordinator.Instance;
@@ -216,7 +217,7 @@ namespace Game.Logging
             {
                 Emit("LogUploadFolderRequested", "UploadConfirmation");
                 CustomizationLogger.FlushForUpload();
-                KeyboardInputLogger.OpenLogFolder();
+                CustomizationLogger.OpenLogFolder();
             }
             if (GUILayout.Button("예, 전송"))
             {
@@ -232,11 +233,31 @@ namespace Game.Logging
         }
 
         /// <summary>
+        /// sceneName이 Customization CSV 업로드를 제공하는 씬인지 반환한다.
+        /// WorkShop2와 W08_Main_Test에서 F12 확인 창을 사용한다.
+        /// </summary>
+        private static bool IsUploadScene(string sceneName)
+        {
+            return sceneName == "WorkShop2" || sceneName == "W08_Main_Test";
+        }
+
+        /// <summary>
         /// 업로드 동의 창의 열림 상태를 갱신한다.
         /// isOpen 값을 인스턴스 상태와 플레이어 입력 제어용 공개 상태에 저장한다.
         /// </summary>
         private void SetUploadConfirmationOpen(bool isOpen)
         {
+            if (isOpen)
+            {
+                if (_uploadConfirmationCursorDialog == null)
+                    _uploadConfirmationCursorDialog = InGameCursor.SuspendForSystemDialog();
+            }
+            else
+            {
+                _uploadConfirmationCursorDialog?.Dispose();
+                _uploadConfirmationCursorDialog = null;
+            }
+
             _uploadConfirmationOpen = isOpen;
             IsUploadConfirmationOpen = isOpen;
         }
@@ -343,7 +364,10 @@ namespace Game.Logging
             _nextCyclePending = true;
         }
 
-        /// <summary>type과 reason을 두 CSV의 관찰자에게 같은 eventId로 전달한다. 행동의 동기는 추정하지 않는다.</summary>
+        /// <summary>
+        /// type, reason과 eventId를 연구 세션 관찰자에게 전달한다.
+        /// 새 행동 CSV에 행을 쓰지 않으며 TestEnd를 제작 회차 종료에 알리는 데 사용한다.
+        /// </summary>
         public static void Emit(string type, string reason)
         {
             if (Game.Workshop.CustomizationOnlyWorkshop.IsActive) return;

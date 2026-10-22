@@ -78,7 +78,8 @@ namespace Game.Logging
 
         void OnGUI()
         {
-            if (!_showStatus || SceneManager.GetActiveScene().name != "WorkShop2") return;
+            string sceneName = SceneManager.GetActiveScene().name;
+            if (!_showStatus || sceneName != "WorkShop2" && sceneName != "W08_Main_Test") return;
             float height = string.IsNullOrEmpty(_lastError) ? 70f : 105f;
             GUILayout.BeginArea(new Rect(12f, Screen.height - height - 12f, 500f, height), GUI.skin.box);
             GUILayout.Label(_statusMessage);
@@ -89,7 +90,7 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 설정과 현재 세션의 Playtest 및 Customization CSV 경로를 확인한 뒤 동의된 두 파일을 마감한다.
+        /// 설정과 현재 세션의 Customization CSV 경로를 확인한 뒤 동의된 파일을 마감한다.
         /// 입력 파일을 대기열에 넣고 업로드를 시작하면 true를 반환하며, 사전 확인에 실패하면 로그를 열린 상태로 둔다.
         /// </summary>
         public bool BeginUploadAfterConsent()
@@ -108,11 +109,7 @@ namespace Game.Logging
                 return false;
             }
 
-            string[] loggerPaths =
-            {
-                KeyboardInputLogger.CurrentFilePath,
-                CustomizationLogger.CurrentFilePath
-            };
+            string[] loggerPaths = { CustomizationLogger.CurrentFilePath };
             if (!TryNormalizeCurrentSessionPaths(loggerPaths, out string[] currentSessionPaths, out string pathError))
             {
                 _lastError = pathError;
@@ -126,7 +123,6 @@ namespace Game.Logging
             _statusMessage = "현재 CSV를 마감하고 업로드를 준비합니다.";
             PlaytestResearchSession.Emit("LogUploadConsent", "Accepted");
             PlaytestResearchSession.FinishForUpload();
-            KeyboardInputLogger.FinishForUpload();
             CustomizationLogger.FinishForUpload();
             StartCoroutine(UploadApprovedEntries(currentSessionPaths));
             return true;
@@ -185,8 +181,8 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 현재 세션에서 전달된 두 CSV만 manifest에 승인하고 안정적인 업로드 ID를 먼저 저장한다.
-        /// 기존 대기열은 제거하고 두 파일의 경로, 크기, 수정 시각, SHA-256이 같은 항목만 재사용한다.
+        /// 현재 세션에서 전달된 Customization CSV만 manifest에 승인하고 안정적인 업로드 ID를 먼저 저장한다.
+        /// 기존 대기열은 제거하고 파일의 경로, 크기, 수정 시각, SHA-256이 같은 항목만 재사용한다.
         /// </summary>
         private bool ApproveClosedFiles(string[] currentSessionPaths, out string error)
         {
@@ -272,30 +268,29 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 전달된 파일 두 개가 현재 로그 폴더의 Playtest 및 Customization CSV인지 확인한다.
-        /// 절대 경로 두 개를 반환하며 파일이 없거나 종류와 폴더가 맞지 않으면 오류를 반환한다.
+        /// 전달된 파일 하나가 현재 로그 폴더의 Customization CSV인지 확인한다.
+        /// 절대 경로 하나를 반환하며 파일이 없거나 종류와 폴더가 맞지 않으면 오류를 반환한다.
         /// </summary>
         private static bool TryNormalizeCurrentSessionPaths(string[] paths, out string[] normalizedPaths, out string error)
         {
             normalizedPaths = null;
             error = null;
-            if (paths == null || paths.Length != 2)
+            if (paths == null || paths.Length != 1)
             {
-                error = "현재 세션의 Playtest 및 Customization CSV를 찾지 못했습니다.";
+                error = "현재 세션의 Customization CSV를 찾지 못했습니다.";
                 return false;
             }
 
             try
             {
                 string expectedFolder = Path.GetFullPath(GetLogFolderPath());
-                string playtestPath = null;
                 string customizationPath = null;
 
                 foreach (string path in paths)
                 {
                     if (string.IsNullOrWhiteSpace(path))
                     {
-                        error = "현재 세션의 Playtest 및 Customization CSV를 찾지 못했습니다.";
+                        error = "현재 세션의 Customization CSV를 찾지 못했습니다.";
                         return false;
                     }
 
@@ -310,16 +305,7 @@ namespace Game.Logging
                         return false;
                     }
 
-                    if (name.StartsWith("Playtest_", StringComparison.Ordinal))
-                    {
-                        if (playtestPath != null)
-                        {
-                            error = "현재 세션의 Playtest CSV가 중복되었습니다.";
-                            return false;
-                        }
-                        playtestPath = fullPath;
-                    }
-                    else if (name.StartsWith("Customization_", StringComparison.Ordinal))
+                    if (name.StartsWith("Customization_", StringComparison.Ordinal))
                     {
                         if (customizationPath != null)
                         {
@@ -330,13 +316,13 @@ namespace Game.Logging
                     }
                 }
 
-                if (playtestPath == null || customizationPath == null)
+                if (customizationPath == null)
                 {
-                    error = "현재 세션의 Playtest 및 Customization CSV를 모두 찾지 못했습니다.";
+                    error = "현재 세션의 Customization CSV를 찾지 못했습니다.";
                     return false;
                 }
 
-                normalizedPaths = new[] { playtestPath, customizationPath };
+                normalizedPaths = new[] { customizationPath };
                 return true;
             }
             catch (Exception)
@@ -360,14 +346,13 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 서버가 허용한 두 CSV 접두사와 확장자를 확인한다.
-        /// 이름이 허용된 Playtest 또는 Customization 로그일 때 true를 반환한다.
+        /// 서버가 허용한 Customization CSV 접두사와 확장자를 확인한다.
+        /// 파일명이 Customization_ CSV일 때 true를 반환한다.
         /// </summary>
         private static bool IsSupportedFileName(string name)
         {
             return name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
-                && (name.StartsWith("Playtest_", StringComparison.Ordinal)
-                    || name.StartsWith("Customization_", StringComparison.Ordinal));
+                && name.StartsWith("Customization_", StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -441,12 +426,12 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 현재 세션 CSV 두 개만 승인 대기열에 넣고 순서대로 전송한다.
-        /// currentSessionPaths는 동의 전에 현재 로거에서 얻은 경로이며 각 파일의 API 흐름을 실행한다.
+        /// 현재 세션의 Customization CSV 한 개만 승인 대기열에 넣고 전송한다.
+        /// currentSessionPaths는 동의 전에 현재 로거에서 얻은 경로이며 파일의 API 흐름을 실행한다.
         /// </summary>
         private IEnumerator UploadApprovedEntries(string[] currentSessionPaths)
         {
-            _statusMessage = "현재 세션의 CSV 두 개를 확인하고 업로드 대기열을 저장합니다.";
+            _statusMessage = "현재 세션의 Customization CSV를 확인하고 업로드 대기열을 저장합니다.";
             if (!ApproveClosedFiles(currentSessionPaths, out string approvalError))
             {
                 FinishWithError(approvalError);

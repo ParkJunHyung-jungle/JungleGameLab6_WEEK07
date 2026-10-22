@@ -108,6 +108,27 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     }
 
     /// <summary>
+    /// index 슬롯에 연결된 입력 키의 안정된 이름을 반환한다.
+    /// 키보드 입력 매핑을 사용하며 찾지 못하면 Keycap과 index를 결합한 ID를 반환한다.
+    /// </summary>
+    public string GetKeycapSlotId(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (index < 0 || index >= _keycaps.Length) return "";
+        KeyboardInputController input = GetComponent<KeyboardInputController>();
+        if (input != null)
+        {
+            foreach (Key key in Enum.GetValues(typeof(Key)))
+            {
+                if (key == Key.None || !input.TryGetKeycapTransform(key, out Transform inputKeycap)) continue;
+                if (_keycaps[index] == inputKeycap || _keycaps[index].IsChildOf(inputKeycap)
+                    || inputKeycap.IsChildOf(_keycaps[index])) return key.ToString();
+            }
+        }
+        return "Keycap:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
     /// ray가 통과하는 슬롯 중 가장 가까운 위치의 인덱스를 반환한다.
     /// switchSlot이 true이면 축 경계를, 아니면 키캡 경계를 검사하며 슬롯이 없으면 -1을 반환한다.
     /// </summary>

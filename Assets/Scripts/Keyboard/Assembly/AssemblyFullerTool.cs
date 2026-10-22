@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -63,6 +64,8 @@ namespace KeyboardModeling.Assembly
         private Material _outlineMaterial;
 
         [Header("Runtime State")]
+        private readonly HashSet<int> _attemptedTargets = new HashSet<int>();
+        private string _interactionId;
         private bool _selected;
         private bool _extracting;
         private Vector3 _originPosition;
@@ -103,7 +106,7 @@ namespace KeyboardModeling.Assembly
 
             if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
             {
-                ReturnToOrigin();
+                RecordUserPutDown();
                 return true;
             }
 
@@ -111,7 +114,7 @@ namespace KeyboardModeling.Assembly
             bool overReturn = _returnCollider.Raycast(ray, out RaycastHit returnHit, Context.InputCamera.farClipPlane);
             if (!overUI && overReturn && mouse.leftButton.wasPressedThisFrame)
             {
-                ReturnToOrigin();
+                RecordUserPutDown();
                 return true;
             }
 
@@ -177,6 +180,9 @@ namespace KeyboardModeling.Assembly
                 _bodies[index].useGravity = false;
             }
             _selected = true;
+            _interactionId = Guid.NewGuid().ToString("N");
+            _attemptedTargets.Clear();
+            Context.RecordToolEvent("ToolPickedUp", _extractSwitches ? "SwitchPuller" : "KeycapRemover", _interactionId);
             UpdateToolPose(ray);
             HeldToolChanged?.Invoke(_fuller);
             ResetHold();
@@ -343,10 +349,34 @@ namespace KeyboardModeling.Assembly
             for (int index = 0; index <= steps; index++)
             {
                 Vector2 position = Vector2.Lerp(start, end, (float)index / steps);
-                Collider hit = GetExtractionTarget(position);
-                Vector2 sideways = Random.insideUnitCircle * _popSideSpeed;
-                Context.TryExtractPart(hit, _extractSwitches, new Vector3(sideways.x, _popUpSpeed, sideways.y), Random.onUnitSphere * _spinSpeed);
+                if (Context.IsPointerOverUI(position))
+                    continue;
+                Ray ray = Context.InputCamera.ScreenPointToRay(position);
+                if (_returnCollider.Raycast(ray, out RaycastHit returnHit, Context.InputCamera.farClipPlane))
+                    continue;
+                Collider hit = FindVisibleCollider(ray);
+                if (hit == null)
+                    continue;
+                AssemblyDraggablePart assemblyPart = hit.GetComponentInParent<AssemblyDraggablePart>();
+                Component target = assemblyPart != null && assemblyPart.IsSwitch == _extractSwitches
+                    ? assemblyPart
+                    : _extractSwitches ? hit.GetComponentInParent<KeyboardSwitch>() : hit.GetComponentInParent<KeycapHealth>();
+                if (target == null || !_attemptedTargets.Add(target.GetInstanceID()))
+                    continue;
+                Vector2 sideways = UnityEngine.Random.insideUnitCircle * _popSideSpeed;
+                Context.TryExtractPart(hit, _extractSwitches, new Vector3(sideways.x, _popUpSpeed, sideways.y),
+                    UnityEngine.Random.onUnitSphere * _spinSpeed, _interactionId);
             }
+        }
+
+        /// <summary>
+        /// 사용자가 놓은 도구의 ToolPutDown 이벤트를 기록한 뒤 원래 위치로 돌려놓는다.
+        /// 현재 도구 종류와 집을 때 만든 interactionId를 사용해 같은 작업으로 묶는다.
+        /// </summary>
+        private void RecordUserPutDown()
+        {
+            Context.RecordToolEvent("ToolPutDown", _extractSwitches ? "SwitchPuller" : "KeycapRemover", _interactionId);
+            ReturnToOrigin();
         }
 
         /// <summary>
@@ -389,6 +419,8 @@ namespace KeyboardModeling.Assembly
             _returnMarker = null;
             _returnCollider = null;
             _outlineMaterial = null;
+            _interactionId = null;
+            _attemptedTargets.Clear();
         }
 
         void OnDisable()

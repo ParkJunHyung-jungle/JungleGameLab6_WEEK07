@@ -402,7 +402,12 @@ namespace Game.Player
                 if (!_entry.TryReserve()) break;
                 bool installed = InstallEntry(customization, index);
                 _entry.FinishReservation(installed);
-                if (installed) { _bulkVisited.Add(index); changed = true; }
+                if (installed)
+                {
+                    _bulkVisited.Add(index);
+                    changed = true;
+                    RecordInstallAttempt(customization, index, true, "BulkPlacement");
+                }
                 if (_entry.AvailableQuantity <= 0) break;
             }
             if (changed) RefreshInventory();
@@ -478,6 +483,7 @@ namespace Game.Player
                 int index = FindInstallSlot(point);
                 bool installed = InstallEntry(customization, index);
                 if (_fromInventory) _entry.FinishReservation(true);
+                if (index >= 0) RecordInstallAttempt(customization, index, installed, "InventoryDrag");
                 if (installed)
                 {
                     _looseParts.Remove(_activePart);
@@ -495,6 +501,34 @@ namespace Game.Player
             _fromInventory = false;
             _dragIcon.gameObject.SetActive(false);
             RefreshInventory();
+        }
+
+        /// <summary>
+        /// 실제 설치를 확정한 슬롯을 Customization 행동 이벤트로 전달한다.
+        /// customization, index, 성공 여부와 설치 경로를 사용하며 일괄 실패는 호출하지 않는다.
+        /// </summary>
+        private void RecordInstallAttempt(KeyboardCustomization customization, int index, bool success, string actionSource)
+        {
+            string part = _entry.IsSwitch ? "Switch" : "Keycap";
+            string elementId = _entry.IsSwitch
+                ? _entry.SwitchData.Type.ToString()
+                : _entry.KeycapDefinition != null ? _entry.KeycapDefinition.Id : "Keycap";
+            Game.Logging.CustomizationTelemetry.Emit(customization, "PartInstallAttempted", part, elementId,
+                success: success, changed: success, targetId: customization.GetKeycapSlotId(index),
+                actionSource: actionSource, outcomeReason: success ? "" : GetInstallFailureReason(customization, index));
+        }
+
+        /// <summary>
+        /// 실패한 재고 설치의 고정 사유 코드를 반환한다.
+        /// customization의 슬롯 점유와 선행 스위치 상태를 읽으며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        private string GetInstallFailureReason(KeyboardCustomization customization, int index)
+        {
+            if (_entry.IsSwitch)
+                return customization.HasSwitchForKeycap(index) || customization.GetKeycapSlotTransform(index).gameObject.activeSelf
+                    ? "SlotOccupied" : "PlacementRejected";
+            if (customization.GetKeycapSlotTransform(index).gameObject.activeSelf) return "SlotOccupied";
+            return customization.HasSwitchForKeycap(index) ? "PlacementRejected" : "PrerequisiteMissing";
         }
 
         /// <summary>

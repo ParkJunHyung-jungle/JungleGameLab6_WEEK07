@@ -548,6 +548,52 @@ namespace KeyboardModeling.Assembly
                 _dragIcon.gameObject.SetActive(false);
         }
 
+        /// <summary>entry의 기존 카탈로그 텍스처로 독립적인 반환 아이콘을 만든다. 반환값은 입력을 가로막지 않는 Canvas 자식이다.</summary>
+        public RawImage CreateReturnIcon(AssemblyCatalogEntry entry)
+        {
+            RawImage icon = Rect("BoundaryReturnIcon", _canvasRect).gameObject.AddComponent<RawImage>();
+            icon.texture = _entryTextures[entry];
+            icon.raycastTarget = false;
+            icon.rectTransform.sizeDelta = _dragIcon.rectTransform.sizeDelta;
+            return icon;
+        }
+
+        /// <summary>worldPosition을 camera로 투영하고 icon 전체가 화면 안에 들어오는 Canvas 좌표를 반환한다. 뒤쪽 위치는 화면 중심 반대쪽 가장자리로 제한한다.</summary>
+        public Vector2 GetReturnIconStart(RawImage icon, Camera camera, Vector3 worldPosition)
+        {
+            Vector3 screen = camera.WorldToScreenPoint(worldPosition);
+            if (screen.z <= 0f)
+            {
+                Vector2 direction = new Vector2(Screen.width * 0.5f - screen.x, Screen.height * 0.5f - screen.y);
+                if (direction.sqrMagnitude < 0.001f)
+                    direction = Vector2.down;
+                screen = new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f)
+                    + (Vector3)(direction.normalized * Mathf.Max(Screen.width, Screen.height));
+            }
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screen, null, out Vector2 local);
+            return ClampReturnIcon(icon, local);
+        }
+
+        /// <summary>현재 패널 상태에 따라 반환 목적지를 계산한다. 펼쳤으면 패널 중심, 접혔으면 화면 왼쪽 중앙의 Canvas 좌표를 반환한다.</summary>
+        public Vector2 GetReturnIconDestination(RawImage icon)
+        {
+            Vector2 screen = _panel.activeInHierarchy
+                ? RectTransformUtility.WorldToScreenPoint(null, ((RectTransform)_panel.transform).TransformPoint(((RectTransform)_panel.transform).rect.center))
+                : new Vector2(0f, Screen.height * 0.5f);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screen, null, out Vector2 local);
+            return ClampReturnIcon(icon, local);
+        }
+
+        /// <summary>icon의 크기와 화면 양끝을 Canvas 좌표로 계산한다. local을 여백 안으로 제한하여 아이콘 전체가 보이는 위치를 반환한다.</summary>
+        public Vector2 ClampReturnIcon(RawImage icon, Vector2 local)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, Vector2.zero, null, out Vector2 min);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, new Vector2(Screen.width, Screen.height), null, out Vector2 max);
+            Vector2 half = icon.rectTransform.rect.size * 0.5f + Vector2.one * 8f;
+            return new Vector2(Mathf.Clamp(local.x, min.x + half.x, Mathf.Max(min.x + half.x, max.x - half.x)),
+                Mathf.Clamp(local.y, min.y + half.y, Mathf.Max(min.y + half.y, max.y - half.y)));
+        }
+
         /// <summary>
         /// entry의 한 개 예약을 consumed에 따라 확정하거나 취소한다.
         /// 초기 수량은 변경하지 않고 목록의 남은 수량 표시만 갱신한다.

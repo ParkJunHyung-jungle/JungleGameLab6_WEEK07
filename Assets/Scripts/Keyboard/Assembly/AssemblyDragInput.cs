@@ -65,7 +65,11 @@ namespace KeyboardModeling.Assembly
         private PointerEventData _pointerEvent;
         private EventSystem _pointerEventSystem;
 
+        [Header("Tool Returns")]
+        private readonly Dictionary<AssemblyDraggablePart, int> _extractedReturns = new Dictionary<AssemblyDraggablePart, int>();
+
         public AssemblyPartSlot[] Slots => _slots;
+        public IReadOnlyList<AssemblyDraggablePart> RegisteredParts => _parts;
         public bool InputAllowed => _inputAllowed;
         public bool IsDragging => _isDragging;
         public AssemblyPartSlot KeycapSlot => _partSlot;
@@ -73,6 +77,29 @@ namespace KeyboardModeling.Assembly
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _partSlot.transform.position.y + _heightOffset;
         public event Action<AssemblyDraggablePart> PartPicked;
+        public event Action<AssemblyDraggablePart> ExtractedReturnScheduled;
+
+        /// <summary>part가 현재 드래그나 일괄 배치 미리보기 대상인지 반환한다. 보이지 않는 UI 드래그 실물도 제외한다.</summary>
+        public bool IsHoldingPart(AssemblyDraggablePart part)
+        {
+            return (_isDragging && _activePart == part) || _bulkPreview == part;
+        }
+
+        /// <summary>part의 현재 조작 버전에 유효한 도구 회수 예약이 있는지 반환한다. 오래된 예약은 대상에서 제외한다.</summary>
+        public bool HasExtractedReturn(AssemblyDraggablePart part)
+        {
+            return _extractedReturns.TryGetValue(part, out int version) && version == part.InteractionVersion;
+        }
+
+        /// <summary>part의 집기 등록을 해제하고 기존 보관 경로로 반환한다. 실물이 활성 상태일 때만 재고를 한 번 늘리고 UI를 갱신한다.</summary>
+        public void ReturnLoosePart(AssemblyDraggablePart part)
+        {
+            if (part == null || !part.gameObject.activeSelf || part.CatalogEntry == null)
+                return;
+            _parts.Remove(part);
+            part.CatalogEntry.StorePart(part, true);
+            _catalog.RefreshInventory();
+        }
 
         /// <summary>불러온 part를 기존 집기 대상에 등록한다. 중복 등록 없이 입력 대상 목록만 갱신한다.</summary>
         public void RegisterRestoredPart(AssemblyDraggablePart part)
@@ -186,27 +213,36 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public void ScheduleExtractedReturn(AssemblyDraggablePart part)
         {
-            if (part.CatalogEntry != null)
-                StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
+            if (part.CatalogEntry == null || HasExtractedReturn(part))
+                return;
+            _extractedReturns[part] = part.InteractionVersion;
+            ExtractedReturnScheduled?.Invoke(part);
+            StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
         }
 
         /// <summary>
-        /// part가 interactionVersion 이후 다시 조작되지 않았으면 1초 뒤 기존 재고로 회수한다.
+        /// part가 interactionVersion 이후 다시 조작되지 않았으면 기존 도구 회수 지연 후 재고로 회수한다.
         /// 시간은 deltaTime으로 누적하며 실물의 집기 등록을 해제하고 재고 한 개와 UI를 갱신한다.
         /// </summary>
         private IEnumerator ReturnExtractedPart(AssemblyDraggablePart part, int interactionVersion)
         {
             float elapsed = 0f;
-            while (elapsed < EXTRACTED_RETURN_DELAY)
+            try
             {
-                yield return null;
-                if (part == null || part.InteractionVersion != interactionVersion)
-                    yield break;
-                elapsed += Time.deltaTime;
+                while (elapsed < EXTRACTED_RETURN_DELAY)
+                {
+                    yield return null;
+                    if (part == null || part.InteractionVersion != interactionVersion)
+                        yield break;
+                    elapsed += Time.deltaTime;
+                }
+                ReturnLoosePart(part);
             }
-            _parts.Remove(part);
-            part.CatalogEntry.StorePart(part, true);
-            _catalog.RefreshInventory();
+            finally
+            {
+                if (_extractedReturns.TryGetValue(part, out int version) && version == interactionVersion)
+                    _extractedReturns.Remove(part);
+            }
         }
 
         /// <summary>

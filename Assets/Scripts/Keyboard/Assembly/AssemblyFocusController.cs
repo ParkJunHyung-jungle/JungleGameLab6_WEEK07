@@ -1,3 +1,5 @@
+using System;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -30,6 +32,7 @@ namespace KeyboardModeling.Assembly
         private bool _initialized;
 
         public bool IsFocused => _isFocused;
+        public event Action<bool> FocusChanged;
 
         void Awake()
         {
@@ -96,6 +99,7 @@ namespace KeyboardModeling.Assembly
             _catalog.SetInventoryVisible(focused);
             _dragInput.SetInputAllowed(focused, _brain.OutputCamera);
             ApplyCursor();
+            FocusChanged?.Invoke(focused);
         }
 
         /// <summary>
@@ -127,6 +131,7 @@ namespace KeyboardModeling.Assembly
                 _dragInput.SetInputAllowed(false, _dragInput.InputCamera);
             if (_catalog != null)
                 _catalog.SetInventoryVisible(false);
+            FocusChanged?.Invoke(false);
             if (_inputAxes != null)
                 _inputAxes.enabled = _inputAxesWereEnabled;
             if (_inputCamera != null)

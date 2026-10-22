@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -14,6 +14,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 {
     [Header("Storage")]
     [SerializeField] private KeyboardCustomizationStorage _storage;
+    private IKeyboardPhotoTarget _assemblyPhotoTarget;
+    private RectTransform _assemblyListContent;
+    private IKeyboardPhotoTarget PhotoTarget => _assemblyPhotoTarget ?? _storage?.Customization;
     private InputField _path;
     private InputField _index;
     private RawImage _preview;
@@ -86,7 +89,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     void Start()
     {
         if (_embedded) return;
-        _input = _storage.Customization.GetComponent<KeyboardInputController>();
+        _input = _assemblyPhotoTarget == null ? _storage.Customization.GetComponent<KeyboardInputController>() : null;
         _previousInput = _input.InputEnabled;
         _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         _canvas = new GameObject("KeyboardPhotoTestCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -152,7 +155,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             if (!WindowsSpecialKeyInput.WasPressedThisFrame(keyboard, keyControl.keyCode))
                 continue;
 
-            if (_storage.Customization.TryGetPhotoKeycapIndex(keyControl.keyCode, out int keycapIndex))
+            if (PhotoTarget.TryGetPhotoKeycapIndex(keyControl.keyCode, out int keycapIndex))
             {
                 CompleteKeyInput(keycapIndex);
                 return;
@@ -239,6 +242,137 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         panel.anchoredPosition = new Vector2(-408f, -20f);
         ResizeEmbeddedPanel();
         _customizationPanel.SetActive(false);
+    }
+
+    /// <summary>
+    /// target을 사용하는 기존 사진 편집 컨트롤을 parent 목록 안에 구성한다.
+    /// width에 맞춰 배치하고 조립 씬에 연결되지 않은 저장 영역은 숨긴 뒤 콘텐츠 높이를 반환한다.
+    /// </summary>
+    public float InitializeAssemblyEmbedded(IKeyboardPhotoTarget target, RectTransform parent, float width, KeyboardCustomizationStorage storage)
+    {
+        _assemblyPhotoTarget = target;
+        _storage = storage;
+        _assemblyListContent = parent.parent as RectTransform;
+        _embedded = true;
+        _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        CreateEmbeddedPanel(parent);
+        GameObject frame = _customizationPanel;
+        _embeddedContentRect.SetParent(parent, false);
+        _embeddedContentRect.anchorMin = _embeddedContentRect.anchorMax = _embeddedContentRect.pivot = new Vector2(0f, 1f);
+        _embeddedContentRect.anchoredPosition = Vector2.zero;
+        _embeddedContentRect.sizeDelta = new Vector2(366f, 802f);
+        _embeddedContentRect.localScale = Vector3.one * (width / 366f);
+        foreach (Text label in _embeddedContentRect.GetComponentsInChildren<Text>(true))
+        {
+            label.fontSize = Mathf.Max(18, label.fontSize);
+            label.resizeTextForBestFit = false;
+            label.verticalOverflow = VerticalWrapMode.Truncate;
+        }
+        _toolsSection.Find("StoragePanel").gameObject.SetActive(_storage != null);
+        ConfigureAssemblyPhotoLayout();
+        _customizationPanel = _embeddedContentRect.gameObject;
+        _embeddedPanelRect = null;
+        _embeddedViewportRect = null;
+        Destroy(frame);
+        _customizationPanel.SetActive(false);
+        return _embeddedContentRect.rect.height * width / 366f;
+    }
+
+    /// <summary>
+    /// 조립용 사진 컨트롤을 내용 높이에 따라 쌓이는 목록으로 구성한다.
+    /// 기존 컨트롤과 이벤트는 유지하고 고정 좌표 대신 레이아웃 그룹이 간격과 높이를 결정한다.
+    /// </summary>
+    private void ConfigureAssemblyPhotoLayout()
+    {
+        CreateAssemblyPhotoStack(_embeddedContentRect, 16);
+        CreateAssemblyPhotoStack(_targetSection, 0);
+        CreateAssemblyPhotoStack(_toolsSection, 0);
+        CreateAssemblyPhotoRow(_embeddedContentRect, "ImageStepRow", 32f, "ImageStepBadge", "ImageStepTitle", "ImageStepHint");
+        CreateAssemblyPhotoRow(_embeddedContentRect, "FileDetailsRow", 64f, "FileName", "FileDimensions");
+        CreateAssemblyPhotoRow(_targetSection, "TargetStepRow", 32f, "TargetStepBadge", "TargetStepTitle");
+        CreateAssemblyPhotoRow(_targetSection, "TargetButtonsRow", 56f, "Target_0", "Target_1", "Target_2");
+        CreateAssemblyPhotoRow(_toolsSection, "ClearButtonsRow", 72f, "ClearKeycaps", "ClearCase");
+        RectTransform storagePanel = (RectTransform)_toolsSection.Find("StoragePanel");
+        if (_storage != null)
+        {
+            CreateAssemblyPhotoStack(storagePanel, 12);
+            storagePanel.Find("StorageTag").gameObject.SetActive(false);
+            CreateAssemblyPhotoRow(storagePanel, "StorageButtonsRow", 64f, "SaveCustomization", "LoadCustomization");
+        }
+        foreach (KeyboardCustomizationTestButton button in _embeddedContentRect.GetComponentsInChildren<KeyboardCustomizationTestButton>(true))
+        {
+            LayoutElement element = button.GetComponent<LayoutElement>();
+            if (element == null) element = button.gameObject.AddComponent<LayoutElement>();
+            element.minHeight = 56f;
+            Text label = button.GetComponentInChildren<Text>(true);
+            label.rectTransform.anchorMin = Vector2.zero;
+            label.rectTransform.anchorMax = Vector2.one;
+            label.rectTransform.offsetMin = new Vector2(6f, 4f);
+            label.rectTransform.offsetMax = new Vector2(-6f, -4f);
+        }
+        _cropEditor.gameObject.AddComponent<LayoutElement>().preferredHeight = 180f;
+        _path.gameObject.AddComponent<LayoutElement>().preferredHeight = 48f;
+        _keyIndexPanel.gameObject.AddComponent<LayoutElement>().preferredHeight = 72f;
+        _scopeNoteRect.gameObject.AddComponent<LayoutElement>().preferredHeight = 88f;
+        _scopeNote.rectTransform.anchorMin = Vector2.zero;
+        _scopeNote.rectTransform.anchorMax = Vector2.one;
+        _scopeNote.rectTransform.offsetMin = new Vector2(22f, 0f);
+        _scopeNote.rectTransform.offsetMax = Vector2.zero;
+        _formatNoteRect.gameObject.AddComponent<LayoutElement>().preferredHeight = 80f;
+        _pathToggleLabel.transform.parent.GetComponent<LayoutElement>().minHeight = 80f;
+        foreach (Image divider in _toolsSection.GetComponentsInChildren<Image>())
+            if (divider.name == "ToolsDivider") divider.gameObject.AddComponent<LayoutElement>().preferredHeight = 1f;
+        _imageDividerRect.gameObject.AddComponent<LayoutElement>().preferredHeight = 1f;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_embeddedContentRect);
+    }
+
+    /// <summary>
+    /// rect 아래의 컨트롤을 padding과 일정 간격을 사용하는 세로 목록으로 배치한다.
+    /// 반환값 없이 콘텐츠 높이가 실제 자식 높이를 따르도록 설정한다.
+    /// </summary>
+    private void CreateAssemblyPhotoStack(RectTransform rect, int padding)
+    {
+        VerticalLayoutGroup layout = rect.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(padding, padding, padding, padding);
+        layout.spacing = 12f;
+        layout.childControlWidth = layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        ContentSizeFitter fitter = rect.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+    }
+
+    /// <summary>
+    /// parent의 names 컨트롤을 name과 height를 사용하는 한 줄로 묶는다.
+    /// 기존 순서를 유지하며 각 컨트롤의 실제 글자 높이와 최소 버튼 높이를 레이아웃에 반영한다.
+    /// </summary>
+    private void CreateAssemblyPhotoRow(RectTransform parent, string name, float height, params string[] names)
+    {
+        int order = parent.Find(names[0]).GetSiblingIndex();
+        RectTransform row = Rect(name, parent, 0f, 0f, 326f, height);
+        HorizontalLayoutGroup layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 8f;
+        layout.childControlWidth = layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = true;
+        row.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
+        foreach (string childName in names)
+        {
+            Transform child = parent.Find(childName);
+            child.SetParent(row, false);
+            LayoutElement element = child.gameObject.AddComponent<LayoutElement>();
+            bool badge = childName.EndsWith("Badge", StringComparison.Ordinal);
+            element.preferredWidth = badge ? 24f : 0f;
+            element.flexibleWidth = badge ? 0f : 1f;
+            if (badge)
+            {
+                RectTransform number = (RectTransform)child.GetChild(0);
+                number.anchorMin = Vector2.zero;
+                number.anchorMax = Vector2.one;
+                number.offsetMin = number.offsetMax = Vector2.zero;
+            }
+        }
+        row.SetSiblingIndex(order);
     }
 
     /// <summary>
@@ -613,7 +747,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
         bool keyTarget = _selectedTarget == ImageTarget.Key;
         bool parsedIndex = int.TryParse(_index.text, out int keyIndex);
-        bool validIndex = !keyTarget || (parsedIndex && keyIndex >= 0 && keyIndex < _storage.Customization.PhotoKeycapCount);
+        bool validIndex = !keyTarget || (parsedIndex && keyIndex >= 0 && keyIndex < PhotoTarget.PhotoKeycapCount);
         float pathOffset = _pathExpanded ? 0f : 36f;
         float targetTop = 434f - pathOffset;
         float targetHeight = keyTarget ? 230f : 190f;
@@ -626,7 +760,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _targetSection.sizeDelta = new Vector2(326f, targetHeight);
         float toolsTop = targetTop + targetHeight + 8f;
         _toolsSection.anchoredPosition = new Vector2(16f, -toolsTop);
-        _embeddedContentRect.sizeDelta = new Vector2(0f, toolsTop + _toolsSection.rect.height + 16f);
+        _embeddedContentRect.sizeDelta = new Vector2(_assemblyPhotoTarget != null ? 366f : 0f, toolsTop + _toolsSection.rect.height + 16f);
+        if (_assemblyListContent != null)
+            _assemblyListContent.sizeDelta = new Vector2(0f, _embeddedContentRect.sizeDelta.y * _embeddedContentRect.localScale.y);
         _path.gameObject.SetActive(_pathExpanded);
         _pathToggleLabel.text = (_pathExpanded ? "[-]" : "[+]") + " 파일 경로 직접 입력   ·   빌드 버전용";
 
@@ -647,6 +783,11 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         else
             _scopeNote.text = "전체 적용 시 기존에 개별 설정한 키캡 이미지가 덮어써집니다.";
         RefreshKeyInputControls();
+        if (_assemblyPhotoTarget != null && _embeddedContentRect.GetComponent<VerticalLayoutGroup>() != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_embeddedContentRect);
+            _assemblyListContent.sizeDelta = new Vector2(0f, _embeddedContentRect.rect.height * _embeddedContentRect.localScale.y);
+        }
         RefreshCropEditor();
     }
 
@@ -656,16 +797,16 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void RefreshCropEditor()
     {
-        if (_cropFrame == null || _storage == null || _storage.Customization == null) return;
+        if (_cropFrame == null || PhotoTarget == null) return;
 
         bool caseImage = _selectedTarget == ImageTarget.Case;
         int keyIndex = -1;
         if (_selectedTarget == ImageTarget.Key
             && int.TryParse(_index.text, out int parsedKeyIndex)
-            && parsedKeyIndex >= 0 && parsedKeyIndex < _storage.Customization.PhotoKeycapCount)
+            && parsedKeyIndex >= 0 && parsedKeyIndex < PhotoTarget.PhotoKeycapCount)
             keyIndex = parsedKeyIndex;
 
-        Vector2 canvasSize = _storage.Customization.GetPhotoCanvasSize(caseImage, keyIndex);
+        Vector2 canvasSize = PhotoTarget.GetPhotoCanvasSize(caseImage, keyIndex);
         float aspect = canvasSize.y > 0f ? canvasSize.x / canvasSize.y : 1f;
         const float maximumWidth = 306f;
         const float maximumHeight = 134f;
@@ -722,14 +863,14 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         if (!_embedded || !_hasSelectedImage || _texture == null)
         {
             RefreshImageStateLabel(false, -1);
-            if (_storage != null && _storage.Customization != null)
-                _storage.Customization.ClearPhotoImagePreview();
+            if (PhotoTarget != null)
+                PhotoTarget.ClearPhotoImagePreview();
             return;
         }
 
         if (_selectedTarget == ImageTarget.Case)
         {
-            bool previewed = _storage.Customization.PreviewCaseImage(_texture, _cropOffset, _cropZoom);
+            bool previewed = PhotoTarget.PreviewCaseImage(_texture, _cropOffset, _cropZoom);
             RefreshImageStateLabel(previewed, -1);
             return;
         }
@@ -737,19 +878,19 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         if (_selectedTarget == ImageTarget.Key)
         {
             if (!int.TryParse(_index.text, out int keyIndex)
-                || keyIndex < 0 || keyIndex >= _storage.Customization.PhotoKeycapCount)
+                || keyIndex < 0 || keyIndex >= PhotoTarget.PhotoKeycapCount)
             {
-                _storage.Customization.ClearPhotoImagePreview();
+                PhotoTarget.ClearPhotoImagePreview();
                 RefreshImageStateLabel(false, -1);
                 return;
             }
 
-            bool previewed = _storage.Customization.PreviewKeycapImage(_texture, keyIndex, _cropOffset, _cropZoom);
+            bool previewed = PhotoTarget.PreviewKeycapImage(_texture, keyIndex, _cropOffset, _cropZoom);
             RefreshImageStateLabel(previewed, keyIndex);
             return;
         }
 
-        bool allPreviewed = _storage.Customization.PreviewKeycapImage(_texture, -1, _cropOffset, _cropZoom);
+        bool allPreviewed = PhotoTarget.PreviewKeycapImage(_texture, -1, _cropOffset, _cropZoom);
         RefreshImageStateLabel(allPreviewed, -1);
     }
 
@@ -894,8 +1035,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _index.text = "0";
         _index.contentType = InputField.ContentType.IntegerNumber;
         Button(panel, "Apply to KEY index", 92, 458, 230, ApplySelectedKey);
-        Button(panel, "Clear keycaps", 18, 504, 147, () => { _storage.Customization.ClearKeycapImage(); ObserveImage("Remove", "AllKeycapsCanvas", -1, true); _message.text = "Keycap photos cleared."; });
-        Button(panel, "Clear case", 175, 504, 147, () => { _storage.Customization.ClearCaseImage(); ObserveImage("Remove", "CaseWhole", -1, true); _message.text = "Case photo cleared."; });
+        Button(panel, "Clear keycaps", 18, 504, 147, () => { PhotoTarget.ClearKeycapImage(); ObserveImage("Remove", "AllKeycapsCanvas", -1, true); _message.text = "Keycap photos cleared."; });
+        Button(panel, "Clear case", 175, 504, 147, () => { PhotoTarget.ClearCaseImage(); ObserveImage("Remove", "CaseWhole", -1, true); _message.text = "Case photo cleared."; });
         Button(panel, "Save", 18, 550, 147, SaveCustomization);
         Button(panel, "Load", 175, 550, 147, LoadCustomization);
         Button(panel, "Finish customization", 18, 596, 304, EndCustomization);
@@ -908,12 +1049,12 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     public void BeginCustomization()
     {
-        if (_isCustomizing || _storage.Customization == null) return;
-        _input = _storage.Customization.GetComponent<KeyboardInputController>();
-        if (_embedded) _previousInput = _input.InputEnabled;
+        if (_isCustomizing || PhotoTarget == null) return;
+        _input = _assemblyPhotoTarget == null ? _storage.Customization.GetComponent<KeyboardInputController>() : null;
+        if (_embedded && _input != null) _previousInput = _input.InputEnabled;
         _isCustomizing = true;
         EventSystem.current.SetSelectedGameObject(null);
-        _input.InputEnabled = true;
+        if (_input != null) _input.InputEnabled = true;
         if (_startPanel != null) _startPanel.SetActive(false);
         _customizationPanel.SetActive(true);
         RefreshEmbeddedPanel();
@@ -933,7 +1074,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         EventSystem.current.SetSelectedGameObject(null);
         _customizationPanel.SetActive(false);
         _startPanel.SetActive(true);
-        _input.InputEnabled = true;
+        if (_input != null) _input.InputEnabled = true;
         _isCustomizing = false;
     }
 
@@ -947,9 +1088,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _isCustomizing = false;
         _isWaitingForKeyInput = false;
         RefreshKeyInputControls();
-        if (_storage != null && _storage.Customization != null)
-            _storage.Customization.ClearPhotoImagePreview();
-        EventSystem.current.SetSelectedGameObject(null);
+        if (PhotoTarget != null)
+            PhotoTarget.ClearPhotoImagePreview();
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         _customizationPanel.SetActive(false);
         if (_input != null) _input.InputEnabled = _previousInput;
     }
@@ -973,7 +1114,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void SaveCustomization()
     {
         bool saved = _storage.SaveCustomization();
-        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "Save", "CustomImage", success: saved);
+        Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "Save", "CustomImage", success: saved);
         _message.text = _embedded && saved ? "커스터마이징을 저장했습니다." : _storage.LastMessage;
     }
 
@@ -983,9 +1124,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void LoadCustomization()
     {
-        if (_storage.Customization != null) _storage.Customization.ClearPhotoImagePreview();
+        if (PhotoTarget != null) PhotoTarget.ClearPhotoImagePreview();
         bool loaded = _storage.LoadCustomization();
-        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "Load", "CustomImage", success: loaded);
+        Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "Load", "CustomImage", success: loaded);
         _message.text = _embedded && loaded ? "저장된 커스터마이징을 불러왔습니다." : _storage.LastMessage;
         if (!loaded) return;
         if (_embedded)
@@ -1010,8 +1151,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             _cropInput.Dragged -= HandleCropDragged;
             _cropInput.Zoomed -= HandleCropZoomed;
         }
-        if (_storage != null && _storage.Customization != null)
-            _storage.Customization.ClearPhotoImagePreview();
+        if (PhotoTarget != null)
+            PhotoTarget.ClearPhotoImagePreview();
         if (_input != null && (!_embedded || _isCustomizing)) _input.InputEnabled = _previousInput;
         if (_texture != null) Destroy(_texture);
         if (_previewCheckerTexture != null) Destroy(_previewCheckerTexture);
@@ -1021,8 +1162,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// <summary>파일 선택 창에서 사진 경로를 받아 입력란과 미리보기를 변경한다. 반환값은 없다.</summary>
     private void ChooseImage()
     {
-        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", "ChooseStarted");
-        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ExternalDialogStart");
+        Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "ImageAction", "CustomImage", "ChooseStarted");
+        Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "ExternalDialogStart");
         string path;
         try { path = KeyboardImageFileDialog.ChooseImage(); }
         catch (Exception exception) when (exception is InvalidOperationException || exception is PlatformNotSupportedException
@@ -1031,10 +1172,10 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             _message.text = exception.Message;
             return;
         }
-        finally { Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ExternalDialogEnd"); }
+        finally { Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "ExternalDialogEnd"); }
         if (string.IsNullOrEmpty(path))
         {
-            Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", "ChooseCancelled");
+            Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "ImageAction", "CustomImage", "ChooseCancelled");
             return;
         }
         _path.text = path;
@@ -1112,8 +1253,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void ClearKeycapImages()
     {
         _appliedPreviewTexture = null;
-        _storage.Customization.ClearPhotoImagePreview();
-        _storage.Customization.ClearKeycapImage();
+        PhotoTarget.ClearPhotoImagePreview();
+        PhotoTarget.ClearKeycapImage();
         RefreshImageStateLabel(false, -1);
         ObserveImage("Remove", "AllKeycapsCanvas", -1, true);
         _message.text = _embedded ? "키캡 이미지가 지워졌습니다." : "Keycap photos cleared.";
@@ -1126,8 +1267,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     private void ClearCaseImage()
     {
         _appliedPreviewTexture = null;
-        _storage.Customization.ClearPhotoImagePreview();
-        _storage.Customization.ClearCaseImage();
+        PhotoTarget.ClearPhotoImagePreview();
+        PhotoTarget.ClearCaseImage();
         RefreshImageStateLabel(false, -1);
         ObserveImage("Remove", "CaseWhole", -1, true);
         _message.text = _embedded ? "케이스 이미지가 지워졌습니다." : "Case photo cleared.";
@@ -1139,8 +1280,8 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void ClearEmbeddedPreview()
     {
-        if (_storage != null && _storage.Customization != null)
-            _storage.Customization.ClearPhotoImagePreview();
+        if (PhotoTarget != null)
+            PhotoTarget.ClearPhotoImagePreview();
         _hasSelectedImage = false;
         _cropOffset = Vector2.zero;
         _cropZoom = 1f;
@@ -1169,7 +1310,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void ApplyImage(bool caseImage, int index)
     {
-        var customization = _storage.Customization;
+        var customization = PhotoTarget;
         bool replacing = false;
         foreach (string[] value in customization.GetCustomizationLogValues())
         {
@@ -1187,7 +1328,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
                 : customization.LoadKeycapImage(_path.text, index);
         ObserveImage(replacing ? "Replace" : "Apply", caseImage ? "CaseWhole" : index < 0 ? "AllKeycapsCanvas" : "SingleKeycap", index, applied);
         _message.text = applied
-            ? (_embedded ? "이미지를 적용했습니다. 저장하면 배치가 유지됩니다." : "Photo applied. Save to keep the layout.")
+            ? (_embedded ? (_assemblyPhotoTarget != null ? "이미지를 적용했습니다." : "이미지를 적용했습니다. 저장하면 배치가 유지됩니다.") : "Photo applied. Save to keep the layout.")
             : customization.ImageError;
         if (applied && _embedded)
         {
@@ -1226,7 +1367,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             if (texture.width > 8192 || texture.height > 8192)
                 throw new InvalidOperationException("이미지의 가로와 세로는 각각 8,192px 이하여야 합니다.");
 
-            if (_storage.Customization != null) _storage.Customization.ClearPhotoImagePreview();
+            if (PhotoTarget != null) PhotoTarget.ClearPhotoImagePreview();
             if (_texture != null) Destroy(_texture);
             _texture = texture;
             texture = null;
@@ -1311,7 +1452,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     private void ObserveImage(string action, string scope, int index, bool success)
     {
-        Game.Logging.CustomizationTelemetry.Emit(_storage.Customization, "ImageAction", "CustomImage", action,
+        Game.Logging.CustomizationTelemetry.Emit(_storage?.Customization, "ImageAction", "CustomImage", action,
             success: success, scope: scope, key: index >= 0 ? index.ToString(System.Globalization.CultureInfo.InvariantCulture) : "");
     }
 

@@ -15,11 +15,20 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     [SerializeField] private Material[] _materialCatalog = new Material[0];
     [SerializeField] private string[] _materialIds = new string[0];
     private string _lastMessage = "Ready";
+    private Func<KeyboardCustomizationState> _captureState;
+    private Action<KeyboardCustomizationState> _applyState;
 
     public string SavePath => Path.Combine(Application.persistentDataPath, SAVE_FILE_NAME);
     public string LastMessage => _lastMessage;
     public KeyboardCustomization Customization => _customization;
     public bool HasSave => File.Exists(SavePath);
+
+    /// <summary>capture와 apply를 조립 씬의 기존 JSON 변환 경로로 연결한다. 파일 경로와 저장 형식은 변경하지 않는다.</summary>
+    public void SetStateHandlers(Func<KeyboardCustomizationState> capture, Action<KeyboardCustomizationState> apply)
+    {
+        _captureState = capture;
+        _applyState = apply;
+    }
 
     /// <summary>공통 카탈로그의 기본 구성을 독립 객체로 반환한다. 저장 파일과 작업실 인스턴스는 변경하지 않는다.</summary>
     public KeyboardCustomizationState GetDefaultCustomization() { return _catalog.GetDefaultState(); }
@@ -128,7 +137,7 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
     {
         try
         {
-            KeyboardCustomizationState state = CaptureCustomization(_customization);
+            KeyboardCustomizationState state = _captureState != null ? _captureState() : CaptureCustomization(_customization);
             string temporaryPath = SavePath + ".tmp";
             File.WriteAllText(temporaryPath, JsonUtility.ToJson(state, true));
             if (File.Exists(SavePath)) File.Replace(temporaryPath, SavePath, null);
@@ -158,7 +167,8 @@ public sealed class KeyboardCustomizationStorage : MonoBehaviour
             }
 
             var state = JsonUtility.FromJson<KeyboardCustomizationState>(File.ReadAllText(SavePath));
-            ApplyCustomization(state, _customization);
+            if (_applyState != null) _applyState(state);
+            else ApplyCustomization(state, _customization);
             _lastMessage = "Loaded";
             return true;
         }

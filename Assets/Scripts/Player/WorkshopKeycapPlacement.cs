@@ -49,8 +49,12 @@ namespace Game.Player
         private readonly List<KeyValuePair<float, int>> _bulkCandidates = new List<KeyValuePair<float, int>>();
         private int _lastBulkFrame = -1;
         private int _lastRemovalFrame = -1;
+        private readonly Dictionary<AssemblyDraggablePart, int> _extractedReturns = new Dictionary<AssemblyDraggablePart, int>();
         private Camera InputCamera => _pullers.InputCamera;
         public bool IsDragging => _entry != null;
+        public bool IsEditing => _interaction.IsKeyboardEditing;
+        public Camera ReturnCamera => InputCamera;
+        public IReadOnlyList<AssemblyDraggablePart> LooseParts => _looseParts;
 
         void Awake()
         {
@@ -453,7 +457,11 @@ namespace Game.Player
                 if (_fromInventory) _entry.FinishReservation(false);
                 _dragOriginPart = null;
             }
-            else if (_dragOriginPart != null) { CancelDrag(); return; }
+            else if (_dragOriginPart != null)
+            {
+                DropActivePart();
+                _dragOriginPart = null;
+            }
             else if (_pullers.IsPointerOverUI(point)) { CancelDrag(); return; }
             else
             {
@@ -500,12 +508,8 @@ namespace Game.Player
             }
             else if (_dragOriginPart != null)
             {
-                _dragOriginPart.gameObject.SetActive(true);
-                if (_entry.IsSwitch)
-                    _dragOriginPart.GetComponentInParent<KeyboardInputController>().SetSwitchSound(_entry.SwitchData.Type);
+                DropActivePart();
                 _dragOriginPart = null;
-                _looseParts.Remove(_activePart);
-                _entry.StorePart(_activePart, false);
             }
             else
             {
@@ -551,7 +555,7 @@ namespace Game.Player
 
         /// <summary>
         /// removed 키캡을 해당 재고의 실물로 출고하고 velocity와 angularVelocity로 튀긴다.
-        /// returnToInventory가 true이면 풀러 지연 반환을 예약하고 일반 클릭은 원본 복귀가 가능한 집기로 전환한다. 성공 여부를 반환한다.
+        /// returnToInventory가 true이면 풀러 지연 반환을 예약하고 일반 클릭은 놓을 때 낙하하는 집기로 전환한다. 성공 여부를 반환한다.
         /// </summary>
         public bool TakeRemovedKeycap(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
         {
@@ -568,7 +572,7 @@ namespace Game.Player
 
         /// <summary>
         /// removed의 축 타입에 대응하는 원본 재고를 찾아 실물 분리를 연결한다.
-        /// returnToInventory와 속도값으로 풀러 지연 반환 또는 원본 복귀가 가능한 집기를 시작한다. 연결 성공 여부를 반환한다.
+        /// returnToInventory와 속도값으로 풀러 지연 반환 또는 놓을 때 낙하하는 집기를 시작한다. 연결 성공 여부를 반환한다.
         /// </summary>
         public bool TakeRemovedSwitch(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
         {
@@ -604,6 +608,7 @@ namespace Game.Player
             body.angularVelocity = angularVelocity;
             if (returnToInventory)
             {
+                _extractedReturns[part] = part.InteractionVersion;
                 StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
             }
         }
@@ -621,9 +626,70 @@ namespace Game.Player
                 if (part == null || part.InteractionVersion != version) yield break;
                 elapsed += Time.deltaTime;
             }
-            _looseParts.Remove(part);
+            _extractedReturns.Remove(part);
+            ReturnLoosePart(part);
+        }
+
+        /// <summary>
+        /// 현재 집은 파츠의 충돌체와 중력을 활성화하여 포인터 위치에서 떨어뜨린다.
+        /// 입력값과 반환값은 없으며 원본 키보드의 제거 상태는 유지한다.
+        /// </summary>
+        private void DropActivePart()
+        {
+            _activePart.gameObject.SetActive(true);
+            foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>()) collider.enabled = true;
+            _activePart.DropWithPhysics();
+        }
+
+        /// <summary>
+        /// part가 현재 집기나 유효한 풀러 회수 예약 대상인지 반환한다.
+        /// 조작 버전을 비교하며 파츠와 재고 상태는 변경하지 않는다.
+        /// </summary>
+        public bool IsReturnBlocked(AssemblyDraggablePart part)
+        {
+            return _activePart == part || (_extractedReturns.TryGetValue(part, out int version)
+                && version == part.InteractionVersion);
+        }
+
+        /// <summary>
+        /// 등록된 자유 파츠 part를 한 번만 재고로 반환한다.
+        /// 실물을 보관하고 수량 표시를 갱신하며 반환값은 없다.
+        /// </summary>
+        public void ReturnLoosePart(AssemblyDraggablePart part)
+        {
+            if (!_looseParts.Remove(part)) return;
+            _extractedReturns.Remove(part);
             part.CatalogEntry.StorePart(part, true);
             RefreshInventory();
+        }
+
+        /// <summary>
+        /// entry의 미리보기로 독립적인 반환 아이콘을 생성해 반환한다.
+        /// 기존 드래그 아이콘과 입력 및 재고 상태는 유지한다.
+        /// </summary>
+        public RawImage CreateReturnIcon(AssemblyCatalogEntry entry)
+        {
+            RawImage icon = Instantiate(_dragIcon, _canvasRect);
+            icon.name = "BoundaryReturnIcon";
+            _entryTextures.TryGetValue(entry, out Texture texture);
+            icon.texture = texture != null ? texture : Texture2D.whiteTexture;
+            icon.color = entry.IsSwitch && entry.SwitchData.StemMaterial != null
+                && entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
+                ? entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
+            icon.gameObject.SetActive(true);
+            return icon;
+        }
+
+        /// <summary>
+        /// entry 종류에 맞는 재료 목록 또는 접힌 UI의 화면 왼쪽을 반환 목적지로 계산한다.
+        /// screen 좌표를 반환하며 패널과 재고는 변경하지 않는다.
+        /// </summary>
+        public Vector2 GetReturnDestination(AssemblyCatalogEntry entry)
+        {
+            RectTransform area = entry.IsSwitch ? _switchReturnArea : _returnArea;
+            return area != null && area.gameObject.activeInHierarchy
+                ? RectTransformUtility.WorldToScreenPoint(null, area.TransformPoint(area.rect.center))
+                : new Vector2(0f, Screen.height * 0.5f);
         }
 
         /// <summary>

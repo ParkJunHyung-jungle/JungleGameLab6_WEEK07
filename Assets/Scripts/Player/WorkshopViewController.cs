@@ -22,6 +22,8 @@ namespace Game.Player
         private int _viewIndex;
         private bool _viewSwitchingAllowed = true;
 
+        public bool ViewSwitchingAllowed => _viewSwitchingAllowed;
+
         void OnEnable()
         {
             _focusCamera.Priority = -1;

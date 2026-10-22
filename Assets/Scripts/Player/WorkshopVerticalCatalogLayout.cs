@@ -13,6 +13,8 @@ namespace Game.Player
         [SerializeField, Min(0f)] private float _bottomMargin = 120f;
         private readonly HashSet<ScrollRect> _configured = new HashSet<ScrollRect>();
         private readonly Dictionary<RectTransform, ScrollRect> _editorPanels = new Dictionary<RectTransform, ScrollRect>();
+        private readonly List<Transform> _pendingPanels = new List<Transform>();
+        private readonly List<ScrollRect> _scrollRects = new List<ScrollRect>();
         private RectTransform _menuRoot;
         private KeyboardEditButton _toggle;
         private Text _toggleLabel;
@@ -47,14 +49,14 @@ namespace Game.Player
 
         void LateUpdate()
         {
-            var panels = new List<Transform>();
+            _pendingPanels.Clear();
             foreach (Transform child in transform)
             {
                 if (child == _menuRoot || child == _toggle.transform || child.name == "ModeBadge"
                     || child.name == "ControlBar" || child.name == "TournamentEntryButton") continue;
-                panels.Add(child);
+                _pendingPanels.Add(child);
             }
-            foreach (Transform panel in panels)
+            foreach (Transform panel in _pendingPanels)
             {
                 panel.SetParent(_menuRoot, false);
                 if (panel.name == "LEDCustomizationPanel" || panel.name == "Photo customization")
@@ -63,9 +65,11 @@ namespace Game.Player
             foreach (var editor in _editorPanels)
             {
                 editor.Value.gameObject.SetActive(editor.Key.gameObject.activeSelf);
-                editor.Value.content.sizeDelta = new Vector2(0f, editor.Key.rect.height * editor.Key.localScale.y);
+                Vector2 size = new Vector2(0f, editor.Key.rect.height * editor.Key.localScale.y);
+                if (editor.Value.content.sizeDelta != size) editor.Value.content.sizeDelta = size;
             }
-            foreach (ScrollRect scroll in GetComponentsInChildren<ScrollRect>(true))
+            GetComponentsInChildren(true, _scrollRects);
+            foreach (ScrollRect scroll in _scrollRects)
             {
                 if (scroll.transform.parent != _menuRoot || !_configured.Add(scroll)) continue;
                 ConfigureCatalog(scroll);
@@ -186,7 +190,9 @@ namespace Game.Player
             clip.anchorMin = Vector2.zero;
             clip.anchorMax = Vector2.one;
             clip.offsetMin = new Vector2(12f, 12f);
-            clip.offsetMax = new Vector2(-24f, panel.name == "PlateViewport" ? -48f : -12f);
+            float topInset = panel.name == "PlateViewport" ? 48f
+                : panel.Find("KeycapPlacementModes") != null ? 60f : 12f;
+            clip.offsetMax = new Vector2(-24f, -topInset);
             scroll.viewport = clip;
             scroll.horizontal = false;
             scroll.vertical = true;

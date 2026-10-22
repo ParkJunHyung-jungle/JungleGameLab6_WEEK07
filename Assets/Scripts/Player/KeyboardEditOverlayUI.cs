@@ -121,6 +121,7 @@ namespace Game.Player
         private float _photoWheelZoomSensitivity = 0.03f;
         private KeyboardCustomizationTestUI _photoUI;
         private KeyboardKeycapPanelUI _keycapUI;
+        private WorkshopKeycapPlacement _keycapPlacement;
         private bool _hasPendingKeycapMaterial;
         private bool _hasActiveKeycapMaterialPreview;
         private float _appliedPhotoWheelZoomSensitivity;
@@ -155,6 +156,7 @@ namespace Game.Player
 
         void Awake()
         {
+            _keycapPlacement = GetComponent<WorkshopKeycapPlacement>();
             _canvas = GetComponentInParent<Canvas>();
             _pickerSprite = (_keycapButton.targetGraphic as Image).sprite;
             _pickerFont = _switchAxisButton.GetComponentInChildren<Text>().font;
@@ -688,6 +690,7 @@ namespace Game.Player
         /// </summary>
         private void HandlePreviewClicked(KeyboardEditButton button)
         {
+            if (_keycapPlacement != null) return;
             int index = _previewButtons.IndexOf(button);
             if (index >= 0 && index < _previewDefinitions.Count)
                 ObserveKeycap("ElementPicked", _previewDefinitions[index], _previewMaterials[index]);
@@ -1448,6 +1451,21 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// placement에 현재 키캡 카드와 재료 및 반환 영역을 연결한다.
+        /// 기존 전체 적용 패널 대신 재고 드래그를 사용하며 키보드 상태는 변경하지 않는다. 반환값은 없다.
+        /// </summary>
+        public void ConnectKeycapPlacement(WorkshopKeycapPlacement placement)
+        {
+            _keycapPlacement = placement;
+            for (int index = 0; index < _previewButtons.Count; index++)
+            {
+                _selectionIndicators[index].gameObject.SetActive(false);
+                placement.BindCard(_previewButtons[index], _previewMaterials[index], _previewDefinitions[index], _viewport);
+            }
+            _keycapUI.Close();
+        }
+
+        /// <summary>
         /// index 재질을 선택 표시와 현재 키캡 범위의 키보드 미리보기에 반영한다.
         /// 유효한 재질, 대응하는 키캡 SO와 패널 대상을 사용하며 모델을 포함한 적용 전 변경으로 보관한다.
         /// </summary>
@@ -2072,7 +2090,7 @@ namespace Game.Player
                 _ledUI.Close();
             if (_pickerMode == PickerMode.Photo)
                 _photoUI.BeginCustomization();
-            if (_pickerMode == PickerMode.Keycap)
+            if (_pickerMode == PickerMode.Keycap && _keycapPlacement == null)
             {
                 _keycapUI.Open(_photoStorage.Customization);
                 RefreshKeycapMaterialSelection();

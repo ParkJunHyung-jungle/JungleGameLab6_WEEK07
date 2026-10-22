@@ -76,6 +76,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     [SerializeField] private Material _keycapMaterial;
     [SerializeField, Min(0)] private int _keycapMaterialIndex;
     private Transform[] _keycaps;
+    private MeshRenderer[] _keycapSlotShells;
     private KeyboardImageCustomization _imageCustomization;
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
     private KeycapMaterialPreviewSnapshot _keycapMaterialPreviewSnapshot;
@@ -94,6 +95,65 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
             if (_keycaps == null) CacheKeycaps();
             return _keycaps.Length;
         }
+    }
+
+    /// <summary>
+    /// index 위치의 키캡 Transform을 반환한다. 키캡 캐시를 준비하며 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public Transform GetKeycapSlotTransform(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return _keycaps[index];
+    }
+
+    /// <summary>
+    /// ray가 통과하는 키캡 슬롯 중 가장 가까운 위치의 인덱스를 반환한다.
+    /// 비활성 키캡의 원본 메시 경계도 검사하며 슬롯이 없으면 -1을 반환한다.
+    /// </summary>
+    public int FindKeycapSlot(Ray ray)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        float nearest = float.PositiveInfinity;
+        int result = -1;
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (GetKeycapSlotBounds(index).IntersectRay(ray, out float distance) && distance < nearest)
+            {
+                nearest = distance;
+                result = index;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// index에 캐시한 외피 참조로 현재 월드 슬롯 경계를 반환한다.
+    /// 전체 렌더러를 다시 검색하지 않으며 비활성 슬롯도 같은 좌표로 계산한다. 설치 상태는 변경하지 않는다.
+    /// </summary>
+    public Bounds GetKeycapSlotBounds(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        MeshRenderer renderer = _keycapSlotShells[index];
+        if (renderer == null) return new Bounds();
+        Bounds bounds = renderer.localBounds;
+        Vector3 center = renderer.transform.TransformPoint(bounds.center);
+        Vector3 x = renderer.transform.TransformVector(Vector3.right * bounds.extents.x);
+        Vector3 y = renderer.transform.TransformVector(Vector3.up * bounds.extents.y);
+        Vector3 z = renderer.transform.TransformVector(Vector3.forward * bounds.extents.z);
+        Vector3 extents = new Vector3(Mathf.Abs(x.x) + Mathf.Abs(y.x) + Mathf.Abs(z.x),
+            Mathf.Abs(x.y) + Mathf.Abs(y.y) + Mathf.Abs(z.y), Mathf.Abs(x.z) + Mathf.Abs(y.z) + Mathf.Abs(z.z));
+        return new Bounds(center, extents * 2f);
+    }
+
+    /// <summary>
+    /// index의 빈 키캡 슬롯에 material과 definition을 설치하고 성공 여부를 반환한다.
+    /// 축 설치와 키캡 규격을 검사하며 재고는 호출자가 관리한다. 성공 시 외형과 설치 상태를 갱신한다.
+    /// </summary>
+    public bool InstallKeycapFromInventory(int index, Material material, Game.Tournament.KeycapDefinition definition)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return index >= 0 && index < _keycaps.Length && !IsKeycapInstalled(index)
+            && ApplyKeycapMaterialToKey(index, material, true, definition);
     }
 
     /// <summary>
@@ -1405,17 +1465,20 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     private void CacheKeycaps()
     {
         var keycaps = new List<Transform>();
+        var shells = new List<MeshRenderer>();
         foreach (MeshRenderer renderer in _keycapRenderers)
         {
             if (renderer != null && renderer.name == "PBT_SculptedShell")
             {
                 keycaps.Add(renderer.transform.parent);
+                shells.Add(renderer);
                 if (!_keycapModels.ContainsKey(renderer.transform.parent))
                     _keycapModels.Add(renderer.transform.parent, new KeycapModelAppearance(renderer));
             }
         }
 
         _keycaps = keycaps.ToArray();
+        _keycapSlotShells = shells.ToArray();
     }
 
     /// <summary>keycap 외피에 definition의 모델을 적용하거나 원본으로 복원한다. 1u 제한과 재질 슬롯을 검증하고 현재 모델 연결을 갱신한다.</summary>

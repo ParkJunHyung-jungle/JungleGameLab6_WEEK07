@@ -16,6 +16,7 @@ namespace Game.Player
         [SerializeField] private Camera _camera;
         [SerializeField] private AssemblyFullerTool _keycapPuller;
         [SerializeField] private AssemblyFullerTool _switchPuller;
+        [SerializeField] private WorkshopKeycapPlacement _keycapPlacement;
 
         [Header("Removal")]
         [SerializeField, Min(0f)] private float _heightOffset = 0.2f;
@@ -49,6 +50,7 @@ namespace Game.Player
                 UpdateDragHeight();
             }
             if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
+            if (_keycapPlacement != null && _keycapPlacement.IsDragging) return;
             Vector2 pointer = Mouse.current.position.ReadValue();
             Ray ray = _camera.ScreenPointToRay(pointer);
             if (_draggedPart != null)
@@ -63,16 +65,32 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// ray에 가장 먼저 닿는 현재 키보드의 제거 가능한 파츠를 찾아 hit와 종류를 반환한다.
-        /// 설치 상태는 변경하지 않으며 키캡이 덮고 있는 축과 다른 물체 뒤의 파츠는 제외한다.
+        /// ray에 닿는 현재 키보드의 제거 가능한 파츠 중 가장 가까운 hit와 종류를 반환한다.
+        /// 본체의 넓은 집기 충돌체는 건너뛰며 키캡이 덮고 있는 축과 외부 물체 뒤의 파츠는 제외한다.
         /// </summary>
         private bool TryGetPartHit(Ray ray, out RaycastHit hit, out bool extractSwitches)
         {
             extractSwitches = false;
-            return Physics.Raycast(ray, out hit, _camera.farClipPlane, Physics.DefaultRaycastLayers,
-                QueryTriggerInteraction.Ignore)
-                && _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>()
-                    .TryGetRemovablePart(hit.transform, out _, out extractSwitches);
+            hit = default;
+            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            float nearest = float.PositiveInfinity;
+            float obstruction = float.PositiveInfinity;
+            foreach (RaycastHit candidate in Physics.RaycastAll(ray, _camera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (!candidate.transform.IsChildOf(customization.transform))
+                {
+                    obstruction = Mathf.Min(obstruction, candidate.distance);
+                    continue;
+                }
+                if (candidate.distance < nearest && customization.TryGetRemovablePart(candidate.transform, out _, out bool isSwitch))
+                {
+                    hit = candidate;
+                    nearest = candidate.distance;
+                    extractSwitches = isSwitch;
+                }
+            }
+            return nearest < obstruction;
         }
 
         /// <summary>
@@ -84,6 +102,12 @@ namespace Game.Player
             if (!TryGetPartHit(ray, out RaycastHit hit, out bool extractSwitches)) return;
             KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
             if (!customization.TryRemovePart(hit.transform, extractSwitches, out Transform removed)) return;
+            if (!extractSwitches && _keycapPlacement != null
+                && _keycapPlacement.TakeRemovedKeycap(removed, false, Vector3.zero, Vector3.zero))
+            {
+                AudioManager.PlayPartSound(removed.position, true);
+                return;
+            }
             _draggedPart = CreateDetachedVisual(removed, Vector3.zero, Vector3.zero, false);
             if (_draggedPart == null) return;
             _draggedPart.isKinematic = true;
@@ -159,18 +183,21 @@ namespace Game.Player
         public bool ConsumesPointer()
         {
             if (!InputAllowed || Mouse.current == null) return false;
+            if (_keycapPlacement != null && _keycapPlacement.IsDragging) return true;
             if (_draggedPart != null) return true;
             Vector2 pointer = Mouse.current.position.ReadValue();
             if (IsPointerOverUI(pointer)) return false;
             Ray ray = _camera.ScreenPointToRay(pointer);
             return _keycapPuller.IsSelected || _switchPuller.IsSelected
                 || _keycapPuller.IsPointerOverTool(ray) || _switchPuller.IsPointerOverTool(ray)
+                || (_keycapPlacement != null && _keycapPlacement.IsPointerOverLoosePart(ray))
                 || TryGetPartHit(ray, out _, out _);
         }
 
         /// <summary>선택 중인 두 풀러를 원래 자리로 되돌린다. 이미 제거된 파츠와 키보드 상태는 유지한다.</summary>
         public void CancelDrag()
         {
+            if (_keycapPlacement != null) _keycapPlacement.CancelDrag();
             ReleasePart();
             _keycapPuller.ReturnToOrigin();
             _switchPuller.ReturnToOrigin();
@@ -182,6 +209,12 @@ namespace Game.Player
             if (!InputAllowed || hit == null || _editingKeyboard == null) return false;
             KeyboardCustomization customization = _editingKeyboard.GetComponent<KeyboardCustomization>();
             if (!customization.TryRemovePart(hit.transform, extractSwitches, out Transform removed)) return false;
+            if (!extractSwitches && _keycapPlacement != null
+                && _keycapPlacement.TakeRemovedKeycap(removed, true, velocity, angularVelocity))
+            {
+                AudioManager.PlayPartSound(removed.position, true);
+                return true;
+            }
             CreateDetachedVisual(removed, velocity, angularVelocity);
             AudioManager.PlayPartSound(removed.position, true);
             return true;

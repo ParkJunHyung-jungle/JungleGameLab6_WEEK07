@@ -14,6 +14,7 @@ namespace Game.Player
     {
         [Header("Workshop")]
         [SerializeField] private PlayerInteractionController _interaction;
+        [SerializeField] private WorkshopViewController _workshopView;
         [SerializeField] private Camera _camera;
         [SerializeField] private AssemblyFullerTool _keycapPuller;
         [SerializeField] private AssemblyFullerTool _switchPuller;
@@ -27,8 +28,14 @@ namespace Game.Player
         private KeyboardInputController _editingKeyboard;
         private float _dragWorldHeight;
 
-        public bool InputAllowed => _interaction.IsKeyboardEditing && _interaction.EditingKeyboard != null
-            && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && InGameCursor.CanProcessVirtualPointer;
+        public bool IsEditing => _workshopView != null ? _workshopView.IsKeyboardEditing
+            : _interaction != null && _interaction.IsKeyboardEditing;
+        public KeyboardInputController EditingKeyboard => _workshopView != null ? _workshopView.EditingKeyboard
+            : _interaction != null ? _interaction.EditingKeyboard : null;
+
+        public bool InputAllowed => IsEditing && EditingKeyboard != null
+            && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen
+            && InGameCursor.CanProcessVirtualPointer;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
             || (_keycapPlacement != null && _keycapPlacement.IsDragging);
         public Camera InputCamera => _camera;
@@ -67,7 +74,7 @@ namespace Game.Player
 
         void Update()
         {
-            KeyboardInputController target = _interaction.IsKeyboardEditing ? _interaction.EditingKeyboard : null;
+            KeyboardInputController target = IsEditing ? EditingKeyboard : null;
             if (target != _editingKeyboard)
             {
                 CancelDrag();
@@ -93,7 +100,7 @@ namespace Game.Player
         {
             extractSwitches = false;
             hit = default;
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             float nearest = float.PositiveInfinity;
             float obstruction = float.PositiveInfinity;
             foreach (RaycastHit candidate in Physics.RaycastAll(ray, _camera.farClipPlane,
@@ -122,7 +129,7 @@ namespace Game.Player
         private void TryRemoveClickedPart(Ray ray)
         {
             if (!TryGetPartHit(ray, out RaycastHit hit, out bool extractSwitches)) return;
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             if (!customization.TryRemovePart(hit.collider.transform, extractSwitches, out Transform removed)) return;
             if (!extractSwitches && _keycapPlacement != null
                 && _keycapPlacement.TakeRemovedKeycap(removed, false, Vector3.zero, Vector3.zero))
@@ -138,7 +145,7 @@ namespace Game.Player
             }
             removed.gameObject.SetActive(true);
             if (extractSwitches)
-                _interaction.EditingKeyboard.SetSwitchSound(customization.GetInstalledSwitchType(removed.GetComponent<KeyboardSwitch>()));
+                EditingKeyboard.SetSwitchSound(customization.GetInstalledSwitchType(removed.GetComponent<KeyboardSwitch>()));
         }
 
         /// <summary>
@@ -201,7 +208,7 @@ namespace Game.Player
             {
                 state.Title = selected.ExtractsSwitches ? "스위치 풀러" : "키캡 풀러";
                 Collider target = selected.GetExtractionTarget(pointer);
-                KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+                KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
                 if (target != null && customization.TryGetRemovablePart(target.transform, out _, out bool isSwitch)
                     && isSwitch == selected.ExtractsSwitches)
                     state.Add("좌클릭 유지·이동", isSwitch ? "스위치 연속 뽑기" : "키캡 연속 뽑기");
@@ -347,8 +354,9 @@ namespace Game.Player
             BoxCollider collider = visual.AddComponent<BoxCollider>();
             collider.center = visual.transform.InverseTransformPoint(bounds.center);
             collider.size = bounds.size;
-            foreach (Collider player in _interaction.GetComponentsInChildren<Collider>()) Physics.IgnoreCollision(collider, player);
-            foreach (Collider keyboardCollider in _interaction.EditingKeyboard.GetComponentsInChildren<Collider>())
+            if (_interaction != null)
+                foreach (Collider player in _interaction.GetComponentsInChildren<Collider>()) Physics.IgnoreCollision(collider, player);
+            foreach (Collider keyboardCollider in EditingKeyboard.GetComponentsInChildren<Collider>())
                 Physics.IgnoreCollision(collider, keyboardCollider);
             Rigidbody body = visual.AddComponent<Rigidbody>();
             body.mass = 0.02f;

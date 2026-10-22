@@ -50,9 +50,11 @@ namespace Game.Player
         private int _lastBulkFrame = -1;
         private int _lastRemovalFrame = -1;
         private readonly Dictionary<AssemblyDraggablePart, int> _extractedReturns = new Dictionary<AssemblyDraggablePart, int>();
+        private KeyboardInputController EditingKeyboard => _interaction != null
+            ? _interaction.EditingKeyboard : _pullers.EditingKeyboard;
         private Camera InputCamera => _pullers.InputCamera;
         public bool IsDragging => _entry != null;
-        public bool IsEditing => _interaction.IsKeyboardEditing;
+        public bool IsEditing => _interaction != null ? _interaction.IsKeyboardEditing : _pullers.IsEditing;
         public Camera ReturnCamera => InputCamera;
         public IReadOnlyList<AssemblyDraggablePart> LooseParts => _looseParts;
 
@@ -257,7 +259,7 @@ namespace Game.Player
             _bulkVisited.Clear();
             _hasPreviousBulkPosition = false;
             _lastBulkFrame = -1;
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             _activePart = CreatePart(entry, entry.IsSwitch ? customization.GetSwitchSlotTransform(0) : customization.GetKeycapSlotTransform(0));
             BeginWorldDrag(_activePart, point);
             RefreshInventory();
@@ -372,7 +374,7 @@ namespace Game.Player
         /// </summary>
         private void InstallAlongBulkPath(Vector2 start, Vector2 end)
         {
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             Vector2 direction = end - start;
             float lengthSquared = direction.sqrMagnitude;
             _bulkCandidates.Clear();
@@ -479,7 +481,7 @@ namespace Game.Player
             else if (_pullers.IsPointerOverUI(point)) { CancelDrag(); return; }
             else
             {
-                KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+                KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
                 int index = FindInstallSlot(point);
                 bool installed = InstallEntry(customization, index);
                 if (_fromInventory) _entry.FinishReservation(true);
@@ -567,7 +569,7 @@ namespace Game.Player
         /// <summary>point의 설치 레이와 가림 검사를 수행해 슬롯 인덱스를 반환한다. 설치 확정과 안내가 같은 대상을 조회한다.</summary>
         private int FindInstallSlot(Vector2 point)
         {
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             Ray ray = InputCamera.ScreenPointToRay(point);
             if (Physics.Raycast(ray, out RaycastHit obstruction, InputCamera.farClipPlane,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
@@ -578,7 +580,7 @@ namespace Game.Player
         /// <summary>현재 entry와 index의 실제 설치 조건을 조회한다. 수량 예약과 효과음 및 부품 상태는 변경하지 않는다.</summary>
         private bool CanInstallEntry(int index)
         {
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             if (_entry.IsSwitch) return customization.CanInstallSwitchFromInventory(index, _entry.SwitchData.Type);
             Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
             return customization.CanInstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
@@ -653,7 +655,7 @@ namespace Game.Player
         /// </summary>
         public bool TakeRemovedKeycap(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
         {
-            KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
+            KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             int index = -1;
             for (int i = 0; i < customization.KeycapCount; i++)
                 if (customization.GetKeycapSlotTransform(i) == removed) { index = i; break; }
@@ -671,7 +673,7 @@ namespace Game.Player
         public bool TakeRemovedSwitch(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
         {
             KeyboardSwitch keyboardSwitch = removed.GetComponent<KeyboardSwitch>();
-            SwitchType type = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>().GetInstalledSwitchType(keyboardSwitch);
+            SwitchType type = EditingKeyboard.GetComponent<KeyboardCustomization>().GetInstalledSwitchType(keyboardSwitch);
             foreach (AssemblyCatalogEntry entry in _switchEntries)
             {
                 if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;

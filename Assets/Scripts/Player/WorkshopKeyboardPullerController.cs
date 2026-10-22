@@ -25,9 +25,6 @@ namespace Game.Player
         private readonly List<GameObject> _fragments = new List<GameObject>();
         private KeyboardInputController _editingKeyboard;
         private float _dragWorldHeight;
-        private Rigidbody _draggedPart;
-        private Plane _partDragPlane;
-        private Vector3 _partGrabOffset;
 
         public bool InputAllowed => _interaction.IsKeyboardEditing && _interaction.EditingKeyboard != null
             && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && InGameCursor.CanProcessVirtualPointer;
@@ -68,15 +65,10 @@ namespace Game.Player
             if (_keycapPlacement != null && _keycapPlacement.IsDragging) return;
             Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);
-            if (_draggedPart != null)
-            {
-                UpdatePartDrag(ray, Mouse.current);
-                return;
-            }
             if (_keycapPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
             if (_switchPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
             if (Mouse.current.leftButton.wasPressedThisFrame && !IsPointerOverUI(pointer))
-                TryBeginPartDrag(ray);
+                TryRemoveClickedPart(ray);
         }
 
         /// <summary>
@@ -93,12 +85,13 @@ namespace Game.Player
             foreach (RaycastHit candidate in Physics.RaycastAll(ray, _camera.farClipPlane,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
-                if (!candidate.transform.IsChildOf(customization.transform))
+                Transform hitTransform = candidate.collider.transform;
+                if (!hitTransform.IsChildOf(customization.transform))
                 {
                     obstruction = Mathf.Min(obstruction, candidate.distance);
                     continue;
                 }
-                if (candidate.distance < nearest && customization.TryGetRemovablePart(candidate.transform, out _, out bool isSwitch))
+                if (candidate.distance < nearest && customization.TryGetRemovablePart(hitTransform, out _, out bool isSwitch))
                 {
                     hit = candidate;
                     nearest = candidate.distance;
@@ -109,14 +102,14 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// ray가 가리키는 설치 파츠를 분리하고 표시용 복제본을 포인터 드래그 상태로 전환한다.
-        /// 원본 설치 상태를 갱신하고 이동 평면과 잡기 오프셋을 저장한다. 반환값은 없다.
+        /// ray가 가리키는 설치 파츠 한 개를 집어 인벤토리 반환 또는 원본 복귀 드래그를 시작한다.
+        /// 재고 항목을 연결할 수 없으면 원본 설치 상태를 복원한다. 반환값은 없다.
         /// </summary>
-        private void TryBeginPartDrag(Ray ray)
+        private void TryRemoveClickedPart(Ray ray)
         {
             if (!TryGetPartHit(ray, out RaycastHit hit, out bool extractSwitches)) return;
             KeyboardCustomization customization = _interaction.EditingKeyboard.GetComponent<KeyboardCustomization>();
-            if (!customization.TryRemovePart(hit.transform, extractSwitches, out Transform removed)) return;
+            if (!customization.TryRemovePart(hit.collider.transform, extractSwitches, out Transform removed)) return;
             if (!extractSwitches && _keycapPlacement != null
                 && _keycapPlacement.TakeRemovedKeycap(removed, false, Vector3.zero, Vector3.zero))
             {
@@ -129,38 +122,9 @@ namespace Game.Player
                 AudioManager.PlayPartSound(removed.position, true);
                 return;
             }
-            _draggedPart = CreateDetachedVisual(removed, Vector3.zero, Vector3.zero, false);
-            if (_draggedPart == null) return;
-            _draggedPart.isKinematic = true;
-            _draggedPart.useGravity = false;
-            _partDragPlane = new Plane(_camera.transform.forward, hit.point);
-            _partGrabOffset = _draggedPart.position - hit.point;
-            AudioManager.PlayPartSound(removed.position, true);
-        }
-
-        /// <summary>
-        /// ray와 mouse 입력으로 집은 파츠를 이동시키고 버튼 해제 시 작업 공간에 내려놓는다.
-        /// 드래그 중 위치를 갱신하며 놓은 복제본은 중력 적용 후 기존 지연 시간에 제거한다.
-        /// </summary>
-        private void UpdatePartDrag(Ray ray, Mouse mouse)
-        {
-            if (_partDragPlane.Raycast(ray, out float distance))
-                _draggedPart.position = ray.GetPoint(distance) + _partGrabOffset;
-            if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
-                ReleasePart();
-        }
-
-        /// <summary>
-        /// 현재 집은 표시용 파츠의 물리를 복원하고 지연 제거를 예약한다.
-        /// 입력값과 반환값은 없으며 드래그 참조를 비운다. 원본의 제거 상태는 유지한다.
-        /// </summary>
-        private void ReleasePart()
-        {
-            if (_draggedPart == null) return;
-            _draggedPart.isKinematic = false;
-            _draggedPart.useGravity = true;
-            Destroy(_draggedPart.gameObject, _returnDelay);
-            _draggedPart = null;
+            removed.gameObject.SetActive(true);
+            if (extractSwitches)
+                _interaction.EditingKeyboard.SetSwitchSound(customization.GetInstalledSwitchType(removed.GetComponent<KeyboardSwitch>()));
         }
 
         /// <summary>
@@ -217,7 +181,6 @@ namespace Game.Player
         {
             if (!InputAllowed || Mouse.current == null) return false;
             if (_keycapPlacement != null && _keycapPlacement.IsDragging) return true;
-            if (_draggedPart != null) return true;
             Vector2 pointer = InGameCursor.Position;
             if (IsPointerOverUI(pointer)) return false;
             Ray ray = _camera.ScreenPointToRay(pointer);
@@ -231,7 +194,6 @@ namespace Game.Player
         public void CancelDrag()
         {
             if (_keycapPlacement != null) _keycapPlacement.CancelDrag();
-            ReleasePart();
             _keycapPuller.ReturnToOrigin();
             _switchPuller.ReturnToOrigin();
         }

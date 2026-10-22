@@ -30,6 +30,7 @@ namespace Game.Player
         private readonly List<AssemblyDraggablePart> _ownedParts = new List<AssemblyDraggablePart>();
         private readonly List<AssemblyDraggablePart> _looseParts = new List<AssemblyDraggablePart>();
         private AssemblyDraggablePart _activePart;
+        private Transform _dragOriginPart;
         private AssemblyCatalogEntry _entry;
         private bool _fromInventory;
         private Plane _dragPlane;
@@ -47,6 +48,7 @@ namespace Game.Player
         private readonly HashSet<int> _bulkVisited = new HashSet<int>();
         private readonly List<KeyValuePair<float, int>> _bulkCandidates = new List<KeyValuePair<float, int>>();
         private int _lastBulkFrame = -1;
+        private int _lastRemovalFrame = -1;
         private Camera InputCamera => _pullers.InputCamera;
         public bool IsDragging => _entry != null;
 
@@ -84,7 +86,8 @@ namespace Game.Player
                 return;
             }
             Vector2 point = InGameCursor.Position;
-            if (!IsDragging && Mouse.current.leftButton.wasPressedThisFrame && !_pullers.IsPointerOverUI(point))
+            if (!IsDragging && _lastRemovalFrame != Time.frameCount
+                && Mouse.current.leftButton.wasPressedThisFrame && !_pullers.IsPointerOverUI(point))
             {
                 AssemblyDraggablePart part = FindLoosePart(InputCamera.ScreenPointToRay(point));
                 if (part != null) BeginWorldDrag(part, point);
@@ -448,7 +451,9 @@ namespace Game.Player
                 _looseParts.Remove(_activePart);
                 _entry.StorePart(_activePart, !_fromInventory);
                 if (_fromInventory) _entry.FinishReservation(false);
+                _dragOriginPart = null;
             }
+            else if (_dragOriginPart != null) { CancelDrag(); return; }
             else if (_pullers.IsPointerOverUI(point)) { CancelDrag(); return; }
             else
             {
@@ -492,6 +497,15 @@ namespace Game.Player
                 _looseParts.Remove(_activePart);
                 _entry.StorePart(_activePart, false);
                 _entry.FinishReservation(false);
+            }
+            else if (_dragOriginPart != null)
+            {
+                _dragOriginPart.gameObject.SetActive(true);
+                if (_entry.IsSwitch)
+                    _dragOriginPart.GetComponentInParent<KeyboardInputController>().SetSwitchSound(_entry.SwitchData.Type);
+                _dragOriginPart = null;
+                _looseParts.Remove(_activePart);
+                _entry.StorePart(_activePart, false);
             }
             else
             {
@@ -537,7 +551,7 @@ namespace Game.Player
 
         /// <summary>
         /// removed 키캡을 해당 재고의 실물로 출고하고 velocity와 angularVelocity로 튀긴다.
-        /// 풀러 제거이면 returnToInventory 후 지연 반환하며 드래그 제거이면 바로 집는다. 성공 여부를 반환한다.
+        /// returnToInventory가 true이면 풀러 지연 반환을 예약하고 일반 클릭은 원본 복귀가 가능한 집기로 전환한다. 성공 여부를 반환한다.
         /// </summary>
         public bool TakeRemovedKeycap(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
         {
@@ -554,7 +568,7 @@ namespace Game.Player
 
         /// <summary>
         /// removed의 축 타입에 대응하는 원본 재고를 찾아 실물 분리를 연결한다.
-        /// returnToInventory와 속도값으로 직접 집기 또는 풀러 지연 반환을 선택한다. 연결 성공 여부를 반환한다.
+        /// returnToInventory와 속도값으로 풀러 지연 반환 또는 원본 복귀가 가능한 집기를 시작한다. 연결 성공 여부를 반환한다.
         /// </summary>
         public bool TakeRemovedSwitch(Transform removed, bool returnToInventory, Vector3 velocity, Vector3 angularVelocity)
         {
@@ -570,22 +584,28 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// entry와 removed로 실물 파츠를 준비하고 직접 드래그 또는 속도값을 가진 풀러 제거로 전환한다.
-        /// returnToInventory가 true이면 조작되지 않은 실물의 2초 뒤 재고 반환을 예약한다. 반환값은 없다.
+        /// entry와 removed로 실물 파츠를 준비하고 일반 클릭이면 원본을 저장한 뒤 드래그를 시작한다.
+        /// returnToInventory가 true이면 속도값을 적용하고 2초 뒤 재고 반환을 예약한다. 반환값은 없다.
         /// </summary>
         private void TakeRemovedPart(AssemblyCatalogEntry entry, Transform removed, bool returnToInventory,
             Vector3 velocity, Vector3 angularVelocity)
         {
             AssemblyDraggablePart part = CreatePart(entry, removed, true);
+            _lastRemovalFrame = Time.frameCount;
+            if (!returnToInventory)
+            {
+                _dragOriginPart = removed;
+                BeginWorldDrag(part, InGameCursor.Position);
+                return;
+            }
+            part.DropWithPhysics();
+            Rigidbody body = part.GetComponent<Rigidbody>();
+            body.linearVelocity = velocity;
+            body.angularVelocity = angularVelocity;
             if (returnToInventory)
             {
-                part.DropWithPhysics();
-                Rigidbody body = part.GetComponent<Rigidbody>();
-                body.linearVelocity = velocity;
-                body.angularVelocity = angularVelocity;
                 StartCoroutine(ReturnExtractedPart(part, part.InteractionVersion));
             }
-            else BeginWorldDrag(part, InGameCursor.Position);
         }
 
         /// <summary>

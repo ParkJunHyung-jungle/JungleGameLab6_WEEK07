@@ -158,6 +158,7 @@ namespace Game.Player
             _clickInput.action.canceled += HandleClickCanceled;
             _clickInput.action.Enable();
             _coverInput.action.started += HandleCoverStarted;
+            _coverInput.action.canceled += HandleClickCanceled;
             _coverInput.action.Enable();
             _keyboardResetInput.started += HandleKeyboardResetStarted;
             _keyboardResetInput.Enable();
@@ -178,6 +179,7 @@ namespace Game.Player
             _clickInput.action.canceled -= HandleClickCanceled;
             _clickInput.action.Disable();
             _coverInput.action.started -= HandleCoverStarted;
+            _coverInput.action.canceled -= HandleClickCanceled;
             _coverInput.action.Disable();
             _keyboardResetInput.started -= HandleKeyboardResetStarted;
             _keyboardResetInput.Disable();
@@ -204,6 +206,12 @@ namespace Game.Player
             UpdateUploadConfirmationInput();
             if (Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
                 || Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (_isKeyboardEditMode && _cameraTransition == null
+                && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                ExitKeyboardEditMode();
+                return;
+            }
             UpdateInteractionPrompt();
             CaptureEditingKeyboardMouseDelta();
             UpdateEditingCameraZoom();
@@ -254,11 +262,6 @@ namespace Game.Player
                 return;
             if (_isKeyboardEditMode)
             {
-                if (_cameraTransition == null)
-                {
-                    TryBeginEditingKeyboardRotation();
-                }
-
                 return;
             }
 
@@ -269,11 +272,12 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 좌클릭이 끝나면 진행 중인 키보드 드래그 회전을 멈춘다.
-        /// context 입력을 사용하며 대기 중인 회전량과 드래그 상태를 초기화한다.
+        /// context의 우클릭 회전 입력이 끝나면 키보드 드래그 회전을 멈춘다.
+        /// 좌클릭 해제는 무시하며 대기 중인 회전량과 드래그 상태를 초기화한다.
         /// </summary>
         private void HandleClickCanceled(InputAction.CallbackContext context)
         {
+            if (context.action != _coverInput.action) return;
             StopEditingKeyboardRotation();
         }
 
@@ -297,7 +301,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 우클릭 입력으로 모니터 포커스나 작업대 키보드 편집을 전환하고, 손에 든 키보드의 커버를 조작한다.
+        /// context의 우클릭 입력으로 편집 중 키보드 회전을 시작하거나 모니터와 작업대 편집에 진입한다.
+        /// 모니터 포커스 중에는 종료하고 손에 든 키보드의 커버를 조작한다.
         /// context 입력을 받으며 조준 대상과 현재 상태에 따라 진입, 종료 또는 커버 전환을 실행한다.
         /// </summary>
         private void HandleCoverStarted(InputAction.CallbackContext context)
@@ -314,7 +319,7 @@ namespace Game.Player
 
             if (_isKeyboardEditMode)
             {
-                ExitKeyboardEditMode();
+                TryBeginEditingKeyboardRotation();
                 return;
             }
 
@@ -431,7 +436,7 @@ namespace Game.Player
             }
             else if (_isKeyboardEditMode)
             {
-                prompt = "우클릭으로 키보드 편집 모드 나가기";
+                prompt = "좌클릭: 파츠 제거 / 우클릭 드래그: 회전 / Esc: 편집 종료";
             }
             else if (_heldKeyboardBody != null)
             {
@@ -894,12 +899,11 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 좌클릭 시작 위치가 편집 중인 키보드 위인지 확인하고 드래그 회전을 시작한다.
+        /// 우클릭 시작 위치가 편집 중인 키보드 위인지 확인하고 드래그 회전을 시작한다.
         /// 마우스 위치와 키보드 렌더 경계 Raycast를 확인하고 앞을 가리는 충돌체를 검사한다.
         /// </summary>
         private void TryBeginEditingKeyboardRotation()
         {
-            if (_keyboardPullers != null && _keyboardPullers.ConsumesPointer()) return;
             Mouse mouse = Mouse.current;
             if (mouse == null || !InGameCursor.CanProcessVirtualPointer || _editingKeyboardBody == null)
                 return;
@@ -957,7 +961,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 키보드 위에서 누른 좌클릭이 유지되는 동안 마우스 이동량을 누적한다.
+        /// 키보드 위에서 누른 우클릭이 유지되는 동안 마우스 이동량을 누적한다.
         /// Mouse.delta를 사용하며 물리 갱신에서 적용할 회전 입력을 저장한다.
         /// </summary>
         private void CaptureEditingKeyboardMouseDelta()

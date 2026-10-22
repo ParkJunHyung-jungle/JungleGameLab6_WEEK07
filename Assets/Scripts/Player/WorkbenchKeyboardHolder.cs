@@ -27,6 +27,42 @@ namespace Game.Player
         /// </summary>
         public Quaternion InitialKeyboardRotation => _initialKeyboardRotation;
 
+        /// <summary>
+        /// 본체 기준의 시각 중심 오프셋을 받아 기존 작업대 기울기와 중심 정렬 정책의 최종 자세를 반환한다.
+        /// centerOffset은 배율을 포함하며 Holder나 본체의 실제 상태는 변경하지 않는다.
+        /// </summary>
+        public Pose GetPlacementPose(Vector3 centerOffset)
+        {
+            Quaternion rotation = transform.rotation * Quaternion.Euler(-57f, 0f, 0f);
+            return new Pose(transform.position - rotation * centerOffset, rotation);
+        }
+
+        /// <summary>
+        /// 빈 Holder에 body를 명시적으로 배치하고 점유 상태와 최초 회전을 저장한다.
+        /// centerOffset으로 최종 자세를 정하며 속도와 중력을 정리하고 고정 성공 여부를 반환한다.
+        /// </summary>
+        public bool TryPlaceKeyboard(Rigidbody body, Vector3 centerOffset)
+        {
+            if (_keyboardBody != null)
+                return false;
+
+            Pose pose = GetPlacementPose(centerOffset);
+            if (!body.isKinematic)
+            {
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+            }
+            _keyboardBody = body;
+            _initialKeyboardRotation = pose.rotation;
+            body.isKinematic = true;
+            body.useGravity = false;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            body.transform.SetParent(transform, true);
+            body.position = pose.position;
+            body.rotation = pose.rotation;
+            return true;
+        }
+
         void OnTriggerEnter(Collider other)
         {
             if (_keyboardBody != null)
@@ -43,7 +79,7 @@ namespace Game.Player
                 return;
 
             _keyboardBody = body;
-            _initialKeyboardRotation = transform.rotation * Quaternion.Euler(-57f, 0f, 0f);
+            _initialKeyboardRotation = GetPlacementPose(Vector3.zero).rotation;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             body.isKinematic = true;

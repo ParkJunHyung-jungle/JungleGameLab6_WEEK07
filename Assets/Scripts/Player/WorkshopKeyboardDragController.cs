@@ -24,6 +24,14 @@ namespace Game.Player
         [SerializeField] private CinemachineBrain _brain;
         [SerializeField] private WorkshopViewController _viewController;
 
+        [Header("Workbench Placement")]
+        [SerializeField] private WorkbenchKeyboardHolder _workbenchHolder;
+        [SerializeField] private Collider _placementArea;
+        [SerializeField] private CinemachineCamera _workbenchCamera;
+        [SerializeField] private Material _placementOutlineMaterial;
+        [SerializeField] private Shader _placementDepthShader;
+        private WorkshopKeyboardPlacementPreview _placementPreview;
+
         [Header("Drag State")]
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
         private float _dragDepth;
@@ -36,6 +44,14 @@ namespace Game.Player
         private bool _releasePending;
 
         public bool IsDragging => _isDragging;
+
+        public bool IsPlaced => !_isDragging && _workbenchHolder.KeyboardBody == _keyboardBody;
+
+        void Awake()
+        {
+            _placementPreview = new WorkshopKeyboardPlacementPreview(
+                _placementOutlineMaterial, _placementDepthShader, _outputCamera);
+        }
 
         void OnEnable()
         {
@@ -84,8 +100,39 @@ namespace Game.Player
             // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
             _keyboardBody.position = position;
             _keyboardBody.rotation = rotation;
+            bool hasHolder = IsHolderUnderCursor();
+            if (hasHolder && !_releasePending)
+                _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset));
             if (_releasePending && !_brain.IsBlending)
+            {
                 DropKeyboard();
+                if (hasHolder)
+                    _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset);
+            }
+        }
+
+        /// <summary>
+        /// 공통 커서 Ray로 명시한 작업대 배치 영역과 가림 물체를 검사하여 Holder 선택 가능 여부를 반환한다.
+        /// 운반 본체와 장착 자식은 제외하며 점유와 UI 및 블렌드와 현재 뷰 조건도 함께 확인한다.
+        /// </summary>
+        private bool IsHolderUnderCursor()
+        {
+            if (_brain.IsBlending || _brain.ActiveVirtualCamera != (ICinemachineCamera)_workbenchCamera
+                || _workbenchHolder.KeyboardBody != null || IsPointerOverUI())
+                return false;
+
+            Physics.SyncTransforms();
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane))
+                return false;
+
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, areaHit.distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (!hit.transform.IsChildOf(_keyboardBody.transform) && hit.distance < areaHit.distance)
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -132,6 +179,10 @@ namespace Game.Player
             if (part != null && (part.Slot == null || part.Slot.InstalledPart != part))
                 return;
 
+            _workbenchHolder.ReleaseKeyboard(_keyboardBody);
+            if (_keyboardBody.transform.parent == _workbenchHolder.transform)
+                _keyboardBody.transform.SetParent(null, true);
+
             Vector3 center = _keyboardBody.transform.TransformPoint(
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
             Vector3 screenCenter = _outputCamera.WorldToScreenPoint(center);
@@ -148,6 +199,7 @@ namespace Game.Player
             _keyboardBody.useGravity = false;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             _releasePending = false;
+            _placementPreview.Prepare(_keyboardBody.transform);
             _isDragging = true;
         }
 
@@ -207,6 +259,11 @@ namespace Game.Player
         {
             InGameCursor.PointerCanceled -= HandlePointerCanceled;
             HandlePointerCanceled();
+        }
+
+        void OnDestroy()
+        {
+            _placementPreview.Dispose();
         }
     }
 }

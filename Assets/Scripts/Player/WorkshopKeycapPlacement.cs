@@ -253,12 +253,12 @@ namespace Game.Player
 
         /// <summary>
         /// entry의 보관 부품이나 프리팹을 꺼내 shape의 크기와 회전에 맞춘 실물을 반환한다.
-        /// preserveSwitchAppearance가 true이면 제거된 축의 현재 외형을 사용하며 재고 수량은 변경하지 않는다.
+        /// preserveAppearance가 true이면 제거 직전의 메시와 재질 및 크기를 그대로 사용하며 재고 수량은 변경하지 않는다.
         /// </summary>
-        private AssemblyDraggablePart CreatePart(AssemblyCatalogEntry entry, Transform shape, bool preserveSwitchAppearance = false)
+        private AssemblyDraggablePart CreatePart(AssemblyCatalogEntry entry, Transform shape, bool preserveAppearance = false)
         {
             AssemblyDraggablePart part = entry.TakeStoredPart();
-            if (entry.IsSwitch && preserveSwitchAppearance)
+            if (preserveAppearance)
             {
                 if (part != null) { _ownedParts.Remove(part); Destroy(part.gameObject); }
                 Rigidbody body = _pullers.CreateDetachedVisual(shape, Vector3.zero, Vector3.zero, false);

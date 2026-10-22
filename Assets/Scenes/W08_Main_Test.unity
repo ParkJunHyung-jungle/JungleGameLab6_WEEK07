@@ -5735,7 +5735,7 @@ MonoBehaviour:
     _keycapDefinition: {fileID: 0}
     _switchData: {fileID: 11400000, guid: 26a139ba317bcbb43804bf12a608e2ba, type: 2}
     _prefab: {fileID: 6363945540374892814, guid: 4ca65bd8f70974241bc6af0f5016c951, type: 3}
-    _initialQuantity: 1
+    _initialQuantity: 100
   - _keycapMaterial: {fileID: 0}
     _keycapDefinition: {fileID: 0}
     _switchData: {fileID: 11400000, guid: 861a81df95ba62f4baa0a937b5b75f3a, type: 2}
@@ -5771,7 +5771,6 @@ MonoBehaviour:
     _switchData: {fileID: 11400000, guid: 963f322bc845e694b9bcd79c59717f6a, type: 2}
     _prefab: {fileID: 2389093803382289243, guid: 6ff119df42b41a94e873ec2ada47af39, type: 3}
     _initialQuantity: 1
-  _spawnEntries: []
 --- !u!1 &2044699887
 GameObject:
   m_ObjectHideFlags: 0

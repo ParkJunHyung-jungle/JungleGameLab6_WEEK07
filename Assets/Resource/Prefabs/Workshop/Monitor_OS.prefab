@@ -1047,6 +1047,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _games:
   - {fileID: 11400000, guid: d726b340d6fd5ef45a85c0b970857132, type: 2}
+  - {fileID: 11400000, guid: d6974902df6144abb1bc91a80a7644d4, type: 2}
+  - {fileID: 11400000, guid: 56583b23a3f5339499095ab193557775, type: 2}
   _screenRoot: {fileID: 7063675437338594823}
 --- !u!225 &7484652827021408629
 CanvasGroup:

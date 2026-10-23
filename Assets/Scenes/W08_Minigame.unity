@@ -1404,6 +1404,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopKeyboardPullerController
   _interaction: {fileID: 7500000001}
+  _workshopView: {fileID: 0}
   _camera: {fileID: 4985256}
   _keycapPuller: {fileID: 989276903}
   _switchPuller: {fileID: 686529946}
@@ -4865,6 +4866,71 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 808486b1e90ce5bf5c65b28da4096dc0, type: 3}
+--- !u!1001 &1730199815
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2195442166095885847, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_Camera
+      value: 
+      objectReference: {fileID: 4985256}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 1.4001789
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -2.4999995
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -1.5855731
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6790844235589385906, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: _player
+      value: 
+      objectReference: {fileID: 7500000001}
+    - target: {fileID: 7638304056920660422, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_Name
+      value: Monitor_OS
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
 --- !u!1001 &1770770338
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10836,6 +10902,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopControlHints
   _interaction: {fileID: 7500000001}
+  _workshopView: {fileID: 0}
   _placement: {fileID: 2019032720}
   _pullers: {fileID: 500387865}
   _editOverlay: {fileID: 9911000090}
@@ -11174,3 +11241,4 @@ SceneRoots:
   - {fileID: 500387866}
   - {fileID: 3464317468958659021}
   - {fileID: 1003994093}
+  - {fileID: 1730199815}

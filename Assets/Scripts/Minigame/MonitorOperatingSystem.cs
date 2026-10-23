@@ -17,6 +17,10 @@ namespace Game.Player
         [SerializeField] private Transform _appRoot;
         [SerializeField] private MonitorOSButton _appTemplate;
 
+        [Header("App Layout")]
+        [SerializeField, Min(1)] private int _appColumns = 6;
+        [SerializeField] private Vector2 _appSpacing = new Vector2(190f, 180f);
+
         [Header("App Window")]
         [SerializeField] private GameObject _window;
         [SerializeField] private Text _windowTitle;
@@ -26,10 +30,16 @@ namespace Game.Player
         void Awake()
         {
             _appTemplate.gameObject.SetActive(false);
+            int appIndex = 0;
             foreach (MonitorMiniGameDefinition definition in _manager.Games)
             {
                 if (definition == null) continue;
                 MonitorOSButton icon = Instantiate(_appTemplate, _appRoot, false);
+                RectTransform iconRect = (RectTransform)icon.transform;
+                int columns = Mathf.Max(1, _appColumns);
+                iconRect.anchoredPosition += new Vector2(
+                    appIndex % columns * _appSpacing.x, -(appIndex / columns) * _appSpacing.y);
+                appIndex++;
                 icon.Configure(definition);
                 icon.Clicked += HandleAppClicked;
                 icon.gameObject.SetActive(true);

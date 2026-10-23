@@ -114,3 +114,6 @@ Assets/Plugins/FMOD/Cache/Editor/FMODStudioCache.asset
 # Local upload token configuration
 /Assets/Resources/GameConfig.asset
 /Assets/Resources/GameConfig.asset.meta
+
+# Downloaded CEF runtime; restore with Tools/Install-MonitorBrowserEngine.ps1.
+/Packages/dev.voltstro.unitywebbrowser.engine.cef.win.x64/Engine~/

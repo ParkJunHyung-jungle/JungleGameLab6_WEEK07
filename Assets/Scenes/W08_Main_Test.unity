@@ -135,6 +135,7 @@ GameObject:
   - component: {fileID: 330585549}
   - component: {fileID: 7000000000000000200}
   - component: {fileID: 7000000000000000306}
+  - component: {fileID: 7000000000000000406}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2524,6 +2525,103 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 861691646}
   m_CullTransparentMesh: 1
+--- !u!1001 &894914146
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 515113642822515294, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 2.847
+      objectReference: {fileID: 0}
+    - target: {fileID: 515113642822515294, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.444
+      objectReference: {fileID: 0}
+    - target: {fileID: 1138078912689317998, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 3.109
+      objectReference: {fileID: 0}
+    - target: {fileID: 1138078912689317998, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.419
+      objectReference: {fileID: 0}
+    - target: {fileID: 1650122865793828096, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -8.375
+      objectReference: {fileID: 0}
+    - target: {fileID: 1650122865793828096, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.416
+      objectReference: {fileID: 0}
+    - target: {fileID: 2195442166095885847, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_Camera
+      value: 
+      objectReference: {fileID: 4985256}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.689
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.977
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -3.872965
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3029134574500868041, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6962178943302615064, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 6962178943302615064, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.61
+      objectReference: {fileID: 0}
+    - target: {fileID: 7638304056920660422, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_Name
+      value: Monitor_OS
+      objectReference: {fileID: 0}
+    - target: {fileID: 9162336399170649921, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.422
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
 --- !u!1001 &910025451
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5408,6 +5506,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1578084d5419f544ca2b607a7d6f1c67, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopKeycapPlacement
+  _failedDropLiftSpeed: 0.6
+  _failedDropPushSpeed: 0.35
+  _failedDropSpinSpeed: 4
   _interaction: {fileID: 0}
   _pullers: {fileID: 500387865}
   _keycapEntries:
@@ -8894,6 +8995,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e02df7475f546d197008fbd0d8de997, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardEditOverlayUI
+  _assemblyCatalog: 0
+  _pcbOutlineMaterial: {fileID: 0}
+  _pcbDepthShader: {fileID: 0}
   _keycapButton: {fileID: 9911000091}
   _switchAxisButton: {fileID: 9911000092}
   _ledButton: {fileID: 9911000093}
@@ -10786,6 +10890,29 @@ MonoBehaviour:
   - {fileID: 7000000000000000932}
   _hangerWorldX: -3.18
   _dragWorldHeight: 0.145
+--- !u!114 &7000000000000000406
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4985254}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ddae5ffcc0146718c474f1d71bcae01, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopMonitorController
+  _outputCamera: {fileID: 4985256}
+  _brain: {fileID: 330585548}
+  _views: {fileID: 7000000000000000200}
+  _drag: {fileID: 7000000000000000306}
+  _holder: {fileID: 9911000310}
+  _focusDistance: 1.5
+  _fieldOfView: 55
+  _monitors: []
+  _focused: {fileID: 0}
+  _focusCamera: {fileID: 0}
+  _returning: 0
 --- !u!1 &7000000000000000500
 GameObject:
   m_ObjectHideFlags: 0
@@ -11207,3 +11334,4 @@ SceneRoots:
   - {fileID: 1712647971}
   - {fileID: 818686754}
   - {fileID: 72215168}
+  - {fileID: 894914146}

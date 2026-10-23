@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 using UnityEngine;
@@ -8,6 +9,19 @@ namespace Game.Player
 {
     public sealed class MonitorTypingGame : MonitorMiniGame
     {
+        [Header("Screen UI")]
+        [SerializeField] private Text _sentenceLabel;
+        [SerializeField] private Text _inputLabel;
+        [SerializeField] private Text _statsLabel;
+        [SerializeField] private Text _statusLabel;
+
+        [Header("Enhanced UI")]
+        [SerializeField] private Text _accuracyValueText;
+        [SerializeField] private Text _speedValueText;
+        [SerializeField] private Text _timeValueText;
+        [SerializeField] private Image _inputBoxBg;
+        [SerializeField] private Image _statusBannerBg;
+
         [Header("Sentences")]
         private TypingSentenceSet _sentenceSet;
         private int _sentenceIndex = -1;
@@ -21,12 +35,6 @@ namespace Game.Player
         private bool _started;
         private bool _completed;
 
-        [Header("Screen UI")]
-        [SerializeField] private Text _sentenceLabel;
-        [SerializeField] private Text _inputLabel;
-        [SerializeField] private Text _statsLabel;
-        [SerializeField] private Text _statusLabel;
-
         public string Sentence => _sentence;
         public string TypedText => _typed;
         public bool IsCompleted => _completed;
@@ -34,7 +42,10 @@ namespace Game.Player
         public float WordsPerMinute => _elapsed > 0f ? (_submittedCharacters + CountMatchingCharacters()) * 12f / _elapsed : 0f;
         public float StrokesPerMinute => _elapsed > 0f ? (_submittedStrokes + CountMatchingStrokes()) * 60f / _elapsed : 0f;
 
-        /// <summary>연결된 문장 SO로 새 연습을 시작한다. 입력값과 반환값 없이 누적 통계와 문장 순서를 초기화하고 첫 유효 문장을 표시한다.</summary>
+        /// <summary>
+        /// 연결된 문장 SO로 새 연습을 시작한다.
+        /// 누적 통계와 문장 순서를 초기화하고 첫 유효 문장을 표시한다.
+        /// </summary>
         protected override void OnStarted()
         {
             _sentenceSet = ((MonitorTypingGameDefinition)Definition).SentenceSet;
@@ -47,19 +58,29 @@ namespace Game.Player
             BeginNextSentence();
         }
 
-        /// <summary>definition이 문장 SO를 가진 타자연습 정의인지 반환한다. 화면과 데이터 종류가 맞지 않으면 시작하지 않으며 상태는 변경하지 않는다.</summary>
+        /// <summary>
+        /// definition이 문장 SO를 가진 타자연습 정의인지 반환한다.
+        /// definition을 검사하며 내부 상태는 변경하지 않는다.
+        /// </summary>
         public override bool CanRun(MonitorMiniGameDefinition definition)
         {
             return definition is MonitorTypingGameDefinition typing && typing.SentenceSet != null;
         }
 
-        /// <summary>현재 연습을 종료하고 대기 안내를 표시한다. 입력값과 반환값 없이 입력 처리를 멈추며 마지막 결과는 화면에 유지한다.</summary>
+        /// <summary>
+        /// 현재 연습을 종료하고 대기 안내를 표시한다.
+        /// 입력 처리를 멈추며 마지막 결과는 화면에 유지한다.
+        /// </summary>
         protected override void OnStopped()
         {
-            _statusLabel.text = "키보드를 거치하고 우클릭하면 타자연습을 시작합니다.";
+            if (_statusLabel != null)
+                _statusLabel.text = "키보드를 거치하고 우클릭하면 타자연습을 시작합니다.";
         }
 
-        /// <summary>deltaTime으로 각 문장의 첫 입력부터 Enter 제출까지의 시간을 누적한다. 다음 문장의 첫 입력 대기 중에는 누적 시간을 유지한다.</summary>
+        /// <summary>
+        /// 타자 연습 진행 중 경과 시간을 누적하고 통계 화면을 갱신한다.
+        /// deltaTime을 사용하여 _elapsed를 증가시킨다.
+        /// </summary>
         public override void Tick(float deltaTime)
         {
             if (!IsRunning || !_started) return;
@@ -67,7 +88,10 @@ namespace Game.Player
             RefreshStats();
         }
 
-        /// <summary>character를 제시 문장과 비교해 입력과 누적 정확도를 갱신한다. 제어 문자와 원문 길이를 초과하는 입력은 무시하고 Enter 제출을 기다린다.</summary>
+        /// <summary>
+        /// 입력된 문자를 제시 문장과 비교하여 입력 문자열 및 누적 정확도를 갱신한다.
+        /// character를 검사하여 _typed, _attempts, _correctPresses를 변경한다.
+        /// </summary>
         public override void HandleTextInput(char character)
         {
             if (!IsRunning || char.IsControl(character) || _typed.Length >= _sentence.Length) return;
@@ -79,7 +103,10 @@ namespace Game.Player
             RefreshScreen();
         }
 
-        /// <summary>key가 Enter면 현재 입력의 올바른 글자와 타수를 누적하고 다음 문장을 연다. Backspace는 현재 입력만 수정하며 이전 문장 통계와 누적 오타 기록은 유지한다.</summary>
+        /// <summary>
+        /// Enter 입력 시 다음 문장으로 넘어가고 Backspace 입력 시 마지막 글자를 삭제한다.
+        /// key를 사용하여 제출 처리 또는 문자열 수정을 수행한다.
+        /// </summary>
         public override void HandleKeyPressed(Key key)
         {
             if (!IsRunning) return;
@@ -101,7 +128,10 @@ namespace Game.Player
             }
         }
 
-        /// <summary>SO 목록에서 다음 유효 문장을 순환 선택하고 현재 입력란만 비운다. 입력값과 반환값 없이 누적 정확도와 타수 및 시간을 유지하며 유효 문장이 없으면 완료를 통지한다.</summary>
+        /// <summary>
+        /// SO 목록에서 다음 유효 문장을 순환 선택하고 현재 입력란을 초기화한다.
+        /// _sentenceSet을 참조하여 _sentence를 설정하고 새 문장 입력을 준비한다.
+        /// </summary>
         private void BeginNextSentence()
         {
             if (_sentenceSet != null)
@@ -123,7 +153,10 @@ namespace Game.Player
             Complete();
         }
 
-        /// <summary>현재 입력과 제시 문장의 같은 위치가 일치하는 글자 수를 반환한다. 속도 계산에 사용하며 입력 상태는 변경하지 않는다.</summary>
+        /// <summary>
+        /// 현재 입력과 제시 문장의 동일한 위치에서 일치하는 글자 수를 계산하여 반환한다.
+        /// _typed와 _sentence를 비교하며 상태는 변경하지 않는다.
+        /// </summary>
         private int CountMatchingCharacters()
         {
             int count = 0;
@@ -132,7 +165,10 @@ namespace Game.Player
             return count;
         }
 
-        /// <summary>현재 입력 중 원문과 같은 위치에서 일치하는 문자의 타수를 합산해 반환한다. 한글은 구성 자모를 세고 영문, 숫자, 기호와 공백은 각각 1타로 계산하며 입력 상태는 변경하지 않는다.</summary>
+        /// <summary>
+        /// 현재 입력 중 올바르게 입력된 글자의 타수를 한글 자모 및 영문 기준으로 합산하여 반환한다.
+        /// _typed와 _sentence를 사용하여 타수를 계산한다.
+        /// </summary>
         private int CountMatchingStrokes()
         {
             int count = 0;
@@ -150,36 +186,78 @@ namespace Game.Player
                 int vowel = syllable / 28 % 21;
                 int final = syllable % 28;
                 count += 2 + (final == 0 ? 0 : 1);
-                // 겹모음과 겹받침은 구성 자모를 각각 세고 Shift 자체는 타수에 넣지 않는다.
+
+                // 겹모음과 겹받침은 구성 자모를 각각 세어 타수에 반영한다.
                 if (vowel == 9 || vowel == 10 || vowel == 11 || vowel == 14 || vowel == 15 || vowel == 16 || vowel == 19) count++;
                 if (final == 3 || final == 5 || final == 6 || (final >= 9 && final <= 15) || final == 18) count++;
             }
             return count;
         }
 
-        /// <summary>현재 문장과 입력을 화면에 표시한다. 정답은 초록색, 오타는 붉은색으로 강조하며 완료 여부에 따른 조작 안내와 통계를 갱신한다.</summary>
+        /// <summary>
+        /// 현재 제시 문장과 사용자 입력을 색상 태그와 함께 화면에 갱신한다.
+        /// _sentence와 _typed를 바탕으로 라벨 및 패널 색상을 변경한다.
+        /// </summary>
         private void RefreshScreen()
         {
-            _sentenceLabel.text = _sentence;
-            var text = new StringBuilder();
-            for (int index = 0; index < _typed.Length; index++)
+            if (_sentenceLabel != null)
+                _sentenceLabel.text = _sentence;
+
+            if (_inputLabel != null)
             {
-                char character = _typed[index];
-                text.Append(index < _sentence.Length && character == _sentence[index] ? "<color=#78E5BB>" : "<color=#FF8484>");
-                text.Append(character == '<' ? "＜" : character == '>' ? "＞" : character == ' ' ? '·' : character);
-                text.Append("</color>");
+                var text = new StringBuilder();
+                for (int index = 0; index < _typed.Length; index++)
+                {
+                    char character = _typed[index];
+                    text.Append(index < _sentence.Length && character == _sentence[index] ? "<color=#78E5BB>" : "<color=#FF8484>");
+                    text.Append(character == '<' ? "＜" : character == '>' ? "＞" : character == ' ' ? '·' : character);
+                    text.Append("</color>");
+                }
+                if (!_completed) text.Append("▏");
+                _inputLabel.text = text.ToString();
             }
-            if (!_completed) text.Append("▏");
-            _inputLabel.text = text.ToString();
-            _statusLabel.text = _completed ? "정확히 입력했습니다! Enter: 다음 문장 · 우클릭: 나가기"
-                : "Enter: 제출 후 다음 문장 · Backspace: 수정 · 우클릭: 나가기";
+
+            if (_statusLabel != null)
+            {
+                _statusLabel.text = _completed
+                    ? "<color=#39FF14>✓ 문장 완성!</color>  [Enter] 다음 문장  ·  [우클릭] 나가기"
+                    : "[Enter] 제출 후 다음 문장  ·  [Backspace] 수정  ·  [우클릭] 나가기";
+            }
+
+            if (_inputBoxBg != null)
+            {
+                _inputBoxBg.color = _completed
+                    ? new Color(0.04f, 0.18f, 0.12f, 0.95f)
+                    : new Color(0.035f, 0.055f, 0.085f, 0.95f);
+            }
+
+            if (_statusBannerBg != null)
+            {
+                _statusBannerBg.color = _completed
+                    ? new Color(0.05f, 0.22f, 0.14f, 0.95f)
+                    : new Color(0.06f, 0.09f, 0.14f, 0.9f);
+            }
+
             RefreshStats();
         }
 
-        /// <summary>모든 문장의 누적 정확도와 경과 시간 및 분당 타수를 표시한다. 수정 전 오타도 정확도에 포함하며 제출된 문장과 현재 입력의 올바른 타수를 누적 시간으로 나눈다.</summary>
+        /// <summary>
+        /// 정확도, 타자 속도, 경과 시간을 통계 라벨과 전용 카드에 갱신한다.
+        /// Accuracy, StrokesPerMinute, _elapsed를 사용하여 UI 텍스트들을 갱신한다.
+        /// </summary>
         private void RefreshStats()
         {
-            _statsLabel.text = $"정확도 {Accuracy:F1}%     속도 {StrokesPerMinute:F0} 타/분     시간 {_elapsed:F1}초";
+            if (_statsLabel != null)
+                _statsLabel.text = $"정확도 {Accuracy:F1}%     속도 {StrokesPerMinute:F0} 타수(타/분)     시간 {_elapsed:F1}초";
+
+            if (_accuracyValueText != null)
+                _accuracyValueText.text = $"{Accuracy:F1}%";
+
+            if (_speedValueText != null)
+                _speedValueText.text = $"{StrokesPerMinute:F0} <size=14>타수(타/분)</size>";
+
+            if (_timeValueText != null)
+                _timeValueText.text = $"{_elapsed:F1}s";
         }
     }
 }

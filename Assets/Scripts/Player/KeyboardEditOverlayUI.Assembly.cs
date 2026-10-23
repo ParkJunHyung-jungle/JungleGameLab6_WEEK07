@@ -25,6 +25,7 @@ namespace Game.Player
         private WorkshopPcbScrewAssembly _screwAssembly;
         private KeyboardAssemblyState ActiveAssembly => _caseCustomization != null
             ? _caseCustomization.GetComponent<KeyboardAssemblyState>() : null;
+        public bool AssemblyCatalogEnabled => _assemblyCatalog;
 
         /// <summary>point가 현재 열린 부품 목록 영역인지 반환한다. 탭과 무관하게 목록 패널만 검사하며 상태를 변경하지 않는다.</summary>
         public bool IsInAssemblyReturnArea(Vector2 point)
@@ -82,6 +83,7 @@ namespace Game.Player
             _assemblyActions.anchoredPosition = new Vector2(568f, -80f);
             _assemblyActions.sizeDelta = new Vector2(250f, 368f);
             _assemblyActions.GetComponent<Image>().color = _pickerPanelColor;
+            _assemblyActions.GetComponent<Image>().raycastTarget = false;
             _assemblyStatus = CreateAssemblyLabel(_assemblyActions, "", 12f, 74f);
             _plateCard = CreateMaterialDragController(AssemblyStructurePart.Plate);
             _upperCard = CreateMaterialDragController(AssemblyStructurePart.Upper);
@@ -197,7 +199,7 @@ namespace Game.Player
             _assemblyActions.gameObject.SetActive(assembly != null
                 && (pcb || plate || upper || _pickerMode == PickerMode.CaseMaterial));
             if (assembly == null) return;
-            _assemblyActions.sizeDelta = new Vector2(250f, 100f);
+            if (_catalogLayout == null) _assemblyActions.sizeDelta = new Vector2(250f, 100f);
             _assemblyStatus.text = _pickerMode == PickerMode.CaseMaterial
                 ? assembly.CanRemoveLower ? "빈 하단부 · 좌클릭 드래그로 분리 가능"
                     : assembly.LowerInstalled ? "하단부 분리: PCB·보강판·상단부·축·키캡 제거 필요"

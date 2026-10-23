@@ -57,6 +57,8 @@ namespace Game.Player
             Text note = CreateLabel(_placeholder.transform, "표시 전용 · 교체 기능 준비 전");
             note.alignment = TextAnchor.MiddleCenter;
             string[] labels = { "키캡", "축", "상부 하우징", "LED", "보강판", "PCB", "하부 하우징", "이미지", "케이스 재질" };
+            if (_overlay.AssemblyCatalogEnabled)
+                labels = new[] { "하단부", "PCB", "보강판", "스위치", "상단부", "키캡", "LED", "이미지" };
             for (int i = 0; i < labels.Length; i++)
             {
                 if (i >= 7)
@@ -114,9 +116,28 @@ namespace Game.Player
             foreach (RectTransform panel in _menuRoot)
             {
                 if (_editorPanels.ContainsKey(panel)) continue;
+                if (_overlay.AssemblyCatalogEnabled && panel.name == "AssemblyActions")
+                {
+                    panel.anchorMin = Vector2.zero;
+                    panel.anchorMax = Vector2.right;
+                    panel.pivot = Vector2.zero;
+                    panel.anchoredPosition = Vector2.zero;
+                    panel.sizeDelta = new Vector2(0f, 64f);
+                    Text status = panel.GetComponentInChildren<Text>(true);
+                    status.rectTransform.anchorMin = Vector2.zero;
+                    status.rectTransform.anchorMax = Vector2.one;
+                    status.rectTransform.offsetMin = new Vector2(8f, 4f);
+                    status.rectTransform.offsetMax = new Vector2(-8f, -4f);
+                    status.fontSize = 12;
+                    status.color = new Color32(48, 32, 22, 255);
+                    continue;
+                }
+                if (_overlay.AssemblyCatalogEnabled && panel.TryGetComponent<WorkshopPcbCardDrag>(out _)) continue;
                 panel.anchorMin = Vector2.zero;
                 panel.anchorMax = Vector2.one;
-                panel.offsetMin = panel.offsetMax = Vector2.zero;
+                panel.offsetMin = _overlay.AssemblyCatalogEnabled && panel.TryGetComponent<ScrollRect>(out _)
+                    ? new Vector2(0f, 64f) : Vector2.zero;
+                panel.offsetMax = Vector2.zero;
                 if (panel.TryGetComponent(out Image image)) image.color = new Color32(221, 197, 165, 255);
             }
             _drawerRoot.sizeDelta = new Vector2(_width, _panelHeight + 7f * _labelSpacing + 76f);
@@ -133,7 +154,7 @@ namespace Game.Player
             _menuRoot.sizeDelta = new Vector2(_width, _panelHeight);
             _menuRoot.anchoredPosition = new Vector2(0f, -(1f - _openAmount) * Mathf.Max(_panelHeight, _slideDistance));
             _clip.gameObject.SetActive(_selected >= 0);
-            _placeholder.SetActive(_selected == 2 || _selected == 5 || _selected == 6);
+            _placeholder.SetActive(!_overlay.AssemblyCatalogEnabled && (_selected == 2 || _selected == 5 || _selected == 6));
             for (int i = 0; i < _labels.Count; i++)
             {
                 RectTransform face = (RectTransform)_labels[i].transform;
@@ -452,7 +473,8 @@ namespace Game.Player
                 GridLayoutGroup grid = content.gameObject.AddComponent<GridLayoutGroup>();
                 grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
                 grid.constraintCount = 2;
-                grid.cellSize = new Vector2((_width - 48f) * 0.5f, 128f);
+                grid.cellSize = new Vector2((_width - 48f) * 0.5f,
+                    _overlay.AssemblyCatalogEnabled && content.GetComponentInChildren<WorkshopPcbCardDrag>(true) != null ? 148f : 128f);
                 grid.spacing = new Vector2(12f, 12f);
                 grid.childAlignment = TextAnchor.UpperCenter;
                 ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();

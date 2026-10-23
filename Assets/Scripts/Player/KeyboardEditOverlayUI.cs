@@ -759,6 +759,19 @@ namespace Game.Player
             {
                 int index = mode == PickerMode.Keycap ? 0 : mode == PickerMode.SwitchSound ? 1
                     : mode == PickerMode.Led ? 3 : mode == PickerMode.Plate ? 4 : mode == PickerMode.Photo ? 7 : 8;
+                if (_assemblyCatalog)
+                    index = mode switch
+                    {
+                        PickerMode.CaseMaterial => 0,
+                        PickerMode.Pcb => 1,
+                        PickerMode.Plate => 2,
+                        PickerMode.SwitchSound => 3,
+                        PickerMode.Upper => 4,
+                        PickerMode.Keycap => 5,
+                        PickerMode.Led => 6,
+                        PickerMode.Photo => 7,
+                        _ => -1
+                    };
                 _catalogLayout.RequestDrawer(index);
                 return;
             }
@@ -801,6 +814,19 @@ namespace Game.Player
                 8 => PickerMode.CaseMaterial,
                 _ => PickerMode.None
             };
+            if (_assemblyCatalog)
+                mode = index switch
+                {
+                    0 => PickerMode.CaseMaterial,
+                    1 => PickerMode.Pcb,
+                    2 => PickerMode.Plate,
+                    3 => PickerMode.SwitchSound,
+                    4 => PickerMode.Upper,
+                    5 => PickerMode.Keycap,
+                    6 => PickerMode.Led,
+                    7 => PickerMode.Photo,
+                    _ => PickerMode.None
+                };
             SetPickerMode(mode);
         }
 

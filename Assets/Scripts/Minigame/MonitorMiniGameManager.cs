@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+using Game.Logging;
+
 namespace Game.Player
 {
     [DisallowMultipleComponent]
@@ -13,6 +15,8 @@ namespace Game.Player
         [SerializeField] private MonitorMiniGameDefinition[] _games = Array.Empty<MonitorMiniGameDefinition>();
         [SerializeField] private Transform _screenRoot;
         private MonitorMiniGame _currentGame;
+        private double _gameStartedAt;
+        private string _gameRunId;
 
         public IReadOnlyList<MonitorMiniGameDefinition> Games => _games;
         public MonitorMiniGame CurrentGame => _currentGame;
@@ -46,6 +50,8 @@ namespace Game.Player
             StopGame();
             MonitorMiniGame game = Instantiate(definition.ScreenPrefab, _screenRoot, false);
             _currentGame = game;
+            _gameStartedAt = Time.realtimeSinceStartupAsDouble;
+            _gameRunId = Guid.NewGuid().ToString("N");
             game.Finished += HandleFinished;
             game.Begin(definition);
             if (_currentGame == game) GameChanged?.Invoke(game);
@@ -57,9 +63,13 @@ namespace Game.Player
         {
             if (_currentGame == null) return;
             MonitorMiniGame game = _currentGame;
+            double endedAt = Time.realtimeSinceStartupAsDouble;
             _currentGame = null;
             game.Finished -= HandleFinished;
             game.End();
+            CustomizationLogger.RecordMiniGameDuration(gameObject, game.Definition.name, _gameRunId, _gameStartedAt,
+                endedAt);
+            _gameRunId = null;
             game.gameObject.SetActive(false);
             Destroy(game.gameObject);
             GameChanged?.Invoke(null);

@@ -2299,9 +2299,14 @@ namespace Game.Player
                 _ledUI.Open(_ledCustomization);
             if (_assemblyCatalog) RefreshAssemblyControls();
             if (previous != _pickerMode)
-                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode),
-                    previous: GetLogPart(previous),
-                    details: _catalogLayout != null && _catalogLayout.IsTransitioning ? "DrawerTransition" : "");
+            {
+                string previousLogPart = GetLogPart(previous);
+                string currentLogPart = GetLogPart(_pickerMode);
+                if (previousLogPart != currentLogPart)
+                    Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", currentLogPart,
+                        previous: previousLogPart,
+                        details: _catalogLayout != null && _catalogLayout.IsTransitioning ? "DrawerTransition" : "");
+            }
         }
 
         /// <summary>

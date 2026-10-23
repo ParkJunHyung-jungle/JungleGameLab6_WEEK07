@@ -157,8 +157,27 @@ namespace Game.Logging
         public static void EnsureLogger()
         {
             string sceneName = SceneManager.GetActiveScene().name;
-            if (_instance == null && (sceneName == "WorkShop2" || sceneName == "W08_Main_Test"))
+            if (_instance == null && (sceneName == "WorkShop2" || sceneName == "W08_Main_Test" || sceneName == "W08_Minigame"))
                 new GameObject("CustomizationLogger").AddComponent<CustomizationLogger>();
+        }
+
+        /// <summary>
+        /// source의 미니게임 실행이 끝나면 appId와 runId 및 시작·종료 시각을 v5 CSV에 한 행 기록한다.
+        /// 제작 회차와 무관하게 실제 체류 시간을 duration_seconds에 저장한다.
+        /// </summary>
+        public static void RecordMiniGameDuration(GameObject source, string appId, string runId, double startedAt, double endedAt)
+        {
+            EnsureLogger();
+            if (_instance == null || _instance._closed || string.IsNullOrEmpty(runId)) return;
+            string[] row = _instance.CreateRow("MiniGameDuration");
+            row[4] = ""; row[5] = "";
+            row[6] = source.scene.path;
+            row[12] = appId;
+            row[18] = Number(startedAt); row[19] = Number(endedAt);
+            row[20] = Number(Math.Max(0d, endedAt - startedAt));
+            row[41] = runId;
+            _instance.WriteRow(row);
+            _instance.Flush();
         }
 
         /// <summary>
@@ -192,14 +211,14 @@ namespace Game.Logging
         }
 
         /// <summary>
-        /// 최초 실행 씬이 WorkShop2 또는 W08_Main_Test이면 로거의 존재를 보장한다.
+        /// 최초 실행 씬이 WorkShop2 또는 W08 모니터 씬이면 로거의 존재를 보장한다.
         /// 이미 씬에 연결된 인스턴스는 그대로 사용하고 중복 파일을 생성하지 않는다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureWorkshopLogger()
         {
             string sceneName = SceneManager.GetActiveScene().name;
-            if (sceneName == "WorkShop2" || sceneName == "W08_Main_Test") EnsureLogger();
+            if (sceneName == "WorkShop2" || sceneName == "W08_Main_Test" || sceneName == "W08_Minigame") EnsureLogger();
         }
 
         void Update()

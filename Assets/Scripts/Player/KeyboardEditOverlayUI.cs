@@ -833,6 +833,15 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 서랍의 펼침 완료 시 현재 부품 목록을 튜토리얼 관찰자에게 알린다.
+        /// 선택된 편집 모드를 사용하며 목록이나 부품 상태는 변경하지 않는다.
+        /// </summary>
+        public void NotifyDrawerOpened()
+        {
+            Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartPanelOpened", GetLogPart(_pickerMode));
+        }
+
+        /// <summary>
         /// 일반 모드 선택을 PlayerInteractionController에 전달한다.
         /// button의 클릭 콜백에서 false를 전달해 공격 요청을 차단하도록 알린다.
         /// </summary>
@@ -2291,7 +2300,8 @@ namespace Game.Player
             if (_assemblyCatalog) RefreshAssemblyControls();
             if (previous != _pickerMode)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode),
-                    previous: GetLogPart(previous));
+                    previous: GetLogPart(previous),
+                    details: _catalogLayout != null && _catalogLayout.IsTransitioning ? "DrawerTransition" : "");
         }
 
         /// <summary>

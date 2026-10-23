@@ -314,6 +314,7 @@ namespace Game.Player
             }
             _transitioning = false;
             _transition = null;
+            if (index >= 0) _overlay.NotifyDrawerOpened();
         }
 
         /// <summary>

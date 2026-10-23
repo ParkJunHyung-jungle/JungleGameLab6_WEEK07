@@ -168,7 +168,7 @@ namespace Game.Player
             {
                 if (hanger != null) _placementPreview.Show(hanger.GetPlacementPose(_centerOffset));
                 else if (hasMonitor) _placementPreview.Show(_monitorHolder.GetPlacementPose(_centerOffset));
-                else if (hasHolder) _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset));
+                else if (hasHolder) _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset, _keyboardBody));
             }
             if (_releasePending && !_brain.IsBlending)
             {

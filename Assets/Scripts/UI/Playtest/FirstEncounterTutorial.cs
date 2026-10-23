@@ -88,6 +88,7 @@ namespace Game.Tutorials
         {
             public TutorialTopic Topic { get; set; }
             public Action Completed { get; set; }
+            public bool AllowHeldInput { get; set; }
         }
 
         /// <summary>새 실행의 정적 참조와 열람 항목을 초기화한다. 입력값 없이 모든 첫 조우 안내를 다시 표시할 수 있게 한다.</summary>
@@ -148,7 +149,8 @@ namespace Game.Tutorials
                 Time.timeScale = 0f;
                 return;
             }
-            if (Time.frameCount <= _resumeFrame || _pending.Count == 0 || Time.timeScale <= 0f || !InputsReleased()) return;
+            if (Time.frameCount <= _resumeFrame || _pending.Count == 0 || Time.timeScale <= 0f) return;
+            if (!_pending.Peek().AllowHeldInput && !InputsReleased()) return;
             _current = _pending.Dequeue();
             _browsing = false;
             Open(FindCard(_current.Topic));
@@ -321,13 +323,15 @@ namespace Game.Tutorials
         /// <summary>observation의 실제 편집 진입과 기능 선택에 맞는 안내를 예약한다. 자동 복원이나 실패 동작은 안내 조건으로 쓰지 않는다.</summary>
         private void HandleCustomization(CustomizationObservation observation)
         {
+            if (observation.Type == "PartChanged" && observation.Details == "DrawerTransition") return;
             if (HasCard(TutorialTopic.AssemblyOrder))
             {
                 HandleAssemblyCustomization(observation);
                 return;
             }
-            if (observation.Type == "PartChanged" && observation.Part == "Keycap") Request(TutorialTopic.KeycapEditing);
-            if (observation.Type == "PartChanged" && observation.Part == "CustomImage") Request(TutorialTopic.Image);
+            bool panelOpened = observation.Type == "PartChanged" || observation.Type == "PartPanelOpened";
+            if (panelOpened && observation.Part == "Keycap") Request(TutorialTopic.KeycapEditing);
+            if (panelOpened && observation.Part == "CustomImage") Request(TutorialTopic.Image);
             if (observation.Type == "CustomizationTestModeChanged" && observation.Element == "AttackEnabled") Request(TutorialTopic.AttackPreview);
             if (observation.Type == "ElementPicked" && observation.KeycapKind == "Artisan") Request(TutorialTopic.Artisan);
         }
@@ -345,11 +349,19 @@ namespace Game.Tutorials
 
         /// <summary>
         /// 현재 콘텐츠에 등록된 topic만 첫 조우 안내 대기열에 추가한다.
-        /// 이미 열람했거나 예약된 안내는 기존 Request 정책에 따라 중복 표시하지 않는다.
+        /// allowHeldInput이면 입력 해제를 기다리지 않도록 설정하고 해당 안내를 대기열 맨 앞으로 옮긴다.
         /// </summary>
-        private void RequestAvailable(TutorialTopic topic)
+        private void RequestAvailable(TutorialTopic topic, bool allowHeldInput = false)
         {
-            if (HasCard(topic)) Request(topic);
+            if (!HasCard(topic) || !Request(topic) || !allowHeldInput) return;
+            PendingCard[] pending = _pending.ToArray();
+            PendingCard immediate = Array.Find(pending, card => card.Topic == topic);
+            if (immediate == null) return;
+            immediate.AllowHeldInput = true;
+            _pending.Clear();
+            _pending.Enqueue(immediate);
+            foreach (PendingCard card in pending)
+                if (card != immediate) _pending.Enqueue(card);
         }
 
         /// <summary>
@@ -364,7 +376,8 @@ namespace Game.Tutorials
                 RequestAvailable(TutorialTopic.AssemblyOrder);
                 RequestAvailable(TutorialTopic.PartsCatalog);
             }
-            if (observation.Type == "PartChanged" && !string.IsNullOrEmpty(observation.Part))
+            if ((observation.Type == "PartChanged" || observation.Type == "PartPanelOpened")
+                && !string.IsNullOrEmpty(observation.Part))
             {
                 RequestAvailable(TutorialTopic.PartsCatalog);
                 switch (observation.Part)
@@ -382,7 +395,7 @@ namespace Game.Tutorials
                     case "CustomImage": RequestAvailable(TutorialTopic.Image); break;
                 }
             }
-            if (observation.Type == "ToolPickedUp") RequestAvailable(TutorialTopic.KeycapPuller);
+            if (observation.Type == "ToolPickedUp") RequestAvailable(TutorialTopic.KeycapPuller, true);
             if (observation.Type == "BulkPlacementStarted") RequestAvailable(TutorialTopic.WholePart);
             if ((observation.Type == "InventoryPartPicked" || observation.Type == "ElementPicked")
                 && observation.KeycapKind == "Artisan") RequestAvailable(TutorialTopic.Artisan);

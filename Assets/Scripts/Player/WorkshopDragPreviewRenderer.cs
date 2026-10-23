@@ -43,9 +43,16 @@ namespace Game.Player
         /// </summary>
         public void Show(Transform part)
         {
+            Show(new[] { part });
+        }
+
+        /// <summary>parts의 기존 실물들을 하나의 드래그 카메라에서 표시한다. 원래 레이어만 보관하며 계층·재질·크기는 변경하지 않는다.</summary>
+        public void Show(IReadOnlyList<Transform> parts)
+        {
             Hide();
             _sourceIncludedLayer = (_source.cullingMask & (1 << PREVIEW_LAYER)) != 0;
             _source.cullingMask &= ~(1 << PREVIEW_LAYER);
+            foreach (Transform part in parts)
             foreach (Transform child in part.GetComponentsInChildren<Transform>(true))
             {
                 _layers.Add((child.gameObject, child.gameObject.layer));

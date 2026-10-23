@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -1857,6 +1857,8 @@ namespace Game.Player
                 _plateMaterialCardBackgrounds.Add(cardBackground);
                 _plateMaterialButtonMaterials.Add(material);
                 _plateMaterialSelectionIndicators.Add(selectionIndicator);
+                if (_assemblyCatalog)
+                    button.gameObject.AddComponent<WorkshopStructureMaterialDrag>().Initialize(this, material, true);
             }
         }
 
@@ -2123,6 +2125,12 @@ namespace Game.Player
                 _caseCardBackgrounds.Add(cardBackground);
                 _caseMaterialIndices.Add(index);
                 _caseSelectionIndicators.Add(selectionIndicator);
+                if (_assemblyCatalog)
+                {
+                    WorkshopStructureMaterialDrag drag = button.gameObject.AddComponent<WorkshopStructureMaterialDrag>();
+                    drag.Initialize(this, material, false);
+                    drag.enabled = _pickerMode == PickerMode.Upper;
+                }
             }
         }
 

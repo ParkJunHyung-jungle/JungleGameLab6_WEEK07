@@ -5,6 +5,13 @@ using UnityEngine;
 
 namespace KeyboardModeling.Assembly
 {
+    public enum AssemblyStructurePart
+    {
+        Pcb,
+        Plate,
+        Upper
+    }
+
     [DisallowMultipleComponent]
     public sealed class KeyboardAssemblyState : MonoBehaviour
     {
@@ -37,6 +44,10 @@ namespace KeyboardModeling.Assembly
         private Quaternion _pcbLocalRotation;
         private Vector3 _pcbLocalScale;
         private Bounds _pcbSlotBounds;
+        private readonly Transform[][] _structureParts = new Transform[3][];
+        private readonly Vector3[][] _structurePositions = new Vector3[3][];
+        private readonly Quaternion[][] _structureRotations = new Quaternion[3][];
+        private readonly Vector3[][] _structureScales = new Vector3[3][];
 
         public bool Initialized => _initialized;
         public Transform Pcb => _pcb;
@@ -65,6 +76,11 @@ namespace KeyboardModeling.Assembly
             _pcbLocalPosition = _pcb.localPosition;
             _pcbLocalRotation = _pcb.localRotation;
             _pcbLocalScale = _pcb.localScale;
+            CacheStructurePose(AssemblyStructurePart.Pcb, new[] { _pcb });
+            CacheStructurePose(AssemblyStructurePart.Plate, new[] { _plate });
+            var upperParts = new Transform[_upperRenderers.Length];
+            for (int index = 0; index < upperParts.Length; index++) upperParts[index] = _upperRenderers[index].transform;
+            CacheStructurePose(AssemblyStructurePart.Upper, upperParts);
             for (int index = 0; index < _screws.Length; index++)
             {
                 _screwPositions[index] = _screws[index].localPosition;
@@ -78,6 +94,7 @@ namespace KeyboardModeling.Assembly
                 _pcbSlotBounds.Encapsulate(matrix.MultiplyPoint3x4(bounds.center + Vector3.Scale(bounds.extents,
                     new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1))));
             _installation.CancelAll();
+            _customization.ConnectPcbSlots(_pcb);
             _lower.gameObject.SetActive(true);
             ApplyStructureVisibility();
             _customization.DisableKeycaps();
@@ -178,21 +195,101 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>PCB 완료와 상단부 및 키캡 상태를 재검사해 보강판을 즉시 설치한다. 성공 시 설치 상태를 저장하고 true를 반환한다.</summary>
-        public bool InstallPlate()
+        private bool InstallPlate()
         {
             if (!CanInstallPlate) return false;
             _plateInstalled = true;
-            _plate.gameObject.SetActive(true);
+            RestoreStructurePose(AssemblyStructurePart.Plate);
             return true;
         }
 
         /// <summary>하단부와 중복 설치 조건을 재검사해 상단부를 즉시 설치한다. 다른 부품은 유지하며 성공 시 true를 반환한다.</summary>
-        public bool InstallUpper()
+        private bool InstallUpper()
         {
             if (!CanInstallUpper) return false;
             _upperInstalled = true;
-            foreach (MeshRenderer upper in _upperRenderers) upper.gameObject.SetActive(true);
+            RestoreStructurePose(AssemblyStructurePart.Upper);
             return true;
+        }
+
+        /// <summary>kind에 해당하는 기존 PCB·보강판·상단부 실물을 반환한다. 참조만 제공하며 다른 설치 부품은 변경하지 않는다.</summary>
+        public IReadOnlyList<Transform> GetStructureParts(AssemblyStructurePart kind) => _structureParts[(int)kind];
+
+        /// <summary>kind의 현재 공통 설치 조건을 반환한다. 스위치와 키캡의 기존 설치 상태는 검사에만 사용한다.</summary>
+        public bool CanInstallStructure(AssemblyStructurePart kind)
+        {
+            return kind == AssemblyStructurePart.Pcb ? CanInstallPcb
+                : kind == AssemblyStructurePart.Plate ? CanInstallPlate : CanInstallUpper;
+        }
+
+        /// <summary>kind와 index의 실물에 저장된 최종 월드 자세를 반환한다. 드래그 중 임시 자세는 사용하지 않는다.</summary>
+        public Pose GetStructurePose(AssemblyStructurePart kind, int index)
+        {
+            int part = (int)kind;
+            Transform parent = _structureParts[part][index].parent;
+            return new Pose(parent.TransformPoint(_structurePositions[part][index]), parent.rotation * _structureRotations[part][index]);
+        }
+
+        /// <summary>kind의 독립적으로 선택된 재질을 반환한다. PCB는 재질 선택 대상이 아니므로 null을 반환한다.</summary>
+        public Material GetStructureMaterial(AssemblyStructurePart kind)
+        {
+            return kind == AssemblyStructurePart.Plate ? _customization.PlateMaterial
+                : kind == AssemblyStructurePart.Upper ? UpperMaterial : null;
+        }
+
+        /// <summary>kind의 보강판 또는 상단부에 material을 독립적으로 선택한다. 원본 재질 에셋과 다른 부품 및 설치 상태는 변경하지 않는다.</summary>
+        public bool SetStructureMaterial(AssemblyStructurePart kind, Material material)
+        {
+            if (material == null) return false;
+            if (kind == AssemblyStructurePart.Plate) return _customization.SetPlateMaterial(material);
+            if (kind != AssemblyStructurePart.Upper) return false;
+            SetUpperMaterial(material);
+            return true;
+        }
+
+        /// <summary>kind의 설치 조건과 ray의 하단부 영역을 드롭 직전에 검사한다. 성공한 부품만 정위치에 장착하며 다른 부품은 유지한다.</summary>
+        public bool TryPlaceStructure(AssemblyStructurePart kind, Ray ray)
+        {
+            if (kind == AssemblyStructurePart.Pcb) return TryPlacePcb(ray);
+            if (!CanInstallStructure(kind)) return false;
+            Ray local = new Ray(transform.InverseTransformPoint(ray.origin), transform.InverseTransformVector(ray.direction));
+            Vector3 planePoint = transform.InverseTransformPoint(GetStructurePose(kind, 0).position);
+            if (!new Plane(Vector3.up, planePoint).Raycast(local, out float distance)) return false;
+            Vector3 point = local.GetPoint(distance);
+            if (point.x < _pcbSlotBounds.min.x || point.x > _pcbSlotBounds.max.x
+                || point.z < _pcbSlotBounds.min.z || point.z > _pcbSlotBounds.max.z) return false;
+            return kind == AssemblyStructurePart.Plate ? InstallPlate() : InstallUpper();
+        }
+
+        /// <summary>kind와 parts의 원래 로컬 위치·회전·크기를 최초 초기화에서 저장한다. 실물의 계층과 설치 상태는 변경하지 않는다.</summary>
+        private void CacheStructurePose(AssemblyStructurePart kind, Transform[] parts)
+        {
+            int part = (int)kind;
+            _structureParts[part] = parts;
+            _structurePositions[part] = new Vector3[parts.Length];
+            _structureRotations[part] = new Quaternion[parts.Length];
+            _structureScales[part] = new Vector3[parts.Length];
+            for (int index = 0; index < parts.Length; index++)
+            {
+                _structurePositions[part][index] = parts[index].localPosition;
+                _structureRotations[part][index] = parts[index].localRotation;
+                _structureScales[part][index] = parts[index].localScale;
+            }
+        }
+
+        /// <summary>kind의 원본 실물만 저장된 자세로 되돌린다. 설치 여부에 맞춰 표시하며 재질과 다른 부품 및 조립 진행은 유지한다.</summary>
+        public void RestoreStructurePose(AssemblyStructurePart kind)
+        {
+            int part = (int)kind;
+            bool installed = kind == AssemblyStructurePart.Pcb ? _pcbInstalled
+                : kind == AssemblyStructurePart.Plate ? _plateInstalled : _upperInstalled;
+            for (int index = 0; index < _structureParts[part].Length; index++)
+            {
+                Transform target = _structureParts[part][index];
+                target.SetLocalPositionAndRotation(_structurePositions[part][index], _structureRotations[part][index]);
+                target.localScale = _structureScales[part][index];
+                target.gameObject.SetActive(installed);
+            }
         }
 
         /// <summary>축과 키캡의 점유 상태를 받아 신규 축 설치 조건을 반환한다. PCB 완료를 요구하며 보강판과 상단부는 제한하지 않는다.</summary>

@@ -479,7 +479,7 @@ PrefabInstance:
       value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-      propertyPath: _caseRenderers.Array.data[1]
+      propertyPath: '_caseRenderers.Array.data[1]'
       value: 
       objectReference: {fileID: 9924000200}
     - target: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
@@ -526,6 +526,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7987264179495128253, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.035
+      objectReference: {fileID: 0}
     - target: {fileID: 8851000000000000002, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0.75
@@ -550,10 +554,10 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0.75
       objectReference: {fileID: 0}
-    - target: {fileID: 7987264179495128253, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.035
-      objectReference: {fileID: 0}
+    - target: {fileID: 8853000000000000001, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11268,9 +11272,6 @@ MonoBehaviour:
   _customization: {fileID: 9924000100}
   _installation: {fileID: 9924000101}
   _pcb: {fileID: 9924000102}
-  _screwStartHeight: 0.8
-  _screwDuration: 0.65
-  _screwRotationDegrees: 720
   _screws:
   - {fileID: 9924000103}
   - {fileID: 9924000104}
@@ -11284,6 +11285,9 @@ MonoBehaviour:
   - {fileID: 9924000111}
   - {fileID: 9924000112}
   - {fileID: 9924000113}
+  _screwStartHeight: 0.8
+  _screwDuration: 0.65
+  _screwRotationDegrees: 720
 --- !u!114 &9924000100 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
@@ -11364,6 +11368,11 @@ MeshRenderer:
 --- !u!23 &9924000113 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 5999264866688161344, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9924000200 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8853000000000000001, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
   m_PrefabInstance: {fileID: 72215168}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &7000000000000000101
@@ -11632,11 +11641,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 19.25, y: 0.85, z: 7.4}
   m_Center: {x: 9.25, y: 0.5, z: 2.8}
---- !u!23 &9924000200 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 8853000000000000001, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-  m_PrefabInstance: {fileID: 72215168}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

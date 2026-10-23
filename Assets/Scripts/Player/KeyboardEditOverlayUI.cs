@@ -361,6 +361,8 @@ namespace Game.Player
         {
             if (_catalogLayout != null) _catalogLayout.ResetDrawers(visible);
             SetPickerMode(_catalogLayout == null && visible && _showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
+            if (visible)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "WorkshopOpened");
         }
 
         /// <summary>

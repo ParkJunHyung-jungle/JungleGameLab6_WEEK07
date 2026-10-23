@@ -23,6 +23,7 @@ namespace Game.Tutorials
         PartsCatalog = 17, PartRemoval = 18, PartReplacement = 19,
         PartReturn = 20, PartCompatibility = 21,
         CaseEditing = 22, PlateEditing = 23, PCBEditing = 24, LEDEditing = 25,
+        ScrewAssembly = 27, UpperCaseEditing = 28, AssemblyOrder = 29,
 
         // 전투 안내는 기존 값을 유지한다.
         Battle = 8, Replenishment = 9, Shop = 10, KeycapPurchase = 11, Unlock = 12,
@@ -118,7 +119,12 @@ namespace Game.Tutorials
 
         void Start()
         {
-            if (SceneManager.GetActiveScene().name == "WorkShop2") Request(TutorialTopic.Welcome);
+            if (HasCard(TutorialTopic.AssemblyOrder))
+            {
+                Request(TutorialTopic.Welcome);
+                Request(TutorialTopic.Workbench);
+            }
+            else if (SceneManager.GetActiveScene().name == "WorkShop2") Request(TutorialTopic.Welcome);
             else if (FindFirstObjectByType<TournamentController>() != null) Request(TutorialTopic.Battle);
         }
 
@@ -315,10 +321,85 @@ namespace Game.Tutorials
         /// <summary>observation의 실제 편집 진입과 기능 선택에 맞는 안내를 예약한다. 자동 복원이나 실패 동작은 안내 조건으로 쓰지 않는다.</summary>
         private void HandleCustomization(CustomizationObservation observation)
         {
+            if (HasCard(TutorialTopic.AssemblyOrder))
+            {
+                HandleAssemblyCustomization(observation);
+                return;
+            }
             if (observation.Type == "PartChanged" && observation.Part == "Keycap") Request(TutorialTopic.KeycapEditing);
             if (observation.Type == "PartChanged" && observation.Part == "CustomImage") Request(TutorialTopic.Image);
             if (observation.Type == "CustomizationTestModeChanged" && observation.Element == "AttackEnabled") Request(TutorialTopic.AttackPreview);
             if (observation.Type == "ElementPicked" && observation.KeycapKind == "Artisan") Request(TutorialTopic.Artisan);
+        }
+
+        /// <summary>
+        /// topic 카드가 현재 연결된 콘텐츠에 등록되어 있는지 반환한다.
+        /// 다른 콘텐츠에서 제공하지 않는 조립 안내를 요청하지 않도록 데이터 존재 여부만 검사한다.
+        /// </summary>
+        private bool HasCard(TutorialTopic topic)
+        {
+            foreach (TutorialCard card in Cards)
+                if (card.Topic == topic) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 현재 콘텐츠에 등록된 topic만 첫 조우 안내 대기열에 추가한다.
+        /// 이미 열람했거나 예약된 안내는 기존 Request 정책에 따라 중복 표시하지 않는다.
+        /// </summary>
+        private void RequestAvailable(TutorialTopic topic)
+        {
+            if (HasCard(topic)) Request(topic);
+        }
+
+        /// <summary>
+        /// observation의 작업 모드 진입과 부품별 실제 조작에 맞는 조립 안내를 예약한다.
+        /// 성공 여부와 실패 원인을 구분하며 부품이나 씬 상태는 변경하지 않는다.
+        /// </summary>
+        private void HandleAssemblyCustomization(CustomizationObservation observation)
+        {
+            if (observation.Type == "WorkshopOpened")
+            {
+                RequestAvailable(TutorialTopic.EditControls);
+                RequestAvailable(TutorialTopic.AssemblyOrder);
+                RequestAvailable(TutorialTopic.PartsCatalog);
+            }
+            if (observation.Type == "PartChanged" && !string.IsNullOrEmpty(observation.Part))
+            {
+                RequestAvailable(TutorialTopic.PartsCatalog);
+                switch (observation.Part)
+                {
+                    case "Lower": case "Case": RequestAvailable(TutorialTopic.CaseEditing); break;
+                    case "Pcb":
+                        RequestAvailable(TutorialTopic.PCBEditing);
+                        RequestAvailable(TutorialTopic.ScrewAssembly);
+                        break;
+                    case "Plate": RequestAvailable(TutorialTopic.PlateEditing); break;
+                    case "Upper": RequestAvailable(TutorialTopic.UpperCaseEditing); break;
+                    case "Switch": RequestAvailable(TutorialTopic.AssemblySwitch); break;
+                    case "Keycap": RequestAvailable(TutorialTopic.KeycapEditing); break;
+                    case "LED": RequestAvailable(TutorialTopic.LEDEditing); break;
+                    case "CustomImage": RequestAvailable(TutorialTopic.Image); break;
+                }
+            }
+            if (observation.Type == "ToolPickedUp") RequestAvailable(TutorialTopic.KeycapPuller);
+            if (observation.Type == "BulkPlacementStarted") RequestAvailable(TutorialTopic.WholePart);
+            if ((observation.Type == "InventoryPartPicked" || observation.Type == "ElementPicked")
+                && observation.KeycapKind == "Artisan") RequestAvailable(TutorialTopic.Artisan);
+            if (observation.Type == "ScrewChanged" || observation.Type == "PartInstallAttempted"
+                && observation.Success && observation.Part == "Pcb") RequestAvailable(TutorialTopic.ScrewAssembly);
+            if (observation.Type == "PartRemoveAttempted" && observation.Success)
+            {
+                RequestAvailable(TutorialTopic.PartRemoval);
+                RequestAvailable(TutorialTopic.PartReplacement);
+                RequestAvailable(TutorialTopic.PartReturn);
+            }
+            if (observation.Type == "PartReturned" && observation.Success) RequestAvailable(TutorialTopic.PartReturn);
+            if ((observation.Type == "PartInstallAttempted" || observation.Type == "PartRemoveAttempted")
+                && !observation.Success && !string.IsNullOrEmpty(observation.OutcomeReason))
+                RequestAvailable(TutorialTopic.PartCompatibility);
+            if (observation.Type == "CustomizationTestModeChanged" && observation.Element == "AttackEnabled")
+                RequestAvailable(TutorialTopic.AttackPreview);
         }
 
         /// <summary>source 상점의 open 상태를 받아 첫 상점 진입을 안내한다. 종료 통지는 안내를 만들지 않는다.</summary>

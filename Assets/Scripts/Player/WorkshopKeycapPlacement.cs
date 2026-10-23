@@ -84,6 +84,7 @@ namespace Game.Player
 
         void Update()
         {
+            if (_pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured) return;
             foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging;
             foreach (KeyboardEditButton button in _bulkPlacementButtons) button.interactable = !IsDragging;
             if (!_pullers.InputAllowed || Mouse.current == null)
@@ -589,7 +590,8 @@ namespace Game.Player
         /// <summary>현재 카드의 entry가 출고 가능한지 반환한다. 배치 입력과 같은 수량 및 드래그 조건만 읽는다.</summary>
         public bool CanBeginInventoryDrag(AssemblyCatalogEntry entry)
         {
-            return _pullers.InputAllowed && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0;
+            return _pullers.InputAllowed && !_pullers.IsPcbDragging && !_pullers.IsScrewPointerCaptured
+                && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0;
         }
 
         /// <summary>state에 현재 부품 드래그나 바닥 부품 집기의 실행 가능한 조작을 추가한다. 포인터는 공통 커서를 사용한다.</summary>

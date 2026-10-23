@@ -476,8 +476,12 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: _caseRenderers.Array.size
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: _caseRenderers.Array.data[1]
+      value: 
+      objectReference: {fileID: 9924000200}
     - target: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: m_Name
       value: Keyboard_Enhanced
@@ -521,6 +525,34 @@ PrefabInstance:
     - target: {fileID: 6484209102016570918, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8851000000000000002, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 8851000000000000012, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 8851000000000000022, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 8851000000000000032, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 8851000000000000042, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 8851000000000000052, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 7987264179495128253, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.035
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1609,6 +1641,8 @@ MonoBehaviour:
   _keycapPuller: {fileID: 989276903}
   _switchPuller: {fileID: 686529946}
   _keycapPlacement: {fileID: 2019032720}
+  _hoverOutlineMaterial: {fileID: 0}
+  _hoverDepthShader: {fileID: 0}
   _heightOffset: 0.2
   _returnDelay: 2
 --- !u!4 &500387866
@@ -9489,7 +9523,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e02df7475f546d197008fbd0d8de997, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardEditOverlayUI
-  _assemblyCatalog: 0
+  _assemblyCatalog: 1
+  _pcbOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
+  _pcbDepthShader: {fileID: 4800000, guid: c15e67eed99449a2a286129ff6aa137e, type: 3}
   _keycapButton: {fileID: 9911000091}
   _switchAxisButton: {fileID: 9911000092}
   _ledButton: {fileID: 9911000093}
@@ -11229,14 +11265,107 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10d79e55c3144010a0d2aea6e26ff0f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.KeyboardAssemblyState
-  _customization: {fileID: 0}
-  _installation: {fileID: 0}
-  _lower: {fileID: 0}
-  _pcb: {fileID: 0}
-  _screws: []
-  _plate: {fileID: 0}
-  _upper: []
-  _upperRenderers: []
+  _customization: {fileID: 9924000100}
+  _installation: {fileID: 9924000101}
+  _pcb: {fileID: 9924000102}
+  _screwStartHeight: 0.8
+  _screwDuration: 0.65
+  _screwRotationDegrees: 720
+  _screws:
+  - {fileID: 9924000103}
+  - {fileID: 9924000104}
+  - {fileID: 9924000105}
+  - {fileID: 9924000106}
+  - {fileID: 9924000107}
+  - {fileID: 9924000108}
+  _upperRenderers:
+  - {fileID: 9924000109}
+  - {fileID: 9924000110}
+  - {fileID: 9924000111}
+  - {fileID: 9924000112}
+  - {fileID: 9924000113}
+--- !u!114 &9924000100 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000700}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f972d9568538a3b4180eadd677f5a94f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardCustomization
+--- !u!114 &9924000101 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 16919128326509319, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000700}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c024d23aded89c14e976d8b93dbd263c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardPartInstallation
+--- !u!4 &9924000102 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7987264179495128253, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9924000103 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8851000000000000002, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9924000104 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8851000000000000012, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9924000105 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8851000000000000022, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9924000106 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8851000000000000032, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9924000107 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8851000000000000042, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9924000108 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8851000000000000052, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9924000109 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8852000000000000004, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9924000110 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8780478049414863374, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9924000111 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4131874619408227893, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9924000112 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 903760536120378401, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9924000113 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 5999264866688161344, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &7000000000000000101
 GameObject:
   m_ObjectHideFlags: 0
@@ -11503,6 +11632,11 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 19.25, y: 0.85, z: 7.4}
   m_Center: {x: 9.25, y: 0.5, z: 2.8}
+--- !u!23 &9924000200 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8853000000000000001, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+  m_PrefabInstance: {fileID: 72215168}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

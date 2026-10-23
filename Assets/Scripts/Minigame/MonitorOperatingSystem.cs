@@ -23,6 +23,7 @@ namespace Game.Player
 
         [Header("App Window")]
         [SerializeField] private GameObject _window;
+        [SerializeField] private Image _windowIcon;
         [SerializeField] private Text _windowTitle;
         [SerializeField] private Text _taskbarTitle;
         [SerializeField] private MonitorOSButton _closeButton;
@@ -98,6 +99,11 @@ namespace Game.Player
             _window.SetActive(running);
             _windowTitle.text = running ? game.DisplayName : "";
             _taskbarTitle.text = running ? game.DisplayName : "아이콘을 더블클릭하여 실행하세요";
+            if (_windowIcon != null)
+            {
+                _windowIcon.sprite = running && game.Definition != null ? game.Definition.Icon : null;
+                _windowIcon.enabled = running && _windowIcon.sprite != null;
+            }
         }
 
         /// <summary>focused로 모니터 UI의 클릭 허용 여부를 변경한다. 바탕화면과 연결된 씬 카메라는 유지한다.</summary>

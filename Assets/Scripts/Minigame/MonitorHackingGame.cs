@@ -10,8 +10,7 @@ namespace Game.Player
 {
     public sealed class MonitorHackingGame : MonitorMiniGame
     {
-        private const int MAX_LOG_LINES = 9;
-        private const int PROGRESS_BAR_LENGTH = 24;
+        private const int MAX_LOG_LINES = 12;
 
         private static readonly Key[] BYPASS_KEYS = new[] { Key.Space, Key.Enter, Key.Tab };
         private static readonly string[] STAGE_NAMES = new[] { "FIREWALL PORT 80", "SECURITY GATEWAY", "CORE MAINFRAME" };
@@ -31,6 +30,13 @@ namespace Game.Player
         [SerializeField] private Text _terminalLogLabel;
         [SerializeField] private Text _actionPromptLabel;
         [SerializeField] private Text _statsLabel;
+
+        [Header("Enhanced UI")]
+        [SerializeField] private Image _progressBarFill;
+        [SerializeField] private Text _progressPercentText;
+        [SerializeField] private Image _promptBoxBg;
+        [SerializeField] private Text _targetHostLabel;
+        [SerializeField] private Text _stageBadgeLabel;
 
         [Header("State")]
         private Phase _phase;
@@ -63,8 +69,8 @@ namespace Game.Player
         {
             if (Definition is MonitorHackingGameDefinition hackingDef)
             {
-                _totalStages = hackingDef.TotalStages;
-                _requiredKeystrokes = hackingDef.KeystrokesPerStage;
+                _totalStages = Mathf.Max(1, hackingDef.TotalStages);
+                _requiredKeystrokes = Mathf.Max(10, hackingDef.KeystrokesPerStage);
             }
 
             if (_statsLabel != null)
@@ -269,6 +275,17 @@ namespace Game.Player
                 _stageLabel.text = $"TARGET: [{stageName}] - LAYER {_currentStage + 1} / {_totalStages}";
             }
 
+            if (_targetHostLabel != null)
+            {
+                _targetHostLabel.text = "<color=#39FF14>● LIVE</color>  HOST: 192.168.0.254  [SECURITY MAINFRAME]";
+            }
+
+            if (_stageBadgeLabel != null)
+            {
+                string stageName = _currentStage < STAGE_NAMES.Length ? STAGE_NAMES[_currentStage] : "CORE SYSTEM";
+                _stageBadgeLabel.text = $"LAYER {_currentStage + 1} / {_totalStages} : {stageName}";
+            }
+
             RefreshProgressBar();
             RefreshTerminalLog();
             RefreshPrompt();
@@ -276,27 +293,29 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 스테이지의 타수 진행도를 블록 형태의 텍스트 프로그레스 바로 변환하여 표시한다.
-        /// _stageKeystrokes와 _requiredKeystrokes를 사용하여 _progressBarLabel을 변경한다.
+        /// 현재 스테이지의 타수 진행도를 그래픽 게이지 바 및 수치 퍼센트로 변환하여 표시한다.
+        /// _stageKeystrokes와 _requiredKeystrokes를 사용하여 프로그레스 바와 퍼센트 텍스트를 갱신한다.
         /// </summary>
         private void RefreshProgressBar()
         {
-            if (_progressBarLabel == null) return;
-
             float ratio = _requiredKeystrokes > 0 ? Mathf.Clamp01((float)_stageKeystrokes / _requiredKeystrokes) : 0f;
             if (_phase == Phase.Success) ratio = 1f;
 
-            int filled = Mathf.RoundToInt(ratio * PROGRESS_BAR_LENGTH);
-            int empty = PROGRESS_BAR_LENGTH - filled;
+            if (_progressBarFill != null)
+            {
+                _progressBarFill.fillAmount = ratio;
+                RectTransform fillRect = _progressBarFill.rectTransform;
+                fillRect.pivot = new Vector2(0f, 0.5f);
+                fillRect.anchorMin = new Vector2(0f, 0f);
+                fillRect.anchorMax = new Vector2(ratio, 1f);
+                fillRect.anchoredPosition = Vector2.zero;
+                fillRect.sizeDelta = Vector2.zero;
+            }
 
-            _stringBuilder.Clear();
-            _stringBuilder.Append("BREACH: [<color=#39FF14>");
-            for (int i = 0; i < filled; i++) _stringBuilder.Append('#');
-            _stringBuilder.Append("</color><color=#224433>");
-            for (int i = 0; i < empty; i++) _stringBuilder.Append('-');
-            _stringBuilder.Append($"</color>] {Mathf.RoundToInt(ratio * 100f)}%");
-
-            _progressBarLabel.text = _stringBuilder.ToString();
+            if (_progressPercentText != null)
+            {
+                _progressPercentText.text = $"{Mathf.RoundToInt(ratio * 100f)}%  [ {_stageKeystrokes} / {_requiredKeystrokes} ]";
+            }
         }
 
         /// <summary>
@@ -326,12 +345,18 @@ namespace Game.Player
             switch (_phase)
             {
                 case Phase.BruteForce:
-                    _actionPromptLabel.text = _promptBlinkVisible ? "<color=#39FF14>>> RAPID FIRE ANY KEY TO INFILTRATE <<</color>" : "";
+                    if (_promptBoxBg != null)
+                        _promptBoxBg.color = new Color(0.04f, 0.16f, 0.12f, 0.85f);
+                    _actionPromptLabel.text = _promptBlinkVisible ? "<color=#39FF14>>> MASH KEYBOARD TO INJECT PAYLOAD <<</color>" : "";
                     break;
                 case Phase.Bypass:
-                    _actionPromptLabel.text = _promptBlinkVisible ? $"<color=#FF3366>>> [CRITICAL] STRIKE [{_currentBypassKey}] TO OVERRIDE! <<</color>" : "";
+                    if (_promptBoxBg != null)
+                        _promptBoxBg.color = _promptBlinkVisible ? new Color(0.38f, 0.05f, 0.10f, 0.95f) : new Color(0.20f, 0.03f, 0.05f, 0.95f);
+                    _actionPromptLabel.text = _promptBlinkVisible ? $"<color=#FFD700>>> [CRITICAL] HIT [{_currentBypassKey}] TO OVERRIDE! <<</color>" : "";
                     break;
                 case Phase.Success:
+                    if (_promptBoxBg != null)
+                        _promptBoxBg.color = new Color(0.06f, 0.24f, 0.14f, 0.95f);
                     _actionPromptLabel.text = "<color=#39FF14>>> [ ACCESS GRANTED ] PRESS [SPACE] TO REPLAY <<</color>";
                     break;
                 default:

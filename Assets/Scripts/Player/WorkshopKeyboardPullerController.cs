@@ -33,6 +33,7 @@ namespace Game.Player
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
         private readonly List<GameObject> _fragments = new List<GameObject>();
         private KeyboardInputController _editingKeyboard;
+        private KeyboardEditOverlayUI _editOverlay;
         private float _dragWorldHeight;
         private bool _pcbDragging;
         private bool _screwPointerCaptured;
@@ -75,6 +76,7 @@ namespace Game.Player
 
         void Awake()
         {
+            if (_keycapPlacement != null) _editOverlay = _keycapPlacement.GetComponent<KeyboardEditOverlayUI>();
             _keycapPuller.SetContext(this, true);
             _switchPuller.SetContext(this, true);
             if (_hoverOutlineMaterial != null && _hoverDepthShader != null)
@@ -91,7 +93,8 @@ namespace Game.Player
         void LateUpdate()
         {
             if (_keycapHoverPreview == null || !Application.isFocused || !InputAllowed
-                || IsManipulatingPart || IsPointerOverUI(InGameCursor.Position))
+                || IsManipulatingPart || (_editOverlay != null && _editOverlay.IsPaintMode)
+                || IsPointerOverUI(InGameCursor.Position))
                 return;
 
             Physics.SyncTransforms();
@@ -134,6 +137,7 @@ namespace Game.Player
                 UpdateDragHeight();
             }
             if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
+            if (_editOverlay != null && _editOverlay.IsPaintMode) return;
             if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && _keycapPlacement.IsDragging) return;
             Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);

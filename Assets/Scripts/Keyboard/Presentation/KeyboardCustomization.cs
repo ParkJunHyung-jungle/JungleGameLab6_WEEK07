@@ -91,6 +91,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     private MeshRenderer[] _keycapSlotShells;
     private MeshRenderer[] _switchSlotShells;
     private KeyboardImageCustomization _imageCustomization;
+    private KeyboardKeycapPaint _keycapPaint;
     private readonly Dictionary<Transform, Material> _keycapMaterialOverrides = new Dictionary<Transform, Material>();
     private KeycapMaterialPreviewSnapshot _keycapMaterialPreviewSnapshot;
     private readonly Dictionary<Transform, KeycapModelAppearance> _keycapModels = new Dictionary<Transform, KeycapModelAppearance>();
@@ -117,6 +118,31 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     {
         if (_keycaps == null) CacheKeycaps();
         return _keycaps[index];
+    }
+
+    /// <summary>
+    /// index에 해당하는 키캡 외피 렌더러를 반환한다.
+    /// 캐시된 키캡 순서를 사용하며 색칠 위치와 표시 대상을 연결한다.
+    /// </summary>
+    public MeshRenderer GetKeycapShellRenderer(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return _keycapSlotShells[index];
+    }
+
+    /// <summary>
+    /// 현재 키보드 인스턴스의 색칠 컴포넌트를 준비해 반환한다.
+    /// 키캡 외피만 연결하며 칠한 내용은 변경하지 않는다.
+    /// </summary>
+    public KeyboardKeycapPaint GetKeycapPaint()
+    {
+        if (_keycapPaint == null)
+        {
+            _keycapPaint = GetComponent<KeyboardKeycapPaint>();
+            if (_keycapPaint == null) _keycapPaint = gameObject.AddComponent<KeyboardKeycapPaint>();
+        }
+        _keycapPaint.Initialize(this);
+        return _keycapPaint;
     }
 
     /// <summary>
@@ -605,6 +631,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
             {
                 state.ImageState.KeycapImages[missingKey] = -1;
                 state.ImageState.IndividualImages[missingKey] = false;
+                if (state.PaintState != null) state.PaintState.KeycapPaint[missingKey] = null;
                 int defaultIndex = Array.IndexOf(defaults.RendererPaths, state.RendererPaths[index]);
                 counts[index] = defaults.SlotCounts[defaultIndex];
                 int start = defaultOffsets[state.RendererPaths[index]];
@@ -643,7 +670,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         return new KeyboardCustomizationState(state.LedEnabled, state.LedColor, state.LedIntensity, state.Selection,
             state.CatalogIds, state.RendererPaths, counts, materials.ToArray(), state.SwitchTypes, state.PlateType,
             state.LedPattern, state.LedSpeed, state.ImageState, state.PlateMaterialId, state.PlateEffect,
-            state.KeycapInstalled, state.SwitchInstalled, state.KeycapKeys, state.KeycapDefinitionIds);
+            state.KeycapInstalled, state.SwitchInstalled, state.KeycapKeys, state.KeycapDefinitionIds, state.PaintState);
     }
 
     /// <summary>
@@ -829,7 +856,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
             _plateType, _ledPattern, _ledSpeed,
             GetImageCustomization().CaptureState(),
             plateMaterialIndex >= 0 ? materialIds[plateMaterialIndex] : null, _plateEffect,
-            keycapInstalled, switchInstalled, keycapKeys, keycapIds);
+            keycapInstalled, switchInstalled, keycapKeys, keycapIds, GetKeycapPaint().CaptureState());
     }
 
     /// <summary>
@@ -840,7 +867,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         IReadOnlyList<Game.Tournament.KeycapDefinition> keycapDefinitions = null)
     {
         if (_keycaps == null) CacheKeycaps();
-        if (state == null || (state.Version < 1 || state.Version > 6) || state.Selection == null || state.Selection.Length != 4 ||
+        if (state == null || (state.Version < 1 || state.Version > 7) || state.Selection == null || state.Selection.Length != 4 ||
             state.CatalogIds == null || state.RendererPaths == null || state.SlotCounts == null ||
             state.MaterialIndices == null || state.SwitchTypes == null || catalog.Length != materialIds.Length)
             throw new InvalidOperationException("Save data is invalid or unsupported.");
@@ -918,6 +945,8 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
 
         KeyboardImageCustomization images = GetImageCustomization();
         Texture2D[] preparedImages = images.PrepareState(state.ImageState);
+        KeyboardKeycapPaint paint = GetKeycapPaint();
+        Texture2D[] preparedPaint = paint.PrepareState(state.PaintState);
         if (_partInstallation != null) _partInstallation.CancelAll();
         images.ClearKeycapImage();
         images.ClearCaseImage();
@@ -962,6 +991,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
 
         RememberKeycapMaterialOverrides();
         images.RestoreState(state.ImageState, preparedImages);
+        paint.RestoreState(preparedPaint);
 
         for (int index = 0; index < _switches.Length; index++)
             _switches[index].gameObject.SetActive(!state.HasInstallationState || state.SwitchInstalled[index]);
@@ -1784,6 +1814,8 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         if (definition != null) _keycapPartDefinitions[keycap] = definition;
         else _keycapPartDefinitions.Remove(keycap);
         appearance.Apply(definition);
+        if (_keycapPaint != null && _keycaps != null)
+            _keycapPaint.RefreshKeycap(Array.IndexOf(_keycaps, keycap));
         KeycapDefinitionChanged?.Invoke();
     }
 

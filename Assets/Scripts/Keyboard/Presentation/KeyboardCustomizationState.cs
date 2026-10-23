@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 [Serializable]
 public sealed class KeyboardCustomizationState
 {
-    [SerializeField] private int _version = 6;
+    [SerializeField] private int _version = 7;
     [SerializeField] private bool _ledEnabled;
     [SerializeField] private Color _ledColor;
     [SerializeField] private float _ledIntensity;
@@ -27,12 +27,15 @@ public sealed class KeyboardCustomizationState
 
     [SerializeField] private Key[] _keycapKeys;
     [SerializeField] private string[] _keycapDefinitionIds;
+    [SerializeField] private KeyboardPaintState _paintState;
 
     // 개발 중 사용한 SO 전용 버전 5도 보유 필드로 구분해 읽는다.
-    public bool HasKeycapDefinitions => _version >= 6 || (_version == 5 && (_keycapKeys != null || _keycapDefinitionIds != null));
+    public bool HasKeycapDefinitions => _version == 6
+        || (_version >= 5 && (_keycapKeys != null || _keycapDefinitionIds != null));
     public bool HasInstallationState => _version >= 6 || (_version == 5 && (_keycapInstalled != null || _switchInstalled != null));
     public Key[] KeycapKeys => _keycapKeys;
     public string[] KeycapDefinitionIds => _keycapDefinitionIds;
+    public KeyboardPaintState PaintState => _version >= 7 ? _paintState : null;
     public int Version => _version;
     public bool LedEnabled => _ledEnabled;
     public Color LedColor => _ledColor;
@@ -61,11 +64,12 @@ public sealed class KeyboardCustomizationState
         SwitchType[] switchTypes, PlateType plateType, LEDPattern ledPattern = LEDPattern.Static, float ledSpeed = 1f,
         KeyboardImageState imageState = null, string plateMaterialId = null, PlateEffect plateEffect = PlateEffect.None,
         bool[] keycapInstalled = null, bool[] switchInstalled = null,
-        Key[] keycapKeys = null, string[] keycapDefinitionIds = null)
+        Key[] keycapKeys = null, string[] keycapDefinitionIds = null, KeyboardPaintState paintState = null)
     {
-        _version = keycapKeys != null || keycapDefinitionIds != null ? 6 : 5;
+        _version = paintState != null ? 7 : keycapKeys != null || keycapDefinitionIds != null ? 6 : 5;
         _keycapKeys = keycapKeys;
         _keycapDefinitionIds = keycapDefinitionIds;
+        _paintState = paintState;
         _ledEnabled = ledEnabled;
         _ledColor = ledColor;
         _ledIntensity = ledIntensity;

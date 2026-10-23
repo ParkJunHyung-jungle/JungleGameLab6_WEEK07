@@ -25,7 +25,8 @@ namespace Game.Player
             Photo,
             Chevron,
             Check,
-            Dot
+            Dot,
+            Paint
         }
 
         /// <summary>
@@ -39,6 +40,16 @@ namespace Game.Player
                 return;
 
             _kind = kind;
+            SetVerticesDirty();
+        }
+
+        /// <summary>
+        /// 이미지 버튼을 복제한 색칠 버튼의 아이콘을 붓 모양으로 바꾼다.
+        /// 기존 선택 표시와 나머지 버튼 아이콘은 변경하지 않는다.
+        /// </summary>
+        public void SetPaintIcon()
+        {
+            _kind = IconKind.Paint;
             SetVerticesDirty();
         }
 
@@ -93,6 +104,10 @@ namespace Game.Player
                     DrawRectangle(helper, 3f, 4f, 18f, 16f, 2f);
                     DrawRectangle(helper, 6f, 7f, 4f, 4f, 2f);
                     DrawPath(helper, 4, 18, 9, 13, 13, 16, 17, 11, 20, 15);
+                    break;
+                case IconKind.Paint:
+                    DrawPath(helper, 5, 19, 8, 16, 16, 5, 19, 8, 11, 19, 5, 19);
+                    DrawPath(helper, 8, 16, 11, 19);
                     break;
                 case IconKind.Chevron:
                     DrawPath(helper, 9, 6, 15, 12, 9, 18);

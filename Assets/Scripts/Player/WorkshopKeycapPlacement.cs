@@ -39,6 +39,7 @@ namespace Game.Player
         private RectTransform _canvasRect;
         private RawImage _dragIcon;
         private WorkshopDragPreviewRenderer _previewRenderer;
+        private KeyboardEditOverlayUI _editOverlay;
         private readonly List<KeyboardEditButton> _singlePlacementButtons = new List<KeyboardEditButton>();
         private readonly List<KeyboardEditButton> _bulkPlacementButtons = new List<KeyboardEditButton>();
         private bool _bulkPlacement;
@@ -66,7 +67,8 @@ namespace Game.Player
 
         void Start()
         {
-            GetComponent<KeyboardEditOverlayUI>().ConnectKeycapPlacement(this);
+            _editOverlay = GetComponent<KeyboardEditOverlayUI>();
+            _editOverlay.ConnectKeycapPlacement(this);
             _canvasRect = (RectTransform)GetComponentInParent<Canvas>().transform;
             _dragIcon = new GameObject("WorkshopKeycapDragIcon", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
             _dragIcon.transform.SetParent(_canvasRect, false);
@@ -88,6 +90,11 @@ namespace Game.Player
             foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging;
             foreach (KeyboardEditButton button in _bulkPlacementButtons) button.interactable = !IsDragging;
             if (!_pullers.InputAllowed || Mouse.current == null)
+            {
+                CancelDrag();
+                return;
+            }
+            if (_editOverlay.IsPaintMode)
             {
                 CancelDrag();
                 return;

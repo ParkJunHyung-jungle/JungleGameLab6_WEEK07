@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 
@@ -46,6 +47,7 @@ namespace Game.Player
         [SerializeField] private KeyboardEditButton _caseButton;
         [SerializeField] private KeyboardEditButton _plateButton;
         [SerializeField] private KeyboardEditButton _customButton;
+        private KeyboardEditButton _paintButton;
         [SerializeField] private bool _showKeycapsOnOpen;
         [SerializeField] private WorkshopKeyboardPullerController _pullerController;
 
@@ -132,6 +134,14 @@ namespace Game.Player
         private KeyboardCustomization _ledCustomization;
         private KeyboardLEDPanelUI _ledUI;
 
+        [Header("Keycap Paint")]
+        private KeyboardPaintPanelUI _paintUI;
+        private bool _paintStrokeActive;
+        private Vector2 _previousPaintPosition;
+        private Image _paintCursor;
+        private Texture2D _paintCursorTexture;
+        private Sprite _paintCursorSprite;
+
         public event Action<SwitchType> SwitchSoundSelected;
         public event Action<Material> CaseMaterialSelected;
         public event Action<Material> PlateMaterialSelected;
@@ -154,8 +164,11 @@ namespace Game.Player
             Photo,
             Led,
             Pcb,
-            Upper
+            Upper,
+            Paint
         }
+
+        public bool IsPaintMode => isActiveAndEnabled && _pickerMode == PickerMode.Paint;
 
         void Awake()
         {
@@ -187,6 +200,19 @@ namespace Game.Player
             _ledUI = ledPanel.AddComponent<KeyboardLEDPanelUI>();
             _ledUI.Initialize();
             if (_assemblyCatalog) BuildAssemblyControls();
+            CreatePaintTab();
+            if (_assemblyCatalog)
+            {
+                RectTransform sidebar = (RectTransform)_caseButton.transform.parent;
+                sidebar.sizeDelta = new Vector2(sidebar.sizeDelta.x, Mathf.Max(sidebar.sizeDelta.y, 416f));
+            }
+            GameObject paintPanel = new GameObject("PaintCustomizationPanel", typeof(RectTransform));
+            paintPanel.transform.SetParent(transform, false);
+            paintPanel.SetActive(false);
+            _paintUI = paintPanel.AddComponent<KeyboardPaintPanelUI>();
+            _paintUI.Initialize(_pickerSprite);
+            _paintUI.ClearAllRequested += HandlePaintClearAllRequested;
+            CreatePaintCursor();
         }
 
         void LateUpdate()
@@ -203,6 +229,11 @@ namespace Game.Player
             _appliedPhotoWheelZoomSensitivity = sensitivity;
         }
 
+        void Update()
+        {
+            UpdatePaintInput();
+        }
+
         void OnEnable()
         {
             CreateCaseMaterialPicker();
@@ -213,6 +244,7 @@ namespace Game.Player
             _caseButton.Clicked += HandleCategoryClicked;
             _plateButton.Clicked += HandleCategoryClicked;
             _customButton.Clicked += HandleCategoryClicked;
+            _paintButton.Clicked += HandleCategoryClicked;
             _generalModeButton.Clicked += HandleGeneralModeClicked;
             _attackModeButton.Clicked += HandleAttackModeClicked;
             foreach (KeyboardEditButton button in _previewButtons)
@@ -244,6 +276,7 @@ namespace Game.Player
             _caseButton.Clicked -= HandleCategoryClicked;
             _plateButton.Clicked -= HandleCategoryClicked;
             _customButton.Clicked -= HandleCategoryClicked;
+            _paintButton.Clicked -= HandleCategoryClicked;
             _generalModeButton.Clicked -= HandleGeneralModeClicked;
             _attackModeButton.Clicked -= HandleAttackModeClicked;
             foreach (KeyboardEditButton button in _previewButtons)
@@ -275,6 +308,9 @@ namespace Game.Player
             _keycapUI.KeyInputCaptured -= HandleKeycapKeyInputCaptured;
             _keycapUI.UndoRequested -= HandleKeycapUndoRequested;
             _keycapUI.ApplyRequested -= HandleKeycapApplyRequested;
+            _paintUI.ClearAllRequested -= HandlePaintClearAllRequested;
+            if (_paintCursorSprite != null) Destroy(_paintCursorSprite);
+            if (_paintCursorTexture != null) Destroy(_paintCursorTexture);
             DestroyPreviewTextures(_previewTextures);
             DestroyPreviewTextures(_casePreviewTextures);
             DestroyPreviewTextures(_platePreviewTextures);
@@ -295,7 +331,8 @@ namespace Game.Player
                 && !ContainsPointer(_plateViewport, eventData.position)
                 && !_photoUI.IsPointerOverUI(eventData.position)
                 && !_keycapUI.IsPointerOverUI(eventData.position)
-                && !_ledUI.IsPointerOverUI(eventData.position))
+                && !_ledUI.IsPointerOverUI(eventData.position)
+                && !_paintUI.IsPointerOverUI(eventData.position))
             {
                 SetPickerMode(PickerMode.None);
             }
@@ -681,6 +718,7 @@ namespace Game.Player
             PickerMode.Pcb => "PCB 조립",
             PickerMode.Upper => "상단부 재질",
             PickerMode.Photo => "이미지 편집",
+            PickerMode.Paint => "키캡 색칠",
             PickerMode.Led => "LED 편집",
             _ => "키보드 편집"
         };
@@ -714,7 +752,8 @@ namespace Game.Player
                 || ContainsPointer(_caseMaterialViewport, screenPosition)
                 || ContainsPointer(_plateViewport, screenPosition)
                 || _photoUI.IsPointerOverUI(screenPosition)
-                || _ledUI.IsPointerOverUI(screenPosition);
+                || _ledUI.IsPointerOverUI(screenPosition)
+                || _paintUI.IsPointerOverUI(screenPosition);
         }
 
         /// <summary>
@@ -738,6 +777,8 @@ namespace Game.Player
                 mode = PickerMode.Plate;
             else if (button == _customButton)
                 mode = PickerMode.Photo;
+            else if (button == _paintButton)
+                mode = PickerMode.Paint;
             else if (button == _ledButton)
                 mode = PickerMode.Led;
             Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartAccess", GetLogPart(mode),
@@ -2167,6 +2208,7 @@ namespace Game.Player
             _caseButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.CaseMaterial);
             _plateButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Plate);
             _customButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Photo);
+            _paintButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Paint);
             if (_viewport != null)
             {
                 _viewport.gameObject.SetActive(_pickerMode == PickerMode.Keycap);
@@ -2187,6 +2229,12 @@ namespace Game.Player
                 _photoUI.HideEmbedded();
             if (_pickerMode != PickerMode.Led)
                 _ledUI.Close();
+            if (_pickerMode != PickerMode.Paint)
+            {
+                _paintUI.Close();
+                _paintStrokeActive = false;
+                _paintCursor.enabled = false;
+            }
             if (_pickerMode == PickerMode.Photo)
                 _photoUI.BeginCustomization();
             if (_pickerMode == PickerMode.Keycap && _keycapPlacement == null)
@@ -2197,10 +2245,146 @@ namespace Game.Player
             }
             if (_pickerMode == PickerMode.Led)
                 _ledUI.Open(_ledCustomization);
+            if (_pickerMode == PickerMode.Paint)
+                _paintUI.Open();
             if (_assemblyCatalog) RefreshAssemblyControls();
             if (previous != _pickerMode)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode),
                     previous: GetLogPart(previous));
+        }
+
+        /// <summary>
+        /// 이미지 탭을 복제해 바로 아래에 색칠 탭을 배치한다.
+        /// 기존 사이드바 모양을 유지하고 버튼의 이름, 문구와 아이콘을 색칠용으로 변경한다.
+        /// </summary>
+        private void CreatePaintTab()
+        {
+            _paintButton = Instantiate(_customButton, _customButton.transform.parent);
+            _paintButton.name = "PaintButton";
+            _paintButton.transform.SetSiblingIndex(_customButton.transform.GetSiblingIndex() + 1);
+            RectTransform rect = (RectTransform)_paintButton.transform;
+            rect.anchoredPosition = ((RectTransform)_customButton.transform).anchoredPosition + Vector2.down * 44f;
+            Text label = _paintButton.GetComponentInChildren<Text>();
+            label.text = "색칠";
+            foreach (KeyboardEditSidebarIcon icon in _paintButton.GetComponentsInChildren<KeyboardEditSidebarIcon>())
+                if (icon.name == "SidebarIcon") icon.SetPaintIcon();
+            _keyboardEditPanel.sizeDelta += new Vector2(0f, 44f);
+        }
+
+        /// <summary>
+        /// 색칠 모드의 마우스 입력을 표면 광선으로 바꿔 붓 또는 페인트 통에 전달한다.
+        /// 마우스를 누른 채 이동한 경로를 보간하고 커서의 원형 붓 크기를 갱신한다.
+        /// </summary>
+        private void UpdatePaintInput()
+        {
+            if (_pickerMode != PickerMode.Paint || Mouse.current == null || _photoStorage.Customization == null
+                || Game.Tutorials.FirstEncounterTutorial.IsBlocking
+                || Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
+                || !InGameCursor.CanProcessVirtualPointer)
+            {
+                _paintCursor.enabled = false;
+                _paintStrokeActive = false;
+                return;
+            }
+            Camera camera = _pullerController != null ? _pullerController.InputCamera : Camera.main;
+            if (camera == null) return;
+            Vector2 position = InGameCursor.Position;
+            bool overUI = IsPointerOverUI(position);
+            KeyboardKeycapPaint paint = _photoStorage.Customization.GetKeycapPaint();
+            int keycapIndex = -1;
+            Vector3 point = Vector3.zero;
+            bool hit = !overUI && paint.TryHit(camera.ScreenPointToRay(position), out keycapIndex, out point);
+            _paintCursor.enabled = hit && _paintUI.Tool != KeyboardPaintPanelUI.PaintTool.Bucket;
+            if (hit && _paintCursor.enabled)
+            {
+                Bounds bounds = _photoStorage.Customization.GetKeycapSlotBounds(keycapIndex);
+                float radius = Mathf.Min(bounds.size.x, bounds.size.z) * 0.1f * _paintUI.BrushScale;
+                float screenRadius = Vector2.Distance(camera.WorldToScreenPoint(point),
+                    camera.WorldToScreenPoint(point + camera.transform.right * radius));
+                RectTransform cursor = (RectTransform)_paintCursor.transform;
+                cursor.anchoredPosition = position / _canvas.scaleFactor - ((RectTransform)transform).rect.size * 0.5f;
+                cursor.sizeDelta = Vector2.one * Mathf.Max(12f, screenRadius * 2f / _canvas.scaleFactor);
+                _paintCursor.color = _paintUI.Tool == KeyboardPaintPanelUI.PaintTool.Eraser
+                    ? Color.white : _paintUI.SelectedColor;
+            }
+            if (Mouse.current.leftButton.wasReleasedThisFrame || !Mouse.current.leftButton.isPressed)
+                _paintStrokeActive = false;
+            if (Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                _paintStrokeActive = hit;
+                _previousPaintPosition = position;
+                if (!hit) return;
+                if (_paintUI.Tool == KeyboardPaintPanelUI.PaintTool.Bucket)
+                {
+                    paint.Fill(keycapIndex, _paintUI.SelectedColor);
+                    _paintStrokeActive = false;
+                    return;
+                }
+                ApplyPaintStamp(paint, keycapIndex, point);
+                paint.Flush();
+                return;
+            }
+            if (!_paintStrokeActive || !Mouse.current.leftButton.isPressed) return;
+            float distance = Vector2.Distance(_previousPaintPosition, position);
+            int steps = Mathf.Clamp(Mathf.CeilToInt(distance / 5f), 1, 100);
+            for (int step = 1; step <= steps; step++)
+            {
+                Vector2 sample = Vector2.Lerp(_previousPaintPosition, position, step / (float)steps);
+                if (IsPointerOverUI(sample)) continue;
+                if (paint.TryHit(camera.ScreenPointToRay(sample), out int sampleIndex, out Vector3 samplePoint))
+                    ApplyPaintStamp(paint, sampleIndex, samplePoint);
+            }
+            paint.Flush();
+            _previousPaintPosition = position;
+        }
+
+        /// <summary>
+        /// keycapIndex의 표면 point에 현재 원형 도구를 한 번 적용한다.
+        /// 키캡 경계로 붓 반경을 정하고 지우개 여부에 따라 색칠 텍스처를 즉시 변경한다.
+        /// </summary>
+        private void ApplyPaintStamp(KeyboardKeycapPaint paint, int keycapIndex, Vector3 point)
+        {
+            Bounds bounds = _photoStorage.Customization.GetKeycapSlotBounds(keycapIndex);
+            float radius = Mathf.Min(bounds.size.x, bounds.size.z) * 0.1f * _paintUI.BrushScale;
+            paint.Stamp(keycapIndex, point, _paintUI.SelectedColor, radius,
+                _paintUI.Tool == KeyboardPaintPanelUI.PaintTool.Eraser);
+        }
+
+        /// <summary>
+        /// 전체 지우기 버튼을 현재 작업대 키보드의 색칠 레이어에 적용한다.
+        /// 사진과 키캡 재질은 유지하고 모든 키캡의 붓 데이터를 비운다.
+        /// </summary>
+        private void HandlePaintClearAllRequested()
+        {
+            if (_photoStorage.Customization != null)
+                _photoStorage.Customization.GetKeycapPaint().ClearAll();
+        }
+
+        /// <summary>
+        /// 색칠 중 마우스 위치와 원형 붓 범위를 표시할 UI 커서를 만든다.
+        /// 투명한 원 테두리 스프라이트를 저장하고 마우스 입력은 통과시킨다.
+        /// </summary>
+        private void CreatePaintCursor()
+        {
+            _paintCursorTexture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+            Color32[] pixels = new Color32[64 * 64];
+            for (int y = 0; y < 64; y++)
+                for (int x = 0; x < 64; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x, y), new Vector2(31.5f, 31.5f));
+                    pixels[y * 64 + x] = distance >= 29f && distance <= 31f
+                        ? new Color32(255, 255, 255, 255) : new Color32(0, 0, 0, 0);
+                }
+            _paintCursorTexture.SetPixels32(pixels);
+            _paintCursorTexture.Apply(false, false);
+            _paintCursorSprite = Sprite.Create(_paintCursorTexture, new Rect(0f, 0f, 64f, 64f), Vector2.one * 0.5f);
+            RectTransform cursor = new GameObject("PaintCursor", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+            cursor.SetParent(transform, false);
+            cursor.anchorMin = cursor.anchorMax = cursor.pivot = Vector2.one * 0.5f;
+            _paintCursor = cursor.GetComponent<Image>();
+            _paintCursor.sprite = _paintCursorSprite;
+            _paintCursor.raycastTarget = false;
+            _paintCursor.enabled = false;
         }
 
         /// <summary>
@@ -2214,6 +2398,7 @@ namespace Game.Player
                 case PickerMode.Keycap: return "Keycap";
                 case PickerMode.SwitchSound: return "Switch";
                 case PickerMode.Led: return "LED";
+                case PickerMode.Paint: return "Paint";
                 case PickerMode.CaseMaterial: return "Case";
                 case PickerMode.Plate: return "Plate";
                 case PickerMode.Photo: return "CustomImage";

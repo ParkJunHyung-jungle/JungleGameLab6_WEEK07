@@ -52,14 +52,15 @@ namespace Game.Player
             _pendingPanels.Clear();
             foreach (Transform child in transform)
             {
-                if (child == _menuRoot || child == _toggle.transform || child.name == "ModeBadge"
+                if (child == _menuRoot || child == _toggle.transform || child.name == "PaintCursor" || child.name == "ModeBadge"
                     || child.name == "ControlBar" || child.name == "TournamentEntryButton") continue;
                 _pendingPanels.Add(child);
             }
             foreach (Transform panel in _pendingPanels)
             {
                 panel.SetParent(_menuRoot, false);
-                if (panel.name == "LEDCustomizationPanel" || panel.name == "Photo customization")
+                if (panel.name == "LEDCustomizationPanel" || panel.name == "Photo customization"
+                    || panel.name == "PaintCustomizationPanel")
                     ConfigureEditorPanel((RectTransform)panel);
             }
             foreach (var editor in _editorPanels)
@@ -123,6 +124,8 @@ namespace Game.Player
             content.anchoredPosition = Vector2.zero;
             if (panel.TryGetComponent<KeyboardLEDPanelUI>(out var led))
                 led.EmbedControls(content, _width - 24f);
+            else if (panel.TryGetComponent<KeyboardPaintPanelUI>(out var paint))
+                paint.EmbedControls(content, _width - 24f);
             else
                 panel = GetComponent<KeyboardCustomizationTestUI>().EmbedControls(content, _width - 24f);
             ScrollRect scroll = host.GetComponent<ScrollRect>();

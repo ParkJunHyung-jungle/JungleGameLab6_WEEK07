@@ -63,7 +63,8 @@ namespace Game.Player
 
         public bool IsDragging => _isDragging;
 
-        public bool IsPlaced => !_isDragging && _workbenchHolder.KeyboardBody == _keyboardBody;
+        public bool IsPlaced => !_isDragging && _workbenchHolder.KeyboardBody != null;
+        private bool IsSelectedOnWorkbench => _keyboardBody != null && _workbenchHolder.KeyboardBody == _keyboardBody;
 
         void Awake()
         {
@@ -104,7 +105,7 @@ namespace Game.Player
 
             if (_clickCandidate)
             {
-                if (!IsPlaced || !_viewController.CanEnterKeyboardFocus)
+                if (!IsSelectedOnWorkbench || !_viewController.CanEnterKeyboardFocus)
                 {
                     _clickCandidate = false;
                     _acceptPress = false;
@@ -137,13 +138,17 @@ namespace Game.Player
             if (mouse.leftButton.wasPressedThisFrame && !_brain.IsBlending
                 && _viewController.ViewSwitchingAllowed && !IsPointerOverUI())
             {
-                if (IsPlaced && _viewController.CanEnterKeyboardFocus && IsKeyboardUnderCursor())
+                if (!TryGetKeyboardUnderCursor(out KeyboardPickupTarget pickup, out Rigidbody body))
+                    return;
+                _pickupTarget = pickup;
+                _keyboardBody = body;
+                if (IsSelectedOnWorkbench && _viewController.CanEnterKeyboardFocus)
                 {
                     _clickCandidate = true;
                     _pressPosition = InGameCursor.Position;
                 }
-                else if (!IsPlaced)
-                    TryBeginDrag(true);
+                else
+                    TryBeginDrag(false);
             }
         }
 
@@ -151,6 +156,11 @@ namespace Game.Player
         {
             if (!_isDragging)
                 return;
+            if (_keyboardBody == null)
+            {
+                HandlePointerCanceled();
+                return;
+            }
 
             if (!_brain.IsBlending)
                 _usingHangerPlane = _hangerCamera != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_hangerCamera;
@@ -293,21 +303,37 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 출력 카메라와 커서 Ray의 가장 가까운 실체가 지정 본체 또는 장착 자식인지 검사한다.
-        /// 분리 부품과 제거 도구를 제외하고 선택 가능 여부를 반환하며 물체 상태는 변경하지 않는다.
+        /// 커서의 가장 가까운 유효 키보드가 현재 선택 본체인지 반환한다.
+        /// 클릭 후보 해제 시 같은 키보드를 계속 가리키는지 확인하며 선택 참조는 변경하지 않는다.
         /// </summary>
         private bool IsKeyboardUnderCursor()
         {
+            return TryGetKeyboardUnderCursor(out _, out Rigidbody body) && body == _keyboardBody;
+        }
+
+        /// <summary>
+        /// 출력 카메라의 커서 Ray에서 가장 가까운 키보드의 집기 표식과 본체를 반환한다.
+        /// 가림 물체와 제거 도구 및 분리 부품은 거부하며 기존 배치 키보드와 런타임 배출 인스턴스를 모두 허용한다.
+        /// </summary>
+        private bool TryGetKeyboardUnderCursor(out KeyboardPickupTarget pickup, out Rigidbody body)
+        {
+            pickup = null;
+            body = null;
             Physics.SyncTransforms();
             Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
             if (!Physics.Raycast(ray, out RaycastHit hit, _outputCamera.farClipPlane,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
-                || !hit.transform.IsChildOf(_keyboardBody.transform)
                 || hit.collider.GetComponentInParent<AssemblyFullerTool>() != null)
                 return false;
 
             AssemblyDraggablePart part = hit.collider.GetComponentInParent<AssemblyDraggablePart>();
-            return part == null || (part.Slot != null && part.Slot.InstalledPart == part);
+            if (part != null && (part.Slot == null || part.Slot.InstalledPart != part))
+                return false;
+            pickup = hit.collider.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickup == null) return false;
+            body = pickup.GetComponent<Rigidbody>();
+            if (body == null) body = pickup.GetComponentInChildren<Rigidbody>();
+            return body != null && hit.transform.IsChildOf(body.transform);
         }
 
         /// <summary>
@@ -408,6 +434,7 @@ namespace Game.Player
             _releasePending = false;
             _awaitingHangerPlacement = false;
             _acceptPress = false;
+            if (_keyboardBody == null) return;
             _keyboardBody.isKinematic = false;
             _keyboardBody.useGravity = true;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;

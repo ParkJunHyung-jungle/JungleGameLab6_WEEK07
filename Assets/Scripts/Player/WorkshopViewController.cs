@@ -45,6 +45,9 @@ namespace Game.Player
         private bool _keyboardInputWasEnabled;
         private bool _keyboardAttackWasEnabled;
 
+        [Header("World Interaction")]
+        [SerializeField] private KeyboardDispenser _dispenser;
+
         [Header("View State")]
         private int _viewIndex;
         private bool _viewSwitchingAllowed = true;
@@ -115,6 +118,10 @@ namespace Game.Player
             if (!_viewSwitchingAllowed || _modeTransitionPending || _brain.IsBlending)
                 return;
 
+            if (!_keyboardDrag.IsDragging && Mouse.current != null
+                && Mouse.current.leftButton.wasPressedThisFrame && TryClickDispenser())
+                return;
+
             if (_monitorHolder != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_monitorCamera
                 && !_keyboardDrag.IsDragging && _monitorHolder.KeyboardBody != null
                 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && IsMonitorScreenSelected())
@@ -162,6 +169,24 @@ namespace Game.Player
                 OpenAssembly();
             else
                 _keyboardDrag.SetInputAllowed(true);
+        }
+
+        /// <summary>
+        /// 출력 카메라의 커서 Ray가 명시된 자판기에 먼저 닿으면 기존 배출 동작을 한 번 실행한다.
+        /// UI 위와 재고 미연결 상태는 무시하며 배출 입력을 처리했는지 반환한다.
+        /// </summary>
+        private bool TryClickDispenser()
+        {
+            if (_dispenser == null || !_dispenser.isActiveAndEnabled || !_dispenser.CanDispense || IsPointerOverUI())
+                return false;
+            Physics.SyncTransforms();
+            Ray ray = _monitorOutputCamera.ScreenPointToRay(InGameCursor.Position);
+            if (!Physics.Raycast(ray, out RaycastHit hit, _monitorOutputCamera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                || hit.collider.GetComponentInParent<KeyboardDispenser>() != _dispenser)
+                return false;
+            _dispenser.TryDispense(out _);
+            return true;
         }
 
         /// <summary>

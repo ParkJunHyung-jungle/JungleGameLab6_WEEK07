@@ -1510,7 +1510,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
             ClearPhotoImagePreview();
             if (extractSwitches ? IsKeycapInstalled(index) : !IsKeycapInstalled(index)) return false;
             if (_partInstallation != null) _partInstallation.CancelForRemoval(keyboardSwitch, _keycaps[index]);
-            if (extractSwitches) KeepSwitchStabilizers(keyboardSwitch);
+            // if (extractSwitches) KeepSwitchStabilizers(keyboardSwitch);
             part.gameObject.SetActive(false);
             if (extractSwitches && !HasAnySwitchForKeycaps()) GetComponent<KeyboardInputController>().DisableSwitchSound();
             removed = part;

@@ -2067,8 +2067,8 @@ MonoBehaviour:
   _heldEulerAngles: {x: 0, y: 0, z: 0}
   _extractSwitches: 1
   _sweepStepPixels: 4
-  _popUpSpeed: 1.2
-  _popSideSpeed: 0.15
+  _popUpSpeed: 5
+  _popSideSpeed: 0.2
   _spinSpeed: 3
   _outlineColor: {r: 1, g: 0.65, b: 0.2, a: 1}
   _outlineWidth: 0.008

@@ -57,7 +57,6 @@ namespace Game.Workshop
             {
                 if (candidate.TryGetComponent(out _playerMovement)) break;
             }
-            _playerStartPosition = _playerMovement.transform.position;
         }
 
         void Start()

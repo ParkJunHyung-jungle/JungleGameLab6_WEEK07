@@ -2308,7 +2308,6 @@ namespace Game.Player
                 case PickerMode.Plate: return "Plate";
                 case PickerMode.Upper: return "Upper";
                 case PickerMode.Photo: return "CustomImage";
-                case PickerMode.Paint: return "Paint";
                 default: return "";
             }
         }

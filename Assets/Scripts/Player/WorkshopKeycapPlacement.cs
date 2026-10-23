@@ -16,6 +16,11 @@ namespace Game.Player
     {
         private const float RETURN_DELAY = 2f;
 
+        [Header("Failed Placement")]
+        [SerializeField, Min(0f)] private float _failedDropLiftSpeed = 0.6f;
+        [SerializeField, Min(0f)] private float _failedDropPushSpeed = 0.35f;
+        [SerializeField, Min(0f)] private float _failedDropSpinSpeed = 4f;
+
         [Header("Workshop")]
         [SerializeField] private PlayerInteractionController _interaction;
         [SerializeField] private WorkshopKeyboardPullerController _pullers;
@@ -34,6 +39,7 @@ namespace Game.Player
         private AssemblyCatalogEntry _entry;
         private bool _fromInventory;
         private Plane _dragPlane;
+        private Plane _switchClearancePlane;
         private RectTransform _returnArea;
         private RectTransform _switchReturnArea;
         private RectTransform _canvasRect;
@@ -330,9 +336,52 @@ namespace Game.Player
             _entry = part.CatalogEntry;
             part.BeginDrag();
             _dragPlane = new Plane(InputCamera.transform.forward, part.transform.position);
+            if (_entry.IsSwitch) PrepareSwitchClearance(part);
             foreach (Collider collider in part.GetComponentsInChildren<Collider>()) collider.enabled = false;
             _previewRenderer.Show(part.transform);
             MoveDrag(point);
+        }
+
+        /// <summary>
+        /// part의 메시 크기와 편집 키보드의 현재 표면으로 스위치 이동의 최소 높이를 저장한다.
+        /// 키보드의 위쪽 방향을 사용하며 슬롯 위치와 부품 크기는 변경하지 않는다.
+        /// </summary>
+        private void PrepareSwitchClearance(AssemblyDraggablePart part)
+        {
+            Vector3 normal = EditingKeyboard.transform.up;
+            Vector3 absoluteNormal = new Vector3(Mathf.Abs(normal.x), Mathf.Abs(normal.y), Mathf.Abs(normal.z));
+            float surface = Vector3.Dot(normal, EditingKeyboard.transform.position);
+            foreach (MeshRenderer renderer in EditingKeyboard.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (!renderer.enabled) continue;
+                Bounds bounds = renderer.bounds;
+                surface = Mathf.Max(surface, Vector3.Dot(normal, bounds.center)
+                    + Vector3.Dot(absoluteNormal, bounds.extents));
+            }
+            float bottomOffset = 0f;
+            foreach (MeshRenderer renderer in part.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (!renderer.enabled) continue;
+                Bounds bounds = renderer.bounds;
+                bottomOffset = Mathf.Max(bottomOffset, Vector3.Dot(normal, part.transform.position - bounds.center)
+                    + Vector3.Dot(absoluteNormal, bounds.extents));
+            }
+            _switchClearancePlane = new Plane(normal, -surface - bottomOffset - 0.02f);
+        }
+
+        /// <summary>
+        /// 클릭으로 제거한 원본 스위치를 복원하고 이동용 실물을 재고 증가 없이 회수한다.
+        /// 저장된 원본 참조와 현재 축 타입을 사용하며 설치 위치와 키 바인딩을 유지한다.
+        /// </summary>
+        private void RestoreRemovedSwitch()
+        {
+            _dragOriginPart.gameObject.SetActive(true);
+            KeyboardInputController keyboard = _dragOriginPart.GetComponentInParent<KeyboardInputController>();
+            KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
+            keyboard.SetSwitchSound(customization.GetInstalledSwitchType(_dragOriginPart.GetComponent<KeyboardSwitch>()));
+            _looseParts.Remove(_activePart);
+            _entry.StorePart(_activePart, false);
+            _dragOriginPart = null;
         }
 
         /// <summary>
@@ -358,8 +407,15 @@ namespace Game.Player
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, point, null, out Vector2 local);
                 _dragIcon.rectTransform.localPosition = local;
             }
-            if (_dragPlane.Raycast(InputCamera.ScreenPointToRay(point), out float distance))
-                _activePart.transform.position = InputCamera.ScreenPointToRay(point).GetPoint(distance);
+            Ray ray = InputCamera.ScreenPointToRay(point);
+            if (_dragPlane.Raycast(ray, out float distance))
+            {
+                Vector3 position = ray.GetPoint(distance);
+                if (_entry.IsSwitch && _switchClearancePlane.GetDistanceToPoint(position) < 0f
+                    && _switchClearancePlane.Raycast(ray, out float clearanceDistance))
+                    position = ray.GetPoint(clearanceDistance);
+                _activePart.transform.position = position;
+            }
             if (!_isBulkDragging) return;
             if (overUI) { _hasPreviousBulkPosition = false; return; }
             if (_hasPreviousBulkPosition && (point - _previousBulkPosition).sqrMagnitude < 0.25f) return;
@@ -474,7 +530,7 @@ namespace Game.Player
                 if (_fromInventory) _entry.FinishReservation(false);
                 _dragOriginPart = null;
             }
-            else if (_dragOriginPart != null)
+            else if (_dragOriginPart != null && !_entry.IsSwitch)
             {
                 DropActivePart();
                 _dragOriginPart = null;
@@ -491,12 +547,12 @@ namespace Game.Player
                 {
                     _looseParts.Remove(_activePart);
                     _entry.StorePart(_activePart, false);
+                    _dragOriginPart = null;
                 }
                 else
                 {
-                    _activePart.gameObject.SetActive(true);
-                    foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>()) collider.enabled = true;
-                    _activePart.DropWithPhysics();
+                    RejectPlacement(customization);
+                    _dragOriginPart = null;
                 }
             }
             _entry = null;
@@ -504,6 +560,51 @@ namespace Game.Player
             _fromInventory = false;
             _dragIcon.gameObject.SetActive(false);
             RefreshInventory();
+        }
+
+        /// <summary>
+        /// customization 위에서 설치에 실패한 실물을 위쪽과 바깥쪽으로 튕겨 낙하시킨다.
+        /// Inspector 속도를 적용하고 조립 인스턴스의 PCB와 보강판 충돌을 활성화하며 재고는 변경하지 않는다.
+        /// </summary>
+        private void RejectPlacement(KeyboardCustomization customization)
+        {
+            _activePart.gameObject.SetActive(true);
+            foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>()) collider.enabled = true;
+            _activePart.DropWithPhysics();
+            if (customization.TryGetComponent<KeyboardAssemblyState>(out var assembly))
+            {
+                Transform pcb = assembly.GetStructureParts(AssemblyStructurePart.Pcb)[0];
+                EnableFailedDropCollision(pcb.Find("PCB_Board").GetComponent<MeshRenderer>());
+                EnableFailedDropCollision(customization.PlateRenderer);
+            }
+            Rigidbody body = _activePart.GetComponent<Rigidbody>();
+            Vector3 up = customization.transform.up;
+            Vector3 outward = Vector3.ProjectOnPlane(_activePart.transform.position - customization.transform.position, up);
+            if (outward.sqrMagnitude < 0.000001f) outward = customization.transform.forward;
+            outward.Normalize();
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            body.linearVelocity = up * _failedDropLiftSpeed + outward * _failedDropPushSpeed;
+            body.angularVelocity = Vector3.Cross(up, outward) * _failedDropSpinSpeed;
+        }
+
+        /// <summary>
+        /// surface의 실제 메시 경계에 런타임 충돌체를 준비하고 실패한 실물과의 충돌 무시를 해제한다.
+        /// 공유 프리팹은 수정하지 않으며 비활성 부품의 충돌체도 해당 부품과 함께 비활성화된다.
+        /// </summary>
+        private void EnableFailedDropCollision(MeshRenderer surface)
+        {
+            Collider target = surface.GetComponent<Collider>();
+            if (target == null)
+            {
+                BoxCollider box = surface.gameObject.AddComponent<BoxCollider>();
+                Bounds bounds = surface.GetComponent<MeshFilter>().sharedMesh.bounds;
+                box.center = bounds.center;
+                box.size = bounds.size;
+                target = box;
+            }
+            foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>())
+                Physics.IgnoreCollision(collider, target, false);
+            Physics.SyncTransforms();
         }
 
         /// <summary>
@@ -551,7 +652,8 @@ namespace Game.Player
             }
             else if (_dragOriginPart != null)
             {
-                DropActivePart();
+                if (_entry.IsSwitch) RestoreRemovedSwitch();
+                else DropActivePart();
                 _dragOriginPart = null;
             }
             else
@@ -570,6 +672,7 @@ namespace Game.Player
         /// <summary>point의 설치 레이와 가림 검사를 수행해 슬롯 인덱스를 반환한다. 설치 확정과 안내가 같은 대상을 조회한다.</summary>
         private int FindInstallSlot(Vector2 point)
         {
+            Physics.SyncTransforms();
             KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             Ray ray = InputCamera.ScreenPointToRay(point);
             if (Physics.Raycast(ray, out RaycastHit obstruction, InputCamera.farClipPlane,

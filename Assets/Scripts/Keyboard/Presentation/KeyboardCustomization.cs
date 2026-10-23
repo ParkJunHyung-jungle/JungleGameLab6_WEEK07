@@ -19,7 +19,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     private const float MAX_LED_SPEED = 10f;
     private const float PCB_SWITCH_CLEARANCE = -0.15f;
 
-    private const float PCB_Stabilizer_HEIGHT = 0.1f;
+    private const float PCB_STABILIZER_HEIGHT = 0.1f;
 
     private static readonly IReadOnlyList<PlateEffect> _plateEffects = Array.AsReadOnly((PlateEffect[])Enum.GetValues(typeof(PlateEffect)));
 
@@ -242,7 +242,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
             _pcbKeycapRotations[index] = Quaternion.Inverse(pcb.rotation) * _keycaps[index].rotation;
             RestorePcbSlotPose(index, true);
             RestorePcbSlotPose(index, false);
-            AlignPcbStabilizers(boundSwitch.transform, surface + PCB_SWITCH_CLEARANCE + PCB_Stabilizer_HEIGHT); //스테빌라이저 높이 보정 값
+            AlignPcbStabilizers(boundSwitch.transform, surface + PCB_SWITCH_CLEARANCE + PCB_STABILIZER_HEIGHT); //스테빌라이저 높이 보정 값
             _pcbSwitchBounds[index] = GetPcbLocalBounds(shell);
             _pcbKeycapBounds[index] = GetPcbLocalBounds(_keycapSlotShells[index]);
         }

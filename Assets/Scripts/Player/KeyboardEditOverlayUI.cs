@@ -232,7 +232,7 @@ namespace Game.Player
 
             SetPlatePickerEventBindings(true);
 
-            SetPickerMode(_showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
+            SetPickerMode(_showKeycapsOnOpen ? (_assemblyCatalog ? PickerMode.CaseMaterial : PickerMode.Keycap) : PickerMode.None);
         }
 
         void OnDisable()
@@ -348,7 +348,7 @@ namespace Game.Player
         /// </summary>
         public void SetWorkshopVisible(bool visible)
         {
-            SetPickerMode(visible && _showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
+            SetPickerMode(visible && _showKeycapsOnOpen ? (_assemblyCatalog ? PickerMode.CaseMaterial : PickerMode.Keycap) : PickerMode.None);
         }
 
         /// <summary>

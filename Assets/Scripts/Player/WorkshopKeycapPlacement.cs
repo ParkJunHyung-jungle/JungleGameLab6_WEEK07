@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -39,6 +39,7 @@ namespace Game.Player
         private RectTransform _canvasRect;
         private RawImage _dragIcon;
         private WorkshopDragPreviewRenderer _previewRenderer;
+        private WorkshopVerticalCatalogLayout _drawerLayout;
         private readonly List<KeyboardEditButton> _singlePlacementButtons = new List<KeyboardEditButton>();
         private readonly List<KeyboardEditButton> _bulkPlacementButtons = new List<KeyboardEditButton>();
         private bool _bulkPlacement;
@@ -54,12 +55,14 @@ namespace Game.Player
             ? _interaction.EditingKeyboard : _pullers.EditingKeyboard;
         private Camera InputCamera => _pullers.InputCamera;
         public bool IsDragging => _entry != null;
+        public WorkshopKeyboardPullerController Pullers => _pullers;
         public bool IsEditing => _interaction != null ? _interaction.IsKeyboardEditing : _pullers.IsEditing;
         public Camera ReturnCamera => InputCamera;
         public IReadOnlyList<AssemblyDraggablePart> LooseParts => _looseParts;
 
         void Awake()
         {
+            _drawerLayout = GetComponent<WorkshopVerticalCatalogLayout>();
             foreach (AssemblyCatalogEntry entry in _keycapEntries) entry.InitializeInventory();
             foreach (AssemblyCatalogEntry entry in _switchEntries) entry.InitializeInventory();
         }
@@ -84,8 +87,8 @@ namespace Game.Player
 
         void Update()
         {
-            foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging;
-            foreach (KeyboardEditButton button in _bulkPlacementButtons) button.interactable = !IsDragging;
+            foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
+            foreach (KeyboardEditButton button in _bulkPlacementButtons) button.interactable = !IsDragging && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
             if (!_pullers.InputAllowed || Mouse.current == null)
             {
                 CancelDrag();
@@ -589,7 +592,8 @@ namespace Game.Player
         /// <summary>현재 카드의 entry가 출고 가능한지 반환한다. 배치 입력과 같은 수량 및 드래그 조건만 읽는다.</summary>
         public bool CanBeginInventoryDrag(AssemblyCatalogEntry entry)
         {
-            return _pullers.InputAllowed && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0;
+            return _pullers.InputAllowed && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0
+                && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
         }
 
         /// <summary>state에 현재 부품 드래그나 바닥 부품 집기의 실행 가능한 조작을 추가한다. 포인터는 공통 커서를 사용한다.</summary>
@@ -782,6 +786,7 @@ namespace Game.Player
         /// </summary>
         public Vector2 GetReturnDestination(AssemblyCatalogEntry entry)
         {
+            if (_drawerLayout != null) return _drawerLayout.GetReturnDestination();
             RectTransform area = entry.IsSwitch ? _switchReturnArea : _returnArea;
             return area != null && area.gameObject.activeInHierarchy
                 ? RectTransformUtility.WorldToScreenPoint(null, area.TransformPoint(area.rect.center))

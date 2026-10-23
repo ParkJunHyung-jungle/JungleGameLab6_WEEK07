@@ -52,7 +52,7 @@ namespace Game.Player
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
 
-        /// <summary>dragging으로 PCB가 공통 포인터를 사용하는지 기록한다. 다른 부품 드래그와 풀러 입력을 막으며 조립 상태는 변경하지 않는다.</summary>
+        /// <summary>dragging으로 PCB·보강판·상단부가 공통 포인터를 사용하는지 기록한다. 다른 부품 드래그와 풀러 입력을 막으며 조립 상태는 변경하지 않는다.</summary>
         public void SetPcbDragging(bool dragging)
         {
             _pcbDragging = dragging;

@@ -17,8 +17,20 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
 {
     private const float MAX_LED_INTENSITY = 10f;
     private const float MAX_LED_SPEED = 10f;
+    private const float PCB_SWITCH_CLEARANCE = -0.15f;
+
+    private const float PCB_Stabilizer_HEIGHT = 0.1f;
 
     private static readonly IReadOnlyList<PlateEffect> _plateEffects = Array.AsReadOnly((PlateEffect[])Enum.GetValues(typeof(PlateEffect)));
+
+    [Header("Assembly PCB Slots")]
+    private Transform _pcbSlotRoot;
+    private Vector3[] _pcbSwitchPositions;
+    private Quaternion[] _pcbSwitchRotations;
+    private Vector3[] _pcbKeycapPositions;
+    private Quaternion[] _pcbKeycapRotations;
+    private Bounds[] _pcbSwitchBounds;
+    private Bounds[] _pcbKeycapBounds;
 
     [Header("LED Layer")]
     [SerializeField, HideInInspector] private MeshRenderer _ledRenderer;
@@ -161,6 +173,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public Bounds GetKeycapSlotBounds(int index)
     {
         if (_keycaps == null) CacheKeycaps();
+        if (_pcbSlotRoot != null) return TransformSlotBounds(_pcbKeycapBounds[index], _pcbSlotRoot);
         return GetRendererSlotBounds(_keycapSlotShells[index]);
     }
 
@@ -171,6 +184,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public Bounds GetSwitchSlotBounds(int index)
     {
         if (_keycaps == null) CacheKeycaps();
+        if (_pcbSlotRoot != null) return TransformSlotBounds(_pcbSwitchBounds[index], _pcbSlotRoot);
         return GetRendererSlotBounds(_switchSlotShells[index]);
     }
 
@@ -181,14 +195,99 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     private static Bounds GetRendererSlotBounds(MeshRenderer renderer)
     {
         if (renderer == null) return new Bounds();
-        Bounds bounds = renderer.localBounds;
-        Vector3 center = renderer.transform.TransformPoint(bounds.center);
-        Vector3 x = renderer.transform.TransformVector(Vector3.right * bounds.extents.x);
-        Vector3 y = renderer.transform.TransformVector(Vector3.up * bounds.extents.y);
-        Vector3 z = renderer.transform.TransformVector(Vector3.forward * bounds.extents.z);
+        return TransformSlotBounds(renderer.localBounds, renderer.transform);
+    }
+
+    /// <summary>bounds를 space에서 월드 슬롯 경계로 변환한다. 회전과 배율을 반영하며 입력 경계와 부품 상태는 변경하지 않는다.</summary>
+    private static Bounds TransformSlotBounds(Bounds bounds, Transform space)
+    {
+        Vector3 center = space.TransformPoint(bounds.center);
+        Vector3 x = space.TransformVector(Vector3.right * bounds.extents.x);
+        Vector3 y = space.TransformVector(Vector3.up * bounds.extents.y);
+        Vector3 z = space.TransformVector(Vector3.forward * bounds.extents.z);
         Vector3 extents = new Vector3(Mathf.Abs(x.x) + Mathf.Abs(y.x) + Mathf.Abs(z.x),
             Mathf.Abs(x.y) + Mathf.Abs(y.y) + Mathf.Abs(z.y), Mathf.Abs(x.z) + Mathf.Abs(y.z) + Mathf.Abs(z.z));
         return new Bounds(center, extents * 2f);
+    }
+
+    /// <summary>pcb의 실제 기판 윗면과 기존 키별 대응으로 슬롯 자세와 경계를 한 번 연결한다. 기존 실물의 위치만 맞추고 바인딩·부모·이름·축 종류는 유지한다.</summary>
+    public void ConnectPcbSlots(Transform pcb)
+    {
+        if (_pcbSlotRoot != null) return;
+        if (_keycaps == null) CacheKeycaps();
+        _pcbSlotRoot = pcb;
+        _pcbSwitchPositions = new Vector3[_switches.Length];
+        _pcbSwitchRotations = new Quaternion[_switches.Length];
+        _pcbKeycapPositions = new Vector3[_keycaps.Length];
+        _pcbKeycapRotations = new Quaternion[_keycaps.Length];
+        _pcbSwitchBounds = new Bounds[_switches.Length];
+        _pcbKeycapBounds = new Bounds[_keycaps.Length];
+        MeshFilter board = pcb.Find("PCB_Board").GetComponent<MeshFilter>();
+        Bounds boardBounds = board.sharedMesh.bounds;
+        float surface = pcb.InverseTransformPoint(board.transform.TransformPoint(
+            new Vector3(boardBounds.center.x, boardBounds.max.y, boardBounds.center.z))).y;
+        KeyboardInputController input = GetComponent<KeyboardInputController>();
+        for (int index = 0; index < _keycaps.Length; index++)
+        {
+            if (!input.TryGetSwitch(_keycaps[index], out KeyboardSwitch boundSwitch) || boundSwitch != _switches[index])
+                throw new InvalidOperationException("PCB slot must preserve its existing key-to-switch binding.");
+            MeshRenderer shell = _switchSlotShells[index];
+            Bounds shellBounds = shell.localBounds;
+            Vector3 bottom = pcb.InverseTransformPoint(shell.transform.TransformPoint(
+                new Vector3(shellBounds.center.x, shellBounds.min.y, shellBounds.center.z)));
+            Vector3 offset = Vector3.up * (surface + PCB_SWITCH_CLEARANCE - bottom.y);
+            _pcbSwitchPositions[index] = pcb.InverseTransformPoint(boundSwitch.transform.position) + offset;
+            _pcbKeycapPositions[index] = pcb.InverseTransformPoint(_keycaps[index].position) + offset;
+            _pcbSwitchRotations[index] = Quaternion.Inverse(pcb.rotation) * boundSwitch.transform.rotation;
+            _pcbKeycapRotations[index] = Quaternion.Inverse(pcb.rotation) * _keycaps[index].rotation;
+            RestorePcbSlotPose(index, true);
+            RestorePcbSlotPose(index, false);
+            AlignPcbStabilizers(boundSwitch.transform, surface + PCB_SWITCH_CLEARANCE + PCB_Stabilizer_HEIGHT); //스테빌라이저 높이 보정 값
+            _pcbSwitchBounds[index] = GetPcbLocalBounds(shell);
+            _pcbKeycapBounds[index] = GetPcbLocalBounds(_keycapSlotShells[index]);
+        }
+        input.RefreshKeyRestPositions();
+    }
+
+    /// <summary>
+    /// switchRoot의 스태빌라이저 하우징 바닥을 PCB 로컬 targetHeight에 맞춘다.
+    /// 하우징과 철심 및 스템을 같은 거리로 이동해 결합 간격을 유지한다.
+    /// </summary>
+    private void AlignPcbStabilizers(Transform switchRoot, float targetHeight)
+    {
+        float bottom = float.PositiveInfinity;
+        foreach (Transform child in switchRoot)
+        {
+            if (!child.name.StartsWith("Stabilizer_Housing", StringComparison.Ordinal)) continue;
+            foreach (MeshRenderer renderer in child.GetComponentsInChildren<MeshRenderer>(true))
+                bottom = Mathf.Min(bottom, GetPcbLocalBounds(renderer).min.y);
+        }
+        if (float.IsPositiveInfinity(bottom)) return;
+        Vector3 offset = _pcbSlotRoot.TransformVector(Vector3.up * (targetHeight - bottom));
+        foreach (Transform child in switchRoot)
+            if (child.name.StartsWith("Stabilizer_", StringComparison.Ordinal)) child.position += offset;
+    }
+
+    /// <summary>renderer의 원본 슬롯 형상을 PCB 로컬 경계로 반환한다. 비활성 실물도 검사하며 설치 연출과 키 눌림의 임시 이동은 저장하지 않는다.</summary>
+    private Bounds GetPcbLocalBounds(MeshRenderer renderer)
+    {
+        Bounds source = renderer.localBounds;
+        Matrix4x4 matrix = _pcbSlotRoot.worldToLocalMatrix * renderer.localToWorldMatrix;
+        Bounds result = new Bounds(matrix.MultiplyPoint3x4(source.center), Vector3.zero);
+        for (int corner = 0; corner < 8; corner++)
+            result.Encapsulate(matrix.MultiplyPoint3x4(source.center + Vector3.Scale(source.extents,
+                new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1))));
+        return result;
+    }
+
+    /// <summary>index와 switchSlot에 대응하는 기존 실물을 PCB 슬롯 자세로 맞춘다. 크기·재질·설치 상태와 부모 경로는 유지한다.</summary>
+    private void RestorePcbSlotPose(int index, bool switchSlot)
+    {
+        if (_pcbSlotRoot == null) return;
+        Transform part = switchSlot ? _switches[index].transform : _keycaps[index];
+        Vector3 position = switchSlot ? _pcbSwitchPositions[index] : _pcbKeycapPositions[index];
+        Quaternion rotation = switchSlot ? _pcbSwitchRotations[index] : _pcbKeycapRotations[index];
+        part.SetPositionAndRotation(_pcbSlotRoot.TransformPoint(position), _pcbSlotRoot.rotation * rotation);
     }
 
     /// <summary>
@@ -204,6 +303,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     {
         if (_keycaps == null) CacheKeycaps();
         if (!CanInstallSwitchFromInventory(index, type)) return false;
+        RestorePcbSlotPose(index, true);
         KeyboardSwitch keyboardSwitch = _switches[index];
         if (!keyboardSwitch.ChangeSwitch(type)) return false;
         PlayPartInstallation(keyboardSwitch.transform);
@@ -219,8 +319,9 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public bool InstallKeycapFromInventory(int index, Material material, Game.Tournament.KeycapDefinition definition)
     {
         if (_keycaps == null) CacheKeycaps();
-        return CanInstallKeycapFromInventory(index, material, definition)
-            && ApplyKeycapMaterialToKey(index, material, true, definition);
+        if (!CanInstallKeycapFromInventory(index, material, definition)) return false;
+        RestorePcbSlotPose(index, false);
+        return ApplyKeycapMaterialToKey(index, material, true, definition);
     }
 
     /// <summary>index의 축 슬롯 점유와 type 데이터로 설치 가능 여부를 반환한다. 외형, 재고와 효과음은 변경하지 않는다.</summary>
@@ -436,7 +537,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         ApplySelectedPlateSettings();
         if (_switches.Length > 0) ApplySwitchType(_switchType, false);
         if (_plate != null) SetPlateType(_plateType);
-        
+
         if (_ledRenderer != null)
         {
             ApplyLED();
@@ -613,7 +714,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         ApplySelectedPlateSettings();
         if (_switches.Length > 0) ApplySwitchType(_switchType, false);
         if (_plate != null) SetPlateType(_plateType);
-        
+
         if (!Application.IsPlaying(gameObject))
         {
             EditorUtility.SetDirty(this);

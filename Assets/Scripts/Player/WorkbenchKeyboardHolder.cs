@@ -3,6 +3,7 @@ using System.Collections;
 using UnityEngine;
 
 using KeyboardModeling;
+using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
@@ -14,6 +15,8 @@ namespace Game.Player
         [Header("Placement Pose")]
         [SerializeField] private Vector3 _placementCenterOffset;
         [SerializeField] private Vector3 _placementEulerAngles = new Vector3(-57f, 0f, 0f);
+        [SerializeField] private Collider _placementSurface;
+        [SerializeField] private Renderer _placementSurfaceVisual;
 
         [Header("Keyboard")]
         private Rigidbody _keyboardBody;
@@ -33,12 +36,43 @@ namespace Game.Player
 
         /// <summary>
         /// 본체의 시각 중심 오프셋과 Inspector의 배치 중심 및 회전으로 최종 자세를 반환한다.
-        /// centerOffset은 배율을 포함하며 Holder나 본체의 실제 상태는 변경하지 않는다.
+        /// centerOffset과 body의 하단부 형상을 사용하며 조립 키보드는 작업대 표면 위로 보정한 자세를 반환한다.
         /// </summary>
-        public Pose GetPlacementPose(Vector3 centerOffset)
+        public Pose GetPlacementPose(Vector3 centerOffset, Rigidbody body = null)
         {
             Quaternion rotation = transform.rotation * Quaternion.Euler(_placementEulerAngles);
-            return new Pose(transform.TransformPoint(_placementCenterOffset) - rotation * centerOffset, rotation);
+            Pose pose = new Pose(transform.TransformPoint(_placementCenterOffset) - rotation * centerOffset, rotation);
+            if (body != null && body.TryGetComponent(out KeyboardAssemblyState assembly)
+                && assembly.Initialized && assembly.LowerInstalled && _placementSurface != null)
+                pose = AlignLowerToSurface(body, pose);
+            return pose;
+        }
+
+        /// <summary>
+        /// body의 하단부 바닥과 작업대 상판 및 매트 윗면을 비교해 pose의 침투를 보정한다.
+        /// 하단부 메시 경계와 지지면 Collider 및 Renderer를 사용해 위쪽 보정만 반환 자세에 적용한다.
+        /// </summary>
+        private Pose AlignLowerToSurface(Rigidbody body, Pose pose)
+        {
+            float surfaceHeight = _placementSurface.bounds.max.y;
+            if (_placementSurfaceVisual != null && _placementSurfaceVisual.enabled
+                && _placementSurfaceVisual.gameObject.activeInHierarchy)
+                surfaceHeight = Mathf.Max(surfaceHeight, _placementSurfaceVisual.bounds.max.y);
+            MeshRenderer lower = body.GetComponent<KeyboardCustomization>().CaseRenderers[0];
+            Bounds bounds = lower.localBounds;
+            float bottom = float.PositiveInfinity;
+            Matrix4x4 targetMatrix = Matrix4x4.TRS(pose.position, pose.rotation, body.transform.lossyScale);
+            Matrix4x4 lowerToRoot = body.transform.worldToLocalMatrix * lower.transform.localToWorldMatrix;
+            for (int index = 0; index < 8; index++)
+            {
+                Vector3 corner = bounds.center + Vector3.Scale(bounds.extents, new Vector3(
+                    (index & 1) == 0 ? -1f : 1f,
+                    (index & 2) == 0 ? -1f : 1f,
+                    (index & 4) == 0 ? -1f : 1f));
+                bottom = Mathf.Min(bottom, targetMatrix.MultiplyPoint3x4(lowerToRoot.MultiplyPoint3x4(corner)).y);
+            }
+            pose.position += Vector3.up * Mathf.Max(0f, surfaceHeight + 0.003f - bottom);
+            return pose;
         }
 
         /// <summary>
@@ -50,7 +84,7 @@ namespace Game.Player
             if (_keyboardBody != null)
                 return false;
 
-            Pose pose = GetPlacementPose(centerOffset);
+            Pose pose = GetPlacementPose(centerOffset, body);
             if (!body.isKinematic)
             {
                 body.linearVelocity = Vector3.zero;
@@ -82,6 +116,16 @@ namespace Game.Player
                 pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
             if (pickupTarget == null)
                 return;
+
+            if (body.TryGetComponent(out KeyboardAssemblyState assembly) && assembly.Initialized)
+            {
+                Vector3 localCenter = pickupTarget.GetVisualCenterLocalPosition(body.transform);
+                Vector3 centerOffset = Quaternion.Inverse(body.rotation) * body.transform.TransformVector(localCenter);
+                TryPlaceKeyboard(body, centerOffset);
+                KeyboardProtectionCover assemblyCover = body.GetComponentInChildren<KeyboardProtectionCover>();
+                if (assemblyCover != null) assemblyCover.RemoveFrom(body.transform);
+                return;
+            }
 
             _keyboardBody = body;
             _initialKeyboardRotation = GetPlacementPose(Vector3.zero).rotation;

@@ -14,51 +14,92 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tutorials.TutorialContent
   _cards:
   - _topic: 0
-    _title: "\uB098\uB9CC\uC758 \uD0A4\uBCF4\uB4DC \uAFB8\uBBF8\uAE30"
-    _body: "\uD0A4\uBCF4\uB4DC\uB97C \uC791\uC5C5\uB300\uC5D0 \uC62C\uB9AC\uACE0
-      \uD0A4\uCEA1, \uCD95, \uCF00\uC774\uC2A4\uC640 LED\uB97C \uC790\uC720\uB86D\uAC8C
-      \uAFB8\uBA70 \uBCF4\uC138\uC694.\n\uC644\uC131\uD55C \uD0A4\uBCF4\uB4DC\uB294
-      \uC804\uC2DC\uD558\uAC70\uB098 \uC800\uC7A5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
-    _controls: "<b>[WASD]</b> \uC774\uB3D9   <b>[\uB9C8\uC6B0\uC2A4]</b> \uC2DC\uC810
-      \uC774\uB3D9\n<b>[\uC88C\uD074\uB9AD]</b> \uBC1B\uAE30\xB7\uB4E4\uAE30   <b>[F10]</b>
-      \uB3C4\uC6C0\uB9D0"
+    _title: "나만의 키보드 조립하기"
+    _body: "하단부부터 부품을 하나씩 조립해 보세요.\n목록에서 드래그해 설치하고, 분리한 부품은 다시 쓰거나 목록에 반환할 수 있습니다."
+    _controls: "<b>[Q / E]</b> 일반 뷰 전환   <b>[F10]</b> 도움말"
   - _topic: 1
-    _title: "\uC791\uC5C5\uB300\uC5D0\uC11C \uC2DC\uC791\uD558\uC138\uC694"
-    _body: "\uD0A4\uBCF4\uB4DC\uB97C \uB4E0 \uCC44 \uC791\uC5C5\uB300 \uC704\uB85C
-      \uB358\uC838 \uB193\uC73C\uC138\uC694.\n\uC791\uC5C5\uB300 \uC704\uC758 \uD0A4\uBCF4\uB4DC\uB97C
-      \uBC14\uB77C\uBCF4\uACE0 <b>[\uC6B0\uD074\uB9AD]</b>\uD558\uBA74 \uD3B8\uC9D1\uD560
-      \uC218 \uC788\uC2B5\uB2C8\uB2E4."
-    _controls: "<b>[\uC88C\uD074\uB9AD]</b> \uB4E4\uAE30\xB7\uB358\uC9C0\uAE30  
-      <b>[\uC6B0\uD074\uB9AD]</b> \uC791\uC5C5\uB300\uC5D0\uC11C \uD3B8\uC9D1"
+    _title: "작업대에 키보드 배치하기"
+    _body: "키보드를 드래그해 작업대에 놓으세요.\n배치된 키보드를 짧게 좌클릭하면 작업 모드, 드래그하면 운반합니다."
+    _controls: "<b>[좌클릭 드래그]</b> 운반·배치\n<b>[배치된 키보드 좌클릭]</b> 작업 모드"
   - _topic: 2
-    _title: "\uB3CC\uB824 \uBCF4\uACE0, \uAFB8\uBA70 \uBCF4\uC138\uC694"
-    _body: "\uD0A4\uBCF4\uB4DC \uC704\uC5D0\uC11C <b>[\uC88C\uD074\uB9AD \uB4DC\uB798\uADF8]</b>\uD558\uBA74
-      \uD68C\uC804\uD558\uACE0, <b>[\uB9C8\uC6B0\uC2A4 \uD720]</b>\uB85C \uD655\uB300\xB7\uCD95\uC18C\uD569\uB2C8\uB2E4.\n<b>[\uC6B0\uD074\uB9AD]</b>\uD558\uBA74
-      \uD3B8\uC9D1\uC744 \uB9C8\uCE69\uB2C8\uB2E4."
-    _controls: "<b>[\uC88C\uD074\uB9AD \uB4DC\uB798\uADF8]</b> \uD68C\uC804   <b>[\uD720]</b>
-      \uD655\uB300\xB7\uCD95\uC18C\n<b>[\uD720 \uD074\uB9AD]</b> \uD68C\uC804\xB7\uD0A4\uCEA1
-      \uBCF5\uAD6C"
+    _title: "작업 모드와 조작 구분"
+    _body: "왼쪽 탭에서 부품을 고르고 카드를 드래그해 설치하세요.\n나사는 PCB 탭에서 클릭으로 조작합니다."
+    _controls: "<b>[좌클릭]</b> 탭 선택·나사 조작\n<b>[좌클릭 드래그]</b> 부품 이동   <b>[Esc]</b> 작업 모드 종료"
+  - _topic: 17
+    _title: "부품 목록 사용하기"
+    _body: "탭에서 부품 종류를 고른 뒤 카드를 설치 위치에 놓으세요.\n축·키캡은 카드의 수량과 빈 슬롯을 확인하세요."
+    _controls: "<b>[탭 좌클릭]</b> 목록 전환\n<b>[카드 드래그 → 좌클릭 놓기]</b> 부품 배치"
+  - _topic: 29
+    _title: "처음 조립하는 순서"
+    _body: "권장 순서: 하단부 → PCB → 나사 6개 → 보강판 → 스위치 → 상단부 → 키캡.\n보강판은 상단부·키캡보다 먼저 넣으세요."
+    _controls: "설치가 안 되면 선행 부품·나사 체결 상태와 슬롯 점유를 확인하세요."
+  - _topic: 22
+    _title: "하단부 설치와 분리"
+    _body: "하단부 탭의 재질 카드를 빈 위치에 드래그하세요.\n분리하려면 연결된 부품과 나사를 먼저 제거하세요."
+    _controls: "<b>[하단부 재질 카드 드래그]</b> 설치\n<b>[빈 하단부 좌클릭 드래그]</b> 분리"
+  - _topic: 24
+    _title: "PCB를 하단부에 배치하기"
+    _body: "하단부 위로 PCB 카드를 드래그하세요.\n나사 6개를 모두 체결해야 보강판과 스위치를 설치할 수 있습니다."
+    _controls: "<b>[PCB 카드 드래그 → 좌클릭 놓기]</b> 배치\nPCB 탭을 유지하고 나사 체결을 진행하세요."
+  - _topic: 27
+    _title: "PCB 나사 체결과 풀기"
+    _body: "PCB 탭에서 나사를 클릭해 체결하거나 풉니다.\n주황색은 체결 전, 초록색은 체결 완료입니다. 상단부·보강판이 있으면 먼저 제거하세요."
+    _controls: "<b>[나사 아웃라인 좌클릭]</b> 체결·풀기\n나사 동작이 끝난 뒤 다음 조작을 하세요."
+  - _topic: 23
+    _title: "보강판 설치와 분리"
+    _body: "PCB 나사 6개를 체결한 뒤 재질 카드를 드래그하세요.\n보강판 설치·분리 시 상단부와 키캡이 없어야 합니다."
+    _controls: "<b>[보강판 재질 카드 드래그]</b> 설치\n<b>[보강판 좌클릭 드래그]</b> 분리"
+  - _topic: 5
+    _title: "스위치 설치하기"
+    _body: "PCB 나사 6개를 체결한 뒤 축 카드를 빈 슬롯에 놓으세요.\n교체하려면 해당 키캡과 기존 축을 먼저 제거하세요."
+    _controls: "<b>[스위치 카드 드래그 → 빈 슬롯에 놓기]</b> 설치"
+  - _topic: 28
+    _title: "상단부 설치와 분리"
+    _body: "하단부가 있으면 상단부 재질 카드를 드래그해 설치할 수 있습니다.\n나사·보강판을 조작하려면 상단부를 먼저 분리하세요."
+    _controls: "<b>[상단부 재질 카드 드래그]</b> 설치\n<b>[상단부 좌클릭 드래그]</b> 분리"
   - _topic: 3
-    _title: "\uC804\uCCB4 \uB610\uB294 \uD558\uB098\uC529 \uBC14\uAFB8\uAE30"
-    _body: "\uC804\uCCB4 \uD0A4\uCEA1 \uB610\uB294 \uD0A4\uCEA1 \uD55C \uAC1C\uB97C
-      \uC120\uD0DD\uD558\uC138\uC694.\n\uC804\uCCB4\uB294 \uBBF8\uB9AC\uBCF4\uAE30
-      \uD6C4 \uC801\uC6A9\uD558\uAE30\uB97C \uB204\uB985\uB2C8\uB2E4.\n\uD55C \uAC1C\uB294
-      \uD0A4\uCEA1\uC744 \uC120\uD0DD\uD55C \uB4A4 \uC2E4\uC81C \uD0A4\uB97C \uB204\uB974\uBA74
-      \uBC14\uB85C \uC801\uC6A9\uB429\uB2C8\uB2E4."
-    _controls: "\uBAA9\uB85D\uC5D0\uC11C \uC6D0\uD558\uB294 \uD0A4\uCEA1\uC744 \uC120\uD0DD\uD558\uC138\uC694."
-  - _topic: 12
-    _title: "\uC544\uD2F0\uC0B0\uC73C\uB85C \uD0A4\uBCF4\uB4DC \uAFB8\uBBF8\uAE30"
-    _body: "\uC544\uD2F0\uC0B0\uC740 1u \uD06C\uAE30\uC758 \uD0A4\uC5D0 \uAC1C\uC218
-      \uC81C\uD55C \uC5C6\uC774 \uC124\uCE58\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\uC804\uCCB4
-      \uC801\uC6A9 \uC2DC \uB098\uBA38\uC9C0 \uD0A4\uB294 \uAE30\uC874 \uD0A4\uCEA1
-      \uB610\uB294 \uBE48 \uC0C1\uD0DC\uB97C \uC720\uC9C0\uD569\uB2C8\uB2E4."
-    _controls: "\uC804\uCCB4 \uC801\uC6A9 \uB610\uB294 \uD0A4\uCEA1 \uD55C \uAC1C\uB97C
-      \uC120\uD0DD\uD574 \uC124\uCE58\uD558\uC138\uC694."
-  - _topic: 13
-    _title: "\uC0AC\uC9C4\uC73C\uB85C \uD0A4\uBCF4\uB4DC \uAFB8\uBBF8\uAE30"
-    _body: "\uC0AC\uC9C4\uC744 \uBD88\uB7EC\uC640 \uD0A4\uCEA1\uC774\uB098 \uCF00\uC774\uC2A4\uC5D0
-      \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\uC704\uCE58\uC640 \uBC94\uC704\uB97C
-      \uC870\uC808\uD558\uACE0 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uD655\uC778\uD55C
-      \uB4A4 \uC801\uC6A9\uD558\uC138\uC694."
-    _controls: "\uC774\uBBF8\uC9C0 \uC120\uD0DD \u2192 \uC801\uC6A9 \uC704\uCE58\xB7\uBC94\uC704
-      \uC120\uD0DD \u2192 \uC801\uC6A9"
+    _title: "키캡 설치하기"
+    _body: "축이 있는 빈 자리에 키캡 카드를 드래그하세요.\n이미 키캡이 있다면 먼저 분리하고, 키캡 규격도 확인하세요."
+    _controls: "<b>[키캡 카드 드래그 → 빈 슬롯에 놓기]</b> 설치\n스위치 유무와 키캡 규격을 확인하세요."
+  - _topic: 6
+    _title: "축과 키캡 연속 배치"
+    _body: "일괄 배치 모드에서 카드를 키보드로 드래그하세요.\n좌클릭을 유지하며 이동하면 설치 가능한 빈 자리에 재고만큼 연속 설치합니다."
+    _controls: "<b>[일괄 배치 선택 → 카드 드래그]</b> 시작\n<b>[좌클릭 유지·이동]</b> 연속 설치   <b>[놓기]</b> 종료"
+  - _topic: 26
+    _title: "풀러로 키캡과 축 분리하기"
+    _body: "풀러를 좌클릭으로 집고 누른 채 대상 위로 움직이세요.\n축을 뽑으려면 해당 키캡을 먼저 제거해야 합니다."
+    _controls: "<b>[풀러 좌클릭 유지·이동]</b> 연속 분리\n<b>[좌클릭 놓기]</b> 풀러 내려놓기"
+  - _topic: 18
+    _title: "구조 부품 분해하기"
+    _body: "상단부·키캡 → 보강판 → 나사 6개 → PCB 순서로 분리하세요.\n하단부는 연결된 부품을 정리한 뒤 분리합니다."
+    _controls: "<b>[해당 부품 탭 선택 → 실물 드래그]</b> 분리\n나사는 PCB 탭에서 클릭으로 풉니다."
+  - _topic: 19
+    _title: "다른 부품으로 교체하기"
+    _body: "기존 축·키캡을 분리한 뒤 빈 자리에 새 부품을 놓으세요.\n구조 부품은 해당 탭의 재질 카드를 사용합니다."
+    _controls: "<b>[기존 부품 분리 → 새 부품 카드 드래그]</b> 교체"
+  - _topic: 20
+    _title: "분리한 부품 반환하기"
+    _body: "분리한 부품을 열린 목록에 놓으면 반환합니다.\n설치 위치에 놓으면 재설치하며, 바닥의 부품도 다시 집을 수 있습니다."
+    _controls: "<b>[부품 드래그 → 목록에서 놓기]</b> 반환\n<b>[부품 드래그 → 설치 위치에서 놓기]</b> 재설치"
+  - _topic: 21
+    _title: "설치가 안 될 때 확인하기"
+    _body: "빈 슬롯인지, 재고와 규격이 맞는지 확인하세요.\n축은 PCB 나사 체결 완료, 키캡은 해당 위치의 축이 필요합니다."
+    _controls: "빈 슬롯·규격·선행 조립 상태·재고 수량을 확인하세요."
+  - _topic: 7
+    _title: "아티산 키캡으로 꾸미기"
+    _body: "아티산은 축이 있는 빈 1u 자리에 설치합니다.\n카드에서 드래그해 놓고 표시된 재고 수량을 확인하세요."
+    _controls: "<b>[아티산 카드 드래그 → 빈 1u 슬롯에 놓기]</b> 설치"
+  - _topic: 25
+    _title: "LED 설정하기"
+    _body: "LED 탭에서 전원·색상·밝기·패턴·속도를 조절하세요.\n실제 키보드에서 조명 결과를 확인하세요."
+    _controls: "<b>[LED 탭]</b> 전원·색상·밝기·패턴·속도 설정"
+  - _topic: 4
+    _title: "사진으로 키보드 꾸미기"
+    _body: "이미지 탭에서 사진을 불러오고 위치와 범위를 조절하세요.\n미리보기로 확인한 뒤 키캡이나 케이스에 적용합니다."
+    _controls: "이미지 선택 → 위치·범위 조절 → 미리보기 확인 → 적용"
+  - _topic: 15
+    _title: "조립한 키보드 타건하기"
+    _body: "실제 키를 눌러 조립한 키보드의 타건을 확인하세요.\n공격 테스트를 켜면 공격 연출도 확인할 수 있습니다."
+    _controls: "<b>[실제 키 입력]</b> 타건 확인\n공격 테스트는 작업 모드의 해당 설정으로 전환합니다."
+
+

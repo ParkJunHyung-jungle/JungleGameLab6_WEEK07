@@ -14102,6 +14102,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8e5837573b94378970ade02a350c20f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkbenchKeyboardHolder
+  _placementSurface: {fileID: 1475487382687866627}
+  _placementSurfaceVisual: {fileID: 5238479021463744105}
 --- !u!1 &6733562014577365404
 GameObject:
   m_ObjectHideFlags: 0

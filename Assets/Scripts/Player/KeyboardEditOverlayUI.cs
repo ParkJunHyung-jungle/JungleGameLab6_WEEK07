@@ -361,6 +361,8 @@ namespace Game.Player
         {
             if (_catalogLayout != null) _catalogLayout.ResetDrawers(visible);
             SetPickerMode(_catalogLayout == null && visible && _showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
+            if (visible)
+                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "WorkshopOpened");
         }
 
         /// <summary>
@@ -828,6 +830,15 @@ namespace Game.Player
                     _ => PickerMode.None
                 };
             SetPickerMode(mode);
+        }
+
+        /// <summary>
+        /// 서랍의 펼침 완료 시 현재 부품 목록을 튜토리얼 관찰자에게 알린다.
+        /// 선택된 편집 모드를 사용하며 목록이나 부품 상태는 변경하지 않는다.
+        /// </summary>
+        public void NotifyDrawerOpened()
+        {
+            Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartPanelOpened", GetLogPart(_pickerMode));
         }
 
         /// <summary>
@@ -2288,8 +2299,14 @@ namespace Game.Player
                 _ledUI.Open(_ledCustomization);
             if (_assemblyCatalog) RefreshAssemblyControls();
             if (previous != _pickerMode)
-                Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode),
-                    previous: GetLogPart(previous));
+            {
+                string previousLogPart = GetLogPart(previous);
+                string currentLogPart = GetLogPart(_pickerMode);
+                if (previousLogPart != currentLogPart)
+                    Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", currentLogPart,
+                        previous: previousLogPart,
+                        details: _catalogLayout != null && _catalogLayout.IsTransitioning ? "DrawerTransition" : "");
+            }
         }
 
         /// <summary>

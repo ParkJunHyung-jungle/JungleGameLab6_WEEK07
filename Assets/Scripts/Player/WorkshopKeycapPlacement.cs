@@ -334,6 +334,9 @@ namespace Game.Player
                     interactionId: _bulkInteractionId, actionSource: "BulkPlacement");
             BeginWorldDrag(_activePart, point);
             RefreshInventory();
+            Game.Logging.CustomizationTelemetry.Emit(customization, "InventoryPartPicked",
+                entry.IsSwitch ? "Switch" : "Keycap", GetEntryLogId(entry),
+                keycapKind: entry.IsSwitch ? "" : entry.IsArtisan ? "Artisan" : "Regular");
         }
 
         /// <summary>

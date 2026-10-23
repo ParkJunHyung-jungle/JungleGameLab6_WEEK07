@@ -50,6 +50,9 @@ namespace Game.Player
         private readonly List<KeyboardEditButton> _bulkPlacementButtons = new List<KeyboardEditButton>();
         private bool _bulkPlacement;
         private bool _isBulkDragging;
+        private string _bulkInteractionId;
+        private int _bulkAttemptCount;
+        private int _bulkSuccessCount;
         private bool _hasPreviousBulkPosition;
         private Vector2 _previousBulkPosition;
         private readonly HashSet<int> _bulkVisited = new HashSet<int>();
@@ -317,11 +320,18 @@ namespace Game.Player
             _entry = entry;
             _fromInventory = true;
             _isBulkDragging = _bulkPlacement;
+            _bulkInteractionId = _isBulkDragging ? System.Guid.NewGuid().ToString("N") : null;
+            _bulkAttemptCount = 0;
+            _bulkSuccessCount = 0;
             _bulkVisited.Clear();
             _hasPreviousBulkPosition = false;
             _lastBulkFrame = -1;
             KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
             _activePart = CreatePart(entry, entry.IsSwitch ? customization.GetSwitchSlotTransform(0) : customization.GetKeycapSlotTransform(0));
+            if (_isBulkDragging)
+                Game.Logging.CustomizationTelemetry.Emit(customization, "BulkPlacementStarted",
+                    entry.IsSwitch ? "Switch" : "Keycap", GetEntryLogId(entry),
+                    interactionId: _bulkInteractionId, actionSource: "BulkPlacement");
             BeginWorldDrag(_activePart, point);
             RefreshInventory();
         }
@@ -513,18 +523,20 @@ namespace Game.Player
                     && !obstruction.transform.IsChildOf(customization.transform)) continue;
                 int index = candidate.Value;
                 if (!_entry.TryReserve()) break;
+                _bulkAttemptCount++;
                 bool installed = InstallEntry(customization, index);
                 _entry.FinishReservation(installed);
                 if (installed)
                 {
                     _bulkVisited.Add(index);
+                    _bulkSuccessCount++;
                     changed = true;
                     RecordInstallAttempt(customization, index, true, "BulkPlacement");
                 }
                 if (_entry.AvailableQuantity <= 0) break;
             }
             if (changed) RefreshInventory();
-            if (_entry.AvailableQuantity <= 0) EndBulkPlacement();
+            if (_entry.AvailableQuantity <= 0) EndBulkPlacement(false, "InventoryDepleted");
         }
 
         /// <summary>
@@ -548,11 +560,17 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 일괄 배치의 표시용 키캡을 보관하고 방문 경로와 드래그 참조를 비운다.
-        /// 미리보기는 재고를 예약하지 않으므로 설치된 수량만 소비된 상태로 유지한다. 반환값은 없다.
+        /// 일괄 배치의 종료 이유와 취소 여부 및 설치 집계를 기록하고 드래그 참조를 비운다.
+        /// cancelled와 endReason을 사용하며 이미 설치된 수량은 유지한다. 반환값은 없다.
         /// </summary>
-        private void EndBulkPlacement()
+        private void EndBulkPlacement(bool cancelled = false, string endReason = "Released")
         {
+            Game.Logging.CustomizationTelemetry.Emit(EditingKeyboard.GetComponent<KeyboardCustomization>(),
+                "BulkPlacementEnded", _entry.IsSwitch ? "Switch" : "Keycap", GetEntryLogId(_entry),
+                success: !cancelled, changed: _bulkSuccessCount > 0, details: endReason,
+                interactionId: _bulkInteractionId, actionSource: "BulkPlacement",
+                outcomeReason: cancelled ? "Cancelled" : "", attemptCount: _bulkAttemptCount,
+                successCount: _bulkSuccessCount);
             _previewRenderer.Hide();
             _looseParts.Remove(_activePart);
             _entry.StorePart(_activePart, false);
@@ -560,6 +578,9 @@ namespace Game.Player
             _activePart = null;
             _fromInventory = false;
             _isBulkDragging = false;
+            _bulkInteractionId = null;
+            _bulkAttemptCount = 0;
+            _bulkSuccessCount = 0;
             _hasPreviousBulkPosition = false;
             _bulkVisited.Clear();
             _dragIcon.gameObject.SetActive(false);
@@ -668,12 +689,18 @@ namespace Game.Player
         private void RecordInstallAttempt(KeyboardCustomization customization, int index, bool success, string actionSource)
         {
             string part = _entry.IsSwitch ? "Switch" : "Keycap";
-            string elementId = _entry.IsSwitch
-                ? _entry.SwitchData.Type.ToString()
-                : _entry.KeycapDefinition != null ? _entry.KeycapDefinition.Id : "Keycap";
+            string elementId = GetEntryLogId(_entry);
             Game.Logging.CustomizationTelemetry.Emit(customization, "PartInstallAttempted", part, elementId,
                 success: success, changed: success, targetId: customization.GetKeycapSlotId(index),
-                actionSource: actionSource, outcomeReason: success ? "" : GetInstallFailureReason(customization, index));
+                actionSource: actionSource, outcomeReason: success ? "" : GetInstallFailureReason(customization, index),
+                interactionId: actionSource == "BulkPlacement" ? _bulkInteractionId : "");
+        }
+
+        /// <summary>entry의 축 타입 또는 키캡 정의에서 로그용 부품 ID를 반환한다. 재고 상태는 변경하지 않는다.</summary>
+        private static string GetEntryLogId(AssemblyCatalogEntry entry)
+        {
+            return entry.IsSwitch ? entry.SwitchData.Type.ToString()
+                : entry.KeycapDefinition != null ? entry.KeycapDefinition.Id : "Keycap";
         }
 
         /// <summary>
@@ -696,7 +723,7 @@ namespace Game.Player
         public void CancelDrag()
         {
             if (!IsDragging) return;
-            if (_isBulkDragging) { EndBulkPlacement(); return; }
+            if (_isBulkDragging) { EndBulkPlacement(true, "Cancelled"); return; }
             _previewRenderer.Hide();
             if (_fromInventory)
             {

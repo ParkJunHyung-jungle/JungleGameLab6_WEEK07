@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 using UnityEngine;
 
+using Game.Logging;
+
 namespace KeyboardModeling.Assembly
 {
     public enum AssemblyStructurePart
@@ -369,6 +371,9 @@ namespace KeyboardModeling.Assembly
                 _fixedScrews[index] = !_releasingScrews[index];
                 _screwCount += _fixedScrews[index] ? 1 : -1;
                 if (_releasingScrews[index]) _screws[index].gameObject.SetActive(false);
+                CustomizationTelemetry.Emit(_customization, "ScrewChanged", "Pcb",
+                    _fixedScrews[index] ? "Fixed" : "Released", changed: true,
+                    targetId: "Screw:" + index, actionSource: "ScrewPointer", screwCount: _screwCount);
             }
         }
 

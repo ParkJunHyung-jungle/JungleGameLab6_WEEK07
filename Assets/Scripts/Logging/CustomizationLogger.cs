@@ -33,17 +33,18 @@ namespace Game.Logging
 
         /// <summary>
         /// target, type, 부품·선택 ID와 적용 결과를 제작 행동 관찰자에게 전달한다.
-        /// interactionId, targetId, actionSource 및 outcomeReason도 포함하며 게임 상태는 변경하지 않는다.
+        /// interactionId, 대상과 결과 및 작업 횟수도 포함하며 게임 상태는 변경하지 않는다.
         /// </summary>
         public static void Emit(KeyboardCustomization target, string type, string part = "", string element = "",
             string previous = "", bool success = true, bool changed = false, string scope = "", string key = "", string details = "", string keycapKind = "", string materialId = "",
-            string interactionId = "", string targetId = "", string actionSource = "", string outcomeReason = "")
+            string interactionId = "", string targetId = "", string actionSource = "", string outcomeReason = "",
+            int? attemptCount = null, int? successCount = null, int? screwCount = null)
         {
             if (!Application.isPlaying) return;
             // 허용된 제작 씬에서만 로거를 보장한다.
             CustomizationLogger.EnsureLogger();
             Observed?.Invoke(new CustomizationObservation(target, type, part, element, previous, success, changed, scope, key, details, keycapKind, materialId,
-                interactionId, targetId, actionSource, outcomeReason));
+                interactionId, targetId, actionSource, outcomeReason, attemptCount, successCount, screwCount));
         }
 
         /// <summary>
@@ -72,26 +73,31 @@ namespace Game.Logging
         public string TargetId { get; }
         public string ActionSource { get; }
         public string OutcomeReason { get; }
+        public int? AttemptCount { get; }
+        public int? SuccessCount { get; }
+        public int? ScrewCount { get; }
 
         /// <summary>
         /// 대상과 동작, 요소 및 적용 결과를 불변 관찰값으로 보관한다.
-        /// 전달된 scope, key와 details를 포함하며 게임 상태는 변경하지 않는다.
+        /// 전달된 scope, key, details와 v5 작업 횟수를 포함하며 게임 상태는 변경하지 않는다.
         /// </summary>
         public CustomizationObservation(KeyboardCustomization target, string type, string part, string element,
             string previous, bool success, bool changed, string scope, string key, string details, string keycapKind = "", string materialId = "",
-            string interactionId = "", string targetId = "", string actionSource = "", string outcomeReason = "")
+            string interactionId = "", string targetId = "", string actionSource = "", string outcomeReason = "",
+            int? attemptCount = null, int? successCount = null, int? screwCount = null)
         {
             Target = target; Type = type; Part = part; Element = element; Previous = previous;
             Success = success; Changed = changed; Scope = scope; Key = key; Details = details;
             KeycapKind = keycapKind; MaterialId = materialId;
             InteractionId = interactionId; TargetId = targetId; ActionSource = actionSource; OutcomeReason = outcomeReason;
+            AttemptCount = attemptCount; SuccessCount = successCount; ScrewCount = screwCount;
         }
     }
 
     [DisallowMultipleComponent]
     public sealed class CustomizationLogger : MonoBehaviour
     {
-        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed,test_run_id,cycle_id,cycle_index,configuration_id,parent_configuration_id,configuration_origin,linked_tournament_run_id,previous_tournament_run_id,tournament_index,participation_context,intervention_id,research_event_id,interaction_id,target_id,action_source,outcome_reason";
+        private const string HEADER = "schema_version,build_version,tester_id,session_id,customization_run_id,keyboard_id,scene_path,sequence,record_type,elapsed_seconds,part,part_visit_id,element_id,previous_element_id,apply_success,value_changed,target_scope,keycap_index,start_elapsed_seconds,end_elapsed_seconds,duration_seconds,focused_duration_seconds,end_reason,is_complete,details,keycap_kind,material_id,snapshot_id,is_installed,test_run_id,cycle_id,cycle_index,configuration_id,parent_configuration_id,configuration_origin,linked_tournament_run_id,previous_tournament_run_id,tournament_index,participation_context,intervention_id,research_event_id,interaction_id,target_id,action_source,outcome_reason,attempt_count,success_count,screw_count";
         private static CustomizationLogger _instance;
 
         [Header("Runtime")]
@@ -268,30 +274,39 @@ namespace Game.Logging
 
         /// <summary>
         /// observation의 측정 이벤트를 CSV 한 행으로 기록한다.
-        /// recordType을 사용하고 이전 스키마 열과 v4 추가 열에 식별값 및 결과를 저장한다.
+        /// recordType을 사용하고 기존 열과 v5 개수 열에 식별값 및 결과를 저장한다.
         /// </summary>
         private void WriteObservation(CustomizationObservation observation, string recordType)
         {
             string[] row = CreateRow(recordType);
             row[10] = observation.Part;
             row[12] = observation.Element; row[13] = observation.Previous;
-            row[14] = Bool(observation.Success); row[15] = Bool(observation.Changed);
+            if (recordType != "BulkPlacementStarted")
+            {
+                row[14] = Bool(observation.Success);
+                row[15] = Bool(observation.Changed);
+            }
             row[16] = observation.Scope; row[17] = observation.Key; row[24] = observation.Details;
             row[25] = observation.KeycapKind; row[26] = observation.MaterialId;
             row[41] = observation.InteractionId; row[42] = observation.TargetId;
             row[43] = observation.ActionSource; row[44] = observation.OutcomeReason;
+            row[45] = observation.AttemptCount?.ToString(CultureInfo.InvariantCulture);
+            row[46] = observation.SuccessCount?.ToString(CultureInfo.InvariantCulture);
+            row[47] = observation.ScrewCount?.ToString(CultureInfo.InvariantCulture);
             WriteRow(row);
         }
 
         /// <summary>
         /// 새 행동 로그에 포함할 recordType인지 반환한다.
-        /// 정의된 메뉴, 선택, 설치·제거 시도 및 도구 이벤트만 통과시킨다.
+        /// 정의된 메뉴, 설치·제거, 도구, 조립, 나사 및 일괄 배치 이벤트만 통과시킨다.
         /// </summary>
         private static bool IsSupportedRecordType(string recordType)
         {
             return recordType == "OptionSelected" || recordType == "PartInstallAttempted"
                 || recordType == "PartRemoveAttempted" || recordType == "ToolPickedUp"
-                || recordType == "ToolPutDown";
+                || recordType == "ToolPutDown" || recordType == "PartReturned"
+                || recordType == "StructureDragCancelled" || recordType == "ScrewChanged"
+                || recordType == "BulkPlacementStarted" || recordType == "BulkPlacementEnded";
         }
 
         /// <summary>편집 대상에 연결된 storage에서 실제 구성을 읽어 식별자를 갱신한다. 실패는 품질 이벤트로 남기며 편집은 유지한다.</summary>
@@ -343,8 +358,8 @@ namespace Game.Logging
         /// </summary>
         private string[] CreateRow(string type)
         {
-            string[] row = new string[45];
-            row[0] = "4"; row[1] = Application.version; row[2] = TesterId; row[3] = _sessionId;
+            string[] row = new string[48];
+            row[0] = "5"; row[1] = Application.version; row[2] = TesterId; row[3] = _sessionId;
             row[4] = _runId; row[5] = _keyboardId; row[6] = _scenePath;
             row[7] = (++_sequence).ToString(CultureInfo.InvariantCulture); row[8] = type;
             row[9] = Number(Time.realtimeSinceStartupAsDouble);

@@ -2293,18 +2293,20 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// mode를 여섯 편집 항목의 고정 로그 식별자로 변환하여 반환한다.
+        /// mode를 일반·조립 편집 항목의 고정 로그 식별자로 변환하여 반환한다.
         /// 목록이 닫힌 상태는 빈 값으로 반환한다.
         /// </summary>
-        private static string GetLogPart(PickerMode mode)
+        private string GetLogPart(PickerMode mode)
         {
             switch (mode)
             {
                 case PickerMode.Keycap: return "Keycap";
                 case PickerMode.SwitchSound: return "Switch";
                 case PickerMode.Led: return "LED";
-                case PickerMode.CaseMaterial: return "Case";
+                case PickerMode.CaseMaterial: return _assemblyCatalog ? "Lower" : "Case";
+                case PickerMode.Pcb: return "Pcb";
                 case PickerMode.Plate: return "Plate";
+                case PickerMode.Upper: return "Upper";
                 case PickerMode.Photo: return "CustomImage";
                 default: return "";
             }

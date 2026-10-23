@@ -9,12 +9,16 @@ namespace Game.Player
     {
         [Header("Assembly Scene Catalog")]
         [SerializeField] private bool _assemblyCatalog;
+        [SerializeField] private Material _pcbOutlineMaterial;
+        [SerializeField] private Shader _pcbDepthShader;
         private KeyboardEditButton _pcbButton;
         private KeyboardEditButton _upperButton;
         private RectTransform _assemblyActions;
         private KeyboardEditButton _installStructureButton;
         private Text _assemblyStatus;
-        private readonly KeyboardEditButton[] _screwButtons = new KeyboardEditButton[6];
+        private RectTransform _pcbViewport;
+        private WorkshopPcbCardDrag _pcbCard;
+        private WorkshopPcbScrewAssembly _screwAssembly;
         private KeyboardAssemblyState ActiveAssembly => _caseCustomization != null
             ? _caseCustomization.GetComponent<KeyboardAssemblyState>() : null;
 
@@ -24,6 +28,8 @@ namespace Game.Player
         /// </summary>
         private void BuildAssemblyControls()
         {
+            _screwAssembly = gameObject.AddComponent<WorkshopPcbScrewAssembly>();
+            _screwAssembly.Initialize(_pullerController, _pcbOutlineMaterial, _pcbDepthShader);
             _pcbButton = Instantiate(_caseButton, _caseButton.transform.parent);
             _pcbButton.name = "PcbButton";
             _upperButton = Instantiate(_caseButton, _caseButton.transform.parent);
@@ -43,6 +49,7 @@ namespace Game.Player
             RectTransform sidebar = (RectTransform)_caseButton.transform.parent;
             sidebar.sizeDelta = new Vector2(sidebar.sizeDelta.x, Mathf.Max(sidebar.sizeDelta.y, 372f));
             RectTransform background = (RectTransform)sidebar.Find("SidebarBackground");
+            background.SetAsFirstSibling();
             background.anchorMin = Vector2.zero;
             background.anchorMax = Vector2.one;
             background.offsetMin = background.offsetMax = Vector2.zero;
@@ -56,13 +63,23 @@ namespace Game.Player
             _assemblyStatus = CreateAssemblyLabel(_assemblyActions, "", 12f, 74f);
             _installStructureButton = CreateAssemblyAction("설치", 94f);
             _installStructureButton.Clicked += HandleStructureInstallClicked;
-            string[] screwNames = { "위 왼쪽", "위 가운데", "위 오른쪽", "아래 왼쪽", "아래 가운데", "아래 오른쪽" };
-            for (int index = 0; index < _screwButtons.Length; index++)
-            {
-                _screwButtons[index] = CreateAssemblyAction(screwNames[index] + " 나사 고정", 136f + index * 37f);
-                _screwButtons[index].Clicked += HandleScrewClicked;
-            }
             _assemblyActions.gameObject.SetActive(false);
+            _pcbViewport = CreateScrollViewport("Pcb", 1, out RectTransform content);
+            RectTransform card = new GameObject("PCB", typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton))
+                .GetComponent<RectTransform>();
+            card.SetParent(content, false);
+            card.sizeDelta = new Vector2(131f, 148f);
+            Image image = card.GetComponent<Image>();
+            image.sprite = _pickerSprite;
+            image.color = _pickerCardColor;
+            card.GetComponent<KeyboardEditButton>().targetGraphic = image;
+            card.GetComponent<KeyboardEditButton>().navigation = new Navigation { mode = Navigation.Mode.None };
+            Text label = CreateAssemblyLabel(card, "PCB · 드래그 배치", 112f, 32f);
+            label.rectTransform.anchoredPosition = new Vector2(6f, -112f);
+            label.rectTransform.sizeDelta = new Vector2(119f, 32f);
+            _pcbCard = card.gameObject.AddComponent<WorkshopPcbCardDrag>();
+            _pcbCard.Initialize(_pullerController, _pcbOutlineMaterial, _pcbDepthShader);
+            _pcbViewport.gameObject.SetActive(false);
         }
 
         /// <summary>parent에 text와 top, height를 사용한 조립 라벨을 만든다. 생성한 Text를 반환한다.</summary>
@@ -107,25 +124,25 @@ namespace Game.Player
             bool pcb = _pickerMode == PickerMode.Pcb;
             bool plate = _pickerMode == PickerMode.Plate;
             bool upper = _pickerMode == PickerMode.Upper;
+            _screwAssembly.SetContext(assembly, pcb);
+            _pcbCard.SetContext(assembly, pcb);
+            _pcbViewport.gameObject.SetActive(pcb && assembly != null);
             _pcbButton.interactable = _upperButton.interactable = assembly != null;
             _pcbButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(pcb);
             _upperButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(upper);
             _assemblyActions.gameObject.SetActive(assembly != null && (pcb || plate || upper));
             if (assembly == null) return;
             bool canInteract = _pullerController.InputAllowed && !_pullerController.IsManipulatingPart;
-            _assemblyActions.sizeDelta = new Vector2(250f, pcb ? 368f : 136f);
+            _assemblyActions.sizeDelta = new Vector2(250f, pcb ? 100f : 136f);
+            _installStructureButton.gameObject.SetActive(!pcb);
             _installStructureButton.interactable = canInteract
                 && (pcb ? assembly.CanInstallPcb : plate ? assembly.CanInstallPlate : assembly.CanInstallUpper);
             _installStructureButton.GetComponentInChildren<Text>().text = pcb ? "PCB 배치" : plate ? "보강판 설치" : "상단부 설치";
             _assemblyStatus.text = pcb
-                ? $"PCB 나사 {assembly.ScrewCount}/6 고정\n상단부·보강판 설치 전 PCB 배치"
-                : plate ? "PCB 나사 6개 고정 필요\n상단부·키캡이 없어야 설치 가능"
-                : "하단부가 있으면 설치 가능\n설치 후 PCB·보강판 배치 불가";
-            for (int index = 0; index < _screwButtons.Length; index++)
-            {
-                _screwButtons[index].gameObject.SetActive(pcb);
-                _screwButtons[index].interactable = canInteract && assembly.CanFixScrew(index);
-            }
+                ? $"{(assembly.PcbComplete ? "PCB 조립 완료" : assembly.PcbPlaced ? "PCB 배치됨" : "PCB 미설치")} · 나사 {assembly.ScrewCount}/6\n"
+                    + (assembly.PcbComplete ? "PCB 고정 완료" : assembly.PcbPlaced ? "나사 아웃라인을 클릭해 고정" : "하단부 위로 PCB를 드래그해 배치")
+                : plate ? $"보강판 {(assembly.PlateInstalled ? "설치됨" : "미설치")}\nPCB 조립 완료 · 상단부 없음 · 키캡 없음 필요"
+                : $"상단부 {(assembly.UpperInstalled ? "설치됨" : "미설치")}\n하단부만 필요 · 설치 후 PCB·보강판 배치 불가";
             if (upper || _pickerMode == PickerMode.CaseMaterial) RefreshCaseMaterialSelection();
         }
 
@@ -133,18 +150,8 @@ namespace Game.Player
         private void HandleStructureInstallClicked(KeyboardEditButton button)
         {
             if (ActiveAssembly == null || !_pullerController.InputAllowed || _pullerController.IsManipulatingPart) return;
-            if (_pickerMode == PickerMode.Pcb) ActiveAssembly.InstallPcb();
-            else if (_pickerMode == PickerMode.Plate) ActiveAssembly.InstallPlate();
+            if (_pickerMode == PickerMode.Plate) ActiveAssembly.InstallPlate();
             else if (_pickerMode == PickerMode.Upper) ActiveAssembly.InstallUpper();
-            RefreshAssemblyControls();
-        }
-
-        /// <summary>button에 대응하는 나사 한 개를 고정한다. PCB 배치와 중복 상태를 검사하고 표시를 갱신한다.</summary>
-        private void HandleScrewClicked(KeyboardEditButton button)
-        {
-            if (ActiveAssembly == null || !_pullerController.InputAllowed || _pullerController.IsManipulatingPart) return;
-            for (int index = 0; index < _screwButtons.Length; index++)
-                if (_screwButtons[index] == button) ActiveAssembly.FixScrew(index);
             RefreshAssemblyControls();
         }
 
@@ -154,7 +161,6 @@ namespace Game.Player
             _pcbButton.Clicked -= HandleCategoryClicked;
             _upperButton.Clicked -= HandleCategoryClicked;
             _installStructureButton.Clicked -= HandleStructureInstallClicked;
-            foreach (KeyboardEditButton button in _screwButtons) button.Clicked -= HandleScrewClicked;
         }
     }
 }

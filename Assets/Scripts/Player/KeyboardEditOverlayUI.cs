@@ -676,8 +676,10 @@ namespace Game.Player
         {
             PickerMode.Keycap => "키캡 카탈로그",
             PickerMode.SwitchSound => "스위치 카탈로그",
-            PickerMode.CaseMaterial => "케이스 재질",
+            PickerMode.CaseMaterial => _assemblyCatalog ? "하단부 재질" : "케이스 재질",
             PickerMode.Plate => "보강판 편집",
+            PickerMode.Pcb => "PCB 조립",
+            PickerMode.Upper => "상단부 재질",
             PickerMode.Photo => "이미지 편집",
             PickerMode.Led => "LED 편집",
             _ => "키보드 편집"

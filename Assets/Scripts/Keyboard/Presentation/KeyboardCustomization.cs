@@ -135,10 +135,15 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public int FindKeycapSlot(Ray ray, bool switchSlot = false)
     {
         if (_keycaps == null) CacheKeycaps();
+        KeyboardModeling.Assembly.KeyboardAssemblyState assembly = GetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>();
+        if (assembly != null && switchSlot && !assembly.CanInstallSwitch(false, false)) return -1;
         float nearest = float.PositiveInfinity;
         int result = -1;
         for (int index = 0; index < _keycaps.Length; index++)
         {
+            if (assembly != null && (switchSlot
+                ? !assembly.CanInstallSwitch(HasSwitchForKeycap(index), IsKeycapInstalled(index))
+                : !assembly.CanInstallKeycap(IsKeycapInstalled(index), HasSwitchForKeycap(index)))) continue;
             Bounds bounds = switchSlot ? GetSwitchSlotBounds(index) : GetKeycapSlotBounds(index);
             if (bounds.IntersectRay(ray, out float distance) && distance < nearest)
             {
@@ -221,9 +226,10 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     /// <summary>index의 축 슬롯 점유와 type 데이터로 설치 가능 여부를 반환한다. 외형, 재고와 효과음은 변경하지 않는다.</summary>
     public bool CanInstallSwitchFromInventory(int index, SwitchType type)
     {
-        if (TryGetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>(out var assembly) && !assembly.PcbComplete)
-            return false;
         if (_keycaps == null) CacheKeycaps();
+        if (index < 0 || index >= _switches.Length) return false;
+        if (TryGetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>(out var assembly)
+            && !assembly.CanInstallSwitch(HasSwitchForKeycap(index), IsKeycapInstalled(index))) return false;
         return index >= 0 && index < _switches.Length && !HasSwitchForKeycap(index)
             && !IsKeycapInstalled(index) && _switches[index].HasSwitchType(type);
     }
@@ -232,6 +238,9 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     public bool CanInstallKeycapFromInventory(int index, Material material, Game.Tournament.KeycapDefinition definition)
     {
         if (_keycaps == null) CacheKeycaps();
+        if (index < 0 || index >= _keycaps.Length) return false;
+        if (TryGetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>(out var assembly)
+            && !assembly.CanInstallKeycap(IsKeycapInstalled(index), HasSwitchForKeycap(index))) return false;
         if (index < 0 || index >= _keycaps.Length || IsKeycapInstalled(index) || material == null
             || !HasSwitchForKeycap(index) || _keycaps[index] == null) return false;
         Transform keycap = _keycaps[index];
@@ -456,6 +465,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     /// </summary>
     public void PrepareForBattle()
     {
+        if (TryGetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>(out _)) return;
         foreach (KeyboardSwitch keyboardSwitch in _switches) keyboardSwitch.gameObject.SetActive(true);
         GetComponent<KeyboardInputController>().SetSwitchSound(_switchType);
         if (_keycaps == null) CacheKeycaps();
@@ -1241,6 +1251,12 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     private bool ApplySwitchType(SwitchType type, bool activate)
     {
         if (_switches.Length == 0) return false;
+        if (activate && TryGetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>(out var assembly))
+        {
+            if (_keycaps == null) CacheKeycaps();
+            for (int index = 0; index < _switches.Length; index++)
+                if (!assembly.CanInstallSwitch(HasSwitchForKeycap(index), IsKeycapInstalled(index))) return false;
+        }
         foreach (KeyboardSwitch keyboardSwitch in _switches)
         {
             if (!keyboardSwitch.HasSwitchType(type))

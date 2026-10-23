@@ -167777,3 +167777,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d626322e2624714ab14ab507c74b2a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeycapHealth
+--- !u!23 &8853000000000000001 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 2821128089571546917, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
+  m_PrefabInstance: {fileID: 712209937148672475}
+  m_PrefabAsset: {fileID: 0}

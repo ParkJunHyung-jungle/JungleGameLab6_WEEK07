@@ -34,6 +34,8 @@ namespace Game.Player
         private readonly List<GameObject> _fragments = new List<GameObject>();
         private KeyboardInputController _editingKeyboard;
         private float _dragWorldHeight;
+        private bool _pcbDragging;
+        private bool _screwPointerCaptured;
 
         public bool IsEditing => _workshopView != null ? _workshopView.IsKeyboardEditing
             : _interaction != null && _interaction.IsKeyboardEditing;
@@ -44,9 +46,23 @@ namespace Game.Player
             && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen
             && InGameCursor.CanProcessVirtualPointer;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
-            || (_keycapPlacement != null && _keycapPlacement.IsDragging);
+            || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && _keycapPlacement.IsDragging);
+        public bool IsPcbDragging => _pcbDragging;
+        public bool IsScrewPointerCaptured => _screwPointerCaptured;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
+
+        /// <summary>dragging으로 PCB가 공통 포인터를 사용하는지 기록한다. 다른 부품 드래그와 풀러 입력을 막으며 조립 상태는 변경하지 않는다.</summary>
+        public void SetPcbDragging(bool dragging)
+        {
+            _pcbDragging = dragging;
+        }
+
+        /// <summary>captured로 나사 클릭의 포인터 점유를 기록한다. 같은 클릭이 풀러나 뒤쪽 부품 조작으로 전달되지 않게 한다.</summary>
+        public void SetScrewPointerCaptured(bool captured)
+        {
+            _screwPointerCaptured = captured;
+        }
 
         /// <summary>
         /// collider가 W08의 키캡 풀러나 스위치 풀러 또는 해당 복귀 표시에 속하는지 반환한다.
@@ -118,7 +134,7 @@ namespace Game.Player
                 UpdateDragHeight();
             }
             if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
-            if (_keycapPlacement != null && _keycapPlacement.IsDragging) return;
+            if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && _keycapPlacement.IsDragging) return;
             Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);
             if (_keycapPuller.ProcessPointer(ray, pointer, Mouse.current)) return;

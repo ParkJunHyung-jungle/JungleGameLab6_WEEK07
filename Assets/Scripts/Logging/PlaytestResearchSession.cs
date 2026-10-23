@@ -117,7 +117,8 @@ namespace Game.Logging
             {
                 if (IsUploadScene(SceneManager.GetActiveScene().name))
                 {
-                    if (LogUploadCoordinator.Instance != null && LogUploadCoordinator.Instance.IsBusy) return;
+                    LogUploadCoordinator coordinator = LogUploadCoordinator.EnsureAvailable();
+                    if (coordinator != null && coordinator.IsBusy) return;
                     _panelOpen = false;
                     SetUploadConfirmationOpen(!_uploadConfirmationOpen);
                     Emit("LogUploadPrompt", _uploadConfirmationOpen ? "Opened" : "Closed");
@@ -205,7 +206,7 @@ namespace Game.Logging
             LogUploadCoordinator coordinator = LogUploadCoordinator.Instance;
             if (coordinator == null)
             {
-                GUILayout.Label("업로드 기능을 시작하지 못했습니다. 앱을 다시 실행해 주세요.");
+                GUILayout.Label("업로드 기능을 준비하지 못했습니다. 로그 폴더를 열어 파일을 보관해 주세요.");
             }
             else if (!string.IsNullOrEmpty(coordinator.LastError))
             {
@@ -219,10 +220,12 @@ namespace Game.Logging
                 CustomizationLogger.FlushForUpload();
                 CustomizationLogger.OpenLogFolder();
             }
+            GUI.enabled = coordinator != null;
             if (GUILayout.Button("예, 전송"))
             {
-                if (coordinator != null && coordinator.BeginUploadAfterConsent()) SetUploadConfirmationOpen(false);
+                if (coordinator.BeginUploadAfterConsent()) SetUploadConfirmationOpen(false);
             }
+            GUI.enabled = true;
             if (GUILayout.Button("아니오"))
             {
                 Emit("LogUploadConsent", "Declined");

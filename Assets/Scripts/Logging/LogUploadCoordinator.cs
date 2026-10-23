@@ -57,15 +57,26 @@ namespace Game.Logging
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureCoordinator()
         {
-            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive || _instance != null) return;
-            new GameObject("LogUploadCoordinator").AddComponent<LogUploadCoordinator>();
+            EnsureAvailable();
+        }
+
+        /// <summary>
+        /// 현재 씬에서 업로드 조정기가 없으면 새 인스턴스를 생성하여 반환한다.
+        /// WorkShop0에서는 생성하지 않고 null을 반환하며 F12 진입 시에도 복구에 사용한다.
+        /// </summary>
+        public static LogUploadCoordinator EnsureAvailable()
+        {
+            if (Game.Workshop.CustomizationOnlyWorkshop.IsActive) return null;
+            if (_instance == null)
+                new GameObject("LogUploadCoordinator").AddComponent<LogUploadCoordinator>();
+            return _instance;
         }
 
         void Awake()
         {
             if (_instance != null && _instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
                 return;
             }
 
@@ -74,6 +85,11 @@ namespace Game.Logging
             _config = Resources.Load<GameConfig>("GameConfig");
             _manifestPath = Path.Combine(Application.persistentDataPath, MANIFEST_FILE_NAME);
             LoadManifest();
+        }
+
+        void OnDestroy()
+        {
+            if (_instance == this) _instance = null;
         }
 
         void OnGUI()

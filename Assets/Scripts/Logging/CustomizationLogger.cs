@@ -124,7 +124,7 @@ namespace Game.Logging
 
         void Awake()
         {
-            if (_instance != null) { Destroy(gameObject); return; }
+            if (_instance != null) { Destroy(this); return; }
             _instance = this;
             _ownsSession = true;
             DontDestroyOnLoad(gameObject);

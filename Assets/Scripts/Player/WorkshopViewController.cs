@@ -288,9 +288,12 @@ namespace Game.Player
                 EditingKeyboard.SetAttackEnabled(_keyboardAttackWasEnabled);
             }
             EditingKeyboard = null;
-            _inventoryGroup.alpha = 0f;
-            _inventoryGroup.interactable = false;
-            _inventoryGroup.blocksRaycasts = false;
+            if (_inventoryGroup != null)
+            {
+                _inventoryGroup.alpha = 0f;
+                _inventoryGroup.interactable = false;
+                _inventoryGroup.blocksRaycasts = false;
+            }
         }
 
         /// <summary>

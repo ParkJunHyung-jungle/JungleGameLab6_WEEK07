@@ -29,16 +29,16 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// keyboardRoot의 현재 활성 메시와 본체 기준 변환 및 배율을 운반 시작 시 저장한다.
+        /// keyboardRoot의 메시와 본체 기준 변환 및 배율을 저장하며 includeInactive가 참이면 숨긴 설치 대상도 포함한다.
         /// 메시 자산은 공유하며 원본 외곽선 중복 표시를 제외하고 동작과 물리 컴포넌트는 생성하지 않는다.
         /// </summary>
-        public void Prepare(Transform keyboardRoot)
+        public void Prepare(Transform keyboardRoot, bool includeInactive = false)
         {
             _meshes.Clear();
             _scale = keyboardRoot.lossyScale;
-            foreach (MeshRenderer renderer in keyboardRoot.GetComponentsInChildren<MeshRenderer>())
+            foreach (MeshRenderer renderer in keyboardRoot.GetComponentsInChildren<MeshRenderer>(includeInactive))
             {
-                if (!renderer.enabled || !renderer.gameObject.activeInHierarchy
+                if (!renderer.enabled || (!includeInactive && !renderer.gameObject.activeInHierarchy)
                     || (renderer.sharedMaterial != null && renderer.sharedMaterial.shader == _outlineMaterial.shader))
                     continue;
                 MeshFilter filter = renderer.GetComponent<MeshFilter>();
@@ -66,6 +66,12 @@ namespace Game.Player
                         null, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
                 }
             }
+        }
+
+        /// <summary>color로 현재 외곽선 색을 바꾼다. 공유 원본 재질은 유지하고 다음 표시부터 적용한다.</summary>
+        public void SetOutlineColor(Color color)
+        {
+            _outlineMaterial.SetColor("_OutlineColor", color);
         }
 
         /// <summary>

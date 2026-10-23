@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -7,10 +7,11 @@ using UnityEngine.Rendering;
 using UnityEngine.UI;
 
 using Game.Tournament;
+using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
-    public sealed class KeyboardEditOverlayUI : MonoBehaviour, IPointerDownHandler
+    public sealed partial class KeyboardEditOverlayUI : MonoBehaviour, IPointerDownHandler
     {
         private const int PREVIEW_LAYER = 31;
         private const int PREVIEW_TEXTURE_SIZE = 128;
@@ -152,7 +153,9 @@ namespace Game.Player
             CaseMaterial,
             Plate,
             Photo,
-            Led
+            Led,
+            Pcb,
+            Upper
         }
 
         void Awake()
@@ -194,10 +197,12 @@ namespace Game.Player
             ledPanel.SetActive(false);
             _ledUI = ledPanel.AddComponent<KeyboardLEDPanelUI>();
             _ledUI.Initialize();
+            if (_assemblyCatalog) BuildAssemblyControls();
         }
 
         void LateUpdate()
         {
+            if (_assemblyCatalog) RefreshAssemblyControls();
             if (_photoUI == null)
                 return;
 
@@ -238,7 +243,7 @@ namespace Game.Player
 
             SetPlatePickerEventBindings(true);
 
-            SetPickerMode(_showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
+            SetPickerMode(_showKeycapsOnOpen ? (_assemblyCatalog ? PickerMode.CaseMaterial : PickerMode.Keycap) : PickerMode.None);
         }
 
         void OnDisable()
@@ -274,6 +279,7 @@ namespace Game.Player
 
         void OnDestroy()
         {
+            if (_assemblyCatalog) ReleaseAssemblyControls();
             _photoUI.CloseRequested -= HandlePhotoCloseRequested;
             _photoUI.CustomizationLoaded -= HandlePhotoCustomizationLoaded;
             _keycapUI.TargetChanged -= HandleKeycapTargetChanged;
@@ -646,7 +652,8 @@ namespace Game.Player
                     _casePreviewButtons[index],
                     _caseCardBackgrounds[index],
                     _caseSelectionIndicators[index],
-                    _keycapMaterials[_caseMaterialIndices[index]] == _caseCustomization.CaseMaterial);
+                    _keycapMaterials[_caseMaterialIndices[index]] == (_pickerMode == PickerMode.Upper && ActiveAssembly != null
+                        ? ActiveAssembly.UpperMaterial : _caseCustomization.CaseMaterial));
             }
         }
 
@@ -682,8 +689,10 @@ namespace Game.Player
         {
             PickerMode.Keycap => "키캡 카탈로그",
             PickerMode.SwitchSound => "스위치 카탈로그",
-            PickerMode.CaseMaterial => "케이스 재질",
+            PickerMode.CaseMaterial => _assemblyCatalog ? "하단부 재질" : "케이스 재질",
             PickerMode.Plate => "보강판 편집",
+            PickerMode.Pcb => "PCB 조립",
+            PickerMode.Upper => "상단부 재질",
             PickerMode.Photo => "이미지 편집",
             PickerMode.Led => "LED 편집",
             _ => "키보드 편집"
@@ -728,7 +737,11 @@ namespace Game.Player
         private void HandleCategoryClicked(KeyboardEditButton button)
         {
             PickerMode mode = PickerMode.None;
-            if (button == _keycapButton)
+            if (button == _pcbButton)
+                mode = PickerMode.Pcb;
+            else if (button == _upperButton)
+                mode = PickerMode.Upper;
+            else if (button == _keycapButton)
                 mode = PickerMode.Keycap;
             else if (button == _switchAxisButton)
                 mode = PickerMode.SwitchSound;
@@ -838,6 +851,13 @@ namespace Game.Player
         /// </summary>
         private void HandleCasePreviewClicked(KeyboardEditButton button)
         {
+            if (_pickerMode == PickerMode.Upper)
+            {
+                if (ActiveAssembly != null && _pullerController.InputAllowed)
+                    ActiveAssembly.SetUpperMaterial(_keycapMaterials[_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]]);
+                RefreshCaseMaterialSelection();
+                return;
+            }
             CaseMaterialSelected?.Invoke(_keycapMaterials[_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]]);
         }
 
@@ -1896,6 +1916,8 @@ namespace Game.Player
                 _plateMaterialCardBackgrounds.Add(cardBackground);
                 _plateMaterialButtonMaterials.Add(material);
                 _plateMaterialSelectionIndicators.Add(selectionIndicator);
+                if (_assemblyCatalog)
+                    button.gameObject.AddComponent<WorkshopStructureMaterialDrag>().Initialize(this, material, AssemblyStructurePart.Plate);
             }
         }
 
@@ -2102,12 +2124,14 @@ namespace Game.Player
         /// </summary>
         private Mesh CreateCasePreviewMesh()
         {
+            if (_assemblyCatalog && _caseCustomization.CaseRenderers.Count == 1)
+                return Instantiate(_caseCustomization.CaseRenderers[0].GetComponent<MeshFilter>().sharedMesh);
             List<CombineInstance> parts = new List<CombineInstance>();
             Matrix4x4 keyboardInverse = _caseCustomization.transform.worldToLocalMatrix;
             foreach (MeshRenderer renderer in _caseCustomization.CaseRenderers)
             {
                 MeshFilter filter = renderer != null ? renderer.GetComponent<MeshFilter>() : null;
-                if (filter == null || filter.sharedMesh == null)
+                if (filter == null || filter.sharedMesh == null || !filter.sharedMesh.isReadable)
                     continue;
 
                 for (int subMesh = 0; subMesh < filter.sharedMesh.subMeshCount; subMesh++)
@@ -2160,6 +2184,13 @@ namespace Game.Player
                 _caseCardBackgrounds.Add(cardBackground);
                 _caseMaterialIndices.Add(index);
                 _caseSelectionIndicators.Add(selectionIndicator);
+                if (_assemblyCatalog)
+                {
+                    WorkshopStructureMaterialDrag drag = button.gameObject.AddComponent<WorkshopStructureMaterialDrag>();
+                    drag.Initialize(this, material, _pickerMode == PickerMode.Upper
+                        ? AssemblyStructurePart.Upper : AssemblyStructurePart.Lower);
+                    drag.enabled = _pickerMode == PickerMode.Upper || _pickerMode == PickerMode.CaseMaterial;
+                }
             }
         }
 
@@ -2184,6 +2215,9 @@ namespace Game.Player
         /// </summary>
         private void SetPickerMode(PickerMode mode)
         {
+            if (_keycapButton == null || _switchAxisButton == null || _ledButton == null
+                || _caseButton == null || _plateButton == null || _customButton == null
+                || _assemblyCatalog && (_pcbButton == null || _upperButton == null)) return;
             PickerMode previous = _pickerMode;
             _pickerMode = mode == PickerMode.Keycap && _viewport == null ? PickerMode.None : mode;
             if (previous == PickerMode.Keycap && _pickerMode != PickerMode.Keycap)
@@ -2204,7 +2238,7 @@ namespace Game.Player
             _switchSoundViewport.gameObject.SetActive(_pickerMode == PickerMode.SwitchSound);
             if (_caseMaterialViewport != null)
             {
-                _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial);
+                _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial || _pickerMode == PickerMode.Upper);
             }
             if (_plateViewport != null)
             {
@@ -2226,6 +2260,7 @@ namespace Game.Player
             }
             if (_pickerMode == PickerMode.Led)
                 _ledUI.Open(_ledCustomization);
+            if (_assemblyCatalog) RefreshAssemblyControls();
             if (previous != _pickerMode)
                 Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartChanged", GetLogPart(_pickerMode),
                     previous: GetLogPart(previous));

@@ -236,6 +236,17 @@ namespace KeyboardModeling
             return result;
         }
 
+        /// <summary>현재 키캡과 축 스템 위치를 타건 복원 기준으로 갱신한다. 바인딩과 축별 사운드는 유지하며 Awake 이전이면 이후 기본 캐시를 사용한다.</summary>
+        public void RefreshKeyRestPositions()
+        {
+            if (_restPositions == null) return;
+            for (int index = 0; index < _bindings.Length; index++)
+            {
+                _restPositions[index] = _bindings[index].Keycap.localPosition;
+                CacheSwitchStems(index);
+            }
+        }
+
         void Awake()
         {
             CacheSwitchBindings();

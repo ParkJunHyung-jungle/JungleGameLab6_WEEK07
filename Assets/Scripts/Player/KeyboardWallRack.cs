@@ -22,6 +22,16 @@ namespace Game.Player
         public string PersistentId => _persistentId;
         public Rigidbody KeyboardBody => _keyboardBody;
 
+        /// <summary>
+        /// 본체 시각 중심의 회전 기준 오프셋으로 기존 장착점의 최종 배치 자세를 반환한다.
+        /// centerOffset을 사용하며 점유와 실제 키보드 자세는 변경하지 않는다.
+        /// </summary>
+        public Pose GetPlacementPose(Vector3 centerOffset)
+        {
+            Quaternion rotation = _keyboardMountPoint.rotation;
+            return new Pose(_keyboardMountPoint.position - rotation * centerOffset, rotation);
+        }
+
         void OnTriggerStay(Collider other)
         {
             if (_keyboardBody != null)

@@ -1579,7 +1579,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7000000000000000901}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
 --- !u!1 &420863323
@@ -2583,7 +2586,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7000000000000000911}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
 --- !u!1 &932701633
@@ -3789,7 +3795,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7000000000000000921}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
 --- !u!1 &1245790183
@@ -4997,7 +5006,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7000000000000000931}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
 --- !u!114 &1830597402
@@ -10761,6 +10773,18 @@ MonoBehaviour:
   _workbenchCamera: {fileID: 1302916166}
   _placementOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
   _placementDepthShader: {fileID: 4800000, guid: c15e67eed99449a2a286129ff6aa137e, type: 3}
+  _hangerCamera: {fileID: 971817264}
+  _hangerHolders:
+  - {fileID: 7000000000000000904}
+  - {fileID: 7000000000000000914}
+  - {fileID: 7000000000000000924}
+  - {fileID: 7000000000000000934}
+  _hangerAreas:
+  - {fileID: 7000000000000000902}
+  - {fileID: 7000000000000000912}
+  - {fileID: 7000000000000000922}
+  - {fileID: 7000000000000000932}
+  _hangerWorldX: -3.18
   _dragWorldHeight: 0.145
 --- !u!1 &7000000000000000500
 GameObject:
@@ -10875,6 +10899,282 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 19.25, y: 0.85, z: 7.4}
   m_Center: {x: 9.25, y: 0.5, z: 2.8}
+--- !u!1 &7000000000000000900
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7000000000000000901}
+  - component: {fileID: 7000000000000000902}
+  m_Layer: 0
+  m_Name: HangerCursorArea
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7000000000000000901
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000900}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 3.9109, y: 1, z: 1.9854}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7000000000000000903}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7000000000000000902
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000900}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.9, y: 1.25, z: 1}
+  m_Center: {x: 0, y: 0.38, z: 0.38}
+--- !u!4 &7000000000000000903 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 378976912}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7000000000000000904 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 378976912}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40abfa85973b484d9de975abb2ca54b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardWallRack
+--- !u!1 &7000000000000000910
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7000000000000000911}
+  - component: {fileID: 7000000000000000912}
+  m_Layer: 0
+  m_Name: HangerCursorArea
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7000000000000000911
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000910}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 3.9109, y: 1, z: 1.9854}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7000000000000000913}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7000000000000000912
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000910}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.9, y: 1.25, z: 1}
+  m_Center: {x: 0, y: 0.38, z: 0.38}
+--- !u!4 &7000000000000000913 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 910025451}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7000000000000000914 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 910025451}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40abfa85973b484d9de975abb2ca54b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardWallRack
+--- !u!1 &7000000000000000920
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7000000000000000921}
+  - component: {fileID: 7000000000000000922}
+  m_Layer: 0
+  m_Name: HangerCursorArea
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7000000000000000921
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000920}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 3.9109, y: 1, z: 1.9854}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7000000000000000923}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7000000000000000922
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000920}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.9, y: 1.25, z: 1}
+  m_Center: {x: 0, y: 0.38, z: 0.38}
+--- !u!4 &7000000000000000923 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 1191349679}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7000000000000000924 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 1191349679}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40abfa85973b484d9de975abb2ca54b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardWallRack
+--- !u!1 &7000000000000000930
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7000000000000000931}
+  - component: {fileID: 7000000000000000932}
+  m_Layer: 0
+  m_Name: HangerCursorArea
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7000000000000000931
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000930}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 3.9109, y: 1, z: 1.9854}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7000000000000000933}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7000000000000000932
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000930}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.9, y: 1.25, z: 1}
+  m_Center: {x: 0, y: 0.38, z: 0.38}
+--- !u!4 &7000000000000000933 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3827855010267814428, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 1770770338}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7000000000000000934 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1897567092171562203, guid: 2285769c2d4ed7a429286c7cf2e8b30e, type: 3}
+  m_PrefabInstance: {fileID: 1770770338}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40abfa85973b484d9de975abb2ca54b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardWallRack
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

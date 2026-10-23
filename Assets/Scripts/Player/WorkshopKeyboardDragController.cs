@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -31,6 +31,14 @@ namespace Game.Player
         [SerializeField] private Material _placementOutlineMaterial;
         [SerializeField] private Shader _placementDepthShader;
         private WorkshopKeyboardPlacementPreview _placementPreview;
+
+        [Header("Hanger Placement")]
+        [SerializeField] private CinemachineCamera _hangerCamera;
+        [SerializeField] private KeyboardWallRack[] _hangerHolders = new KeyboardWallRack[0];
+        [SerializeField] private Collider[] _hangerAreas = new Collider[0];
+        [SerializeField] private float _hangerWorldX = -3.18f;
+        private bool _usingHangerPlane;
+        private bool _awaitingHangerPlacement;
 
         [Header("Drag Plane")]
         [SerializeField, Tooltip("본체를 운반할 수평면의 절대 월드 Y 높이입니다.")]
@@ -77,7 +85,14 @@ namespace Game.Player
 
             if (_isDragging)
             {
-                if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
+                if (_awaitingHangerPlacement)
+                {
+                    if (mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI())
+                        _releasePending = true;
+                    else if (mouse.leftButton.wasReleasedThisFrame)
+                        _releasePending = true;
+                }
+                else if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
                     _releasePending = true;
                 return;
             }
@@ -132,25 +147,83 @@ namespace Game.Player
             if (!_isDragging)
                 return;
 
+            if (!_brain.IsBlending)
+                _usingHangerPlane = _hangerCamera != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_hangerCamera;
+            if (!_brain.IsBlending && !_usingHangerPlane && _awaitingHangerPlacement)
+                _releasePending = true;
             Quaternion rotation = _outputCamera.transform.rotation * _dragRotation;
             // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
             if (TryGetDragPosition(out Vector3 position))
                 _keyboardBody.position = position;
             _keyboardBody.rotation = rotation;
-            bool hasHolder = IsHolderUnderCursor();
-            if (hasHolder && !_releasePending)
-                _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset));
+            KeyboardWallRack hanger = _usingHangerPlane ? GetHangerUnderCursor() : null;
+            bool hasHolder = !_usingHangerPlane && IsHolderUnderCursor();
+            if (!_brain.IsBlending && !_releasePending)
+            {
+                if (hanger != null) _placementPreview.Show(hanger.GetPlacementPose(_centerOffset));
+                else if (hasHolder) _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset));
+            }
             if (_releasePending && !_brain.IsBlending)
             {
-                if (hasHolder && _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset))
+                bool placed = hanger != null ? hanger.TryAttachKeyboard(_keyboardBody, true)
+                    : hasHolder && _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset);
+                if (placed)
                 {
+                    if (hanger != null)
+                    {
+                        Pose pose = hanger.GetPlacementPose(_centerOffset);
+                        _keyboardBody.position = pose.position;
+                        _keyboardBody.rotation = pose.rotation;
+                        _keyboardBody.transform.SetPositionAndRotation(pose.position, pose.rotation);
+                    }
                     _isDragging = false;
                     _releasePending = false;
+                    _awaitingHangerPlacement = false;
                     _acceptPress = false;
+                }
+                else if (_usingHangerPlane)
+                {
+                    _releasePending = false;
+                    _awaitingHangerPlacement = true;
                 }
                 else
                     DropKeyboard();
             }
+        }
+
+        /// <summary>
+        /// 명시된 장식장 영역 중 커서 Ray가 가장 먼저 닿는 빈 Holder를 반환한다.
+        /// UI와 블렌드 및 실제 물체 가림을 검사하고 운반 본체와 장착 자식은 제외한다.
+        /// </summary>
+        private KeyboardWallRack GetHangerUnderCursor()
+        {
+            if (_brain.IsBlending || IsPointerOverUI()) return null;
+            Physics.SyncTransforms();
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            float nearest = _outputCamera.farClipPlane;
+            KeyboardWallRack holder = null;
+            for (int i = 0; i < _hangerHolders.Length; i++)
+            {
+                if (_hangerAreas[i].Raycast(ray, out RaycastHit hit, nearest))
+                {
+                    nearest = hit.distance;
+                    holder = _hangerHolders[i];
+                }
+            }
+            return holder != null && holder.KeyboardBody == null && !IsPlacementOccluded(ray, nearest) ? holder : null;
+        }
+
+        /// <summary>
+        /// ray에서 배치 영역의 distance 앞에 실제 가림 물체가 있으면 true를 반환한다.
+        /// 운반 본체와 그 자식 충돌체는 제외하고 물체 상태는 변경하지 않는다.
+        /// </summary>
+        private bool IsPlacementOccluded(Ray ray, float distance)
+        {
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (!hit.transform.IsChildOf(_keyboardBody.transform) && hit.distance < distance)
+                    return true;
+            return false;
         }
 
         /// <summary>
@@ -168,13 +241,7 @@ namespace Game.Player
             if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane))
                 return false;
 
-            foreach (RaycastHit hit in Physics.RaycastAll(ray, areaHit.distance,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-            {
-                if (!hit.transform.IsChildOf(_keyboardBody.transform) && hit.distance < areaHit.distance)
-                    return false;
-            }
-            return true;
+            return !IsPlacementOccluded(ray, areaHit.distance);
         }
 
         /// <summary>
@@ -231,18 +298,26 @@ namespace Game.Player
                 return false;
             Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
 
-            var dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragWorldHeight, 0f));
-            if (!dragPlane.Raycast(ray, out float distance))
+            _usingHangerPlane = _hangerCamera != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_hangerCamera;
+            Plane dragPlane = GetDragPlane();
+            if (!dragPlane.Raycast(ray, out float distance) || distance > _outputCamera.farClipPlane)
                 return false;
 
             _workbenchHolder.ReleaseKeyboard(_keyboardBody);
-            if (_keyboardBody.transform.parent == _workbenchHolder.transform)
-                _keyboardBody.transform.SetParent(null, true);
+            bool detach = _keyboardBody.transform.parent == _workbenchHolder.transform;
+            foreach (KeyboardWallRack holder in _hangerHolders)
+            {
+                if (holder.KeyboardBody != _keyboardBody) continue;
+                holder.ReleaseKeyboard(_keyboardBody);
+                detach |= _keyboardBody.transform.parent == holder.transform;
+            }
+            if (detach) _keyboardBody.transform.SetParent(null, true);
 
             Vector3 center = _keyboardBody.transform.TransformPoint(
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
             _pointerOffset = _keyboardBody.position - ray.GetPoint(distance);
-            _pointerOffset.y = 0f;
+            if (_usingHangerPlane) _pointerOffset.x = 0f;
+            else _pointerOffset.y = 0f;
             _centerOffset = Quaternion.Inverse(_keyboardBody.rotation) * (center - _keyboardBody.position);
             _dragRotation = Quaternion.Inverse(_outputCamera.transform.rotation) * _keyboardBody.rotation;
             if (!_keyboardBody.isKinematic)
@@ -253,29 +328,45 @@ namespace Game.Player
             _keyboardBody.isKinematic = true;
             _keyboardBody.useGravity = false;
             Vector3 position = _keyboardBody.position;
-            position.y = _dragWorldHeight;
+            if (_usingHangerPlane) position.x = _hangerWorldX;
+            else position.y = _dragWorldHeight;
             _keyboardBody.position = position;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             _releasePending = false;
+            _awaitingHangerPlacement = false;
             _placementPreview.Prepare(_keyboardBody.transform);
             _isDragging = true;
             return true;
         }
 
         /// <summary>
-        /// 현재 커서 Ray와 지정한 절대 월드 높이의 수평면으로 본체 목표 위치를 계산한다.
-        /// 집기 시 X/Z 오프셋을 유지하고 position의 Y를 dragWorldHeight로 고정하며 교차 실패 시 false를 반환한다.
+        /// 현재 커서 Ray와 뷰별 고정 X 또는 Y 평면으로 본체 목표 위치를 계산한다.
+        /// 이동 가능한 오프셋 성분만 적용하며 교차 실패와 카메라 범위 밖 교점은 false를 반환해 마지막 위치를 유지한다.
         /// </summary>
         private bool TryGetDragPosition(out Vector3 position)
         {
-            var dragPlane = new Plane(Vector3.up, new Vector3(0f, _dragWorldHeight, 0f));
+            Plane dragPlane = GetDragPlane();
             Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
             position = _keyboardBody.position;
-            if (!dragPlane.Raycast(ray, out float distance))
+            if (!dragPlane.Raycast(ray, out float distance) || distance > _outputCamera.farClipPlane)
                 return false;
-            position = ray.GetPoint(distance) + _pointerOffset;
-            position.y = _dragWorldHeight;
+            Vector3 offset = _pointerOffset;
+            if (_usingHangerPlane) offset.x = 0f;
+            else offset.y = 0f;
+            position = ray.GetPoint(distance) + offset;
+            if (_usingHangerPlane) position.x = _hangerWorldX;
+            else position.y = _dragWorldHeight;
             return true;
+        }
+
+        /// <summary>
+        /// 현재 운반 뷰에 맞는 고정 X의 YZ 평면 또는 고정 Y의 XZ 평면을 반환한다.
+        /// Inspector의 월드 좌표를 사용하며 키보드 위치는 변경하지 않는다.
+        /// </summary>
+        private Plane GetDragPlane()
+        {
+            return _usingHangerPlane ? new Plane(Vector3.right, new Vector3(_hangerWorldX, 0f, 0f))
+                : new Plane(Vector3.up, new Vector3(0f, _dragWorldHeight, 0f));
         }
 
         /// <summary>
@@ -288,6 +379,7 @@ namespace Game.Player
                 return;
             _isDragging = false;
             _releasePending = false;
+            _awaitingHangerPlacement = false;
             _acceptPress = false;
             _keyboardBody.isKinematic = false;
             _keyboardBody.useGravity = true;
@@ -304,6 +396,8 @@ namespace Game.Player
         private void HandlePointerCanceled()
         {
             _clickCandidate = false;
+            _awaitingHangerPlacement = false;
+            _releasePending = false;
             DropKeyboard();
             _acceptPress = false;
         }

@@ -17,11 +17,13 @@ namespace Game.Player
 
         /// <summary>
         /// 기존 외곽선 재질과 깊이 마스크 Shader 및 출력 Camera로 표시 전용 재질을 준비한다.
-        /// 원본 재질과 카메라는 변경하지 않으며 생성한 재질은 Dispose에서 해제한다.
+        /// outlineColor가 있으면 복제 재질에만 적용하며 원본은 유지하고 생성 재질은 Dispose에서 해제한다.
         /// </summary>
-        public WorkshopKeyboardPlacementPreview(Material outlineMaterial, Shader depthShader, Camera camera)
+        public WorkshopKeyboardPlacementPreview(Material outlineMaterial, Shader depthShader, Camera camera, Color? outlineColor = null)
         {
             _outlineMaterial = new Material(outlineMaterial) { renderQueue = 3001 };
+            if (outlineColor.HasValue)
+                _outlineMaterial.SetColor("_OutlineColor", outlineColor.Value);
             _depthMaterial = new Material(depthShader) { renderQueue = 3000 };
             _camera = camera;
         }

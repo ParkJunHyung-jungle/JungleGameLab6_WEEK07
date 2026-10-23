@@ -1602,6 +1602,8 @@ MonoBehaviour:
   _keycapPuller: {fileID: 989276903}
   _switchPuller: {fileID: 686529946}
   _keycapPlacement: {fileID: 2019032720}
+  _hoverOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
+  _hoverDepthShader: {fileID: 4800000, guid: c15e67eed99449a2a286129ff6aa137e, type: 3}
   _heightOffset: 0.2
   _returnDelay: 2
 --- !u!4 &500387866

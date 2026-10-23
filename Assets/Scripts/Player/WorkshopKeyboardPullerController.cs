@@ -10,6 +10,7 @@ using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
+    [DefaultExecutionOrder(210)]
     public sealed class WorkshopKeyboardPullerController : MonoBehaviour, IKeyboardPullerContext
     {
         [Header("Workshop")]
@@ -19,6 +20,12 @@ namespace Game.Player
         [SerializeField] private AssemblyFullerTool _keycapPuller;
         [SerializeField] private AssemblyFullerTool _switchPuller;
         [SerializeField] private WorkshopKeycapPlacement _keycapPlacement;
+
+        [Header("Hover Outline")]
+        [SerializeField] private Material _hoverOutlineMaterial;
+        [SerializeField] private Shader _hoverDepthShader;
+        private WorkshopKeyboardPlacementPreview _keycapHoverPreview;
+        private WorkshopKeyboardPlacementPreview _switchHoverPreview;
 
         [Header("Removal")]
         [SerializeField, Min(0f)] private float _heightOffset = 0.2f;
@@ -54,6 +61,34 @@ namespace Game.Player
         {
             _keycapPuller.SetContext(this, true);
             _switchPuller.SetContext(this, true);
+            if (_hoverOutlineMaterial != null && _hoverDepthShader != null)
+            {
+                _keycapHoverPreview = new WorkshopKeyboardPlacementPreview(
+                    _hoverOutlineMaterial, _hoverDepthShader, _camera, Color.white);
+                _switchHoverPreview = new WorkshopKeyboardPlacementPreview(
+                    _hoverOutlineMaterial, _hoverDepthShader, _camera, Color.white);
+                _keycapHoverPreview.Prepare(_keycapPuller.ToolTransform);
+                _switchHoverPreview.Prepare(_switchPuller.ToolTransform);
+            }
+        }
+
+        void LateUpdate()
+        {
+            if (_keycapHoverPreview == null || !Application.isFocused || !InputAllowed
+                || IsManipulatingPart || IsPointerOverUI(InGameCursor.Position))
+                return;
+
+            Physics.SyncTransforms();
+            Ray ray = _camera.ScreenPointToRay(InGameCursor.Position);
+            if (!Physics.Raycast(ray, out RaycastHit hit, _camera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return;
+            if (_keycapPuller.isActiveAndEnabled && _keycapPuller.ToolTransform.gameObject.activeInHierarchy
+                && hit.transform.IsChildOf(_keycapPuller.ToolTransform))
+                _keycapHoverPreview.Show(new Pose(_keycapPuller.ToolTransform.position, _keycapPuller.ToolTransform.rotation));
+            else if (_switchPuller.isActiveAndEnabled && _switchPuller.ToolTransform.gameObject.activeInHierarchy
+                && hit.transform.IsChildOf(_switchPuller.ToolTransform))
+                _switchHoverPreview.Show(new Pose(_switchPuller.ToolTransform.position, _switchPuller.ToolTransform.rotation));
         }
 
         void OnEnable()
@@ -392,6 +427,8 @@ namespace Game.Player
 
         void OnDestroy()
         {
+            _keycapHoverPreview?.Dispose();
+            _switchHoverPreview?.Dispose();
             foreach (GameObject fragment in _fragments) if (fragment != null) Destroy(fragment);
         }
     }

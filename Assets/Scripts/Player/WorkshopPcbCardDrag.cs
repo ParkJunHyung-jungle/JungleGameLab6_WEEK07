@@ -6,6 +6,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+using Game.Logging;
+
 using KeyboardModeling;
 using KeyboardModeling.Assembly;
 
@@ -149,9 +151,12 @@ namespace Game.Player
             MoveParts(point);
             if (Mouse.current.leftButton.isPressed) return;
             if (!Mouse.current.leftButton.wasReleasedThisFrame) { CancelDrag(); return; }
-            bool valid = !_pullers.IsPointerOverUI(point) && !IsObstructed(ray) && _assembly.TryPlaceStructure(_kind, ray);
+            bool overUi = _pullers.IsPointerOverUI(point);
+            bool blocked = !overUi && IsObstructed(ray);
+            bool valid = !overUi && !blocked && _assembly.TryPlaceStructure(_kind, ray);
             if (valid)
             {
+                RecordStructureEvent("PartInstallAttempted", true, "InventoryDrag");
                 FinishDrag();
                 AudioManager.PlayPartSound(_parts[0].position, false);
             }
@@ -162,7 +167,12 @@ namespace Game.Player
                 _worldDragging = true;
                 UpdateWorldDrag();
             }
-            else StartReturn(point);
+            else
+            {
+                RecordStructureEvent(overUi ? "StructureDragCancelled" : "PartInstallAttempted",
+                    false, "InventoryDrag", overUi ? "Cancelled" : GetPlacementFailureReason(blocked));
+                StartReturn(point);
+            }
         }
 
         /// <summary>가상 커서 아래의 설치 또는 바닥 구조 부품을 집는다. 분리 조건을 확인한 뒤 실제 성공 시에만 점유를 해제한다.</summary>
@@ -222,6 +232,7 @@ namespace Game.Player
             if (nearest >= obstruction) return;
             if (_kind == AssemblyStructurePart.Plate && _assembly.PlateInstalled && !_assembly.CanRemovePlate)
             {
+                RecordStructureEvent("PartRemoveAttempted", false, "WorldDrag", "PrerequisiteMissing");
                 Debug.LogWarning("보강판 분리 불가: 상단부 또는 설치된 키캡이 남아 있습니다.", _assembly);
                 return;
             }
@@ -229,7 +240,11 @@ namespace Game.Player
                 : _kind == AssemblyStructurePart.Upper ? _assembly.UpperInstalled
                 : _kind == AssemblyStructurePart.Lower ? _assembly.LowerInstalled : _assembly.PlateInstalled;
             if (_wasInstalled && !(_kind == AssemblyStructurePart.Pcb
-                ? _assembly.TryRemovePcb() : _assembly.TryRemoveStructure(_kind))) return;
+                ? _assembly.TryRemovePcb() : _assembly.TryRemoveStructure(_kind)))
+            {
+                RecordStructureEvent("PartRemoveAttempted", false, "WorldDrag", "PrerequisiteMissing");
+                return;
+            }
             _worldDragging = true;
             _dragging = true;
             _pullers.SetPcbDragging(true);
@@ -271,6 +286,7 @@ namespace Game.Player
             {
                 if (_kind == AssemblyStructurePart.Pcb && !overlay.TryReturnPcbBundle(_assembly))
                 {
+                    RecordStructureEvent("PartReturned", false, "InventoryReturn", "InventoryReturnFailed");
                     CancelDrag();
                     return;
                 }
@@ -279,10 +295,15 @@ namespace Game.Player
                 if (_kind == AssemblyStructurePart.Pcb) _assembly.ReturnPcbToInventory();
                 else if (_kind == AssemblyStructurePart.Lower) _assembly.ReturnLowerToInventory();
                 else _assembly.RestoreStructurePose(_kind);
+                if (_wasInstalled) RecordStructureEvent("PartRemoveAttempted", true, "InventoryReturn");
+                RecordStructureEvent("PartReturned", true, "InventoryReturn");
                 return;
             }
             if (_pullers.IsPointerOverUI(point)) { CancelDrag(); return; }
-            bool installed = !IsObstructed(ray) && _assembly.TryPlaceStructure(_kind, ray);
+            bool blocked = IsObstructed(ray);
+            bool installed = !blocked && _assembly.TryPlaceStructure(_kind, ray);
+            RecordStructureEvent("PartInstallAttempted", installed, "WorldDrag",
+                installed ? "" : GetPlacementFailureReason(blocked), _wasInstalled && installed ? "Reinstalled" : "");
             Vector3 position = _parts[0].position;
             FinishWorldDrag();
             if (installed) { AudioManager.PlayPartSound(position, false); return; }
@@ -301,6 +322,7 @@ namespace Game.Player
                 body.angularVelocity = Vector3.zero;
                 if (!_looseBodies.Contains(body)) _looseBodies.Add(body);
             }
+            if (_wasInstalled) RecordStructureEvent("PartRemoveAttempted", true, "WorldDrag", details: "DroppedToWorld");
         }
 
         /// <summary>실물 드래그의 표시와 충돌체를 복구한다. 설치 여부는 변경하지 않고 입력 점유만 해제한다.</summary>
@@ -433,6 +455,7 @@ namespace Game.Player
         {
             if (_worldDragging)
             {
+                RecordStructureEvent("StructureDragCancelled", false, "WorldDrag", "Cancelled");
                 FinishWorldDrag();
                 if (_wasInstalled)
                 {
@@ -447,10 +470,30 @@ namespace Game.Player
                 }
                 return;
             }
-            if (_dragging) FinishDrag();
+            if (_dragging)
+            {
+                RecordStructureEvent("StructureDragCancelled", false, "InventoryDrag", "Cancelled");
+                FinishDrag();
+            }
             StopAllCoroutines();
             _returning = false;
             if (_returnIcon != null) _returnIcon.gameObject.SetActive(false);
+        }
+
+        /// <summary>확정된 kind의 조립 결과를 제작 로그에 기록한다. type과 성공 여부 및 실패 이유를 사용하며 조립 상태는 변경하지 않는다.</summary>
+        private void RecordStructureEvent(string type, bool success, string source, string reason = "", string details = "")
+        {
+            CustomizationTelemetry.Emit(_assembly.GetComponent<KeyboardCustomization>(), type, _kind.ToString(),
+                _assembly.GetStructureMaterial(_kind)?.name ?? "", success: success,
+                changed: success && type != "StructureDragCancelled", details: details,
+                materialId: _assembly.GetStructureMaterial(_kind)?.name ?? "",
+                targetId: _kind.ToString(), actionSource: source, outcomeReason: reason);
+        }
+
+        /// <summary>blocked와 조립 선행 조건을 확인해 배치 실패 코드를 반환한다. 조립 상태는 변경하지 않는다.</summary>
+        private string GetPlacementFailureReason(bool blocked)
+        {
+            return blocked ? "Blocked" : _assembly.CanInstallStructure(_kind) ? "PlacementRejected" : "PrerequisiteMissing";
         }
 
         void OnDisable()

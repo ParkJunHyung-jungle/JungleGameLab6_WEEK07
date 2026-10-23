@@ -19,7 +19,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     private const float MAX_LED_SPEED = 10f;
     private const float PCB_SWITCH_CLEARANCE = -0.15f;
 
-    private const float PCB_STABILIZER_HEIGHT = 0.1f;
+    private const float PCB_STABILIZER_HEIGHT = 0.24f;
 
     private static readonly IReadOnlyList<PlateEffect> _plateEffects = Array.AsReadOnly((PlateEffect[])Enum.GetValues(typeof(PlateEffect)));
 

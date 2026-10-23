@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -11,6 +11,7 @@ namespace Game.Player
     {
         [Header("Connections")]
         [SerializeField] private PlayerInteractionController _player;
+        [SerializeField] private bool _useWorkshopFocus;
         [SerializeField] private MonitorKeyboardHolder _holder;
         [SerializeField] private MonitorMiniGameManager _manager;
         [SerializeField] private Canvas _canvas;
@@ -74,7 +75,7 @@ namespace Game.Player
                 Camera sceneCamera = null;
                 foreach (GameObject root in gameObject.scene.GetRootGameObjects())
                 {
-                    if (_player == null)
+                    if (!_useWorkshopFocus && _player == null)
                         _player = root.GetComponentInChildren<PlayerInteractionController>(true);
                     foreach (Camera candidate in root.GetComponentsInChildren<Camera>(true))
                     {
@@ -88,6 +89,7 @@ namespace Game.Player
                 _canvas.worldCamera = sceneCamera;
             }
 
+            if (_useWorkshopFocus) return;
             if (!Application.isPlaying || !isActiveAndEnabled
                 || (_player != null && _subscribedPlayer == _player)) return;
             if (_subscribedPlayer != null)
@@ -100,6 +102,17 @@ namespace Game.Player
                 _subscribedPlayer.MonitorFocusChanged += HandleFocusChanged;
             else
                 Debug.LogWarning("모니터와 같은 씬에 PlayerInteractionController를 배치하세요.", this);
+        }
+
+        /// <summary>
+        /// Workshop 전용 연결에서 focused에 따라 기존 모니터 입력을 시작하거나 종료한다.
+        /// 기존 키보드 입력과 공격 상태를 보관 및 복원하며 Player 이벤트 경로는 유지한다.
+        /// </summary>
+        public void SetWorkshopFocus(bool focused)
+        {
+            if (!_useWorkshopFocus) return;
+            if (focused && isActiveAndEnabled) HandleFocusChanged(_holder);
+            else Disconnect();
         }
 
         void Update()
@@ -124,6 +137,7 @@ namespace Game.Player
             Disconnect();
             if (holder != _holder || holder.KeyboardBody == null) return;
             _keyboard = holder.KeyboardBody.GetComponent<KeyboardInputController>();
+            if (_keyboard == null) return;
             _previousInput = _keyboard.InputEnabled;
             _previousAttack = _keyboard.AttackEnabled;
             _keyboard.SetInputEnabled(true);

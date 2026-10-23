@@ -32,6 +32,11 @@ namespace Game.Player
         [SerializeField] private Shader _placementDepthShader;
         private WorkshopKeyboardPlacementPreview _placementPreview;
 
+        [Header("Monitor Placement")]
+        [SerializeField] private MonitorKeyboardHolder _monitorHolder;
+        [SerializeField] private Collider _monitorPlacementArea;
+        [SerializeField] private CinemachineCamera _monitorCamera;
+
         [Header("Hanger Placement")]
         [SerializeField] private CinemachineCamera _hangerCamera;
         [SerializeField] private KeyboardWallRack[] _hangerHolders = new KeyboardWallRack[0];
@@ -158,14 +163,17 @@ namespace Game.Player
             _keyboardBody.rotation = rotation;
             KeyboardWallRack hanger = _usingHangerPlane ? GetHangerUnderCursor() : null;
             bool hasHolder = !_usingHangerPlane && IsHolderUnderCursor();
+            bool hasMonitor = !_usingHangerPlane && IsMonitorUnderCursor();
             if (!_brain.IsBlending && !_releasePending)
             {
                 if (hanger != null) _placementPreview.Show(hanger.GetPlacementPose(_centerOffset));
+                else if (hasMonitor) _placementPreview.Show(_monitorHolder.GetPlacementPose(_centerOffset));
                 else if (hasHolder) _placementPreview.Show(_workbenchHolder.GetPlacementPose(_centerOffset));
             }
             if (_releasePending && !_brain.IsBlending)
             {
                 bool placed = hanger != null ? hanger.TryAttachKeyboard(_keyboardBody, true)
+                    : hasMonitor ? _monitorHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset)
                     : hasHolder && _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset);
                 if (placed)
                 {
@@ -245,6 +253,20 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// 모니터 일반 뷰에서 명시된 빈 Holder 영역을 커서로 가리키는지 반환한다.
+        /// 기존 UI와 가림 판정을 재사용하며 운반 중인 본체와 자식은 제외한다.
+        /// </summary>
+        private bool IsMonitorUnderCursor()
+        {
+            if (_monitorHolder == null || _brain.IsBlending || IsPointerOverUI()
+                || _brain.ActiveVirtualCamera != (ICinemachineCamera)_monitorCamera || _monitorHolder.KeyboardBody != null)
+                return false;
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            return _monitorPlacementArea.Raycast(ray, out RaycastHit hit, _outputCamera.farClipPlane)
+                && !IsPlacementOccluded(ray, hit.distance);
+        }
+
+        /// <summary>
         /// allowed를 사용하여 본체 운반 입력 허용 상태를 변경한다.
         /// false이면 현재 위치에서 중력으로 놓고 새 클릭을 기다리며 후속 집중 모드의 차단점으로 사용한다.
         /// </summary>
@@ -305,6 +327,11 @@ namespace Game.Player
 
             _workbenchHolder.ReleaseKeyboard(_keyboardBody);
             bool detach = _keyboardBody.transform.parent == _workbenchHolder.transform;
+            if (_monitorHolder != null && _monitorHolder.KeyboardBody == _keyboardBody)
+            {
+                _monitorHolder.ReleaseKeyboard(_keyboardBody);
+                detach |= _keyboardBody.transform.parent == _monitorHolder.transform;
+            }
             foreach (KeyboardWallRack holder in _hangerHolders)
             {
                 if (holder.KeyboardBody != _keyboardBody) continue;

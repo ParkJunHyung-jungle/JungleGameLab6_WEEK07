@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,6 +21,16 @@ namespace Game.Player
         [SerializeField] private CinemachineBrain _brain;
         [SerializeField] private CinemachineCamera[] _views;
         [SerializeField] private CinemachineCamera _focusCamera;
+
+        [Header("Monitor Mode")]
+        [SerializeField] private Camera _monitorOutputCamera;
+        [SerializeField] private CinemachineCamera _monitorCamera;
+        [SerializeField] private CinemachineCamera _monitorFocusCamera;
+        [SerializeField] private MonitorKeyboardHolder _monitorHolder;
+        [SerializeField] private MonitorMiniGameInput _monitorInput;
+        [SerializeField] private Collider _monitorScreen;
+        private bool _monitorFocused;
+        private bool _monitorTransition;
 
         [Header("Workshop Mode")]
         [SerializeField] private WorkshopKeyboardDragController _keyboardDrag;
@@ -46,6 +56,7 @@ namespace Game.Player
             && !FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen;
 
         public bool CanEnterKeyboardFocus => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
+            && !_monitorFocused && !_monitorTransition
             && _viewSwitchingAllowed && _viewIndex == 0 && !_brain.IsBlending
             && _brain.ActiveVirtualCamera == (ICinemachineCamera)_views[0]
             && !_keyboardDrag.IsDragging && Application.isFocused && InGameCursor.CanProcessPointer
@@ -65,6 +76,8 @@ namespace Game.Player
         void OnEnable()
         {
             _focusCamera.Priority = -1;
+            if (_monitorFocusCamera != null) _monitorFocusCamera.Priority = -1;
+            if (_monitorHolder != null) _monitorHolder.KeyboardChanged += HandleMonitorKeyboardChanged;
             SelectView(0);
             ApplyCursor();
             _editOverlay.SwitchSoundSelected += HandleSwitchSoundSelected;
@@ -87,6 +100,12 @@ namespace Game.Player
                 || !InGameCursor.CanProcessPointer)
                 return;
 
+            if (_monitorFocused || _monitorTransition)
+            {
+                if (_monitorFocused && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                    EndMonitorFocus();
+                return;
+            }
             if (_isFocused)
             {
                 if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
@@ -96,6 +115,17 @@ namespace Game.Player
             if (!_viewSwitchingAllowed || _modeTransitionPending || _brain.IsBlending)
                 return;
 
+            if (_monitorHolder != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_monitorCamera
+                && !_keyboardDrag.IsDragging && _monitorHolder.KeyboardBody != null
+                && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && IsMonitorScreenSelected())
+            {
+                _monitorFocused = true;
+                _monitorTransition = true;
+                _keyboardDrag.SetInputAllowed(false);
+                _monitorFocusCamera.Priority = 2;
+                ApplyCursor();
+                return;
+            }
             if (Keyboard.current == null)
                 return;
 
@@ -113,6 +143,14 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            if (_monitorTransition)
+            {
+                ICinemachineCamera monitorDestination = _monitorFocused ? _monitorFocusCamera : _monitorCamera;
+                if (_brain.IsBlending || _brain.ActiveVirtualCamera != monitorDestination) return;
+                _monitorTransition = false;
+                if (_monitorFocused) _monitorInput.SetWorkshopFocus(true);
+                else _keyboardDrag.SetInputAllowed(true);
+            }
             if (!_modeTransitionPending || _brain.IsBlending)
                 return;
             ICinemachineCamera destination = _isFocused ? _focusCamera : _views[0];
@@ -124,6 +162,45 @@ namespace Game.Player
                 OpenAssembly();
             else
                 _keyboardDrag.SetInputAllowed(true);
+        }
+
+        /// <summary>
+        /// 출력 Camera의 공통 커서 Ray로 명시된 모니터 화면을 가장 먼저 가리키는지 반환한다.
+        /// 실제 UI 처리 대상과 화면 앞의 물체를 제외하며 카메라와 입력 상태는 변경하지 않는다.
+        /// </summary>
+        private bool IsMonitorScreenSelected()
+        {
+            if (IsPointerOverUI()) return false;
+            Physics.SyncTransforms();
+            Ray ray = _monitorOutputCamera.ScreenPointToRay(InGameCursor.Position);
+            if (!_monitorScreen.Raycast(ray, out RaycastHit screen, _monitorOutputCamera.farClipPlane)) return false;
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, screen.distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (hit.distance < screen.distance && !hit.transform.IsChildOf(_monitorScreen.transform)) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// 모니터 입력을 즉시 종료하고 Cam_Monitor 복귀 블렌드를 시작한다.
+        /// 기존 앱 종료와 타건 및 공격 상태 복원을 재사용하며 완료 전까지 본체 운반은 차단한다.
+        /// </summary>
+        private void EndMonitorFocus()
+        {
+            if (!_monitorFocused) return;
+            _monitorInput.SetWorkshopFocus(false);
+            _monitorFocused = false;
+            _monitorTransition = true;
+            _monitorFocusCamera.Priority = -1;
+            ApplyCursor();
+        }
+
+        /// <summary>
+        /// installed가 false이면 사용 중인 모니터를 종료한다.
+        /// 키보드 제거 이벤트를 사용하며 진열 및 재고 상태는 변경하지 않는다.
+        /// </summary>
+        private void HandleMonitorKeyboardChanged(bool installed)
+        {
+            if (!installed) EndMonitorFocus();
         }
 
         /// <summary>
@@ -321,6 +398,12 @@ namespace Game.Player
         {
             if (!CanShowControlHints)
                 return;
+            if (_monitorFocused || _monitorTransition)
+            {
+                state.Title = "모니터 사용";
+                state.Add("Esc", "모니터 뷰 복귀");
+                return;
+            }
             state.Title = _isFocused ? "작업 모드" : "일반 뷰";
             if (_isFocused)
                 state.Add("Esc", "작업대 뷰 복귀");
@@ -330,6 +413,8 @@ namespace Game.Player
                     state.Add("Q / E", "이전 / 다음 뷰");
                 if (_keyboardDrag.IsDragging)
                     state.Add("좌클릭 놓기", "배치 또는 내려놓기");
+                else if (_monitorHolder != null && _viewIndex == 1 && _monitorHolder.KeyboardBody != null)
+                    state.Add("화면 좌클릭", "모니터 사용");
                 else if (_viewIndex == 0 && _keyboardDrag.IsPlaced)
                     state.Add("좌클릭 / 드래그", "배치된 키보드 작업 모드 / 운반");
             }
@@ -370,11 +455,19 @@ namespace Game.Player
             if (hasFocus)
                 ApplyCursor();
             else
+            {
                 _pullers.CancelDrag();
+                EndMonitorFocus();
+            }
         }
 
         void OnDisable()
         {
+            if (_monitorHolder != null) _monitorHolder.KeyboardChanged -= HandleMonitorKeyboardChanged;
+            if (_monitorFocused) _monitorInput.SetWorkshopFocus(false);
+            _monitorFocused = false;
+            _monitorTransition = false;
+            if (_monitorFocusCamera != null) _monitorFocusCamera.Priority = -1;
             _editOverlay.SwitchSoundSelected -= HandleSwitchSoundSelected;
             _editOverlay.CaseMaterialSelected -= HandleCaseMaterialSelected;
             _editOverlay.PlateMaterialSelected -= HandlePlateMaterialSelected;

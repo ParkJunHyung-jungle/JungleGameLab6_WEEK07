@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 
@@ -28,6 +28,40 @@ namespace Game.Player
         public Rigidbody KeyboardBody => _keyboardBody;
 
         public event Action<bool> KeyboardChanged;
+
+        /// <summary>
+        /// 본체 시각 중심 오프셋으로 기존 모니터 Holder의 최종 배치 자세를 반환한다.
+        /// centerOffset을 Holder 방향에 맞춰 중심 정렬하며 실제 위치와 점유는 변경하지 않는다.
+        /// </summary>
+        public Pose GetPlacementPose(Vector3 centerOffset)
+        {
+            return new Pose(transform.position - transform.rotation * centerOffset, transform.rotation);
+        }
+
+        /// <summary>
+        /// 빈 Holder에 body를 명시적으로 배치하고 기존 화면 전원 이벤트를 알린다.
+        /// centerOffset으로 자세를 정하며 속도를 정리하고 중력을 끈 뒤 배치 성공 여부를 반환한다.
+        /// </summary>
+        public bool TryPlaceKeyboard(Rigidbody body, Vector3 centerOffset)
+        {
+            if (_keyboardBody != null) return false;
+            if (!body.isKinematic)
+            {
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+            }
+            Pose pose = GetPlacementPose(centerOffset);
+            body.isKinematic = true;
+            body.useGravity = false;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            body.transform.SetParent(transform, true);
+            body.position = pose.position;
+            body.rotation = pose.rotation;
+            body.transform.SetPositionAndRotation(pose.position, pose.rotation);
+            _keyboardBody = body;
+            KeyboardChanged?.Invoke(true);
+            return true;
+        }
 
         void OnTriggerEnter(Collider other)
         {

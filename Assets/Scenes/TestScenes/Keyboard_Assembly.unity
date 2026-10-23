@@ -474,6 +474,10 @@ PrefabInstance:
       propertyPath: _inputEnabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      propertyPath: _caseRenderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: m_Name
       value: Keyboard_Enhanced
@@ -517,10 +521,6 @@ PrefabInstance:
     - target: {fileID: 6484209102016570918, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-      propertyPath: _caseRenderers.Array.size
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9489,7 +9489,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e02df7475f546d197008fbd0d8de997, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardEditOverlayUI
-  _assemblyCatalog: 1
+  _assemblyCatalog: 0
   _keycapButton: {fileID: 9911000091}
   _switchAxisButton: {fileID: 9911000092}
   _ledButton: {fileID: 9911000093}
@@ -11217,6 +11217,26 @@ MonoBehaviour:
   _border: {r: 0.271, g: 0.357, b: 0.439, a: 0.86}
   _textColor: {r: 0.925, g: 0.906, b: 0.839, a: 1}
   _accent: {r: 0.451, g: 0.863, b: 0.89, a: 1}
+--- !u!114 &9923999999
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000000000000700}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10d79e55c3144010a0d2aea6e26ff0f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.KeyboardAssemblyState
+  _customization: {fileID: 0}
+  _installation: {fileID: 0}
+  _lower: {fileID: 0}
+  _pcb: {fileID: 0}
+  _screws: []
+  _plate: {fileID: 0}
+  _upper: []
+  _upperRenderers: []
 --- !u!1 &7000000000000000101
 GameObject:
   m_ObjectHideFlags: 0
@@ -11517,15 +11537,3 @@ SceneRoots:
   - {fileID: 1712647971}
   - {fileID: 818686754}
   - {fileID: 72215168}
---- !u!114 &9923999999
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7000000000000000700}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 10d79e55c3144010a0d2aea6e26ff0f7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.KeyboardAssemblyState

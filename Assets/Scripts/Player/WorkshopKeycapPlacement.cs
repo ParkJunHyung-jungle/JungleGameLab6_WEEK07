@@ -649,12 +649,7 @@ namespace Game.Player
             _activePart.gameObject.SetActive(true);
             foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>()) collider.enabled = true;
             _activePart.DropWithPhysics();
-            if (customization.TryGetComponent<KeyboardAssemblyState>(out var assembly))
-            {
-                Transform pcb = assembly.GetStructureParts(AssemblyStructurePart.Pcb)[0];
-                EnableFailedDropCollision(pcb.Find("PCB_Board").GetComponent<MeshRenderer>());
-                EnableFailedDropCollision(customization.PlateRenderer);
-            }
+            PrepareDetachedPartCollisions(_activePart, customization);
             Rigidbody body = _activePart.GetComponent<Rigidbody>();
             Vector3 up = customization.transform.up;
             Vector3 outward = Vector3.ProjectOnPlane(_activePart.transform.position - customization.transform.position, up);
@@ -666,21 +661,48 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// surface의 실제 메시 경계에 런타임 충돌체를 준비하고 실패한 실물과의 충돌 무시를 해제한다.
-        /// 공유 프리팹은 수정하지 않으며 비활성 부품의 충돌체도 해당 부품과 함께 비활성화된다.
+        /// part가 customization의 PCB와 보강판 및 상단부와 다시 충돌하도록 준비한다.
+        /// 런타임 구조 부품에 필요한 충돌체를 만들고 분리 시 설정된 충돌 무시를 해제한다.
         /// </summary>
-        private void EnableFailedDropCollision(MeshRenderer surface)
+        private void PrepareDetachedPartCollisions(AssemblyDraggablePart part, KeyboardCustomization customization)
+        {
+            if (!customization.TryGetComponent<KeyboardAssemblyState>(out var assembly) || !assembly.Initialized) return;
+            Transform pcb = assembly.GetStructureParts(AssemblyStructurePart.Pcb)[0];
+            EnableFailedDropCollision(pcb.Find("PCB_Board").GetComponent<MeshRenderer>(), part);
+            EnableFailedDropCollision(customization.PlateRenderer, part);
+            foreach (MeshRenderer upper in assembly.UpperRenderers)
+                EnableFailedDropCollision(upper, part, true);
+        }
+
+        /// <summary>
+        /// surface에 런타임 충돌체를 준비하고 part와의 충돌 무시를 해제한다.
+        /// matchMesh가 켜진 상단부는 구멍을 유지하는 메시와 독립된 고정 Rigidbody를 사용한다.
+        /// </summary>
+        private void EnableFailedDropCollision(MeshRenderer surface, AssemblyDraggablePart part, bool matchMesh = false)
         {
             Collider target = surface.GetComponent<Collider>();
             if (target == null)
             {
-                BoxCollider box = surface.gameObject.AddComponent<BoxCollider>();
-                Bounds bounds = surface.GetComponent<MeshFilter>().sharedMesh.bounds;
-                box.center = bounds.center;
-                box.size = bounds.size;
-                target = box;
+                Mesh mesh = surface.GetComponent<MeshFilter>().sharedMesh;
+                if (matchMesh)
+                {
+                    Rigidbody supportBody = surface.GetComponent<Rigidbody>();
+                    if (supportBody == null) supportBody = surface.gameObject.AddComponent<Rigidbody>();
+                    supportBody.isKinematic = true;
+                    supportBody.useGravity = false;
+                    MeshCollider shape = surface.gameObject.AddComponent<MeshCollider>();
+                    shape.sharedMesh = mesh;
+                    target = shape;
+                }
+                else
+                {
+                    BoxCollider box = surface.gameObject.AddComponent<BoxCollider>();
+                    box.center = mesh.bounds.center;
+                    box.size = mesh.bounds.size;
+                    target = box;
+                }
             }
-            foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>())
+            foreach (Collider collider in part.GetComponentsInChildren<Collider>())
                 Physics.IgnoreCollision(collider, target, false);
             Physics.SyncTransforms();
         }
@@ -881,6 +903,7 @@ namespace Game.Player
             Vector3 velocity, Vector3 angularVelocity)
         {
             AssemblyDraggablePart part = CreatePart(entry, removed, true);
+            PrepareDetachedPartCollisions(part, EditingKeyboard.GetComponent<KeyboardCustomization>());
             _lastRemovalFrame = Time.frameCount;
             if (!returnToInventory)
             {
@@ -925,6 +948,7 @@ namespace Game.Player
             _activePart.gameObject.SetActive(true);
             foreach (Collider collider in _activePart.GetComponentsInChildren<Collider>()) collider.enabled = true;
             _activePart.DropWithPhysics();
+            PrepareDetachedPartCollisions(_activePart, EditingKeyboard.GetComponent<KeyboardCustomization>());
         }
 
         /// <summary>

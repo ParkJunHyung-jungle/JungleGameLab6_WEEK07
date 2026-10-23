@@ -24,6 +24,7 @@ namespace Game.Tutorials
         PartReturn = 20, PartCompatibility = 21,
         CaseEditing = 22, PlateEditing = 23, PCBEditing = 24, LEDEditing = 25,
         ScrewAssembly = 27, UpperCaseEditing = 28, AssemblyOrder = 29,
+        WorkbenchPlaced = 30,
 
         // 전투 안내는 기존 값을 유지한다.
         Battle = 8, Replenishment = 9, Shop = 10, KeycapPurchase = 11, Unlock = 12,
@@ -370,11 +371,14 @@ namespace Game.Tutorials
         /// </summary>
         private void HandleAssemblyCustomization(CustomizationObservation observation)
         {
+            if ((observation.Type == "PartChanged" || observation.Type == "PartPanelOpened")
+                && observation.Target == null) return;
+            if (observation.Type == "WorkbenchPlaced")
+                RequestAvailable(TutorialTopic.WorkbenchPlaced);
             if (observation.Type == "WorkshopOpened")
             {
                 RequestAvailable(TutorialTopic.EditControls);
                 RequestAvailable(TutorialTopic.AssemblyOrder);
-                RequestAvailable(TutorialTopic.PartsCatalog);
             }
             if ((observation.Type == "PartChanged" || observation.Type == "PartPanelOpened")
                 && !string.IsNullOrEmpty(observation.Part))
@@ -385,7 +389,6 @@ namespace Game.Tutorials
                     case "Lower": case "Case": RequestAvailable(TutorialTopic.CaseEditing); break;
                     case "Pcb":
                         RequestAvailable(TutorialTopic.PCBEditing);
-                        RequestAvailable(TutorialTopic.ScrewAssembly);
                         break;
                     case "Plate": RequestAvailable(TutorialTopic.PlateEditing); break;
                     case "Upper": RequestAvailable(TutorialTopic.UpperCaseEditing); break;
@@ -396,15 +399,17 @@ namespace Game.Tutorials
                 }
             }
             if (observation.Type == "ToolPickedUp") RequestAvailable(TutorialTopic.KeycapPuller, true);
-            if (observation.Type == "BulkPlacementStarted") RequestAvailable(TutorialTopic.WholePart);
+            if (observation.Type == "BulkPlacementStarted") RequestAvailable(TutorialTopic.WholePart, true);
             if ((observation.Type == "InventoryPartPicked" || observation.Type == "ElementPicked")
                 && observation.KeycapKind == "Artisan") RequestAvailable(TutorialTopic.Artisan);
             if (observation.Type == "ScrewChanged" || observation.Type == "PartInstallAttempted"
                 && observation.Success && observation.Part == "Pcb") RequestAvailable(TutorialTopic.ScrewAssembly);
             if (observation.Type == "PartRemoveAttempted" && observation.Success)
             {
-                RequestAvailable(TutorialTopic.PartRemoval);
-                RequestAvailable(TutorialTopic.PartReplacement);
+                if (observation.Part == "Keycap" || observation.Part == "Switch")
+                    RequestAvailable(TutorialTopic.PartReplacement);
+                else
+                    RequestAvailable(TutorialTopic.PartRemoval);
                 RequestAvailable(TutorialTopic.PartReturn);
             }
             if (observation.Type == "PartReturned" && observation.Success) RequestAvailable(TutorialTopic.PartReturn);

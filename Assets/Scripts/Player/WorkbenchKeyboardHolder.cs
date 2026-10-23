@@ -99,6 +99,7 @@ namespace Game.Player
             body.position = pose.position;
             body.rotation = pose.rotation;
             body.transform.SetPositionAndRotation(pose.position, pose.rotation);
+            Game.Logging.CustomizationTelemetry.Emit(body.GetComponent<KeyboardCustomization>(), "WorkbenchPlaced");
             return true;
         }
 

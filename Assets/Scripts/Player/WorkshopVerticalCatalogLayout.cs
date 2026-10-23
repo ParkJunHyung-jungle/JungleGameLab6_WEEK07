@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,52 +8,89 @@ namespace Game.Player
     [DisallowMultipleComponent]
     public sealed class WorkshopVerticalCatalogLayout : MonoBehaviour
     {
-        [Header("Catalog Layout")]
+        [Header("Drawer Layout")]
         [SerializeField, Min(320f)] private float _width = 340f;
-        [SerializeField, Min(0f)] private float _bottomMargin = 120f;
+        [SerializeField, Min(0f)] private float _bottomMargin = 24f;
+        [SerializeField, Min(120f)] private float _panelHeight = 320f;
+        [SerializeField, Min(24f)] private float _labelSpacing = 32f;
+        [SerializeField, Min(24f)] private float _tabWidth = 132f;
+        [SerializeField, Min(16f)] private float _tabHeight = 22f;
+        [SerializeField, Min(0.01f)] private float _slideDuration = 0.22f;
+        [SerializeField, Min(1f)] private float _slideDistance = 340f;
         private readonly HashSet<ScrollRect> _configured = new HashSet<ScrollRect>();
         private readonly Dictionary<RectTransform, ScrollRect> _editorPanels = new Dictionary<RectTransform, ScrollRect>();
         private readonly List<Transform> _pendingPanels = new List<Transform>();
         private readonly List<ScrollRect> _scrollRects = new List<ScrollRect>();
+        private readonly List<KeyboardEditButton> _labels = new List<KeyboardEditButton>();
+        private readonly List<Image> _categoryTabs = new List<Image>();
+        private KeyboardEditButton[] _modeButtons;
         private RectTransform _menuRoot;
-        private KeyboardEditButton _toggle;
-        private Text _toggleLabel;
+        private RectTransform _drawerRoot;
+        private RectTransform _clip;
+        private CanvasGroup _listInput;
+        private KeyboardEditOverlayUI _overlay;
+        private WorkshopKeyboardPullerController _pullers;
+        private GameObject _placeholder;
+        private Coroutine _transition;
+        private bool _workshopVisible;
+        private bool _transitioning;
+        private int _selected = -1;
+        private float _openAmount;
+        public bool IsTransitioning => _transitioning;
 
         void Start()
         {
-            _menuRoot = new GameObject("WorkshopCatalogMenu", typeof(RectTransform)).GetComponent<RectTransform>();
-            _menuRoot.SetParent(transform, false);
-            _menuRoot.anchorMin = Vector2.zero;
-            _menuRoot.anchorMax = Vector2.one;
-            _menuRoot.sizeDelta = Vector2.zero;
-            RectTransform toggleRect = new GameObject("CatalogToggle", typeof(RectTransform), typeof(Image),
-                typeof(KeyboardEditButton)).GetComponent<RectTransform>();
-            toggleRect.SetParent(transform, false);
-            toggleRect.anchorMin = toggleRect.anchorMax = toggleRect.pivot = Vector2.up;
-            toggleRect.anchoredPosition = new Vector2(_width + 36f, -24f);
-            toggleRect.sizeDelta = new Vector2(180f, 40f);
-            toggleRect.GetComponent<Image>().color = new Color32(37, 52, 68, 255);
-            _toggle = toggleRect.GetComponent<KeyboardEditButton>();
-            _toggle.Clicked += HandleToggleClicked;
-            _toggleLabel = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
-            _toggleLabel.transform.SetParent(toggleRect, false);
-            _toggleLabel.rectTransform.anchorMin = Vector2.zero;
-            _toggleLabel.rectTransform.anchorMax = Vector2.one;
-            _toggleLabel.rectTransform.sizeDelta = Vector2.zero;
-            _toggleLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _toggleLabel.fontSize = 16;
-            _toggleLabel.alignment = TextAnchor.MiddleCenter;
-            _toggleLabel.raycastTarget = false;
-            _toggleLabel.text = "UI 접기";
+            _overlay = GetComponent<KeyboardEditOverlayUI>();
+            _pullers = GetComponent<WorkshopKeycapPlacement>().Pullers;
+            _drawerRoot = CreateRect("WorkshopDrawerCatalog", transform);
+            _drawerRoot.anchorMin = _drawerRoot.anchorMax = _drawerRoot.pivot = Vector2.zero;
+            _clip = CreateRect("DrawerRevealMask", _drawerRoot);
+            _clip.gameObject.AddComponent<RectMask2D>();
+            _menuRoot = CreateRect("SlidingCatalogContents", _clip);
+            _menuRoot.anchorMin = _menuRoot.anchorMax = _menuRoot.pivot = Vector2.zero;
+            _menuRoot.gameObject.AddComponent<Image>().color = new Color32(225, 204, 176, 255);
+            Outline trayRim = _menuRoot.gameObject.AddComponent<Outline>();
+            trayRim.effectColor = new Color32(113, 76, 44, 255);
+            trayRim.effectDistance = new Vector2(3f, -3f);
+            _listInput = _menuRoot.gameObject.AddComponent<CanvasGroup>();
+            _placeholder = CreateRect("DisplayOnlyCategory", _menuRoot).gameObject;
+            Text note = CreateLabel(_placeholder.transform, "표시 전용 · 교체 기능 준비 전");
+            note.alignment = TextAnchor.MiddleCenter;
+            string[] labels = { "키캡", "축", "상부 하우징", "LED", "보강판", "PCB", "하부 하우징", "이미지", "케이스 재질" };
+            for (int i = 0; i < labels.Length; i++)
+            {
+                if (i >= 7)
+                {
+                    KeyboardEditButton utility = _overlay.GetDrawerUtilityButton(i);
+                    utility.transform.SetParent(_drawerRoot, false);
+                    _labels.Add(utility);
+                    continue;
+                }
+                RectTransform face = CreateRect("DrawerFront_" + labels[i], _drawerRoot);
+                Image image = face.gameObject.AddComponent<Image>();
+                image.color = new Color32(202, 168, 129, 255);
+                Shadow shadow = face.gameObject.AddComponent<Shadow>();
+                shadow.effectColor = new Color(0.16f, 0.09f, 0.04f, 0.35f);
+                shadow.effectDistance = new Vector2(3f, -3f);
+                KeyboardEditButton button = face.gameObject.AddComponent<KeyboardEditButton>();
+                button.targetGraphic = image;
+                button.Clicked += HandleDrawerClicked;
+                _labels.Add(button);
+                CreateTopViewTray(face, labels[i]);
+            }
+            _modeButtons = _overlay.MoveDrawerModeButtons(_drawerRoot);
+            ResetDrawers(_workshopVisible);
         }
 
         void LateUpdate()
         {
+            if (_menuRoot == null) return;
             _pendingPanels.Clear();
             foreach (Transform child in transform)
             {
-                if (child == _menuRoot || child == _toggle.transform || child.name == "ModeBadge"
-                    || child.name == "ControlBar" || child.name == "TournamentEntryButton") continue;
+                if (child == _drawerRoot || child.name == "ModeBadge" || child.name == "ControlBar"
+                    || child.name == "TournamentEntryButton" || child.name == "KeycapCustomizationPanel") continue;
+                if (child.name == "KeyboardEditPanel") { child.gameObject.SetActive(false); continue; }
                 _pendingPanels.Add(child);
             }
             foreach (Transform panel in _pendingPanels)
@@ -74,23 +111,229 @@ namespace Game.Player
                 if (scroll.transform.parent != _menuRoot || !_configured.Add(scroll)) continue;
                 ConfigureCatalog(scroll);
             }
+            foreach (RectTransform panel in _menuRoot)
+            {
+                if (_editorPanels.ContainsKey(panel)) continue;
+                panel.anchorMin = Vector2.zero;
+                panel.anchorMax = Vector2.one;
+                panel.offsetMin = panel.offsetMax = Vector2.zero;
+                if (panel.TryGetComponent(out Image image)) image.color = new Color32(221, 197, 165, 255);
+            }
+            _drawerRoot.sizeDelta = new Vector2(_width, _panelHeight + 7f * _labelSpacing + 76f);
+            _drawerRoot.anchoredPosition = new Vector2(24f, _bottomMargin);
+            RectTransform canvas = (RectTransform)GetComponentInParent<Canvas>().transform;
+            float fit = Mathf.Min(1f, (canvas.rect.width - 48f) / _drawerRoot.sizeDelta.x,
+                (canvas.rect.height - _bottomMargin - 24f) / _drawerRoot.sizeDelta.y);
+            _drawerRoot.localScale = Vector3.one * Mathf.Max(0.1f, fit);
+            _clip.anchorMin = _clip.anchorMax = _clip.pivot = Vector2.zero;
+            float revealedHeight = _panelHeight * _openAmount;
+            float openingBase = _selected >= 0 && _selected < 7 ? (6 - _selected) * _labelSpacing : 7f * _labelSpacing;
+            _clip.anchoredPosition = new Vector2(0f, openingBase);
+            _clip.sizeDelta = new Vector2(_width, revealedHeight);
+            _menuRoot.sizeDelta = new Vector2(_width, _panelHeight);
+            _menuRoot.anchoredPosition = new Vector2(0f, -(1f - _openAmount) * Mathf.Max(_panelHeight, _slideDistance));
+            _clip.gameObject.SetActive(_selected >= 0);
+            _placeholder.SetActive(_selected == 2 || _selected == 5 || _selected == 6);
+            for (int i = 0; i < _labels.Count; i++)
+            {
+                RectTransform face = (RectTransform)_labels[i].transform;
+                face.anchorMin = face.anchorMax = face.pivot = Vector2.zero;
+                face.anchoredPosition = i < 7
+                    ? new Vector2(0f, (6 - i) * _labelSpacing + (_selected >= 0 && _selected < 7 && i <= _selected ? revealedHeight : 0f))
+                    : new Vector2((i - 7) * _width * 0.5f, 7f * _labelSpacing + revealedHeight + 4f);
+                face.sizeDelta = new Vector2(i < 7 ? _width : _width * 0.5f - 4f, i < 7 ? _labelSpacing - 2f : 30f);
+                _labels[i].targetGraphic.color = i == _selected ? new Color32(165, 112, 65, 255) : new Color32(211, 180, 143, 255);
+                if (i < _categoryTabs.Count)
+                {
+                    _categoryTabs[i].rectTransform.sizeDelta = new Vector2(
+                        Mathf.Min(_tabWidth, _width - 100f), Mathf.Min(_tabHeight, _labelSpacing - 6f));
+                    _categoryTabs[i].color = i == _selected ? new Color32(240, 199, 130, 255) : new Color32(235, 220, 195, 255);
+                }
+            }
+            for (int i = 0; i < _modeButtons.Length; i++)
+            {
+                RectTransform mode = (RectTransform)_modeButtons[i].transform;
+                mode.anchorMin = mode.anchorMax = mode.pivot = Vector2.zero;
+                mode.anchoredPosition = new Vector2(i * _width * 0.5f, 7f * _labelSpacing + revealedHeight + 40f);
+                mode.sizeDelta = new Vector2(_width * 0.5f - 4f, 30f);
+            }
+            _listInput.interactable = !_transitioning && _selected >= 0;
+            _listInput.blocksRaycasts = _selected >= 0;
+        }
+
+        /// <summary>
+        /// name과 parent로 입력을 가리지 않는 기본 UI 사각형을 생성해 반환한다.
+        /// </summary>
+        private RectTransform CreateRect(string name, Transform parent)
+        {
+            RectTransform rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            return rect;
+        }
+
+        /// <summary>
+        /// face에 탑 뷰 서랍의 바닥과 손잡이 및 중앙의 내부 인식표를 구성한다.
+        /// text를 표시한 인식표를 포함한 장식은 입력을 받지 않으며 기존 앞면 버튼으로 선택을 처리한다.
+        /// </summary>
+        private void CreateTopViewTray(RectTransform face, string text)
+        {
+            Image floor = CreateTrayDecoration("RecessedTrayFloor", face, new Color32(186, 148, 108, 255));
+            floor.rectTransform.offsetMin = new Vector2(4f, 8f);
+            floor.rectTransform.offsetMax = new Vector2(-4f, -3f);
+            Image lip = CreateTrayDecoration("FrontWoodLip", face, new Color32(151, 105, 62, 255));
+            lip.rectTransform.anchorMax = Vector2.right;
+            lip.rectTransform.offsetMin = Vector2.zero;
+            lip.rectTransform.offsetMax = new Vector2(0f, 7f);
+            for (int i = 0; i < 2; i++)
+            {
+                Image handle = CreateTrayDecoration("InsetHandle", face, new Color32(87, 70, 52, 255));
+                RectTransform rect = handle.rectTransform;
+                rect.anchorMin = rect.anchorMax = new Vector2(i == 0 ? 0.12f : 0.88f, 0.5f);
+                rect.sizeDelta = new Vector2(34f, 5f);
+                rect.anchoredPosition = new Vector2(0f, -1f);
+                Outline edge = handle.gameObject.AddComponent<Outline>();
+                edge.effectColor = new Color32(220, 208, 185, 255);
+                edge.effectDistance = new Vector2(1f, -1f);
+            }
+            Image plate = CreateTrayDecoration("CategoryNameplate", face, new Color32(235, 220, 195, 255));
+            plate.rectTransform.anchorMin = plate.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            plate.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            plate.rectTransform.sizeDelta = new Vector2(_tabWidth, _tabHeight);
+            plate.rectTransform.anchoredPosition = new Vector2(0f, 1f);
+            _categoryTabs.Add(plate);
+            Outline rim = plate.gameObject.AddComponent<Outline>();
+            rim.effectColor = new Color32(127, 111, 87, 255);
+            rim.effectDistance = new Vector2(1f, -1f);
+            Text label = CreateLabel(plate.transform, text);
+            label.alignment = TextAnchor.MiddleCenter;
+            label.fontSize = 14;
+            label.lineSpacing = 0.95f;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        }
+
+        /// <summary>
+        /// name과 color로 parent 전체를 채우는 장식 Image를 만들어 반환한다.
+        /// 장식은 입력을 받지 않고 기존 서랍 버튼의 클릭 영역을 유지한다.
+        /// </summary>
+        private Image CreateTrayDecoration(string name, Transform parent, Color color)
+        {
+            RectTransform rect = CreateRect(name, parent);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>
+        /// parent 안에 text를 표시하는 비입력 인식표를 만들고 Text를 반환한다.
+        /// </summary>
+        private Text CreateLabel(Transform parent, string text)
+        {
+            RectTransform rect = CreateRect("CategoryLabel", parent);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(10f, 0f);
+            rect.offsetMax = new Vector2(-10f, 0f);
+            Text label = rect.gameObject.AddComponent<Text>();
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.fontSize = 16;
+            label.color = new Color32(48, 32, 22, 255);
+            label.alignment = TextAnchor.MiddleLeft;
+            label.raycastTarget = false;
+            label.text = text;
+            return label;
+        }
+
+        /// <summary>
+        /// button에 대응하는 서랍을 요청하며 진행 중 전환과 부품 및 도구 조작 중에는 입력을 무시한다.
+        /// </summary>
+        private void HandleDrawerClicked(KeyboardEditButton button)
+        {
+            RequestDrawer(_labels.IndexOf(button));
+        }
+
+        /// <summary>
+        /// index의 기존 카테고리를 닫기 후 열기 순서로 선택한다.
+        /// 동일 항목이면 닫고 진행 중 조작과 애니메이션의 추가 요청은 무시한다.
+        /// </summary>
+        public void RequestDrawer(int index)
+        {
+            if (_menuRoot == null || !_workshopVisible || _transitioning || !_pullers.InputAllowed
+                || _pullers.IsManipulatingPart) return;
+            _transitioning = true;
+            _listInput.interactable = false;
+            _transition = StartCoroutine(SlideDrawers(index == _selected ? -1 : index));
+        }
+
+        /// <summary>
+        /// index로 전환하면서 기존 목록을 아래로 숨긴 뒤 새 목록을 위로 이동한다.
+        /// Time.deltaTime으로 진행하며 재고와 출고 및 반환 예약은 변경하지 않는다.
+        /// </summary>
+        private System.Collections.IEnumerator SlideDrawers(int index)
+        {
+            while (_openAmount > 0f)
+            {
+                _openAmount = Mathf.MoveTowards(_openAmount, 0f, Time.deltaTime / _slideDuration);
+                yield return null;
+            }
+            _overlay.SetDrawerCategory(-1);
+            _selected = index;
+            if (index >= 0)
+            {
+                _overlay.SetDrawerCategory(index);
+                yield return null;
+                while (_openAmount < 1f)
+                {
+                    _openAmount = Mathf.MoveTowards(_openAmount, 1f, Time.deltaTime / _slideDuration);
+                    yield return null;
+                }
+            }
+            _transitioning = false;
+            _transition = null;
+        }
+
+        /// <summary>
+        /// visible에 따라 서랍을 즉시 접고 UI 표시 상태를 변경한다.
+        /// 조작 취소는 기존 호출자가 먼저 처리하며 재고와 회수 코루틴은 유지한다.
+        /// </summary>
+        public void ResetDrawers(bool visible)
+        {
+            _workshopVisible = visible;
+            if (_transition != null) StopCoroutine(_transition);
+            _transition = null;
+            _transitioning = false;
+            _selected = -1;
+            _openAmount = 0f;
+            if (_drawerRoot != null)
+            {
+                _drawerRoot.gameObject.SetActive(visible);
+                _clip.gameObject.SetActive(false);
+                _listInput.interactable = false;
+            }
+        }
+
+        /// <summary>
+        /// 현재 펼침 중인 목록의 화면상 중심을 반환한다.
+        /// 모두 접혔거나 숨겨졌으면 화면 왼쪽 안쪽 세로 중앙을 반환한다.
+        /// </summary>
+        public Vector2 GetReturnDestination()
+        {
+            return _workshopVisible && _selected >= 0 && _openAmount > 0f
+                ? RectTransformUtility.WorldToScreenPoint(null, _clip.TransformPoint(_clip.rect.center))
+                : new Vector2(24f, Screen.height * 0.5f);
+        }
+
+        void OnDisable()
+        {
+            ResetDrawers(false);
         }
 
         void OnDestroy()
         {
-            if (_toggle != null) _toggle.Clicked -= HandleToggleClicked;
-        }
-
-        /// <summary>
-        /// button의 클릭으로 재료 목록과 파츠 버튼의 표시 상태를 함께 전환한다.
-        /// 현재 선택과 재료는 유지하고 토글 문구와 위치를 갱신한다. 반환값은 없다.
-        /// </summary>
-        private void HandleToggleClicked(KeyboardEditButton button)
-        {
-            bool expanded = !_menuRoot.gameObject.activeSelf;
-            _menuRoot.gameObject.SetActive(expanded);
-            _toggleLabel.text = expanded ? "UI 접기" : "UI 펼치기";
-            ((RectTransform)button.transform).anchoredPosition = new Vector2(expanded ? _width + 36f : 24f, -24f);
+            for (int i = 0; i < Mathf.Min(7, _labels.Count); i++) _labels[i].Clicked -= HandleDrawerClicked;
         }
 
         /// <summary>

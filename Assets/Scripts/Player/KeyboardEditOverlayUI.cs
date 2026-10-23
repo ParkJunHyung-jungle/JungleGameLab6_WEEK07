@@ -28,15 +28,15 @@ namespace Game.Player
         private const float PLATE_PICKER_PREVIEW_WIDTH = 68f;
         private const float PLATE_PICKER_PREVIEW_HEIGHT = 60f;
 
-        private static readonly Color _pickerPanelColor = new Color32(37, 52, 68, 255);
-        private static readonly Color _pickerPanelBorderColor = new Color32(69, 91, 112, 255);
-        private static readonly Color _pickerBorderColor = new Color32(80, 103, 122, 255);
-        private static readonly Color _pickerHoverColor = new Color32(115, 220, 247, 255);
-        private static readonly Color _pickerFocusColor = new Color32(128, 234, 255, 255);
-        private static readonly Color _pickerSelectedColor = new Color32(87, 214, 243, 255);
-        private static readonly Color _pickerCardColor = new Color32(48, 66, 84, 255);
-        private static readonly Color _pickerSelectedCardColor = new Color32(39, 80, 100, 255);
-        private static readonly Color _pickerScrollbarColor = new Color32(75, 129, 151, 255);
+        private Color _pickerPanelColor = new Color32(37, 52, 68, 255);
+        private Color _pickerPanelBorderColor = new Color32(69, 91, 112, 255);
+        private Color _pickerBorderColor = new Color32(80, 103, 122, 255);
+        private Color _pickerHoverColor = new Color32(115, 220, 247, 255);
+        private Color _pickerFocusColor = new Color32(128, 234, 255, 255);
+        private Color _pickerSelectedColor = new Color32(87, 214, 243, 255);
+        private Color _pickerCardColor = new Color32(48, 66, 84, 255);
+        private Color _pickerSelectedCardColor = new Color32(39, 80, 100, 255);
+        private Color _pickerScrollbarColor = new Color32(75, 129, 151, 255);
         private static readonly SwitchType[] _switchSoundTypes = (SwitchType[])Enum.GetValues(typeof(SwitchType));
 
         [Header("Edit Buttons")]
@@ -159,6 +159,16 @@ namespace Game.Player
         {
             _keycapPlacement = GetComponent<WorkshopKeycapPlacement>();
             _catalogLayout = GetComponent<WorkshopVerticalCatalogLayout>();
+            if (_catalogLayout != null)
+            {
+                _pickerPanelColor = new Color32(225, 204, 176, 255);
+                _pickerPanelBorderColor = new Color32(148, 111, 77, 255);
+                _pickerBorderColor = new Color32(157, 122, 87, 255);
+                _pickerCardColor = new Color32(193, 160, 124, 255);
+                _pickerSelectedCardColor = new Color32(146, 107, 69, 255);
+                _pickerSelectedColor = new Color32(255, 231, 188, 255);
+                _pickerScrollbarColor = new Color32(130, 92, 59, 255);
+            }
             _canvas = GetComponentInParent<Canvas>();
             _pickerSprite = (_keycapButton.targetGraphic as Image).sprite;
             _pickerFont = _switchAxisButton.GetComponentInChildren<Text>().font;
@@ -343,7 +353,8 @@ namespace Game.Player
         /// </summary>
         public void SetWorkshopVisible(bool visible)
         {
-            SetPickerMode(visible && _showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
+            if (_catalogLayout != null) _catalogLayout.ResetDrawers(visible);
+            SetPickerMode(_catalogLayout == null && visible && _showKeycapsOnOpen ? PickerMode.Keycap : PickerMode.None);
         }
 
         /// <summary>
@@ -408,7 +419,8 @@ namespace Game.Player
         /// </summary>
         private void HandlePhotoCloseRequested()
         {
-            SetPickerMode(PickerMode.None);
+            if (_catalogLayout != null) _catalogLayout.RequestDrawer(7);
+            else SetPickerMode(PickerMode.None);
         }
 
         /// <summary>
@@ -730,7 +742,53 @@ namespace Game.Player
                 mode = PickerMode.Led;
             Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartAccess", GetLogPart(mode),
                 mode == _pickerMode ? "Close" : "Open");
+            if (_catalogLayout != null)
+            {
+                int index = mode == PickerMode.Keycap ? 0 : mode == PickerMode.SwitchSound ? 1
+                    : mode == PickerMode.Led ? 3 : mode == PickerMode.Plate ? 4 : mode == PickerMode.Photo ? 7 : 8;
+                _catalogLayout.RequestDrawer(index);
+                return;
+            }
             SetPickerMode(mode == _pickerMode ? PickerMode.None : mode);
+        }
+
+        /// <summary>
+        /// index에 해당하는 기존 이미지 또는 케이스 버튼을 반환해 서랍 도구줄로 옮길 수 있게 한다.
+        /// 원본 이벤트 연결과 선택 표시 컴포넌트는 유지한다.
+        /// </summary>
+        public KeyboardEditButton GetDrawerUtilityButton(int index)
+        {
+            return index == 7 ? _customButton : _caseButton;
+        }
+
+        /// <summary>
+        /// parent 아래로 기존 일반 및 공격 모드 버튼을 옮겨 카테고리 목록 숨김과 분리한다.
+        /// 두 버튼의 이벤트와 기능은 유지하며 반환한 버튼을 새 도구줄에서 배치한다.
+        /// </summary>
+        public KeyboardEditButton[] MoveDrawerModeButtons(Transform parent)
+        {
+            _generalModeButton.transform.SetParent(parent, false);
+            _attackModeButton.transform.SetParent(parent, false);
+            return new[] { _generalModeButton, _attackModeButton };
+        }
+
+        /// <summary>
+        /// 서랍 index를 기존 편집 목록 모드로 연결하고 표시 전용 항목은 목록 없이 유지한다.
+        /// 기존 재고와 선택 데이터는 변경하지 않으며 음수는 모든 목록을 닫는다.
+        /// </summary>
+        public void SetDrawerCategory(int index)
+        {
+            PickerMode mode = index switch
+            {
+                0 => PickerMode.Keycap,
+                1 => PickerMode.SwitchSound,
+                3 => PickerMode.Led,
+                4 => PickerMode.Plate,
+                7 => PickerMode.Photo,
+                8 => PickerMode.CaseMaterial,
+                _ => PickerMode.None
+            };
+            SetPickerMode(mode);
         }
 
         /// <summary>

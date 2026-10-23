@@ -17,12 +17,32 @@ namespace Game.Player
         private RectTransform _assemblyActions;
         private WorkshopPcbCardDrag _plateCard;
         private WorkshopPcbCardDrag _upperCard;
+        private WorkshopPcbCardDrag _lowerCard;
         private Text _assemblyStatus;
         private RectTransform _pcbViewport;
         private WorkshopPcbCardDrag _pcbCard;
+        private WorkshopPcbCardDrag _pcbWorldDrag;
         private WorkshopPcbScrewAssembly _screwAssembly;
         private KeyboardAssemblyState ActiveAssembly => _caseCustomization != null
             ? _caseCustomization.GetComponent<KeyboardAssemblyState>() : null;
+
+        /// <summary>point가 현재 열린 부품 목록 영역인지 반환한다. 탭과 무관하게 목록 패널만 검사하며 상태를 변경하지 않는다.</summary>
+        public bool IsInAssemblyReturnArea(Vector2 point)
+        {
+            RectTransform[] areas = { _viewport, _switchSoundViewport, _caseMaterialViewport,
+                _plateViewport, _pcbViewport };
+            foreach (RectTransform area in areas)
+                if (area != null && area.gameObject.activeInHierarchy
+                    && RectTransformUtility.RectangleContainsScreenPoint(area, point, null)) return true;
+            return false;
+        }
+
+        /// <summary>assembly의 장착 축·키캡을 모두 재고에 반환한다. 연결이 누락되면 묶음을 보존하고 실패를 반환한다.</summary>
+        public bool TryReturnPcbBundle(KeyboardAssemblyState assembly)
+        {
+            return _keycapPlacement != null && _keycapPlacement.TryReturnPcbParts(
+                assembly.GetComponent<KeyboardCustomization>());
+        }
 
         /// <summary>
         /// 기존 부품 버튼을 재사용해 조립 씬의 순서와 설치 조작을 구성한다.
@@ -65,9 +85,11 @@ namespace Game.Player
             _assemblyStatus = CreateAssemblyLabel(_assemblyActions, "", 12f, 74f);
             _plateCard = CreateMaterialDragController(AssemblyStructurePart.Plate);
             _upperCard = CreateMaterialDragController(AssemblyStructurePart.Upper);
+            _lowerCard = CreateMaterialDragController(AssemblyStructurePart.Lower);
             _assemblyActions.gameObject.SetActive(false);
             _pcbViewport = CreateScrollViewport("Pcb", 1, out RectTransform content);
             _pcbCard = CreateStructureCard(content, "PCB · 드래그 배치", AssemblyStructurePart.Pcb, Vector2.zero);
+            _pcbWorldDrag = CreateMaterialDragController(AssemblyStructurePart.Pcb);
             _pcbViewport.gameObject.SetActive(false);
         }
 
@@ -107,7 +129,8 @@ namespace Game.Player
             text.rectTransform.anchoredPosition = new Vector2(6f, -112f);
             text.rectTransform.sizeDelta = new Vector2(119f, 32f);
             WorkshopPcbCardDrag drag = card.gameObject.AddComponent<WorkshopPcbCardDrag>();
-            drag.Initialize(_pullerController, _pcbOutlineMaterial, _pcbDepthShader, kind);
+            drag.Initialize(_pullerController, _pcbOutlineMaterial, _pcbDepthShader, kind,
+                worldPickupEnabled: kind != AssemblyStructurePart.Pcb);
             return drag;
         }
 
@@ -123,16 +146,20 @@ namespace Game.Player
         }
 
         /// <summary>material과 plate 및 origin 카드로 해당 구조 부품의 드래그를 시작한다. eventData는 시작 입력에만 사용하며 선택 표시는 기존 재질 UI로 갱신한다.</summary>
-        public void BeginStructureMaterialDrag(Material material, bool plate, PointerEventData eventData, RectTransform origin)
+        public void BeginStructureMaterialDrag(Material material, AssemblyStructurePart kind, PointerEventData eventData, RectTransform origin)
         {
             if (!_assemblyCatalog) return;
-            if (plate && _pickerMode == PickerMode.Plate)
+            if (kind == AssemblyStructurePart.Plate && _pickerMode == PickerMode.Plate)
             {
                 if (_plateCard.BeginMaterialDrag(eventData, material, origin)) RefreshPlateSelection();
             }
-            else if (!plate && _pickerMode == PickerMode.Upper)
+            else if (kind == AssemblyStructurePart.Upper && _pickerMode == PickerMode.Upper)
             {
                 if (_upperCard.BeginMaterialDrag(eventData, material, origin)) RefreshCaseMaterialSelection();
+            }
+            else if (kind == AssemblyStructurePart.Lower && _pickerMode == PickerMode.CaseMaterial)
+            {
+                if (_lowerCard.BeginMaterialDrag(eventData, material, origin)) RefreshCaseMaterialSelection();
             }
         }
 
@@ -144,27 +171,53 @@ namespace Game.Player
             bool plate = _pickerMode == PickerMode.Plate;
             bool upper = _pickerMode == PickerMode.Upper;
             foreach (KeyboardEditButton button in _casePreviewButtons)
-                button.GetComponent<WorkshopStructureMaterialDrag>().enabled = upper && assembly != null && assembly.CanInstallUpper;
+            {
+                WorkshopStructureMaterialDrag drag = button.GetComponent<WorkshopStructureMaterialDrag>();
+                drag.Initialize(this, _keycapMaterials[_caseMaterialIndices[_casePreviewButtons.IndexOf(button)]],
+                    upper ? AssemblyStructurePart.Upper : AssemblyStructurePart.Lower);
+                drag.enabled = assembly != null && (upper && assembly.CanInstallUpper
+                    || _pickerMode == PickerMode.CaseMaterial && assembly.CanInstallLower && !assembly.LowerLoose);
+            }
             foreach (KeyboardEditButton button in _plateMaterialButtons)
                 button.GetComponent<WorkshopStructureMaterialDrag>().enabled = plate && assembly != null && assembly.CanInstallPlate;
             _screwAssembly.SetContext(assembly, pcb);
             _pcbCard.SetContext(assembly, pcb);
+            _pcbWorldDrag.SetContext(assembly, false);
             _plateCard.SetContext(assembly, plate);
             _upperCard.SetContext(assembly, upper);
-            _plateCard.gameObject.SetActive(assembly != null && plate);
-            _upperCard.gameObject.SetActive(assembly != null && upper);
+            _lowerCard.SetContext(assembly, _pickerMode == PickerMode.CaseMaterial);
+            _plateCard.gameObject.SetActive(assembly != null);
+            _upperCard.gameObject.SetActive(assembly != null);
+            _lowerCard.gameObject.SetActive(assembly != null);
+            _pcbWorldDrag.gameObject.SetActive(assembly != null);
             _pcbViewport.gameObject.SetActive(pcb && assembly != null);
             _pcbButton.interactable = _upperButton.interactable = assembly != null;
             _pcbButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(pcb);
             _upperButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(upper);
-            _assemblyActions.gameObject.SetActive(assembly != null && (pcb || plate || upper));
+            _assemblyActions.gameObject.SetActive(assembly != null
+                && (pcb || plate || upper || _pickerMode == PickerMode.CaseMaterial));
             if (assembly == null) return;
             _assemblyActions.sizeDelta = new Vector2(250f, 100f);
-            _assemblyStatus.text = pcb
+            _assemblyStatus.text = _pickerMode == PickerMode.CaseMaterial
+                ? assembly.CanRemoveLower ? "빈 하단부 · 좌클릭 드래그로 분리 가능"
+                    : assembly.LowerInstalled ? "하단부 분리: PCB·보강판·상단부·축·키캡 제거 필요"
+                    : assembly.LowerLoose ? "바닥의 하단부를 집어 정위치에 놓기"
+                    : "하단부 목록에서 드래그해 정위치에 놓기"
+                : pcb
                 ? $"{(assembly.PcbComplete ? "PCB 조립 완료" : assembly.PcbPlaced ? "PCB 배치됨" : "PCB 미설치")} · 나사 {assembly.ScrewCount}/6\n"
-                    + (assembly.PcbComplete ? "PCB 고정 완료" : assembly.PcbPlaced ? "나사 아웃라인을 클릭해 고정" : "하단부 위로 PCB를 드래그해 배치")
-                : plate ? $"보강판 {(assembly.PlateInstalled ? "설치됨" : "미설치")}\nPCB 조립 완료 · 상단부 없음 · 키캡 없음 필요"
-                : $"상단부 {(assembly.UpperInstalled ? "설치됨" : "미설치")}\n하단부만 필요 · 설치 후 PCB·보강판 배치 불가";
+                    + (assembly.PcbPlaced && (assembly.UpperInstalled || assembly.PlateInstalled)
+                        ? "상단부·보강판 제거 후 나사 조작"
+                        : assembly.PcbComplete ? "나사 풀기 가능" : assembly.PcbPlaced
+                        ? assembly.CanRemovePcb ? "PCB 좌클릭 드래그로 분리 가능" : "나사 아웃라인 클릭으로 조작"
+                        : assembly.PcbLoose ? "바닥의 PCB를 집어 하단부에 놓기"
+                        : assembly.CanInstallPcb ? "하단부 위로 PCB 드래그 배치" : "하단부 설치 필요")
+                : plate ? $"보강판 {(assembly.PlateInstalled ? "설치됨" : "미설치")}\n"
+                    + (assembly.CanRemovePlate ? "좌클릭 드래그로 분리 가능"
+                        : assembly.PlateInstalled ? "상단부·키캡 제거 후 분리 가능"
+                        : assembly.CanInstallPlate ? "재질 카드를 드래그해 설치 가능" : "PCB 나사 완료·상단부·키캡 상태 확인")
+                : $"상단부 {(assembly.UpperInstalled ? "설치됨" : "미설치")}\n"
+                    + (assembly.CanRemoveUpper ? "좌클릭 드래그로 분리 가능"
+                        : assembly.CanInstallUpper ? "재질 카드를 드래그해 설치 가능" : "하단부 설치 후 배치 가능");
             if (upper || _pickerMode == PickerMode.CaseMaterial) RefreshCaseMaterialSelection();
         }
 

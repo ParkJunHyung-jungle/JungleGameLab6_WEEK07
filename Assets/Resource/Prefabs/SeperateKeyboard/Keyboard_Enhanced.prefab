@@ -149021,6 +149021,7 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects:
+    - {fileID: 612496960891010183, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
     - {fileID: 4659717494507785070, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
     - {fileID: 6164541545200243363, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
     - {fileID: 5041485654217565670, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
@@ -167777,8 +167778,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d626322e2624714ab14ab507c74b2a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeycapHealth
---- !u!23 &8853000000000000001 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 2821128089571546917, guid: 029f15bca3a509045b23cad09a0d2be5, type: 3}
-  m_PrefabInstance: {fileID: 712209937148672475}
-  m_PrefabAsset: {fileID: 0}

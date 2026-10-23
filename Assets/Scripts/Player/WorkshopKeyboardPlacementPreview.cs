@@ -68,6 +68,12 @@ namespace Game.Player
             }
         }
 
+        /// <summary>color로 현재 외곽선 색을 바꾼다. 공유 원본 재질은 유지하고 다음 표시부터 적용한다.</summary>
+        public void SetOutlineColor(Color color)
+        {
+            _outlineMaterial.SetColor("_OutlineColor", color);
+        }
+
         /// <summary>
         /// 표시 전용 재질과 캐시를 해제한다.
         /// 원본 메시 자산과 원본 외곽선 재질 및 카메라는 유지한다.

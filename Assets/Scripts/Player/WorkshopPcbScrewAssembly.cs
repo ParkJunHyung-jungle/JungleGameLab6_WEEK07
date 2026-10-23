@@ -42,7 +42,8 @@ namespace Game.Player
                 {
                     for (int index = 0; index < 6; index++)
                     {
-                        var outline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _pullers.InputCamera);
+                        Color color = assembly.FixedScrews[index] ? new Color(0.3f, 1f, 0.45f) : new Color(1f, 0.65f, 0.2f);
+                        var outline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _pullers.InputCamera, color);
                         outline.Prepare(assembly.GetScrew(index), true);
                         _outlines.Add(outline);
                     }
@@ -67,7 +68,7 @@ namespace Game.Player
             if (_captured && (mouse == null || !mouse.leftButton.isPressed && !mouse.leftButton.wasReleasedThisFrame))
                 _captured = false;
             _pullers.SetScrewPointerCaptured(_captured);
-            if (_captured || !_selected || _assembly == null || !_assembly.PcbPlaced || Time.timeScale <= 0f
+            if (_captured || !_selected || _assembly == null || !_assembly.PcbPlaced || _assembly.PlateInstalled || _assembly.UpperInstalled || Time.timeScale <= 0f
                 || !_pullers.InputAllowed || _pullers.IsManipulatingPart || mouse == null
                 || !mouse.leftButton.wasPressedThisFrame || _pullers.IsPointerOverUI(InGameCursor.Position)) return;
             Ray ray = _pullers.InputCamera.ScreenPointToRay(InGameCursor.Position);
@@ -75,15 +76,19 @@ namespace Game.Player
             if (hit < 0 || IsBlocked(ray, distance)) return;
             _captured = true;
             _pullers.SetScrewPointerCaptured(true);
-            _assembly.FixScrew(hit);
+            if (_assembly.FixedScrews[hit]) _assembly.ReleaseScrew(hit);
+            else _assembly.FixScrew(hit);
         }
 
         void LateUpdate()
         {
-            if (!_selected || _assembly == null || !_assembly.PcbPlaced || !_pullers.InputAllowed || Time.timeScale <= 0f) return;
+            if (!_selected || _assembly == null || !_assembly.PcbPlaced || _assembly.PlateInstalled || _assembly.UpperInstalled
+                || !_pullers.InputAllowed || Time.timeScale <= 0f) return;
             for (int index = 0; index < 6; index++)
             {
-                if (!_assembly.CanFixScrew(index)) continue;
+                if (!_assembly.CanFixScrew(index) && !_assembly.CanReleaseScrew(index)) continue;
+                _outlines[index].SetOutlineColor(_assembly.FixedScrews[index]
+                    ? new Color(0.3f, 1f, 0.45f) : new Color(1f, 0.65f, 0.2f));
                 Pose pose = _assembly.GetScrewPose(index);
                 Transform screw = _assembly.GetScrew(index);
                 Vector3 center = Matrix4x4.TRS(pose.position, pose.rotation, screw.lossyScale).MultiplyPoint3x4(GetHeadBounds(screw).center);
@@ -157,7 +162,8 @@ namespace Game.Player
         {
             foreach (var outline in _outlines) outline.Dispose();
             _outlines.Clear();
-            foreach (MeshCollider blocker in _blockers) Destroy(blocker.gameObject);
+            foreach (MeshCollider blocker in _blockers)
+                if (blocker != null) Destroy(blocker.gameObject);
             _blockers.Clear();
         }
 
@@ -165,7 +171,8 @@ namespace Game.Player
         {
             _captured = false;
             if (_pullers != null) _pullers.SetScrewPointerCaptured(false);
-            foreach (MeshCollider blocker in _blockers) blocker.enabled = false;
+            foreach (MeshCollider blocker in _blockers)
+                if (blocker != null) blocker.enabled = false;
         }
 
         void OnDestroy() { ClearGeometry(); }

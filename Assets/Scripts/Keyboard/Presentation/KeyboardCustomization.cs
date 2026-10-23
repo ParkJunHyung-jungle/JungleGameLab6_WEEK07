@@ -295,6 +295,20 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     /// </summary>
     public Transform GetSwitchSlotTransform(int index) => _switches[index].transform;
 
+    /// <summary>index의 PCB 키캡 설치 여부를 반환한다. 슬롯의 현재 외형 표시를 검사하며 상태는 변경하지 않는다.</summary>
+    public bool IsPcbKeycapInstalled(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return IsKeycapInstalled(index);
+    }
+
+    /// <summary>index의 PCB 축 설치 여부를 반환한다. 연결된 키캡 슬롯의 축 상태를 검사하며 상태는 변경하지 않는다.</summary>
+    public bool IsPcbSwitchInstalled(int index)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        return HasSwitchForKeycap(index);
+    }
+
     /// <summary>
     /// index의 빈 축 슬롯에 type을 설치하고 성공 여부를 반환한다.
     /// 키캡이나 축이 이미 있으면 거부하고 성공 시 외형과 타건음을 갱신하며 설치 연출을 재생한다.

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -249,6 +249,57 @@ namespace Game.Player
                     || (definition != null && entry.KeycapDefinition == definition)
                     || (definition == null && !entry.IsArtisan && entry.KeycapMaterial == material))) return entry;
             return null;
+        }
+
+        /// <summary>customization의 PCB에 실제 장착된 축·키캡의 재고 연결을 모두 검사한다. 누락 시 상태를 보존하고 이유를 기록하며 false를 반환한다.</summary>
+        public bool TryReturnPcbParts(KeyboardCustomization customization)
+        {
+            var parts = new List<(Transform Part, AssemblyCatalogEntry Entry)>();
+            for (int index = 0; index < customization.KeycapCount; index++)
+            {
+                if (customization.IsPcbKeycapInstalled(index))
+                {
+                    AssemblyCatalogEntry keycap = FindEntry(customization.GetKeycapMaterial(index), customization.GetKeycapDefinition(index));
+                    if (keycap == null) { Debug.LogError($"PCB 반환 실패: 키캡 {index} 재고 항목 없음", customization); return false; }
+                    parts.Add((customization.GetKeycapSlotTransform(index), keycap));
+                }
+                if (customization.IsPcbSwitchInstalled(index))
+                {
+                    Transform part = customization.GetSwitchSlotTransform(index);
+                    SwitchType type = customization.GetInstalledSwitchType(part.GetComponent<KeyboardSwitch>());
+                    AssemblyCatalogEntry found = null;
+                    foreach (AssemblyCatalogEntry entry in _switchEntries)
+                        if (entry.IsSwitch && entry.SwitchData.Type == type) { found = entry; break; }
+                    if (found == null) { Debug.LogError($"PCB 반환 실패: 축 {index} 재고 항목 없음", customization); return false; }
+                    parts.Add((part, found));
+                }
+            }
+            var prepared = new List<AssemblyDraggablePart>();
+            try
+            {
+                foreach (var item in parts)
+                {
+                    Rigidbody visual = _pullers.CreateDetachedVisual(item.Part, Vector3.zero, Vector3.zero, false);
+                    AssemblyDraggablePart part = visual.gameObject.AddComponent<AssemblyDraggablePart>();
+                    prepared.Add(part);
+                    part.InitializeLoosePart(item.Entry, true);
+                    part.gameObject.SetActive(false);
+                }
+            }
+            catch (System.Exception exception)
+            {
+                foreach (AssemblyDraggablePart part in prepared) Destroy(part.gameObject);
+                Debug.LogError("PCB 반환 준비 실패: 원본 묶음을 유지합니다. " + exception, customization);
+                return false;
+            }
+            for (int index = 0; index < parts.Count; index++)
+            {
+                parts[index].Part.gameObject.SetActive(false);
+                _ownedParts.Add(prepared[index]);
+                parts[index].Entry.StorePart(prepared[index], true);
+            }
+            RefreshInventory();
+            return true;
         }
 
         /// <summary>

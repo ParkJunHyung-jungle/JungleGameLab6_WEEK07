@@ -7,6 +7,7 @@ using UnityEngine.Rendering;
 using UnityEngine.UI;
 
 using Game.Tournament;
+using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
@@ -1858,7 +1859,7 @@ namespace Game.Player
                 _plateMaterialButtonMaterials.Add(material);
                 _plateMaterialSelectionIndicators.Add(selectionIndicator);
                 if (_assemblyCatalog)
-                    button.gameObject.AddComponent<WorkshopStructureMaterialDrag>().Initialize(this, material, true);
+                    button.gameObject.AddComponent<WorkshopStructureMaterialDrag>().Initialize(this, material, AssemblyStructurePart.Plate);
             }
         }
 
@@ -2072,7 +2073,7 @@ namespace Game.Player
             foreach (MeshRenderer renderer in _caseCustomization.CaseRenderers)
             {
                 MeshFilter filter = renderer != null ? renderer.GetComponent<MeshFilter>() : null;
-                if (filter == null || filter.sharedMesh == null)
+                if (filter == null || filter.sharedMesh == null || !filter.sharedMesh.isReadable)
                     continue;
 
                 for (int subMesh = 0; subMesh < filter.sharedMesh.subMeshCount; subMesh++)
@@ -2128,8 +2129,9 @@ namespace Game.Player
                 if (_assemblyCatalog)
                 {
                     WorkshopStructureMaterialDrag drag = button.gameObject.AddComponent<WorkshopStructureMaterialDrag>();
-                    drag.Initialize(this, material, false);
-                    drag.enabled = _pickerMode == PickerMode.Upper;
+                    drag.Initialize(this, material, _pickerMode == PickerMode.Upper
+                        ? AssemblyStructurePart.Upper : AssemblyStructurePart.Lower);
+                    drag.enabled = _pickerMode == PickerMode.Upper || _pickerMode == PickerMode.CaseMaterial;
                 }
             }
         }
@@ -2155,6 +2157,9 @@ namespace Game.Player
         /// </summary>
         private void SetPickerMode(PickerMode mode)
         {
+            if (_keycapButton == null || _switchAxisButton == null || _ledButton == null
+                || _caseButton == null || _plateButton == null || _customButton == null
+                || _assemblyCatalog && (_pcbButton == null || _upperButton == null)) return;
             PickerMode previous = _pickerMode;
             _pickerMode = mode == PickerMode.Keycap && _viewport == null ? PickerMode.None : mode;
             if (previous == PickerMode.Keycap && _pickerMode != PickerMode.Keycap)

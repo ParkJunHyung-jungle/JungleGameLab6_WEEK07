@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -6,10 +6,12 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+using KeyboardModeling;
 using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
+    [DefaultExecutionOrder(-50)]
     public sealed class WorkshopPcbCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [Header("PCB·보강판·상단부 Drag")]
@@ -33,15 +35,22 @@ namespace Game.Player
         private bool _selected;
         private bool _dragging;
         private bool _returning;
+        private bool _worldDragging;
+        private bool _worldPickupEnabled;
+        private bool _wasInstalled;
+        private readonly List<Rigidbody> _looseBodies = new List<Rigidbody>();
+        private Vector3[] _worldStartPositions;
+        private Quaternion[] _worldStartRotations;
         private readonly List<(Collider Collider, bool Enabled)> _colliders = new List<(Collider, bool)>();
 
         /// <summary>pullers와 kind 및 기존 아웃라인 에셋을 카드에 연결한다. 표시용 카메라와 아이콘을 만들며 원본 부품의 설치 상태는 변경하지 않는다.</summary>
         public void Initialize(WorkshopKeyboardPullerController pullers, Material outlineMaterial, Shader depthShader,
-            AssemblyStructurePart kind = AssemblyStructurePart.Pcb, bool showCard = true)
+            AssemblyStructurePart kind = AssemblyStructurePart.Pcb, bool showCard = true, bool worldPickupEnabled = true)
         {
             _pullers = pullers;
             _button = GetComponent<KeyboardEditButton>();
             _kind = kind;
+            _worldPickupEnabled = worldPickupEnabled;
             _outlineMaterial = outlineMaterial;
             _depthShader = depthShader;
             _preview = gameObject.AddComponent<WorkshopDragPreviewRenderer>();
@@ -67,6 +76,7 @@ namespace Game.Player
             if (_assembly != assembly)
             {
                 CancelDrag();
+                _looseBodies.Clear();
                 foreach (var outline in _outlines) outline.Dispose();
                 _outlines.Clear();
                 _assembly = assembly;
@@ -83,9 +93,11 @@ namespace Game.Player
                 }
             }
             _selected = selected;
-            if (!selected) CancelDrag();
+            if (!selected && !_worldDragging) CancelDrag();
             if (assembly != null && !_dragging && !_returning && _iconMaterial != assembly.GetStructureMaterial(_kind)) BuildIcon();
-            _button.interactable = selected && assembly != null && assembly.CanInstallStructure(_kind) && !_returning;
+            _button.interactable = selected && assembly != null && assembly.CanInstallStructure(_kind)
+                && !(_kind == AssemblyStructurePart.Pcb && assembly.PcbLoose
+                    || _kind == AssemblyStructurePart.Lower && assembly.LowerLoose) && !_returning;
         }
 
         /// <summary>현재 PCB·보강판·상단부의 모든 렌더 메시와 재질을 카탈로그 아이콘으로 합친다. 런타임 미리보기만 생성하며 메시 에셋과 원본 모델은 유지한다.</summary>
@@ -98,6 +110,7 @@ namespace Game.Player
             {
                 if (!renderer.enabled) continue;
                 Mesh mesh = renderer.GetComponent<MeshFilter>().sharedMesh;
+                if (mesh == null || !mesh.isReadable) continue;
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
                 {
                     parts.Add(new CombineInstance { mesh = mesh, subMeshIndex = submesh,
@@ -105,12 +118,16 @@ namespace Game.Player
                     materials.Add(renderer.sharedMaterials[submesh]);
                 }
             }
-            Mesh combined = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
-            combined.CombineMeshes(parts.ToArray(), false, true);
             if (_texture != null) Destroy(_texture);
-            _texture = AssemblyCatalogPreview.Render(combined, materials.ToArray());
-            Destroy(combined);
-            _icon.texture = _returnIcon.texture = _texture;
+            _texture = null;
+            if (parts.Count > 0)
+            {
+                Mesh combined = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                combined.CombineMeshes(parts.ToArray(), false, true);
+                _texture = AssemblyCatalogPreview.Render(combined, materials.ToArray());
+                Destroy(combined);
+            }
+            _icon.texture = _returnIcon.texture = _texture != null ? _texture : Texture2D.whiteTexture;
             _iconMaterial = _assembly.GetStructureMaterial(_kind);
         }
 
@@ -118,7 +135,9 @@ namespace Game.Player
 
         void Update()
         {
+            if (!_dragging && _worldPickupEnabled) TryBeginWorldDrag();
             if (!_dragging) return;
+            if (_worldDragging) { UpdateWorldDrag(); return; }
             if (!_selected || !_pullers.InputAllowed || Mouse.current == null
                 || !_assembly.CanInstallStructure(_kind) || Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
@@ -136,7 +155,163 @@ namespace Game.Player
                 FinishDrag();
                 AudioManager.PlayPartSound(_parts[0].position, false);
             }
+            else if (_kind == AssemblyStructurePart.Lower && !_pullers.IsPointerOverUI(point))
+            {
+                _assembly.DropLooseLower();
+                _wasInstalled = false;
+                _worldDragging = true;
+                UpdateWorldDrag();
+            }
             else StartReturn(point);
+        }
+
+        /// <summary>가상 커서 아래의 설치 또는 바닥 구조 부품을 집는다. 분리 조건을 확인한 뒤 실제 성공 시에만 점유를 해제한다.</summary>
+        private void TryBeginWorldDrag()
+        {
+            if (_assembly == null || _returning || !_pullers.InputAllowed || _pullers.IsManipulatingPart
+                || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
+            Vector2 point = InGameCursor.Position;
+            if (_pullers.IsPointerOverUI(point) || _pullers.IsPullerInteraction(point)) return;
+            Ray ray = _pullers.InputCamera.ScreenPointToRay(point);
+            Physics.SyncTransforms();
+            Vector3 boardPoint = default;
+            bool boardHit = _kind == AssemblyStructurePart.Pcb
+                && _assembly.TryGetInstalledPcbHit(ray, out boardPoint);
+            Vector3 hitPoint = boardHit ? boardPoint : Vector3.zero;
+            float nearest = float.PositiveInfinity;
+            if (boardHit) nearest = Vector3.Distance(ray.origin, boardPoint);
+            if (_kind == AssemblyStructurePart.Plate && _assembly.PlateInstalled
+                || _kind == AssemblyStructurePart.Upper && _assembly.UpperInstalled
+                || _kind == AssemblyStructurePart.Lower && _assembly.LowerInstalled)
+            {
+                foreach (Transform part in _parts)
+                {
+                    MeshFilter filter = part.GetComponent<MeshFilter>();
+                    Ray localRay = new Ray(part.InverseTransformPoint(ray.origin), part.InverseTransformVector(ray.direction));
+                    Bounds bounds = filter.sharedMesh.bounds;
+                    bounds.Expand(new Vector3(0f, 0.02f, 0f));
+                    if (!bounds.IntersectRay(localRay, out float distance)) continue;
+                    Vector3 pointOnPart = part.TransformPoint(localRay.GetPoint(distance));
+                    float worldDistance = Vector3.Distance(ray.origin, pointOnPart);
+                    if (worldDistance >= nearest) continue;
+                    hitPoint = pointOnPart;
+                    nearest = worldDistance;
+                }
+            }
+            float obstruction = float.PositiveInfinity;
+            KeyboardCustomization customization = _kind == AssemblyStructurePart.Pcb
+                ? _assembly.GetComponent<KeyboardCustomization>() : null;
+            foreach (RaycastHit candidate in Physics.RaycastAll(ray, _pullers.InputCamera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                bool belongs = false;
+                foreach (Transform part in _parts)
+                    if (candidate.transform == part || candidate.transform.IsChildOf(part)) { belongs = true; break; }
+                if (!candidate.transform.IsChildOf(_assembly.transform) && !belongs)
+                    obstruction = Mathf.Min(obstruction, candidate.distance);
+                if (!belongs && customization != null && _assembly.CanRemovePcb)
+                    for (int index = 0; index < customization.KeycapCount && !belongs; index++)
+                        belongs = customization.IsPcbKeycapInstalled(index)
+                            && candidate.transform.IsChildOf(customization.GetKeycapSlotTransform(index))
+                            || customization.IsPcbSwitchInstalled(index)
+                            && candidate.transform.IsChildOf(customization.GetSwitchSlotTransform(index));
+                if (!belongs || candidate.distance >= nearest) continue;
+                hitPoint = candidate.point;
+                nearest = candidate.distance;
+            }
+            if (nearest >= obstruction) return;
+            if (_kind == AssemblyStructurePart.Plate && _assembly.PlateInstalled && !_assembly.CanRemovePlate)
+            {
+                Debug.LogWarning("보강판 분리 불가: 상단부 또는 설치된 키캡이 남아 있습니다.", _assembly);
+                return;
+            }
+            _wasInstalled = _kind == AssemblyStructurePart.Pcb ? _assembly.PcbPlaced
+                : _kind == AssemblyStructurePart.Upper ? _assembly.UpperInstalled
+                : _kind == AssemblyStructurePart.Lower ? _assembly.LowerInstalled : _assembly.PlateInstalled;
+            if (_wasInstalled && !(_kind == AssemblyStructurePart.Pcb
+                ? _assembly.TryRemovePcb() : _assembly.TryRemoveStructure(_kind))) return;
+            _worldDragging = true;
+            _dragging = true;
+            _pullers.SetPcbDragging(true);
+            foreach (Rigidbody body in _looseBodies) if (body != null) body.isKinematic = true;
+            _partOffsets = new Vector3[_parts.Count];
+            _worldStartPositions = new Vector3[_parts.Count];
+            _worldStartRotations = new Quaternion[_parts.Count];
+            for (int index = 0; index < _parts.Count; index++)
+            {
+                _partOffsets[index] = _parts[index].position - _parts[0].position;
+                _worldStartPositions[index] = _parts[index].position;
+                _worldStartRotations[index] = _parts[index].rotation;
+            }
+            _centerOffset = _parts[0].position - hitPoint;
+            _dragPlane = new Plane(_pullers.InputCamera.transform.forward, hitPoint);
+            _colliders.Clear();
+            foreach (Transform part in _parts)
+            foreach (Collider collider in part.GetComponentsInChildren<Collider>(true))
+            {
+                _colliders.Add((collider, collider.enabled));
+                collider.enabled = false;
+            }
+            _preview.Show(_parts);
+            MoveParts(point);
+        }
+
+        /// <summary>가상 커서를 따라 실물을 이동하고 버튼을 놓을 때 목록 반환·설치·바닥 드롭 중 하나를 확정한다.</summary>
+        private void UpdateWorldDrag()
+        {
+            if (!_pullers.InputAllowed || Mouse.current == null || Keyboard.current != null
+                && Keyboard.current.escapeKey.wasPressedThisFrame) { CancelDrag(); return; }
+            Vector2 point = InGameCursor.Position;
+            Ray ray = _pullers.InputCamera.ScreenPointToRay(point);
+            MoveParts(point);
+            if (Mouse.current.leftButton.isPressed) return;
+            if (!Mouse.current.leftButton.wasReleasedThisFrame) { CancelDrag(); return; }
+            KeyboardEditOverlayUI overlay = GetComponentInParent<KeyboardEditOverlayUI>();
+            if (overlay != null && overlay.IsInAssemblyReturnArea(point))
+            {
+                if (_kind == AssemblyStructurePart.Pcb && !overlay.TryReturnPcbBundle(_assembly))
+                {
+                    CancelDrag();
+                    return;
+                }
+                FinishWorldDrag();
+                if (_kind == AssemblyStructurePart.Pcb) _assembly.ReleasePcbParts();
+                if (_kind == AssemblyStructurePart.Pcb) _assembly.ReturnPcbToInventory();
+                else if (_kind == AssemblyStructurePart.Lower) _assembly.ReturnLowerToInventory();
+                else _assembly.RestoreStructurePose(_kind);
+                return;
+            }
+            if (_pullers.IsPointerOverUI(point)) { CancelDrag(); return; }
+            bool installed = !IsObstructed(ray) && _assembly.TryPlaceStructure(_kind, ray);
+            Vector3 position = _parts[0].position;
+            FinishWorldDrag();
+            if (installed) { AudioManager.PlayPartSound(position, false); return; }
+            if (!new Plane(Vector3.up, _assembly.transform.position).Raycast(ray, out float distance))
+                distance = Mathf.Max(1f, Vector3.Distance(_pullers.InputCamera.transform.position, _assembly.transform.position));
+            Vector3 drop = ray.GetPoint(distance) + Vector3.up * 0.3f;
+            for (int index = 0; index < _parts.Count; index++)
+            {
+                Transform part = _parts[index];
+                part.position = drop + _partOffsets[index];
+                Rigidbody body = part.GetComponent<Rigidbody>();
+                if (body == null) body = part.gameObject.AddComponent<Rigidbody>();
+                body.isKinematic = false;
+                body.useGravity = true;
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                if (!_looseBodies.Contains(body)) _looseBodies.Add(body);
+            }
+        }
+
+        /// <summary>실물 드래그의 표시와 충돌체를 복구한다. 설치 여부는 변경하지 않고 입력 점유만 해제한다.</summary>
+        private void FinishWorldDrag()
+        {
+            _preview.Hide();
+            foreach (var entry in _colliders) entry.Collider.enabled = entry.Enabled;
+            _colliders.Clear();
+            _dragging = false;
+            _worldDragging = false;
+            _pullers.SetPcbDragging(false);
         }
 
         void LateUpdate()
@@ -158,7 +333,9 @@ namespace Game.Player
         {
             if (eventData.button != PointerEventData.InputButton.Left || !_selected || _returning
                 || _dragging
-                || _assembly == null || !_assembly.CanInstallStructure(_kind) || !_pullers.InputAllowed
+                || _assembly == null || !_assembly.CanInstallStructure(_kind)
+                || (_kind == AssemblyStructurePart.Pcb && _assembly.PcbLoose
+                    || _kind == AssemblyStructurePart.Lower && _assembly.LowerLoose) || !_pullers.InputAllowed
                 || _pullers.IsManipulatingPart || Mouse.current == null || !Mouse.current.leftButton.isPressed) return;
             eventData.eligibleForClick = false;
             _pullers.CancelDrag();
@@ -254,6 +431,22 @@ namespace Game.Player
         /// <summary>입력 중단이나 탭 전환 시 PCB·보강판·상단부를 원래 미설치 위치로 반환한다. 진행 중인 반환 표시도 정리하며 설치 상태는 유지한다.</summary>
         private void CancelDrag()
         {
+            if (_worldDragging)
+            {
+                FinishWorldDrag();
+                if (_wasInstalled)
+                {
+                    if (_kind == AssemblyStructurePart.Pcb) _assembly.RestoreRemovedPcb();
+                    else _assembly.RestoreRemovedStructure(_kind);
+                }
+                else for (int index = 0; index < _parts.Count; index++)
+                {
+                    _parts[index].SetPositionAndRotation(_worldStartPositions[index], _worldStartRotations[index]);
+                    Rigidbody body = _parts[index].GetComponent<Rigidbody>();
+                    if (body != null) { body.isKinematic = false; body.useGravity = true; }
+                }
+                return;
+            }
             if (_dragging) FinishDrag();
             StopAllCoroutines();
             _returning = false;

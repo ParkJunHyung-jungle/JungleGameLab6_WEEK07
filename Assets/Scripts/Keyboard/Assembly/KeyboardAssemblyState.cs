@@ -9,7 +9,8 @@ namespace KeyboardModeling.Assembly
     {
         Pcb,
         Plate,
-        Upper
+        Upper,
+        Lower
     }
 
     [DisallowMultipleComponent]
@@ -22,7 +23,12 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private Transform[] _screws;
         [SerializeField] private MeshRenderer[] _upperRenderers;
         private Transform _lower;
+        private Transform _lowerParent;
         private Transform _plate;
+        private Transform _pcbParent;
+        private readonly Dictionary<Transform, Transform> _pcbPartParents = new Dictionary<Transform, Transform>();
+        private readonly Dictionary<Rigidbody, (bool Kinematic, bool Gravity, bool Collisions)> _pcbBodies
+            = new Dictionary<Rigidbody, (bool, bool, bool)>();
 
         [Header("PCB Screw Fastening")]
         [SerializeField, Min(0f)] private float _screwStartHeight = 0.8f;
@@ -31,11 +37,15 @@ namespace KeyboardModeling.Assembly
         private readonly Vector3[] _screwPositions = new Vector3[6];
         private readonly Quaternion[] _screwRotations = new Quaternion[6];
         private readonly bool[] _runningScrews = new bool[6];
+        private readonly bool[] _releasingScrews = new bool[6];
         private readonly float[] _screwElapsed = new float[6];
 
         [Header("Assembly Progress")]
         private bool _initialized;
         private bool _pcbInstalled;
+        private bool _lowerInstalled;
+        private bool _lowerLoose;
+        private bool _pcbLoose;
         private bool _plateInstalled;
         private bool _upperInstalled;
         private readonly bool[] _fixedScrews = new bool[6];
@@ -44,10 +54,10 @@ namespace KeyboardModeling.Assembly
         private Quaternion _pcbLocalRotation;
         private Vector3 _pcbLocalScale;
         private Bounds _pcbSlotBounds;
-        private readonly Transform[][] _structureParts = new Transform[3][];
-        private readonly Vector3[][] _structurePositions = new Vector3[3][];
-        private readonly Quaternion[][] _structureRotations = new Quaternion[3][];
-        private readonly Vector3[][] _structureScales = new Vector3[3][];
+        private readonly Transform[][] _structureParts = new Transform[4][];
+        private readonly Vector3[][] _structurePositions = new Vector3[4][];
+        private readonly Quaternion[][] _structureRotations = new Quaternion[4][];
+        private readonly Vector3[][] _structureScales = new Vector3[4][];
 
         public bool Initialized => _initialized;
         public Transform Pcb => _pcb;
@@ -55,29 +65,100 @@ namespace KeyboardModeling.Assembly
         public Pose PcbPose => new Pose(transform.TransformPoint(_pcbLocalPosition), transform.rotation * _pcbLocalRotation);
         public event Action PcbPlacementCompleted;
         public bool PcbPlaced => _pcbInstalled;
+        public bool PcbLoose => _pcbLoose;
         public bool PcbComplete => _pcbInstalled && _screwCount == 6;
         public bool PlateInstalled => _plateInstalled;
         public bool UpperInstalled => _upperInstalled;
+        public bool LowerInstalled => _lowerInstalled;
         public int ScrewCount => _screwCount;
         public IReadOnlyList<bool> FixedScrews => Array.AsReadOnly(_fixedScrews);
         public Material UpperMaterial => _upperRenderers[0].sharedMaterial;
-        public bool CanInstallPcb => _initialized && _lower.gameObject.activeSelf
+        public bool CanInstallPcb => _initialized && _lowerInstalled
             && !_pcbInstalled && !_plateInstalled && !_upperInstalled;
         public bool CanInstallPlate => _initialized && PcbComplete && !_plateInstalled
             && !_upperInstalled && !_customization.HasAnyInstalledKeycaps();
-        public bool CanInstallUpper => _initialized && _lower.gameObject.activeSelf && !_upperInstalled;
+        public bool CanInstallUpper => _initialized && _lowerInstalled && !_upperInstalled;
+        public bool CanInstallLower => _initialized && !_lowerInstalled;
+        public bool CanRemoveLower => _initialized && _lowerInstalled && !_pcbInstalled
+            && !_plateInstalled && !_upperInstalled && _screwCount == 0
+            && (_pcbLoose || !_customization.HasAnyInstalledKeycaps() && !_customization.HasAnySwitchForKeycaps());
+        public bool LowerLoose => _lowerLoose;
+        public bool CanRemovePcb
+        {
+            get
+            {
+                if (!_initialized || !_pcbInstalled || _upperInstalled || _plateInstalled || _screwCount != 0) return false;
+                foreach (bool running in _runningScrews) if (running) return false;
+                return true;
+            }
+        }
+        public bool CanRemoveUpper => _initialized && _upperInstalled;
+        public bool CanRemovePlate => _initialized && _plateInstalled && !_upperInstalled
+            && !_customization.HasAnyInstalledKeycaps();
+
+        /// <summary>kind의 설치된 상단부·보강판·빈 하단부를 분리한다. 선행 상태를 검사하고 성공 시 해당 점유만 해제한다.</summary>
+        public bool TryRemoveStructure(AssemblyStructurePart kind)
+        {
+            if (kind == AssemblyStructurePart.Upper && CanRemoveUpper) _upperInstalled = false;
+            else if (kind == AssemblyStructurePart.Plate && CanRemovePlate) _plateInstalled = false;
+            else if (kind == AssemblyStructurePart.Lower && CanRemoveLower)
+            {
+                _lowerInstalled = false;
+                _lowerLoose = true;
+                _lower.SetParent(null, true);
+            }
+            else return false;
+            return true;
+        }
+
+        /// <summary>취소된 kind의 구조 부품을 원래 설치 상태로 되돌린다. 해당 점유와 원래 자세를 복구한다.</summary>
+        public void RestoreRemovedStructure(AssemblyStructurePart kind)
+        {
+            if (kind == AssemblyStructurePart.Upper) _upperInstalled = true;
+            else if (kind == AssemblyStructurePart.Plate) _plateInstalled = true;
+            else if (kind == AssemblyStructurePart.Lower) { _lowerInstalled = true; _lowerLoose = false; }
+            RestoreStructurePose(kind);
+        }
+
+        /// <summary>하단부를 재고에 반환한다. 원본 관리 객체는 유지하고 하단부 실물만 숨긴다.</summary>
+        public void ReturnLowerToInventory()
+        {
+            _lowerLoose = false;
+            RestoreStructurePose(AssemblyStructurePart.Lower);
+        }
+
+        /// <summary>재고에서 꺼낸 미설치 하단부를 바닥 부품으로 전환한다. 관리 객체를 유지하고 실물의 부모만 분리한다.</summary>
+        public void DropLooseLower()
+        {
+            _lowerLoose = true;
+            _lower.SetParent(null, true);
+        }
 
         /// <summary>최초 신규 조립에서 연결된 부품의 연출을 취소하고 하단부만 남긴다. 입력 없이 초기화 표시를 저장하며 재호출은 상태를 유지한다.</summary>
         public void InitializeNewAssembly()
         {
             if (_initialized) return;
             _lower = _customization.CaseRenderers[0].transform;
+            _lowerParent = _lower.parent;
+            _lowerInstalled = true;
             _plate = _customization.PlateRenderer.transform;
             _pcbLocalPosition = _pcb.localPosition;
+            _pcbParent = _pcb.parent;
             _pcbLocalRotation = _pcb.localRotation;
             _pcbLocalScale = _pcb.localScale;
             CacheStructurePose(AssemblyStructurePart.Pcb, new[] { _pcb });
+            CacheStructurePose(AssemblyStructurePart.Lower, new[] { _lower });
+            BoxCollider lowerCollider = _lower.GetComponent<BoxCollider>();
+            if (lowerCollider == null) lowerCollider = _lower.gameObject.AddComponent<BoxCollider>();
+            Bounds lowerBounds = _lower.GetComponent<MeshFilter>().sharedMesh.bounds;
+            lowerCollider.center = lowerBounds.center;
+            lowerCollider.size = new Vector3(lowerBounds.size.x, Mathf.Max(lowerBounds.size.y, 0.02f), lowerBounds.size.z);
             CacheStructurePose(AssemblyStructurePart.Plate, new[] { _plate });
+            BoxCollider plateCollider = _plate.GetComponent<BoxCollider>();
+            if (plateCollider == null) plateCollider = _plate.gameObject.AddComponent<BoxCollider>();
+            Bounds plateBounds = _plate.GetComponent<MeshFilter>().sharedMesh.bounds;
+            plateCollider.center = plateBounds.center;
+            plateCollider.size = new Vector3(plateBounds.size.x, Mathf.Max(plateBounds.size.y, 0.02f), plateBounds.size.z);
             var upperParts = new Transform[_upperRenderers.Length];
             for (int index = 0; index < upperParts.Length; index++) upperParts[index] = _upperRenderers[index].transform;
             CacheStructurePose(AssemblyStructurePart.Upper, upperParts);
@@ -93,6 +174,15 @@ namespace KeyboardModeling.Assembly
             for (int corner = 0; corner < 8; corner++)
                 _pcbSlotBounds.Encapsulate(matrix.MultiplyPoint3x4(bounds.center + Vector3.Scale(bounds.extents,
                     new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1))));
+            BoxCollider pcbCollider = _pcb.GetComponent<BoxCollider>();
+            if (pcbCollider == null) pcbCollider = _pcb.gameObject.AddComponent<BoxCollider>();
+            Matrix4x4 pcbMatrix = _pcb.worldToLocalMatrix * board.transform.localToWorldMatrix;
+            Bounds pcbBounds = new Bounds(pcbMatrix.MultiplyPoint3x4(bounds.center), Vector3.zero);
+            for (int corner = 0; corner < 8; corner++)
+                pcbBounds.Encapsulate(pcbMatrix.MultiplyPoint3x4(bounds.center + Vector3.Scale(bounds.extents,
+                    new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1))));
+            pcbCollider.center = pcbBounds.center;
+            pcbCollider.size = new Vector3(pcbBounds.size.x, Mathf.Max(pcbBounds.size.y, 0.02f), pcbBounds.size.z);
             _installation.CancelAll();
             _customization.ConnectPcbSlots(_pcb);
             _lower.gameObject.SetActive(true);
@@ -108,6 +198,7 @@ namespace KeyboardModeling.Assembly
         {
             if (!CanInstallPcb) return false;
             _pcbInstalled = true;
+            _pcbLoose = false;
             RestorePcbPose();
             PcbPlacementCompleted?.Invoke();
             return true;
@@ -124,6 +215,20 @@ namespace KeyboardModeling.Assembly
                 && point.z >= _pcbSlotBounds.min.z && point.z <= _pcbSlotBounds.max.z;
         }
 
+        /// <summary>ray가 설치된 PCB 보드 영역을 통과하는지 검사한다. 맞으면 월드 집기 위치를 반환하고 조립 상태는 변경하지 않는다.</summary>
+        public bool TryGetInstalledPcbHit(Ray ray, out Vector3 point)
+        {
+            point = default;
+            if (!CanRemovePcb) return false;
+            Ray local = new Ray(transform.InverseTransformPoint(ray.origin), transform.InverseTransformVector(ray.direction));
+            if (!new Plane(Vector3.up, _pcbSlotBounds.center).Raycast(local, out float distance)) return false;
+            Vector3 hit = local.GetPoint(distance);
+            if (hit.x < _pcbSlotBounds.min.x || hit.x > _pcbSlotBounds.max.x
+                || hit.z < _pcbSlotBounds.min.z || hit.z > _pcbSlotBounds.max.z) return false;
+            point = transform.TransformPoint(hit);
+            return true;
+        }
+
         /// <summary>ray의 설치 영역과 현재 조립 조건을 다시 검사해 PCB 배치를 확정한다. 실패 시 상태를 유지하고 false를 반환한다.</summary>
         public bool TryPlacePcb(Ray ray)
         {
@@ -133,16 +238,96 @@ namespace KeyboardModeling.Assembly
         /// <summary>입력 없이 원본 PCB를 지정된 로컬 위치와 회전 및 크기로 복원한다. 배치 여부에 맞춰 활성 상태를 갱신한다.</summary>
         public void RestorePcbPose()
         {
+            _pcb.SetParent(_pcbParent, true);
             _pcb.SetLocalPositionAndRotation(_pcbLocalPosition, _pcbLocalRotation);
             _pcb.localScale = _pcbLocalScale;
+            Rigidbody body = _pcb.GetComponent<Rigidbody>();
+            if (body != null) { body.isKinematic = true; body.useGravity = false; }
             _pcb.gameObject.SetActive(_pcbInstalled);
+        }
+
+        /// <summary>PCB와 나사 조건을 확인한 뒤 PCB와 현재 장착 축·키캡만 하나의 이동 계층으로 묶는다. 성공 시 PCB 점유를 해제한다.</summary>
+        public bool TryRemovePcb()
+        {
+            if (!CanRemovePcb) return false;
+            for (int index = 0; index < _customization.KeycapCount; index++)
+            {
+                if (_customization.IsPcbSwitchInstalled(index)) AttachPcbPart(_customization.GetSwitchSlotTransform(index));
+                if (_customization.IsPcbKeycapInstalled(index)) AttachPcbPart(_customization.GetKeycapSlotTransform(index));
+            }
+            _pcb.SetParent(null, true);
+            _pcbInstalled = false;
+            _pcbLoose = true;
+            return true;
+        }
+
+        /// <summary>part의 기존 부모를 보관하고 PCB에 연결한다. 월드 자세와 개별 커스텀 상태는 유지한다.</summary>
+        private void AttachPcbPart(Transform part)
+        {
+            if (!_pcbPartParents.ContainsKey(part)) _pcbPartParents.Add(part, part.parent);
+            part.SetParent(_pcb, true);
+            foreach (Rigidbody body in part.GetComponentsInChildren<Rigidbody>(true))
+            {
+                if (!_pcbBodies.ContainsKey(body))
+                    _pcbBodies.Add(body, (body.isKinematic, body.useGravity, body.detectCollisions));
+                body.isKinematic = true;
+                body.useGravity = false;
+                body.detectCollisions = false;
+            }
+        }
+
+        /// <summary>재고 반환 전에 PCB에 묶인 부품의 원래 부모를 복원한다. 실물 활성 상태와 재고는 변경하지 않는다.</summary>
+        public void ReleasePcbParts()
+        {
+            foreach (KeyValuePair<Transform, Transform> pair in _pcbPartParents)
+                pair.Key.SetParent(pair.Value, true);
+            _pcbPartParents.Clear();
+            foreach (var pair in _pcbBodies)
+            {
+                pair.Key.isKinematic = pair.Value.Kinematic;
+                pair.Key.useGravity = pair.Value.Gravity;
+                pair.Key.detectCollisions = pair.Value.Collisions;
+            }
+            _pcbBodies.Clear();
+        }
+
+        /// <summary>취소된 PCB 집기를 원래 조립 자세로 복구한다. 묶음의 키캡·축과 나사 상태는 유지한다.</summary>
+        public void RestoreRemovedPcb()
+        {
+            _pcbInstalled = true;
+            _pcbLoose = false;
+            RestorePcbPose();
+        }
+
+        /// <summary>반환된 PCB의 바닥 점유를 해제한다. 재고 카드에서 다시 꺼낼 수 있도록 상태를 갱신한다.</summary>
+        public void ReturnPcbToInventory()
+        {
+            _pcbLoose = false;
+            RestorePcbPose();
         }
 
         /// <summary>index의 나사가 PCB 배치 후 아직 고정되지 않았는지 반환한다. 조립 상태는 변경하지 않는다.</summary>
         public bool CanFixScrew(int index)
         {
             return _initialized && _pcbInstalled && index >= 0 && index < _fixedScrews.Length
-                && !_fixedScrews[index] && !_runningScrews[index];
+                && !_plateInstalled && !_upperInstalled && !_fixedScrews[index] && !_runningScrews[index];
+        }
+
+        /// <summary>index의 체결 나사가 분리 가능한지 검사한다. PCB와 덮개 상태를 사용하며 조립 상태는 변경하지 않는다.</summary>
+        public bool CanReleaseScrew(int index)
+        {
+            return _initialized && _pcbInstalled && index >= 0 && index < _fixedScrews.Length
+                && !_plateInstalled && !_upperInstalled && _fixedScrews[index] && !_runningScrews[index];
+        }
+
+        /// <summary>index의 체결 나사를 역방향으로 풀기 시작한다. 완료 상태는 연출 종료까지 유지하며 성공 여부를 반환한다.</summary>
+        public bool ReleaseScrew(int index)
+        {
+            if (!CanReleaseScrew(index) || Time.timeScale <= 0f) return false;
+            _runningScrews[index] = true;
+            _releasingScrews[index] = true;
+            _screwElapsed[index] = 0f;
+            return true;
         }
 
         /// <summary>index의 미고정 나사 체결을 시작한다. 진행 중 또는 완료된 나사는 거부하고 완료 수량은 연출이 끝날 때만 변경한다.</summary>
@@ -150,6 +335,7 @@ namespace KeyboardModeling.Assembly
         {
             if (!CanFixScrew(index) || Time.timeScale <= 0f) return false;
             _runningScrews[index] = true;
+            _releasingScrews[index] = false;
             _screwElapsed[index] = 0f;
             _screws[index].gameObject.SetActive(true);
             ApplyScrewPose(index, 0f);
@@ -177,11 +363,12 @@ namespace KeyboardModeling.Assembly
                 if (!_runningScrews[index]) continue;
                 _screwElapsed[index] += Time.deltaTime;
                 float progress = Mathf.Clamp01(_screwElapsed[index] / Mathf.Max(0.01f, _screwDuration));
-                ApplyScrewPose(index, progress);
+                ApplyScrewPose(index, _releasingScrews[index] ? 1f - progress : progress);
                 if (progress < 1f) continue;
                 _runningScrews[index] = false;
-                _fixedScrews[index] = true;
-                _screwCount++;
+                _fixedScrews[index] = !_releasingScrews[index];
+                _screwCount += _fixedScrews[index] ? 1 : -1;
+                if (_releasingScrews[index]) _screws[index].gameObject.SetActive(false);
             }
         }
 
@@ -212,21 +399,24 @@ namespace KeyboardModeling.Assembly
             return true;
         }
 
-        /// <summary>kind에 해당하는 기존 PCB·보강판·상단부 실물을 반환한다. 참조만 제공하며 다른 설치 부품은 변경하지 않는다.</summary>
+        /// <summary>kind에 해당하는 기존 구조 부품 실물을 반환한다. 참조만 제공하며 설치 상태는 변경하지 않는다.</summary>
         public IReadOnlyList<Transform> GetStructureParts(AssemblyStructurePart kind) => _structureParts[(int)kind];
 
         /// <summary>kind의 현재 공통 설치 조건을 반환한다. 스위치와 키캡의 기존 설치 상태는 검사에만 사용한다.</summary>
         public bool CanInstallStructure(AssemblyStructurePart kind)
         {
             return kind == AssemblyStructurePart.Pcb ? CanInstallPcb
-                : kind == AssemblyStructurePart.Plate ? CanInstallPlate : CanInstallUpper;
+                : kind == AssemblyStructurePart.Plate ? CanInstallPlate
+                : kind == AssemblyStructurePart.Lower ? CanInstallLower : CanInstallUpper;
         }
 
         /// <summary>kind와 index의 실물에 저장된 최종 월드 자세를 반환한다. 드래그 중 임시 자세는 사용하지 않는다.</summary>
         public Pose GetStructurePose(AssemblyStructurePart kind, int index)
         {
             int part = (int)kind;
-            Transform parent = _structureParts[part][index].parent;
+            Transform parent = kind == AssemblyStructurePart.Lower ? _lowerParent
+                : kind == AssemblyStructurePart.Pcb ? _pcbParent : _structureParts[part][index].parent;
+            if (parent == null) parent = transform;
             return new Pose(parent.TransformPoint(_structurePositions[part][index]), parent.rotation * _structureRotations[part][index]);
         }
 
@@ -234,13 +424,19 @@ namespace KeyboardModeling.Assembly
         public Material GetStructureMaterial(AssemblyStructurePart kind)
         {
             return kind == AssemblyStructurePart.Plate ? _customization.PlateMaterial
-                : kind == AssemblyStructurePart.Upper ? UpperMaterial : null;
+                : kind == AssemblyStructurePart.Upper ? UpperMaterial
+                : kind == AssemblyStructurePart.Lower ? _customization.CaseMaterial : null;
         }
 
-        /// <summary>kind의 보강판 또는 상단부에 material을 독립적으로 선택한다. 원본 재질 에셋과 다른 부품 및 설치 상태는 변경하지 않는다.</summary>
+        /// <summary>kind의 하단부·보강판·상단부에 material을 선택한다. 원본 재질 에셋과 설치 상태는 변경하지 않는다.</summary>
         public bool SetStructureMaterial(AssemblyStructurePart kind, Material material)
         {
             if (material == null) return false;
+            if (kind == AssemblyStructurePart.Lower)
+            {
+                if (_customization.CaseMaterial != material) _customization.SetCaseMaterial(material);
+                return true;
+            }
             if (kind == AssemblyStructurePart.Plate) return _customization.SetPlateMaterial(material);
             if (kind != AssemblyStructurePart.Upper) return false;
             SetUpperMaterial(material);
@@ -258,6 +454,13 @@ namespace KeyboardModeling.Assembly
             Vector3 point = local.GetPoint(distance);
             if (point.x < _pcbSlotBounds.min.x || point.x > _pcbSlotBounds.max.x
                 || point.z < _pcbSlotBounds.min.z || point.z > _pcbSlotBounds.max.z) return false;
+            if (kind == AssemblyStructurePart.Lower)
+            {
+                _lowerInstalled = true;
+                _lowerLoose = false;
+                RestoreStructurePose(kind);
+                return true;
+            }
             return kind == AssemblyStructurePart.Plate ? InstallPlate() : InstallUpper();
         }
 
@@ -280,19 +483,28 @@ namespace KeyboardModeling.Assembly
         /// <summary>kind의 원본 실물만 저장된 자세로 되돌린다. 설치 여부에 맞춰 표시하며 재질과 다른 부품 및 조립 진행은 유지한다.</summary>
         public void RestoreStructurePose(AssemblyStructurePart kind)
         {
+            if (kind == AssemblyStructurePart.Pcb) { RestorePcbPose(); return; }
+            if (kind == AssemblyStructurePart.Lower) _lower.SetParent(_lowerParent, true);
             int part = (int)kind;
             bool installed = kind == AssemblyStructurePart.Pcb ? _pcbInstalled
-                : kind == AssemblyStructurePart.Plate ? _plateInstalled : _upperInstalled;
+                : kind == AssemblyStructurePart.Plate ? _plateInstalled
+                : kind == AssemblyStructurePart.Lower ? _lowerInstalled : _upperInstalled;
             for (int index = 0; index < _structureParts[part].Length; index++)
             {
                 Transform target = _structureParts[part][index];
                 target.SetLocalPositionAndRotation(_structurePositions[part][index], _structureRotations[part][index]);
                 target.localScale = _structureScales[part][index];
+                Rigidbody body = target.GetComponent<Rigidbody>();
+                if (body != null && kind != AssemblyStructurePart.Pcb)
+                {
+                    body.isKinematic = true;
+                    body.useGravity = false;
+                }
                 target.gameObject.SetActive(installed);
             }
         }
 
-        /// <summary>축과 키캡의 점유 상태를 받아 신규 축 설치 조건을 반환한다. PCB 완료를 요구하며 보강판과 상단부는 제한하지 않는다.</summary>
+        /// <summary>축과 키캡의 점유 상태로 신규 축 설치 가능 여부를 반환한다. PCB 나사 6개 완료를 요구하며 보강판과 상단부는 제한하지 않는다.</summary>
         public bool CanInstallSwitch(bool occupied, bool hasKeycap)
         {
             return _initialized && PcbComplete && !occupied && !hasKeycap;

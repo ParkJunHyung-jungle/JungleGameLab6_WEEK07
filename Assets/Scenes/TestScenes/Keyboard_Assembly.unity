@@ -476,12 +476,8 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: _caseRenderers.Array.size
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 3967785068815222441, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-      propertyPath: '_caseRenderers.Array.data[1]'
-      value: 
-      objectReference: {fileID: 9924000200}
     - target: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
       propertyPath: m_Name
       value: Keyboard_Enhanced
@@ -554,10 +550,6 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0.75
       objectReference: {fileID: 0}
-    - target: {fileID: 8853000000000000001, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5870,6 +5862,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1578084d5419f544ca2b607a7d6f1c67, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopKeycapPlacement
+  _failedDropLiftSpeed: 0.6
+  _failedDropPushSpeed: 0.35
+  _failedDropSpinSpeed: 4
   _interaction: {fileID: 0}
   _pullers: {fileID: 500387865}
   _keycapEntries:
@@ -11368,11 +11363,6 @@ MeshRenderer:
 --- !u!23 &9924000113 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 5999264866688161344, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
-  m_PrefabInstance: {fileID: 72215168}
-  m_PrefabAsset: {fileID: 0}
---- !u!23 &9924000200 stripped
-MeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 8853000000000000001, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
   m_PrefabInstance: {fileID: 72215168}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &7000000000000000101

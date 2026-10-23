@@ -221,6 +221,8 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     /// <summary>index의 축 슬롯 점유와 type 데이터로 설치 가능 여부를 반환한다. 외형, 재고와 효과음은 변경하지 않는다.</summary>
     public bool CanInstallSwitchFromInventory(int index, SwitchType type)
     {
+        if (TryGetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>(out var assembly) && !assembly.PcbComplete)
+            return false;
         if (_keycaps == null) CacheKeycaps();
         return index >= 0 && index < _switches.Length && !HasSwitchForKeycap(index)
             && !IsKeycapInstalled(index) && _switches[index].HasSwitchType(type);
@@ -411,6 +413,14 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
 
     void OnEnable()
     {
+        KeyboardModeling.Assembly.KeyboardAssemblyState assembly = GetComponent<KeyboardModeling.Assembly.KeyboardAssemblyState>();
+        if (Application.IsPlaying(gameObject) && assembly != null && assembly.Initialized)
+        {
+            AudioManager.Ready -= HandleAudioManagerReady;
+            AudioManager.Ready += HandleAudioManagerReady;
+            if (AudioManager.instance != null) HandleAudioManagerReady(AudioManager.instance);
+            return;
+        }
         CacheKeycaps();
         ApplySelectedCaseMaterial();
         ApplySelectedKeycapMaterial();
@@ -430,9 +440,13 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         }
         if (Application.IsPlaying(gameObject))
         {
-            DisableKeycaps();
-            DisableSwitches();
-            SetLEDEnabled(false);
+            if (assembly != null) assembly.InitializeNewAssembly();
+            else
+            {
+                DisableKeycaps();
+                DisableSwitches();
+                SetLEDEnabled(false);
+            }
         }
     }
 

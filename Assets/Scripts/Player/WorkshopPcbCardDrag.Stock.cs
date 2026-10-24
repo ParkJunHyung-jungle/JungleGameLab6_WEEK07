@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -151,7 +151,7 @@ namespace Game.Player
                 else
                 {
                     bool returnedToTray = _stockTray.IsCategoryOpen(WorkshopDrawerCategory.LowerHousing)
-                        && _stockTray.TryGetReturnDestination(out _) && GetComponentInParent<KeyboardEditOverlayUI>().IsInStructureTray(point, _kind);
+                        && _stockTray.TryGetReturnDestination(out _) && _overlay.IsInStructureTray(point, _kind);
                     if (returnedToTray)
                     {
                         AssemblyDraggablePart keyboard = _stockKeyboard;
@@ -171,7 +171,8 @@ namespace Game.Player
                 ReleaseStockKeyboardHolder(keyboard);
                 CommitStockReservation();
                 FinishStockMotion();
-                keyboard.DropWithPhysics();
+                if (!_pullers.TryPlaceLowerHousing(keyboard.GetComponent<Rigidbody>(), ray))
+                    keyboard.DropWithPhysics();
                 return true;
             }
             bool installed = !IsObstructed(ray) && _assembly.TryPlaceStructure(_kind, ray);
@@ -252,7 +253,7 @@ namespace Game.Player
             AssemblyCatalogEntry entry = keyboard != null ? keyboard.CatalogEntry : null;
             if (entry == null || !entry.IsStructure || entry.StructureKind != AssemblyStructurePart.Lower
                 || entry.StructureMaterial != assembly.GetStructureMaterial(AssemblyStructurePart.Lower))
-                entry = GetComponentInParent<KeyboardEditOverlayUI>().GetLowerHousingEntry(assembly.GetStructureMaterial(AssemblyStructurePart.Lower));
+                entry = _overlay.GetLowerHousingEntry(assembly.GetStructureMaterial(AssemblyStructurePart.Lower));
             if (entry == null) return;
             Rigidbody body = assembly.GetComponent<Rigidbody>();
             bool wasKinematic = body.isKinematic;

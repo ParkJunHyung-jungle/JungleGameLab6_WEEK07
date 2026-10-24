@@ -274,6 +274,28 @@ namespace Game.Player
             return !IsPlacementOccluded(ray, areaHit.distance);
         }
 
+        /// <summary>body를 ray가 닿는 작업대 영역에 기존 자세와 높이 보정으로 장착한 결과를 반환한다. 자기 Collider를 제외한 가림과 점유를 확인하며 재고와 편집 상태는 변경하지 않는다.</summary>
+        public bool TryPlaceInventoryKeyboard(Rigidbody body, Ray ray)
+        {
+            Rigidbody current = _workbenchHolder.KeyboardBody;
+            if (current != null && !current.gameObject.activeInHierarchy)
+            {
+                _workbenchHolder.ReleaseKeyboard(current);
+                current = null;
+            }
+            if (current == body) return true;
+            if (_brain.IsBlending || _isDragging || current != null || IsPointerOverUI(true)) return false;
+            Physics.SyncTransforms();
+            if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane)) return false;
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, areaHit.distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (!hit.transform.IsChildOf(body.transform) && hit.distance < areaHit.distance) return false;
+            KeyboardPickupTarget pickup = body.GetComponent<KeyboardPickupTarget>();
+            Vector3 centerOffset = Quaternion.Inverse(body.rotation)
+                * body.transform.TransformVector(pickup.GetVisualCenterLocalPosition(body.transform));
+            return _workbenchHolder.TryPlaceKeyboard(body, centerOffset);
+        }
+
         /// <summary>
         /// 모니터 일반 뷰에서 명시된 빈 Holder 영역을 커서로 가리키는지 반환한다.
         /// 기존 UI와 가림 판정을 재사용하며 운반 중인 본체와 자식은 제외한다.
@@ -300,16 +322,17 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 공통 커서 좌표로 UI Raycast를 수행하여 GraphicRaycaster에 적중했는지 반환한다.
-        /// 물리 Raycaster 결과는 제외하고 실제 화면 UI 위에서 본체를 집는 것을 막는다.
+        /// 공통 커서 좌표로 UI Raycast를 수행하여 실제 화면 UI에 적중했는지 반환한다.
+        /// ignoreEditBackground가 참이면 편집 전체 배경만 제외하며 버튼·서랍과 일반 본체 집기의 차단은 유지한다.
         /// </summary>
-        private bool IsPointerOverUI()
+        private bool IsPointerOverUI(bool ignoreEditBackground = false)
         {
             _uiHits.Clear();
             var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.Position };
             EventSystem.current.RaycastAll(pointer, _uiHits);
             foreach (RaycastResult hit in _uiHits)
-                if (hit.module is GraphicRaycaster)
+                if (hit.module is GraphicRaycaster
+                    && !(ignoreEditBackground && hit.gameObject.TryGetComponent<KeyboardEditOverlayUI>(out _)))
                     return true;
             return false;
         }

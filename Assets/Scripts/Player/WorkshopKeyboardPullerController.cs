@@ -58,6 +58,12 @@ namespace Game.Player
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
 
+        /// <summary>body를 ray가 가리키는 작업대에 배치하고 편집 대상으로 연결한 결과를 반환한다. 기존 작업대 판정과 설치 경로를 사용하며 재고는 변경하지 않는다.</summary>
+        public bool TryPlaceLowerHousing(Rigidbody body, Ray ray)
+        {
+            return _workshopView.TryPlaceInventoryKeyboard(body, ray);
+        }
+
         /// <summary>tray와 두 items를 기존 실물 풀러에 연결한다. C# 누름 이벤트를 구독하며 기존 작업대의 직접 접근은 숨긴다.</summary>
         public void ConnectToolTray(WorkshopKeycapDrawerTransition tray, WorkshopPullerTrayItem[] items)
         {

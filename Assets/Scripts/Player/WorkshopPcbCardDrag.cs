@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -18,6 +18,7 @@ namespace Game.Player
     {
         [Header("PCB·보강판·상단부 Drag")]
         private WorkshopKeyboardPullerController _pullers;
+        private KeyboardEditOverlayUI _overlay;
         private KeyboardAssemblyState _assembly;
         private readonly List<WorkshopKeyboardPlacementPreview> _outlines = new List<WorkshopKeyboardPlacementPreview>();
         private AssemblyStructurePart _kind;
@@ -45,11 +46,12 @@ namespace Game.Player
         private Quaternion[] _worldStartRotations;
         private readonly List<(Collider Collider, bool Enabled)> _colliders = new List<(Collider, bool)>();
 
-        /// <summary>pullers와 kind 및 기존 아웃라인 에셋을 카드에 연결한다. 표시용 카메라와 아이콘을 만들며 원본 부품의 설치 상태는 변경하지 않는다.</summary>
+        /// <summary>pullers와 kind 및 기존 아웃라인 에셋을 카드에 연결한다. 트레이로 이동하기 전 소유 UI 참조를 보관하고 아이콘을 만들며 설치 상태는 유지한다.</summary>
         public void Initialize(WorkshopKeyboardPullerController pullers, Material outlineMaterial, Shader depthShader,
             AssemblyStructurePart kind = AssemblyStructurePart.Pcb, bool showCard = true, bool worldPickupEnabled = true)
         {
             _pullers = pullers;
+            _overlay = GetComponentInParent<KeyboardEditOverlayUI>();
             _button = GetComponent<KeyboardEditButton>();
             _kind = kind;
             _worldPickupEnabled = worldPickupEnabled;
@@ -262,7 +264,7 @@ namespace Game.Player
             MoveParts(point);
             if (Mouse.current.leftButton.isPressed) return;
             if (!Mouse.current.leftButton.wasReleasedThisFrame) { CancelDrag(); return; }
-            KeyboardEditOverlayUI overlay = GetComponentInParent<KeyboardEditOverlayUI>();
+            KeyboardEditOverlayUI overlay = _overlay;
             if (overlay != null && (_stockEnabled ? overlay.IsInStructureTray(point, _kind) : overlay.IsInAssemblyReturnArea(point)))
             {
                 if (_kind == AssemblyStructurePart.Pcb && !overlay.TryReturnPcbBundle(_assembly))

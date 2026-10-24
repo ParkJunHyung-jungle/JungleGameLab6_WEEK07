@@ -43,6 +43,7 @@ namespace Game.Player
         [SerializeField] private Collider[] _hangerAreas = new Collider[0];
         [SerializeField] private float _hangerWorldX = -3.18f;
         private bool _usingHangerPlane;
+        private float _hangerDragWorldX;
         private bool _awaitingHangerPlacement;
 
         [Header("Drag Plane")]
@@ -274,6 +275,28 @@ namespace Game.Player
             return !IsPlacementOccluded(ray, areaHit.distance);
         }
 
+        /// <summary>body를 ray가 닿는 작업대 영역에 기존 자세와 높이 보정으로 장착한 결과를 반환한다. 자기 Collider를 제외한 가림과 점유를 확인하며 재고와 편집 상태는 변경하지 않는다.</summary>
+        public bool TryPlaceInventoryKeyboard(Rigidbody body, Ray ray)
+        {
+            Rigidbody current = _workbenchHolder.KeyboardBody;
+            if (current != null && !current.gameObject.activeInHierarchy)
+            {
+                _workbenchHolder.ReleaseKeyboard(current);
+                current = null;
+            }
+            if (current == body) return true;
+            if (_brain.IsBlending || _isDragging || current != null || IsPointerOverUI(true)) return false;
+            Physics.SyncTransforms();
+            if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane)) return false;
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, areaHit.distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (!hit.transform.IsChildOf(body.transform) && hit.distance < areaHit.distance) return false;
+            KeyboardPickupTarget pickup = body.GetComponent<KeyboardPickupTarget>();
+            Vector3 centerOffset = Quaternion.Inverse(body.rotation)
+                * body.transform.TransformVector(pickup.GetVisualCenterLocalPosition(body.transform));
+            return _workbenchHolder.TryPlaceKeyboard(body, centerOffset);
+        }
+
         /// <summary>
         /// 모니터 일반 뷰에서 명시된 빈 Holder 영역을 커서로 가리키는지 반환한다.
         /// 기존 UI와 가림 판정을 재사용하며 운반 중인 본체와 자식은 제외한다.
@@ -300,16 +323,17 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 공통 커서 좌표로 UI Raycast를 수행하여 GraphicRaycaster에 적중했는지 반환한다.
-        /// 물리 Raycaster 결과는 제외하고 실제 화면 UI 위에서 본체를 집는 것을 막는다.
+        /// 공통 커서 좌표로 UI Raycast를 수행하여 실제 화면 UI에 적중했는지 반환한다.
+        /// ignoreEditBackground가 참이면 편집 전체 배경만 제외하며 버튼·서랍과 일반 본체 집기의 차단은 유지한다.
         /// </summary>
-        private bool IsPointerOverUI()
+        private bool IsPointerOverUI(bool ignoreEditBackground = false)
         {
             _uiHits.Clear();
             var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.Position };
             EventSystem.current.RaycastAll(pointer, _uiHits);
             foreach (RaycastResult hit in _uiHits)
-                if (hit.module is GraphicRaycaster)
+                if (hit.module is GraphicRaycaster
+                    && !(ignoreEditBackground && hit.gameObject.TryGetComponent<KeyboardEditOverlayUI>(out _)))
                     return true;
             return false;
         }
@@ -339,7 +363,9 @@ namespace Game.Player
                 return false;
 
             AssemblyDraggablePart part = hit.collider.GetComponentInParent<AssemblyDraggablePart>();
-            if (part != null && (part.Slot == null || part.Slot.InstalledPart != part))
+            bool issuedKeyboard = part != null && part.CatalogEntry != null && part.CatalogEntry.IsStructure
+                && part.CatalogEntry.StructureKind == AssemblyStructurePart.Lower && part.GetComponent<KeyboardPickupTarget>() != null;
+            if (part != null && !issuedKeyboard && (part.Slot == null || part.Slot.InstalledPart != part))
                 return false;
             pickup = hit.collider.GetComponentInParent<KeyboardPickupTarget>();
             if (pickup == null) return false;
@@ -412,6 +438,9 @@ namespace Game.Player
         /// </summary>
         private void CacheDragPointer()
         {
+            if (_usingHangerPlane)
+                _hangerDragWorldX = _keyboardBody.GetComponentInParent<KeyboardWallRack>() != null
+                    ? _keyboardBody.position.x : _hangerWorldX;
             Transform camera = _outputCamera.transform;
             Vector3 center = _keyboardBody.transform.TransformPoint(
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
@@ -435,16 +464,37 @@ namespace Game.Player
             {
                 if (!collider.enabled || collider.isTrigger || collider.attachedRigidbody != _keyboardBody) continue;
                 _dragColliders.Add(collider);
-                Bounds bounds = collider.bounds;
+                Bounds bounds = GetColliderLocalBounds(collider);
                 for (int corner = 0; corner < 8; corner++)
                 {
-                    Vector3 point = _keyboardBody.transform.InverseTransformPoint(bounds.center
+                    Vector3 point = _keyboardBody.transform.InverseTransformPoint(collider.transform.TransformPoint(bounds.center
                         + Vector3.Scale(bounds.extents, new Vector3((corner & 1) == 0 ? -1f : 1f,
-                            (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f)));
+                            (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f))));
                     if (found) _dragLocalBounds.Encapsulate(point);
                     else { _dragLocalBounds = new Bounds(point, Vector3.zero); found = true; }
                 }
             }
+        }
+
+        /// <summary>collider의 형상 기준 로컬 경계를 반환한다. 회전으로 부풀어진 월드 경계를 제외하며 기타 형상은 월드 경계를 보수적으로 변환한다.</summary>
+        private static Bounds GetColliderLocalBounds(Collider collider)
+        {
+            if (collider is BoxCollider box) return new Bounds(box.center, box.size);
+            if (collider is MeshCollider mesh && mesh.sharedMesh != null) return mesh.sharedMesh.bounds;
+            if (collider is SphereCollider sphere) return new Bounds(sphere.center, Vector3.one * sphere.radius * 2f);
+            if (collider is CapsuleCollider capsule)
+            {
+                Vector3 size = Vector3.one * capsule.radius * 2f;
+                size[capsule.direction] = Mathf.Max(capsule.height, capsule.radius * 2f);
+                return new Bounds(capsule.center, size);
+            }
+            Bounds world = collider.bounds;
+            Bounds local = new Bounds(collider.transform.InverseTransformPoint(world.center), Vector3.zero);
+            for (int corner = 0; corner < 8; corner++)
+                local.Encapsulate(collider.transform.InverseTransformPoint(world.center + Vector3.Scale(world.extents,
+                    new Vector3((corner & 1) == 0 ? -1f : 1f, (corner & 2) == 0 ? -1f : 1f,
+                        (corner & 4) == 0 ? -1f : 1f))));
+            return local;
         }
 
         /// <summary>
@@ -472,34 +522,44 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// obstacle과 이미 겹친 본체가 direction으로 모든 접촉에서 빠져나가는지 반환한다.
-        /// 실제 충돌체의 분리 방향을 사용해 기존 접촉에서 벗어나는 이동만 허용한다.
+        /// obstacle과 접촉한 본체가 direction으로 관통을 악화시키지 않는지 반환한다.
+        /// 실제 분리 방향과 접선 이동을 허용하며 검사 상자의 빈 공간은 실제 접촉으로 취급하지 않는다.
         /// </summary>
         private bool IsLeavingDragOverlap(Collider obstacle, Vector3 direction)
         {
-            bool overlapping = false;
             foreach (Collider collider in _dragColliders)
             {
                 if (!Physics.ComputePenetration(collider, collider.transform.position, collider.transform.rotation,
                     obstacle, obstacle.transform.position, obstacle.transform.rotation, out Vector3 separation, out _)) continue;
-                overlapping = true;
-                if (Vector3.Dot(direction, separation) <= 0.001f) return false;
+                if (Vector3.Dot(direction, separation) < -0.001f) return false;
             }
-            return overlapping;
+            return true;
         }
 
-        /// <summary>position과 rotation의 키보드 상자가 외부 물체와 겹치는지 반환한다. 회전으로 벽 안에 들어가는 것을 막는다.</summary>
+        /// <summary>position과 rotation의 실제 Collider가 새로 관통하거나 기존 관통을 심화하는지 반환한다. 빈 경계 공간과 기존 지지면 접촉은 회전을 막지 않는다.</summary>
         private bool IsDragPoseBlocked(Vector3 position, Quaternion rotation)
         {
             foreach (Collider collider in Physics.OverlapBox(GetDragBoundsCenter(position, rotation),
                 GetDragHalfExtents(), rotation, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-                if (IsDragObstacle(collider)) return true;
+            {
+                if (!IsDragObstacle(collider)) continue;
+                Quaternion delta = rotation * Quaternion.Inverse(_keyboardBody.rotation);
+                foreach (Collider source in _dragColliders)
+                {
+                    Vector3 candidate = position + delta * (source.transform.position - _keyboardBody.position);
+                    if (!Physics.ComputePenetration(source, candidate, delta * source.transform.rotation,
+                        collider, collider.transform.position, collider.transform.rotation, out _, out float depth)) continue;
+                    Physics.ComputePenetration(source, source.transform.position, source.transform.rotation,
+                        collider, collider.transform.position, collider.transform.rotation, out _, out float previousDepth);
+                    if (depth > Mathf.Max(previousDepth, _dragCollisionSkin) + 0.0001f) return true;
+                }
+            }
             return false;
         }
 
         /// <summary>
-        /// target까지 키보드 크기의 상자를 이동 검사하고 가장 가까운 장애물 앞 위치를 반환한다.
-        /// rotation과 접촉 여유를 사용하며 자기 충돌체와 설치 영역 트리거는 제외한다.
+        /// target까지 각 Collider의 실제 로컬 경계로 이동 검사하고 장애물 앞 위치를 반환한다.
+        /// rotation과 접촉 여유를 사용하며 자기 충돌과 트리거 및 기존 접촉을 악화시키지 않는 이동은 제외한다.
         /// </summary>
         private Vector3 LimitDragMovement(Vector3 target, Quaternion rotation)
         {
@@ -509,13 +569,35 @@ namespace Game.Player
             if (distance < 0.00001f) return start;
             Vector3 direction = movement / distance;
             float allowed = distance;
-            foreach (RaycastHit hit in Physics.BoxCastAll(GetDragBoundsCenter(start, rotation),
-                GetDragHalfExtents(), direction, rotation, distance + _dragCollisionSkin,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            Quaternion delta = rotation * Quaternion.Inverse(_keyboardBody.rotation);
+            foreach (Collider source in _dragColliders)
             {
-                if (!IsDragObstacle(hit.collider)) continue;
-                if (hit.distance <= _dragCollisionSkin && IsLeavingDragOverlap(hit.collider, direction)) continue;
-                allowed = Mathf.Min(allowed, Mathf.Max(0f, hit.distance - _dragCollisionSkin));
+                Bounds bounds = GetColliderLocalBounds(source);
+                Vector3 center = start + delta * (source.transform.TransformPoint(bounds.center) - start);
+                Vector3 scale = source.transform.lossyScale;
+                scale = new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+                Vector3 extents = Vector3.Max(Vector3.one * 0.001f,
+                    Vector3.Scale(bounds.extents, scale) - Vector3.one * _dragCollisionSkin);
+                foreach (RaycastHit hit in Physics.BoxCastAll(center, extents, direction,
+                    delta * source.transform.rotation, distance + _dragCollisionSkin,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    if (!IsDragObstacle(hit.collider)) continue;
+                    if (hit.distance <= _dragCollisionSkin && IsLeavingDragOverlap(hit.collider, direction)) continue;
+                    allowed = Mathf.Min(allowed, Mathf.Max(0f, hit.distance - _dragCollisionSkin));
+                }
+            }
+            if (IsDragPoseBlocked(start + direction * allowed, rotation))
+            {
+                float lower = 0f;
+                float upper = allowed;
+                for (int step = 0; step < 12; step++)
+                {
+                    float middle = (lower + upper) * 0.5f;
+                    if (IsDragPoseBlocked(start + direction * middle, rotation)) upper = middle;
+                    else lower = middle;
+                }
+                allowed = lower;
             }
             return start + direction * allowed;
         }
@@ -534,7 +616,7 @@ namespace Game.Player
             Vector3 offset = _usingHangerPlane ? _pointerOffset : _outputCamera.transform.TransformVector(_pointerOffset);
             if (_usingHangerPlane) offset.x = 0f;
             position = ray.GetPoint(distance) + offset;
-            if (_usingHangerPlane) position.x = _hangerWorldX;
+            if (_usingHangerPlane) position.x = _hangerDragWorldX;
             return true;
         }
 
@@ -544,7 +626,7 @@ namespace Game.Player
         /// </summary>
         private Plane GetDragPlane()
         {
-            return _usingHangerPlane ? new Plane(Vector3.right, new Vector3(_hangerWorldX, 0f, 0f))
+            return _usingHangerPlane ? new Plane(Vector3.right, new Vector3(_hangerDragWorldX, 0f, 0f))
                 : new Plane(_outputCamera.transform.forward,
                     _outputCamera.transform.position + _outputCamera.transform.forward * _dragDepth);
         }

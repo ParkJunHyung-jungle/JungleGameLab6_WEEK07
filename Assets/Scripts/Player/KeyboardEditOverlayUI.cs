@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -202,6 +202,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            if (_keycapTrayGrid != null) UpdateKeycapTrayWidth();
             if (_assemblyCatalog) RefreshAssemblyControls();
             if (_photoUI == null)
                 return;
@@ -216,6 +217,7 @@ namespace Game.Player
 
         void OnEnable()
         {
+            SetEditorTrayBindings(true);
             CreateCaseMaterialPicker();
             CreatePlatePicker();
             _keycapButton.Clicked += HandleCategoryClicked;
@@ -248,6 +250,7 @@ namespace Game.Player
 
         void OnDisable()
         {
+            SetEditorTrayBindings(false);
             Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "CustomizationEnd", success: false, details: "OverlayDisabled");
             _keycapButton.Clicked -= HandleCategoryClicked;
             _switchAxisButton.Clicked -= HandleCategoryClicked;
@@ -274,7 +277,8 @@ namespace Game.Player
 
             SetPlatePickerEventBindings(false);
 
-            SetPickerMode(PickerMode.None);
+            if (_switchSoundViewport != null && _photoUI != null && _ledUI != null && _keycapUI != null)
+                SetPickerMode(PickerMode.None);
         }
 
         void OnDestroy()
@@ -289,6 +293,7 @@ namespace Game.Player
             DestroyPreviewTextures(_previewTextures);
             DestroyPreviewTextures(_casePreviewTextures);
             DestroyPreviewTextures(_platePreviewTextures);
+            DestroyPreviewTextures(_structurePreviewTextures);
         }
 
         /// <summary>
@@ -375,6 +380,7 @@ namespace Game.Player
                 return;
 
             _plateCustomization = customization;
+            RefreshStructureTrayPreviews();
             if (!isActiveAndEnabled)
                 return;
 
@@ -427,7 +433,9 @@ namespace Game.Player
         /// </summary>
         private void HandlePhotoCloseRequested()
         {
-            if (_catalogLayout != null) _catalogLayout.RequestDrawer(7);
+            if (_keycapTrayContent != null && _keycapTrayTransition.IsCategoryOpen(WorkshopDrawerCategory.LedCustomImage))
+                _keycapTrayTransition.RequestClose();
+            else if (_catalogLayout != null) _catalogLayout.RequestDrawer(7);
             else SetPickerMode(PickerMode.None);
         }
 
@@ -687,6 +695,8 @@ namespace Game.Player
             }
         }
 
+        public Color CatalogCardColor => _pickerCardColor;
+
         public string ControlHintTitle => _pickerMode switch
         {
             PickerMode.Keycap => "키캡 카탈로그",
@@ -724,8 +734,8 @@ namespace Game.Player
                 return true;
             }
 
-            return ContainsPointer(_viewport, screenPosition)
-                || ContainsPointer(_switchSoundViewport, screenPosition)
+            return ((_keycapTrayContent == null || _keycapTrayTransition.IsTrayVisible) && ContainsPointer(_viewport, screenPosition))
+                || ((_keycapTrayContent == null || _keycapTrayTransition.IsTrayVisible) && ContainsPointer(_switchSoundViewport, screenPosition))
                 || ContainsPointer(_caseMaterialViewport, screenPosition)
                 || ContainsPointer(_plateViewport, screenPosition)
                 || _photoUI.IsPointerOverUI(screenPosition)
@@ -755,6 +765,20 @@ namespace Game.Player
                 mode = PickerMode.Photo;
             else if (button == _ledButton)
                 mode = PickerMode.Led;
+            if (_keycapTrayContent != null && (mode == PickerMode.Photo || mode == PickerMode.Led))
+            {
+                _photoTraySelected = mode == PickerMode.Photo;
+                _keycapTrayTransition.RequestDrawer(WorkshopDrawerCategory.LedCustomImage);
+                return;
+            }
+            if (_keycapTrayContent != null && (mode == PickerMode.Plate || mode == PickerMode.Upper
+                || mode == PickerMode.Pcb || mode == PickerMode.CaseMaterial))
+            {
+                _keycapTrayTransition.RequestDrawer(mode == PickerMode.Plate ? WorkshopDrawerCategory.Plate
+                    : mode == PickerMode.Upper ? WorkshopDrawerCategory.UpperHousing
+                    : mode == PickerMode.Pcb ? WorkshopDrawerCategory.Pcb : WorkshopDrawerCategory.LowerHousing);
+                return;
+            }
             Game.Logging.CustomizationTelemetry.Emit(_caseCustomization, "PartAccess", GetLogPart(mode),
                 mode == _pickerMode ? "Close" : "Open");
             if (_catalogLayout != null)
@@ -1181,6 +1205,7 @@ namespace Game.Player
         private void CreateViewport(int itemCount)
         {
             _viewport = CreateScrollViewport("KeycapMaterial", itemCount, out _content);
+            if (_keycapTrayContent != null) _viewport.SetParent(_keycapTrayContent, false);
         }
 
         /// <summary>
@@ -1643,10 +1668,11 @@ namespace Game.Player
             for (int index = 0; index < _previewButtons.Count; index++)
             {
                 _selectionIndicators[index].gameObject.SetActive(false);
-                placement.BindCard(_previewButtons[index], _previewMaterials[index], _previewDefinitions[index], _viewport);
+                placement.BindCard(_previewButtons[index], _previewMaterials[index], _previewDefinitions[index], _viewport, _keycapTrayContent != null ? _keycapTrayTransition : null);
             }
             for (int index = 0; index < _switchSoundButtons.Count; index++)
-                placement.BindSwitchCard(_switchSoundButtons[index], _switchSoundTypes[index], _switchSoundViewport);
+                placement.BindSwitchCard(_switchSoundButtons[index], _switchSoundTypes[index], _switchSoundViewport, _keycapTrayContent != null ? _keycapTrayTransition : null);
+            if (_keycapTrayContent != null) ConnectKeycapTray();
             _keycapUI.Close();
         }
 
@@ -1834,6 +1860,7 @@ namespace Game.Player
                 new Vector2(166f, -PLATE_PICKER_TAB_TOP_PADDING));
             SetPlatePickerSection(_platePickerSection);
             RefreshPlateSelection();
+            ConnectPlateTray();
         }
 
         /// <summary>
@@ -2269,10 +2296,10 @@ namespace Game.Player
             _customButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Photo);
             if (_viewport != null)
             {
-                _viewport.gameObject.SetActive(_pickerMode == PickerMode.Keycap);
+                _viewport.gameObject.SetActive(_keycapTrayContent != null ? _keycapTrayTransition.Category == WorkshopDrawerCategory.Keycaps : _pickerMode == PickerMode.Keycap);
             }
 
-            _switchSoundViewport.gameObject.SetActive(_pickerMode == PickerMode.SwitchSound);
+            _switchSoundViewport.gameObject.SetActive(_keycapTrayContent != null ? _keycapTrayTransition.Category == WorkshopDrawerCategory.Switches : _pickerMode == PickerMode.SwitchSound);
             if (_caseMaterialViewport != null)
             {
                 _caseMaterialViewport.gameObject.SetActive(_pickerMode == PickerMode.CaseMaterial || _pickerMode == PickerMode.Upper);

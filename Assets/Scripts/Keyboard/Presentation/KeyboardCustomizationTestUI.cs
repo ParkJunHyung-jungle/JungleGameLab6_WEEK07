@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -115,7 +115,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
     void Update()
     {
-        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+        if (Game.Tutorials.FirstEncounterTutorial.IsBlocking
+            || Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
+            || (_embedded && !InGameCursor.CanProcessVirtualPointer)) return;
         if (_isWaitingForKeyInput)
             CaptureWaitingKeyInput();
 

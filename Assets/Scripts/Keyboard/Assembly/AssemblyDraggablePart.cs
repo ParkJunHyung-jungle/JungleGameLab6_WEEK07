@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -64,12 +64,12 @@ namespace KeyboardModeling.Assembly
             if (_partCollider == null) _partCollider = GetComponent<Collider>();
             if (_body == null) _body = GetComponent<Rigidbody>();
             if (_body == null) _body = gameObject.AddComponent<Rigidbody>();
-            _body.mass = 0.02f;
+            if (!entry.IsStructure) _body.mass = 0.02f;
             _body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             if (preserveAppearance)
             {
                 _isSwitch = entry.IsSwitch;
-                _isAdaptiveKeycap = !entry.IsSwitch && !entry.IsArtisan;
+                _isAdaptiveKeycap = !entry.IsStructure && !entry.IsSwitch && !entry.IsArtisan;
             }
             else PrepareInventoryPart(entry, entry.Prefab.gameObject);
             SetBodyFrozen(true);
@@ -245,7 +245,7 @@ namespace KeyboardModeling.Assembly
         public void PrepareInventoryPart(AssemblyCatalogEntry entry, GameObject previewShape)
         {
             _isSwitch = entry.IsSwitch;
-            _isAdaptiveKeycap = !entry.IsSwitch && !entry.IsArtisan;
+            _isAdaptiveKeycap = !entry.IsStructure && !entry.IsSwitch && !entry.IsArtisan;
             _keycapShape = previewShape;
             RestoreKeyboardCollisions();
             transform.SetParent(null, true);

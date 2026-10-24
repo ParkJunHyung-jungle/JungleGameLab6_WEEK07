@@ -53,8 +53,18 @@ namespace Game.Player
         private bool _viewSwitchingAllowed = true;
 
         public bool ViewSwitchingAllowed => _viewSwitchingAllowed;
+        public KeyboardDispenser KeyboardDispenser => _dispenser;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
+
+        /// <summary>body를 ray가 가리키는 빈 작업대에 장착한 결과를 반환한다. 성공하면 기존 편집 연결을 종료하고 새 실물을 연결하며 카메라와 재고는 유지한다.</summary>
+        public bool TryPlaceInventoryKeyboard(Rigidbody body, Ray ray)
+        {
+            if (!IsKeyboardEditing || !_keyboardDrag.TryPlaceInventoryKeyboard(body, ray)) return false;
+            CloseAssembly();
+            OpenAssembly();
+            return true;
+        }
         public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && !_brain.IsBlending
             && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
 

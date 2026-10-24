@@ -310,7 +310,8 @@ namespace KeyboardModeling
 
         void Update()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Tournament.TournamentController.IsReturnPaused)
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Tournament.TournamentController.IsReturnPaused
+                || InGameCursor.IsSystemDialogOpen || Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen)
             {
                 SuspendManualInput();
                 return;

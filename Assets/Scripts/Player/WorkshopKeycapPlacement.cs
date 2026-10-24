@@ -32,6 +32,9 @@ namespace Game.Player
         [SerializeField] private AssemblyCatalogEntry[] _switchEntries = new AssemblyCatalogEntry[0];
         private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
+        private WorkshopKeycapDrawerTransition _keycapTray;
+        private WorkshopKeycapCardDrag _inventoryScrollOwner;
+        private RectTransform _trayPlacementModes;
         private readonly List<AssemblyDraggablePart> _ownedParts = new List<AssemblyDraggablePart>();
         private readonly List<AssemblyDraggablePart> _looseParts = new List<AssemblyDraggablePart>();
         private AssemblyDraggablePart _activePart;
@@ -50,6 +53,7 @@ namespace Game.Player
         private readonly List<KeyboardEditButton> _bulkPlacementButtons = new List<KeyboardEditButton>();
         private bool _bulkPlacement;
         private bool _isBulkDragging;
+        private KeyboardCustomization _bulkCustomization;
         private string _bulkInteractionId;
         private int _bulkAttemptCount;
         private int _bulkSuccessCount;
@@ -64,6 +68,7 @@ namespace Game.Player
             ? _interaction.EditingKeyboard : _pullers.EditingKeyboard;
         private Camera InputCamera => _pullers.InputCamera;
         public bool IsDragging => _entry != null;
+        public bool IsInventoryScrolling => _inventoryScrollOwner != null;
         public WorkshopKeyboardPullerController Pullers => _pullers;
         public bool IsEditing => _interaction != null ? _interaction.IsKeyboardEditing : _pullers.IsEditing;
         public Camera ReturnCamera => InputCamera;
@@ -96,14 +101,14 @@ namespace Game.Player
 
         void Update()
         {
-            if (_pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured) return;
-            foreach (KeyboardEditButton button in _singlePlacementButtons) button.interactable = !IsDragging && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
-            foreach (KeyboardEditButton button in _bulkPlacementButtons) button.interactable = !IsDragging && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
+            if (_keycapTray != null) RefreshInventory();
+            RefreshPlacementModes();
             if (!_pullers.InputAllowed || Mouse.current == null)
             {
                 CancelDrag();
                 return;
             }
+            if (_pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured || IsInventoryScrolling) return;
             Vector2 point = InGameCursor.Position;
             if (!IsDragging && _lastRemovalFrame != Time.frameCount
                 && Mouse.current.leftButton.wasPressedThisFrame && !_pullers.IsPointerOverUI(point))
@@ -122,15 +127,17 @@ namespace Game.Player
 
         /// <summary>
         /// material과 definition에 대응하는 원본 재고 항목을 찾아 카드와 수량 표시를 연결한다.
-        /// viewport를 반환 영역으로 저장하며 초기 수량은 변경하지 않는다. 반환값은 없다.
+        /// viewport를 반환 영역으로 저장하며 tray의 목록 드래그에서 선택한 배치 모드로 출고한다. 초기 수량은 유지한다.
         /// </summary>
-        public void BindCard(KeyboardEditButton button, Material material, KeycapDefinition definition, RectTransform viewport)
+        public void BindCard(KeyboardEditButton button, Material material, KeycapDefinition definition, RectTransform viewport, WorkshopKeycapDrawerTransition tray = null)
         {
+            _keycapTray = tray;
             AssemblyCatalogEntry match = FindEntry(material, definition);
-            if (_returnArea == null) CreatePlacementModes(viewport);
+            if (_returnArea == null && tray == null) CreatePlacementModes(viewport);
             _returnArea = viewport;
             if (match == null) { button.interactable = false; return; }
-            button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, match);
+            if (tray != null) button.enabled = false;
+            button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, match, tray);
             _entryTextures[match] = button.GetComponentInChildren<RawImage>().texture;
             BindQuantityLabel(button, match);
         }
@@ -139,18 +146,35 @@ namespace Game.Player
         /// type에 대응하는 원본 축 재고와 수량 표시를 button에 연결한다.
         /// viewport를 반환 영역으로 저장하고 재고 카드 드래그와 배치 모드를 연결한다. 반환값은 없다.
         /// </summary>
-        public void BindSwitchCard(KeyboardEditButton button, SwitchType type, RectTransform viewport)
+        public void BindSwitchCard(KeyboardEditButton button, SwitchType type, RectTransform viewport, WorkshopKeycapDrawerTransition tray = null)
         {
-            if (_switchReturnArea == null) CreatePlacementModes(viewport);
+            if (_switchReturnArea == null && tray == null) CreatePlacementModes(viewport);
             _switchReturnArea = viewport;
             foreach (AssemblyCatalogEntry entry in _switchEntries)
             {
                 if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
-                button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry);
+                if (tray != null) button.enabled = false;
+                button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry, tray);
                 BindQuantityLabel(button, entry);
                 return;
             }
             button.interactable = false;
+        }
+
+        /// <summary>구조 부품 entry의 카드에 기존 수량·아이콘·스크롤 출고 입력을 연결한다. structureDrag만 실물 설치 경로를 담당하며 기존 키캡·스위치 재고는 변경하지 않는다.</summary>
+        public void BindStructureCard(KeyboardEditButton button, AssemblyCatalogEntry entry, Texture texture,
+            WorkshopKeycapDrawerTransition tray, WorkshopPcbCardDrag structureDrag)
+        {
+            button.enabled = false;
+            button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry, tray, structureDrag);
+            _entryTextures[entry] = texture;
+            BindQuantityLabel(button, entry);
+        }
+
+        /// <summary>entry의 기존 출고 아이콘만 texture로 갱신한다. 카드 재생성이나 수량·예약 초기화는 하지 않는다.</summary>
+        public void SetInventoryTexture(AssemblyCatalogEntry entry, Texture texture)
+        {
+            _entryTextures[entry] = texture;
         }
 
         /// <summary>
@@ -173,10 +197,10 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// viewport 위쪽에 원본 조립 UI의 한 개 배치와 일괄 배치 선택 버튼을 만든다.
-        /// C# 클릭 이벤트로 모드를 전환하고 기본값은 한 개 배치로 유지한다. 반환값은 없다.
+        /// viewport 상단에 font로 기존 한 개 배치와 일괄 배치 버튼을 만들고 행을 반환한다.
+        /// C# 클릭 이벤트를 연결하며 현재 배치 모드는 변경하지 않는다.
         /// </summary>
-        private void CreatePlacementModes(RectTransform viewport)
+        private RectTransform CreatePlacementModes(RectTransform viewport, Font font = null)
         {
             RectTransform row = new GameObject("KeycapPlacementModes", typeof(RectTransform), typeof(HorizontalLayoutGroup))
                 .GetComponent<RectTransform>();
@@ -190,16 +214,38 @@ namespace Game.Player
             layout.spacing = 8f;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = true;
-            _singlePlacementButtons.Add(CreatePlacementButton(row, "한 개 배치"));
-            _bulkPlacementButtons.Add(CreatePlacementButton(row, "일괄 배치"));
+            _singlePlacementButtons.Add(CreatePlacementButton(row, "한 개 배치", font));
+            _bulkPlacementButtons.Add(CreatePlacementButton(row, "일괄 배치", font));
+            RefreshPlacementModes();
+            return row;
+        }
+
+        /// <summary>
+        /// parent의 예약된 상단 공간에 기존 배치 모드 버튼을 font로 한 번 연결한다.
+        /// 트레이의 카드와 스크롤은 이동시키지 않으며 현재 배치 모드는 유지한다.
+        /// </summary>
+        public void BindTrayPlacementModes(RectTransform parent, Font font)
+        {
+            if (_trayPlacementModes != null) return;
+            _trayPlacementModes = CreatePlacementModes(parent, font);
             RefreshPlacementModes();
         }
 
         /// <summary>
-        /// parent에 text를 표시하는 배치 모드 버튼을 생성하고 클릭 이벤트를 연결한다.
+        /// owner의 목록 드래그 시작과 종료를 active로 기록한다.
+        /// 해당 카드만 점유를 해제할 수 있으며 재고 예약과 실물 생성은 수행하지 않는다.
+        /// </summary>
+        public void SetInventoryScroll(WorkshopKeycapCardDrag owner, bool active)
+        {
+            if (active) _inventoryScrollOwner = owner;
+            else if (_inventoryScrollOwner == owner) _inventoryScrollOwner = null;
+        }
+
+        /// <summary>
+        /// parent에 text와 font를 사용하는 배치 모드 버튼을 생성하고 클릭 이벤트를 연결한다.
         /// 생성된 KeyboardEditButton을 반환하며 현재 모드는 변경하지 않는다.
         /// </summary>
-        private KeyboardEditButton CreatePlacementButton(RectTransform parent, string text)
+        private KeyboardEditButton CreatePlacementButton(RectTransform parent, string text, Font font)
         {
             KeyboardEditButton button = new GameObject(text, typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton))
                 .GetComponent<KeyboardEditButton>();
@@ -211,7 +257,7 @@ namespace Game.Player
             label.rectTransform.anchorMin = Vector2.zero;
             label.rectTransform.anchorMax = Vector2.one;
             label.rectTransform.sizeDelta = Vector2.zero;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             label.fontSize = 14;
             label.alignment = TextAnchor.MiddleCenter;
             label.raycastTarget = false;
@@ -225,7 +271,7 @@ namespace Game.Player
         /// </summary>
         private void HandlePlacementModeClicked(KeyboardEditButton button)
         {
-            if (IsDragging) return;
+            if (!CanChangePlacementMode(button)) return;
             _bulkPlacement = _bulkPlacementButtons.Contains(button);
             RefreshPlacementModes();
         }
@@ -236,12 +282,31 @@ namespace Game.Player
         /// </summary>
         private void RefreshPlacementModes()
         {
+            if (_trayPlacementModes != null)
+                _trayPlacementModes.gameObject.SetActive(_keycapTray.Category == WorkshopDrawerCategory.Keycaps || _keycapTray.Category == WorkshopDrawerCategory.Switches);
             foreach (KeyboardEditButton button in _singlePlacementButtons)
+            {
+                button.interactable = CanChangePlacementMode(button);
                 button.GetComponent<Image>().color = !_bulkPlacement
                     ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+            }
             foreach (KeyboardEditButton button in _bulkPlacementButtons)
+            {
+                button.interactable = CanChangePlacementMode(button);
                 button.GetComponent<Image>().color = _bulkPlacement
                     ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+            }
+        }
+
+        /// <summary>
+        /// button이 속한 트레이의 열림과 기존 집중·드래그·도구 상태로 모드 전환 허용 여부를 반환한다.
+        /// 다른 서랍의 배치 버튼에는 키캡 트레이 열림 조건을 적용하지 않는다.
+        /// </summary>
+        private bool CanChangePlacementMode(KeyboardEditButton button)
+        {
+            return _pullers.InputAllowed && !_pullers.IsManipulatingPart && !IsInventoryScrolling
+                && (_drawerLayout == null || !_drawerLayout.IsTransitioning)
+                && (_trayPlacementModes == null || button.transform.parent != _trayPlacementModes || _keycapTray.CanInteractWithTray);
         }
 
         /// <summary>
@@ -315,11 +380,12 @@ namespace Game.Player
         public void BeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 point)
         {
             if (!CanBeginInventoryDrag(entry) || !Mouse.current.leftButton.isPressed) return;
-            if (!_bulkPlacement && !entry.TryReserve()) return;
+            bool bulk = _bulkPlacement;
+            if (!bulk && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
             _fromInventory = true;
-            _isBulkDragging = _bulkPlacement;
+            _isBulkDragging = bulk;
             _bulkInteractionId = _isBulkDragging ? System.Guid.NewGuid().ToString("N") : null;
             _bulkAttemptCount = 0;
             _bulkSuccessCount = 0;
@@ -327,6 +393,7 @@ namespace Game.Player
             _hasPreviousBulkPosition = false;
             _lastBulkFrame = -1;
             KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
+            _bulkCustomization = bulk ? customization : null;
             _activePart = CreatePart(entry, entry.IsSwitch ? customization.GetSwitchSlotTransform(0) : customization.GetKeycapSlotTransform(0));
             if (_isBulkDragging)
                 Game.Logging.CustomizationTelemetry.Emit(customization, "BulkPlacementStarted",
@@ -452,6 +519,22 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// entry의 기존 썸네일을 point에 표시하며 null이면 아이콘을 숨긴다. 재고 예약이나 실물 생성은 하지 않는다.
+        /// </summary>
+        public void ShowInventoryIcon(AssemblyCatalogEntry entry, Vector2 point)
+        {
+            _dragIcon.gameObject.SetActive(entry != null);
+            if (entry == null) return;
+            _entryTextures.TryGetValue(entry, out Texture texture);
+            _dragIcon.texture = texture != null ? texture : Texture2D.whiteTexture;
+            _dragIcon.color = entry.IsSwitch && entry.SwitchData.StemMaterial != null
+                && entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
+                ? entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, point, null, out Vector2 local);
+            _dragIcon.rectTransform.localPosition = local;
+        }
+
+        /// <summary>
         /// point의 포인터 위치에 집은 키캡을 이동시키고 UI 위에서는 실물을 숨긴다.
         /// 재고와 설치 상태는 변경하지 않으며 반환값은 없다.
         /// </summary>
@@ -463,17 +546,7 @@ namespace Game.Player
             if (_isBulkDragging) _lastBulkFrame = Time.frameCount;
             bool overUI = _pullers.IsPointerOverUI(point);
             _activePart.gameObject.SetActive(!overUI);
-            _dragIcon.gameObject.SetActive(overUI);
-            if (overUI)
-            {
-                _entryTextures.TryGetValue(_entry, out Texture texture);
-                _dragIcon.texture = texture != null ? texture : Texture2D.whiteTexture;
-                _dragIcon.color = _entry.IsSwitch && _entry.SwitchData.StemMaterial != null
-                    && _entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
-                    ? _entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, point, null, out Vector2 local);
-                _dragIcon.rectTransform.localPosition = local;
-            }
+            ShowInventoryIcon(overUI ? _entry : null, point);
             Ray ray = InputCamera.ScreenPointToRay(point);
             if (_dragPlane.Raycast(ray, out float distance))
             {
@@ -525,10 +598,12 @@ namespace Game.Player
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                     && !obstruction.transform.IsChildOf(customization.transform)) continue;
                 int index = candidate.Value;
+                if (!CanInstallEntry(index)) continue;
                 if (!_entry.TryReserve()) break;
                 _bulkAttemptCount++;
-                bool installed = InstallEntry(customization, index);
-                _entry.FinishReservation(installed);
+                bool installed = false;
+                try { installed = InstallEntry(customization, index); }
+                finally { _entry.FinishReservation(installed); }
                 if (installed)
                 {
                     _bulkVisited.Add(index);
@@ -548,6 +623,7 @@ namespace Game.Player
         /// </summary>
         private bool InstallEntry(KeyboardCustomization customization, int index)
         {
+            if (!CanInstallEntry(index)) return false;
             if (_entry.IsSwitch) return customization.InstallSwitchFromInventory(index, _entry.SwitchData.Type);
             Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
             return customization.InstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
@@ -568,7 +644,7 @@ namespace Game.Player
         /// </summary>
         private void EndBulkPlacement(bool cancelled = false, string endReason = "Released")
         {
-            Game.Logging.CustomizationTelemetry.Emit(EditingKeyboard.GetComponent<KeyboardCustomization>(),
+            if (_bulkCustomization != null) Game.Logging.CustomizationTelemetry.Emit(_bulkCustomization,
                 "BulkPlacementEnded", _entry.IsSwitch ? "Switch" : "Keycap", GetEntryLogId(_entry),
                 success: !cancelled, changed: _bulkSuccessCount > 0, details: endReason,
                 interactionId: _bulkInteractionId, actionSource: "BulkPlacement",
@@ -581,6 +657,7 @@ namespace Game.Player
             _activePart = null;
             _fromInventory = false;
             _isBulkDragging = false;
+            _bulkCustomization = null;
             _bulkInteractionId = null;
             _bulkAttemptCount = 0;
             _bulkSuccessCount = 0;
@@ -747,6 +824,8 @@ namespace Game.Player
         /// </summary>
         public void CancelDrag()
         {
+            if (_inventoryScrollOwner != null) _inventoryScrollOwner.CancelInventoryScroll();
+            if (_dragIcon != null) _dragIcon.gameObject.SetActive(false);
             if (!IsDragging) return;
             if (_isBulkDragging) { EndBulkPlacement(true, "Cancelled"); return; }
             _previewRenderer.Hide();
@@ -787,10 +866,14 @@ namespace Game.Player
             return customization.FindKeycapSlot(ray, _entry.IsSwitch);
         }
 
-        /// <summary>현재 entry와 index의 실제 설치 조건을 조회한다. 수량 예약과 효과음 및 부품 상태는 변경하지 않는다.</summary>
+        /// <summary>현재 entry와 index의 점유·축 선행·규격 및 명시된 InstalledPart 점유로 설치 가능 여부를 반환한다. 수량과 부품 상태는 변경하지 않는다.</summary>
         private bool CanInstallEntry(int index)
         {
             KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
+            if (index < 0 || index >= customization.KeycapCount) return false;
+            Transform target = _entry.IsSwitch ? customization.GetSwitchSlotTransform(index) : customization.GetKeycapSlotTransform(index);
+            AssemblyDraggablePart original = target.GetComponent<AssemblyDraggablePart>();
+            if (original != null && original.Slot != null && original.Slot.InstalledPart != null) return false;
             if (_entry.IsSwitch) return customization.CanInstallSwitchFromInventory(index, _entry.SwitchData.Type);
             Material material = _entry.KeycapMaterial != null ? _entry.KeycapMaterial : _entry.KeycapDefinition.Material;
             return customization.CanInstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
@@ -799,7 +882,8 @@ namespace Game.Player
         /// <summary>현재 카드의 entry가 출고 가능한지 반환한다. 배치 입력과 같은 수량 및 드래그 조건만 읽는다.</summary>
         public bool CanBeginInventoryDrag(AssemblyCatalogEntry entry)
         {
-            return _pullers.InputAllowed && !_pullers.IsPcbDragging && !_pullers.IsScrewPointerCaptured
+            return _pullers.InputAllowed && !_pullers.IsPcbDragging && !_pullers.IsScrewPointerCaptured && !IsInventoryScrolling
+                && (_keycapTray == null || (_keycapTray.CanInteractWithTray && _keycapTray.IsCategoryOpen(entry.IsSwitch ? WorkshopDrawerCategory.Switches : WorkshopDrawerCategory.Keycaps)))
                 && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0
                 && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
         }
@@ -838,9 +922,9 @@ namespace Game.Player
         /// </summary>
         private bool IsInReturnArea(Vector2 point)
         {
-            return (_returnArea != null && _returnArea.gameObject.activeInHierarchy
+            return (_returnArea != null && (_keycapTray == null || _keycapTray.IsTrayVisible) && _returnArea.gameObject.activeInHierarchy
                 && RectTransformUtility.RectangleContainsScreenPoint(_returnArea, point, null))
-                || (_switchReturnArea != null && _switchReturnArea.gameObject.activeInHierarchy
+                || (_switchReturnArea != null && (_keycapTray == null || _keycapTray.IsTrayVisible) && _switchReturnArea.gameObject.activeInHierarchy
                 && RectTransformUtility.RectangleContainsScreenPoint(_switchReturnArea, point, null));
         }
 
@@ -991,11 +1075,16 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// entry 종류에 맞는 재료 목록 또는 접힌 UI의 화면 왼쪽을 반환 목적지로 계산한다.
-        /// screen 좌표를 반환하며 패널과 재고는 변경하지 않는다.
+        /// 연출이 허용된 entry의 반환 목적지를 계산하며 새 키캡 트레이를 기존 카탈로그보다 우선한다.
+        /// 화면 좌표를 반환하고 스위치와 기존 카테고리의 목적지 계산은 유지한다.
         /// </summary>
         public Vector2 GetReturnDestination(AssemblyCatalogEntry entry)
         {
+            if (_keycapTray != null)
+            {
+                _keycapTray.TryGetReturnDestination(out Vector2 destination);
+                return destination;
+            }
             if (_drawerLayout != null) return _drawerLayout.GetReturnDestination();
             RectTransform area = entry.IsSwitch ? _switchReturnArea : _returnArea;
             return area != null && area.gameObject.activeInHierarchy
@@ -1004,12 +1093,29 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// entry의 반환 연출이 현재 집중 상태와 목적지 표시 상태에서 가능한지 반환한다.
+        /// 새 키캡 트레이가 닫혔거나 전환 중이면 false이며 재고와 반환 예약은 변경하지 않는다.
+        /// </summary>
+        public bool CanAnimateReturn(AssemblyCatalogEntry entry)
+        {
+            return IsEditing && (_keycapTray == null || (_keycapTray.IsCategoryOpen(entry.IsSwitch ? WorkshopDrawerCategory.Switches : WorkshopDrawerCategory.Keycaps) && _keycapTray.TryGetReturnDestination(out _)));
+        }
+
+        /// <summary>
         /// 각 원본 재고 항목의 사용 가능한 수량을 카드에 표시한다.
-        /// 예약과 소모 수량을 읽기만 하며 반환값은 없다.
+        /// 예약과 소모 수량을 읽으며 새 트레이의 키캡 카드는 재고가 없으면 숨기고 복구되면 다시 표시한다.
         /// </summary>
         private void RefreshInventory()
         {
-            foreach (var label in _quantityLabels) label.Value.text = "×" + label.Key.AvailableQuantity;
+            foreach (var label in _quantityLabels)
+            {
+                string quantity = "×" + label.Key.AvailableQuantity;
+                if (label.Value.text != quantity) label.Value.text = quantity;
+                if (_keycapTray == null) continue;
+                GameObject card = label.Value.transform.parent.gameObject;
+                bool visible = label.Key.AvailableQuantity > 0;
+                if (card.activeSelf != visible) card.SetActive(visible);
+            }
         }
 
         void OnDisable()

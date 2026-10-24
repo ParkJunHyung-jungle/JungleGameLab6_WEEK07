@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -14,10 +14,11 @@ using KeyboardModeling.Assembly;
 namespace Game.Player
 {
     [DefaultExecutionOrder(-50)]
-    public sealed class WorkshopPcbCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public sealed partial class WorkshopPcbCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [Header("PCB·보강판·상단부 Drag")]
         private WorkshopKeyboardPullerController _pullers;
+        private KeyboardEditOverlayUI _overlay;
         private KeyboardAssemblyState _assembly;
         private readonly List<WorkshopKeyboardPlacementPreview> _outlines = new List<WorkshopKeyboardPlacementPreview>();
         private AssemblyStructurePart _kind;
@@ -45,11 +46,12 @@ namespace Game.Player
         private Quaternion[] _worldStartRotations;
         private readonly List<(Collider Collider, bool Enabled)> _colliders = new List<(Collider, bool)>();
 
-        /// <summary>pullers와 kind 및 기존 아웃라인 에셋을 카드에 연결한다. 표시용 카메라와 아이콘을 만들며 원본 부품의 설치 상태는 변경하지 않는다.</summary>
+        /// <summary>pullers와 kind 및 기존 아웃라인 에셋을 카드에 연결한다. 트레이로 이동하기 전 소유 UI 참조를 보관하고 아이콘을 만들며 설치 상태는 유지한다.</summary>
         public void Initialize(WorkshopKeyboardPullerController pullers, Material outlineMaterial, Shader depthShader,
             AssemblyStructurePart kind = AssemblyStructurePart.Pcb, bool showCard = true, bool worldPickupEnabled = true)
         {
             _pullers = pullers;
+            _overlay = GetComponentInParent<KeyboardEditOverlayUI>();
             _button = GetComponent<KeyboardEditButton>();
             _kind = kind;
             _worldPickupEnabled = worldPickupEnabled;
@@ -106,30 +108,8 @@ namespace Game.Player
         /// <summary>현재 PCB·보강판·상단부의 모든 렌더 메시와 재질을 카탈로그 아이콘으로 합친다. 런타임 미리보기만 생성하며 메시 에셋과 원본 모델은 유지한다.</summary>
         private void BuildIcon()
         {
-            var parts = new List<CombineInstance>();
-            var materials = new List<Material>();
-            foreach (Transform part in _parts)
-            foreach (MeshRenderer renderer in part.GetComponentsInChildren<MeshRenderer>(true))
-            {
-                if (!renderer.enabled) continue;
-                Mesh mesh = renderer.GetComponent<MeshFilter>().sharedMesh;
-                if (mesh == null || !mesh.isReadable) continue;
-                for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
-                {
-                    parts.Add(new CombineInstance { mesh = mesh, subMeshIndex = submesh,
-                        transform = _parts[0].worldToLocalMatrix * renderer.localToWorldMatrix });
-                    materials.Add(renderer.sharedMaterials[submesh]);
-                }
-            }
             if (_texture != null) Destroy(_texture);
-            _texture = null;
-            if (parts.Count > 0)
-            {
-                Mesh combined = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
-                combined.CombineMeshes(parts.ToArray(), false, true);
-                _texture = AssemblyCatalogPreview.Render(combined, materials.ToArray());
-                Destroy(combined);
-            }
+            _texture = AssemblyCatalogPreview.RenderParts(_parts);
             _icon.texture = _returnIcon.texture = _texture != null ? _texture : Texture2D.whiteTexture;
             _iconMaterial = _assembly.GetStructureMaterial(_kind);
         }
@@ -138,6 +118,7 @@ namespace Game.Player
 
         void Update()
         {
+            if (_stockEnabled && ProcessStockDrag()) return;
             if (!_dragging && _worldPickupEnabled) TryBeginWorldDrag();
             if (!_dragging) return;
             if (_worldDragging) { UpdateWorldDrag(); return; }
@@ -179,6 +160,7 @@ namespace Game.Player
         /// <summary>가상 커서 아래의 설치 또는 바닥 구조 부품을 집는다. 분리 조건을 확인한 뒤 실제 성공 시에만 점유를 해제한다.</summary>
         private void TryBeginWorldDrag()
         {
+            if (_stockEnabled && _kind == AssemblyStructurePart.Lower) return;
             if (_assembly == null || _returning || !_pullers.InputAllowed || _pullers.IsManipulatingPart
                 || Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
             Vector2 point = InGameCursor.Position;
@@ -282,8 +264,8 @@ namespace Game.Player
             MoveParts(point);
             if (Mouse.current.leftButton.isPressed) return;
             if (!Mouse.current.leftButton.wasReleasedThisFrame) { CancelDrag(); return; }
-            KeyboardEditOverlayUI overlay = GetComponentInParent<KeyboardEditOverlayUI>();
-            if (overlay != null && overlay.IsInAssemblyReturnArea(point))
+            KeyboardEditOverlayUI overlay = _overlay;
+            if (overlay != null && (_stockEnabled ? overlay.IsInStructureTray(point, _kind) : overlay.IsInAssemblyReturnArea(point)))
             {
                 if (_kind == AssemblyStructurePart.Pcb && !overlay.TryReturnPcbBundle(_assembly))
                 {
@@ -292,6 +274,7 @@ namespace Game.Player
                     return;
                 }
                 FinishWorldDrag();
+                _assembly.ReturnStructureInventory(_kind);
                 if (_kind == AssemblyStructurePart.Pcb) _assembly.ReleasePcbParts();
                 if (_kind == AssemblyStructurePart.Pcb) _assembly.ReturnPcbToInventory();
                 else if (_kind == AssemblyStructurePart.Lower) _assembly.ReturnLowerToInventory();
@@ -308,6 +291,13 @@ namespace Game.Player
             Vector3 position = _parts[0].position;
             FinishWorldDrag();
             if (installed) { AudioManager.PlayPartSound(position, false); return; }
+            DropWorldParts(ray);
+            if (_wasInstalled) RecordStructureEvent("PartRemoveAttempted", true, "WorldDrag", details: "DroppedToWorld");
+        }
+
+        /// <summary>ray의 기존 작업대 평면에 구조 부품을 내려놓고 중력·충돌을 복구한다. 원래 부품 참조와 재질 및 낙하 물리 경로를 유지한다.</summary>
+        private void DropWorldParts(Ray ray)
+        {
             if (!new Plane(Vector3.up, _assembly.transform.position).Raycast(ray, out float distance))
                 distance = Mathf.Max(1f, Vector3.Distance(_pullers.InputCamera.transform.position, _assembly.transform.position));
             Vector3 drop = ray.GetPoint(distance) + Vector3.up * 0.3f;
@@ -323,7 +313,6 @@ namespace Game.Player
                 body.angularVelocity = Vector3.zero;
                 if (!_looseBodies.Contains(body)) _looseBodies.Add(body);
             }
-            if (_wasInstalled) RecordStructureEvent("PartRemoveAttempted", true, "WorldDrag", details: "DroppedToWorld");
         }
 
         /// <summary>실물 드래그의 표시와 충돌체를 복구한다. 설치 여부는 변경하지 않고 입력 점유만 해제한다.</summary>
@@ -339,7 +328,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
-            if (_selected && _assembly != null && _assembly.CanInstallStructure(_kind) && _pullers.InputAllowed)
+            if (!_stockDragging && _selected && _assembly != null && _assembly.CanInstallStructure(_kind) && _pullers.InputAllowed)
                 for (int index = 0; index < _outlines.Count; index++)
                     _outlines[index].Show(_assembly.GetStructurePose(_kind, index));
         }
@@ -407,7 +396,8 @@ namespace Game.Player
             Ray ray = _pullers.InputCamera.ScreenPointToRay(point);
             if (!_dragPlane.Raycast(ray, out float distance)) return;
             Vector3 position = ray.GetPoint(distance) + _centerOffset;
-            for (int index = 0; index < _parts.Count; index++) _parts[index].position = position + _partOffsets[index];
+            IReadOnlyList<Transform> parts = _stockDragging ? _stockParts : _parts;
+            for (int index = 0; index < parts.Count; index++) parts[index].position = position + _partOffsets[index];
         }
 
         public void OnDrag(PointerEventData eventData) { }
@@ -454,6 +444,7 @@ namespace Game.Player
         /// <summary>입력 중단이나 탭 전환 시 PCB·보강판·상단부를 원래 미설치 위치로 반환한다. 진행 중인 반환 표시도 정리하며 설치 상태는 유지한다.</summary>
         private void CancelDrag()
         {
+            if (_stockDragging) { CancelStockDrag(); return; }
             if (_worldDragging)
             {
                 RecordStructureEvent("StructureDragCancelled", false, "WorldDrag", "Cancelled");

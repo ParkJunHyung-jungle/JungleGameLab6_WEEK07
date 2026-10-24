@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -38,6 +39,12 @@ public sealed class InGameCursor : MonoBehaviour
     private int _blockedFrame;
     private int _dialogDepth;
     private bool _modeWasActive;
+#if UNITY_EDITOR
+    private bool _editorPointerReleased;
+#endif
+#if UNITY_EDITOR_WIN
+    private bool _editorCursorConfined;
+#endif
 
     [Header("Runtime UI")]
     private RawImage _graphic;
@@ -50,7 +57,7 @@ public sealed class InGameCursor : MonoBehaviour
 
     public static InGameCursor Instance => _instance;
     public static Vector2 Position => _instance != null && _instance.IsActive ? _instance._position : Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
-    public static bool CanProcessPointer => _instance == null || (_instance._hasFocus && _instance._dialogDepth == 0 && !_instance._waitRelease && Time.frameCount > _instance._blockedFrame);
+    public static bool CanProcessPointer => _instance == null || (_instance.HasPointerFocus && _instance._dialogDepth == 0 && !_instance._waitRelease && Time.frameCount > _instance._blockedFrame);
     public static bool CanProcessVirtualPointer => _instance != null && _instance.IsActive && CanProcessPointer;
     public float Sensitivity => _sensitivity;
     public event Action<float> SensitivityChanged;
@@ -79,7 +86,21 @@ public sealed class InGameCursor : MonoBehaviour
         }
     }
 
-    private bool IsActive => _hasFocus && _dialogDepth == 0 && _requestedVisible && _requestedLock != CursorLockMode.Locked;
+    private bool IsActive => HasPointerFocus && _dialogDepth == 0 && _requestedVisible && _requestedLock != CursorLockMode.Locked;
+
+    private bool HasPointerFocus
+    {
+        get
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorWindow focused = UnityEditor.EditorWindow.focusedWindow;
+            return _hasFocus && !_editorPointerReleased && !UnityEditor.EditorApplication.isPaused
+                && focused != null && focused.GetType().Name == "GameView";
+#else
+            return _hasFocus;
+#endif
+        }
+    }
 
     /// <summary>이전 실행의 정적 참조를 비운다. 도메인 재로드를 끈 실행에서도 새 실행의 기본 모드를 사용한다.</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -120,9 +141,36 @@ public sealed class InGameCursor : MonoBehaviour
 
     void Update()
     {
+#if UNITY_EDITOR
+        UpdateEditorCapture();
+#endif
         BindSceneModules();
         ApplyPresentation();
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// 에디터의 Shift와 Escape 동시 입력으로 실제 커서를 해제하고 Game 뷰 재클릭으로 제한을 복구한다.
+    /// 포커스와 버튼 상태를 사용하며 복귀 클릭이 게임 조작으로 전달되지 않도록 입력을 재대기한다.
+    /// </summary>
+    private void UpdateEditorCapture()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame
+            && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed))
+        {
+            _editorPointerReleased = true;
+            Rearm();
+        }
+        else if (_editorPointerReleased && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            UnityEditor.EditorWindow focused = UnityEditor.EditorWindow.focusedWindow;
+            if (focused == null || focused.GetType().Name != "GameView" || UnityEditor.EditorApplication.isPaused) return;
+            _editorPointerReleased = false;
+            Rearm();
+        }
+    }
+#endif
 
     void LateUpdate()
     {
@@ -199,7 +247,7 @@ public sealed class InGameCursor : MonoBehaviour
         }
         bool released = mouse == null || (!mouse.leftButton.isPressed && !mouse.rightButton.isPressed
             && !mouse.middleButton.isPressed && !mouse.forwardButton.isPressed && !mouse.backButton.isPressed);
-        if (_waitRelease && released && _hasFocus && _dialogDepth == 0)
+        if (_waitRelease && released && HasPointerFocus && _dialogDepth == 0)
         {
             _waitRelease = false;
             _blockedFrame = Time.frameCount;
@@ -235,12 +283,15 @@ public sealed class InGameCursor : MonoBehaviour
         ApplyPresentation();
     }
 
-    /// <summary>현재 모드와 디자인으로 커서를 표시하고 게임 조작 중에는 마우스를 창 안에 가둔다. 포커스 상실과 시스템 창에서는 잠금을 해제한다.</summary>
+    /// <summary>게임 조작 중 실제 마우스를 창 안에 제한하고 가상 커서를 표시한다. 포커스 상실과 시스템 창에서는 제한을 해제한다.</summary>
     private void ApplyPresentation()
     {
-        bool external = !_hasFocus || _dialogDepth > 0;
+        bool external = !HasPointerFocus || _dialogDepth > 0;
         Cursor.lockState = external ? CursorLockMode.None
             : _requestedLock == CursorLockMode.Locked ? CursorLockMode.Locked : CursorLockMode.Confined;
+#if UNITY_EDITOR_WIN
+        ApplyEditorConfinement(external || _requestedLock == CursorLockMode.Locked);
+#endif
         Cursor.visible = external;
         if (_graphic == null) return;
         _graphic.enabled = IsActive;
@@ -252,6 +303,58 @@ public sealed class InGameCursor : MonoBehaviour
         _graphic.rectTransform.anchoredPosition = _position;
         SetModulesSuspended(external || _waitRelease);
     }
+
+#if UNITY_EDITOR_WIN
+    /// <summary>
+    /// released이면 OS 커서 제한을 해제하고 그 외에는 Game 뷰의 내부 화면에 제한한다.
+    /// 에디터 창 좌표와 DPI 배율을 사용하며 Unity UI가 클릭과 드래그를 처리할 수 있도록 Locked는 사용하지 않는다.
+    /// </summary>
+    private void ApplyEditorConfinement(bool released)
+    {
+        if (released)
+        {
+            if (_editorCursorConfined) ReleaseEditorCursor(IntPtr.Zero);
+            _editorCursorConfined = false;
+            return;
+        }
+        Rect view = UnityEditor.EditorWindow.focusedWindow.position;
+        float scale = UnityEditor.EditorGUIUtility.pixelsPerPoint;
+        CursorClipRect clip = new CursorClipRect(
+            Mathf.CeilToInt((view.xMin + 4f) * scale),
+            Mathf.CeilToInt((view.yMin + 26f) * scale),
+            Mathf.FloorToInt((view.xMax - 4f) * scale),
+            Mathf.FloorToInt((view.yMax - 4f) * scale));
+        _editorCursorConfined = ConfineEditorCursor(ref clip);
+    }
+
+    /// <summary>rect로 지정한 OS 화면 영역에 실제 커서를 제한하고 성공 여부를 반환한다.</summary>
+    [DllImport("user32.dll", EntryPoint = "ClipCursor")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ConfineEditorCursor(ref CursorClipRect rect);
+
+    /// <summary>rect가 IntPtr.Zero이면 OS 커서 제한을 해제하고 성공 여부를 반환한다.</summary>
+    [DllImport("user32.dll", EntryPoint = "ClipCursor")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ReleaseEditorCursor(IntPtr rect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CursorClipRect
+    {
+        private int _left;
+        private int _top;
+        private int _right;
+        private int _bottom;
+
+        /// <summary>left, top, right, bottom 픽셀 좌표로 Windows 커서 제한 사각형을 구성한다.</summary>
+        public CursorClipRect(int left, int top, int right, int bottom)
+        {
+            _left = left;
+            _top = top;
+            _right = right;
+            _bottom = bottom;
+        }
+    }
+#endif
 
     /// <summary>새 씬의 UI 모듈을 전용 포인터에 연결한다. 저장된 민감도와 좌표는 유지하고 전환 입력만 대기한다.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -329,6 +432,9 @@ public sealed class InGameCursor : MonoBehaviour
     void OnDestroy()
     {
         if (_instance != this) return;
+#if UNITY_EDITOR_WIN
+        ApplyEditorConfinement(true);
+#endif
         InputSystem.onAfterUpdate -= UpdatePointer;
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         foreach (var entry in _modules)

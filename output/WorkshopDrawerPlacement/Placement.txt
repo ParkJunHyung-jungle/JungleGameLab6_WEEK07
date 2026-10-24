@@ -1,0 +1,2 @@
+WorkshopDrawerCabinet | position (7.15000, -0.23000, 0.30000) | rotation (0.00000, 90.00000, 0.00000) | scale (1.50000, 1.50000, 1.50000)
+WorkshopDrawerDisplayPose | position (6.25000, -0.23000, 2.15000) | rotation (0.00000, 180.00000, 0.00000) | scale (1.50000, 1.50000, 1.50000)

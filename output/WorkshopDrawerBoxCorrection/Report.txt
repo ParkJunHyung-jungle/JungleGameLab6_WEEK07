@@ -1,0 +1,21 @@
+Drawers: 8
+Layout: 1 / 1 / 2 / 4
+Carcass: 1.80 x 0.40 x 0.34 m
+Root pivot: base center
+Drawer pivot: front bottom center, +Z inward, -Z pull direction
+Tray clear depth: 0.2965 m; floor top Y: 0.010 m
+Missing mesh/material/shader: 0
+Runtime scripts: 0
+Colliders: 0
+Label dependency: baked Korean atlas; no runtime font
+Drawer_01_Keycaps local=(-0.7000, 0.0230, -0.1700)
+Drawer_02_Switches local=(-0.3220, 0.0230, -0.1700)
+Drawer_03_ScrewsTools local=(0.0410, 0.2090, -0.1700)
+Drawer_04_LedCustomImage local=(0.0410, 0.0230, -0.1700)
+Drawer_05_UpperHousing local=(0.5520, 0.3020, -0.1700)
+Drawer_06_Plate local=(0.5520, 0.2090, -0.1700)
+Drawer_07_Pcb local=(0.5520, 0.1160, -0.1700)
+Drawer_08_LowerHousing local=(0.5520, 0.0230, -0.1700)
+Preview-only translation and rotation performed on all 8 drawers; all children inherit each drawer transform.
+AllTrays shows empty compartments and all 8 tray interiors.
+Saved prefab remains closed.

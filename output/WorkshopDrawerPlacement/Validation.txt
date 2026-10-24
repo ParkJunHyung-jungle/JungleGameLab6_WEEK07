@@ -1,0 +1,6 @@
+Existing components preserved: 10921
+Existing component changes: 0
+Closed drawers: 8
+Prefab link: Assets/Resource/Prefabs/Workshop/WorkshopDrawerCabinet.prefab
+Camera render: edit mode, copied output settings and authored Cinemachine final pose
+Play Mode: not performed

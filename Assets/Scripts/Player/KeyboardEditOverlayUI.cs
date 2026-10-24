@@ -202,6 +202,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            if (_keycapTrayGrid != null) UpdateKeycapTrayWidth();
             if (_assemblyCatalog) RefreshAssemblyControls();
             if (_photoUI == null)
                 return;
@@ -724,7 +725,7 @@ namespace Game.Player
                 return true;
             }
 
-            return ContainsPointer(_viewport, screenPosition)
+            return ((_keycapTrayContent == null || _keycapTrayTransition.IsTrayVisible) && ContainsPointer(_viewport, screenPosition))
                 || ContainsPointer(_switchSoundViewport, screenPosition)
                 || ContainsPointer(_caseMaterialViewport, screenPosition)
                 || ContainsPointer(_plateViewport, screenPosition)
@@ -1181,6 +1182,7 @@ namespace Game.Player
         private void CreateViewport(int itemCount)
         {
             _viewport = CreateScrollViewport("KeycapMaterial", itemCount, out _content);
+            if (_keycapTrayContent != null) _viewport.SetParent(_keycapTrayContent, false);
         }
 
         /// <summary>
@@ -1643,8 +1645,9 @@ namespace Game.Player
             for (int index = 0; index < _previewButtons.Count; index++)
             {
                 _selectionIndicators[index].gameObject.SetActive(false);
-                placement.BindCard(_previewButtons[index], _previewMaterials[index], _previewDefinitions[index], _viewport);
+                placement.BindCard(_previewButtons[index], _previewMaterials[index], _previewDefinitions[index], _viewport, _keycapTrayContent != null ? _keycapTrayTransition : null);
             }
+            if (_keycapTrayContent != null) ConnectKeycapTray();
             for (int index = 0; index < _switchSoundButtons.Count; index++)
                 placement.BindSwitchCard(_switchSoundButtons[index], _switchSoundTypes[index], _switchSoundViewport);
             _keycapUI.Close();
@@ -2269,7 +2272,7 @@ namespace Game.Player
             _customButton.GetComponent<KeyboardEditSidebarButtonUI>().SetSelected(_pickerMode == PickerMode.Photo);
             if (_viewport != null)
             {
-                _viewport.gameObject.SetActive(_pickerMode == PickerMode.Keycap);
+                _viewport.gameObject.SetActive(_keycapTrayContent != null || _pickerMode == PickerMode.Keycap);
             }
 
             _switchSoundViewport.gameObject.SetActive(_pickerMode == PickerMode.SwitchSound);

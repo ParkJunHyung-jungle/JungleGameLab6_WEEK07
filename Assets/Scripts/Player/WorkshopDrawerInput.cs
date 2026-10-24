@@ -29,12 +29,14 @@ namespace Game.Player
             [SerializeField] private Transform _front;
             [SerializeField] private Transform _handle;
             [SerializeField] private Collider[] _clickAreas;
+            [SerializeField] private Collider _openClickArea;
 
             public WorkshopDrawerCategory Category => _category;
             public Transform Drawer => _drawer;
             public Transform Front => _front;
             public Transform Handle => _handle;
             public Collider[] ClickAreas => _clickAreas;
+            public Collider OpenClickArea => _openClickArea;
         }
 
         [Header("Workshop")]
@@ -55,8 +57,28 @@ namespace Game.Player
         [Header("Pointer State")]
         private DrawerBinding _hovered;
         private bool _pressArmed;
+        private bool _transitionLocked;
+        private DrawerBinding _openDrawer;
 
         public event Action<WorkshopDrawerCategory> DrawerClicked;
+        public bool IsInputAllowed => isActiveAndEnabled && !_transitionLocked && CanProcessInput();
+
+        /// <summary>locked로 전환 중 입력을 잠그거나 해제하고 기존 호버와 버튼 준비 상태를 비운다.</summary>
+        public void SetTransitionLocked(bool locked)
+        {
+            _transitionLocked = locked;
+            ResetPointer();
+        }
+
+        /// <summary>category의 열린 상태를 지정한다. opened이면 이동한 서랍 대신 명시된 빈 수납칸을 판정한다.</summary>
+        public void SetDrawerOpen(WorkshopDrawerCategory category, bool opened)
+        {
+            _openDrawer = null;
+            if (opened)
+                foreach (DrawerBinding drawer in _drawers)
+                    if (drawer.Category == category) { _openDrawer = drawer; break; }
+            ResetPointer();
+        }
 
         void Awake()
         {
@@ -75,7 +97,7 @@ namespace Game.Player
         void LateUpdate()
         {
             Mouse mouse = Mouse.current;
-            if (!CanProcessInput() || mouse == null)
+            if (!IsInputAllowed || mouse == null)
             {
                 ResetPointer();
                 return;
@@ -96,13 +118,18 @@ namespace Game.Player
             SetHovered(FindDrawer(_outputCamera.ScreenPointToRay(pointer)));
             if (_hovered == null) return;
 
-            _frontPreview.Show(new Pose(_hovered.Front.position, _hovered.Front.rotation));
-            _handlePreview.Show(new Pose(_hovered.Handle.position, _hovered.Handle.rotation));
-            if (!canClick || !mouse.leftButton.wasPressedThisFrame) return;
-
-            WorkshopDrawerCategory category = _hovered.Category;
-            Debug.Log($"[WorkshopDrawerInput] Clicked: {category}", this);
-            DrawerClicked?.Invoke(category);
+            if (canClick && mouse.leftButton.wasPressedThisFrame)
+            {
+                WorkshopDrawerCategory category = _hovered.Category;
+                Debug.Log($"[WorkshopDrawerInput] Clicked: {category}", this);
+                DrawerClicked?.Invoke(category);
+                if (_transitionLocked || _hovered == null) return;
+            }
+            if (_hovered != _openDrawer)
+            {
+                _frontPreview.Show(new Pose(_hovered.Front.position, _hovered.Front.rotation));
+                _handlePreview.Show(new Pose(_hovered.Handle.position, _hovered.Handle.rotation));
+            }
         }
 
         /// <summary>
@@ -133,6 +160,17 @@ namespace Game.Player
             DrawerBinding selected = null;
             foreach (DrawerBinding drawer in _drawers)
             {
+                if (drawer == _openDrawer)
+                {
+                    Collider slot = drawer.OpenClickArea;
+                    if (slot.enabled && slot.gameObject.activeInHierarchy
+                        && slot.Raycast(ray, out RaycastHit slotHit, nearest) && slotHit.distance < nearest)
+                    {
+                        nearest = slotHit.distance;
+                        selected = drawer;
+                    }
+                    continue;
+                }
                 if (!drawer.Drawer.gameObject.activeInHierarchy) continue;
                 foreach (Collider area in drawer.ClickAreas)
                 {
@@ -153,7 +191,7 @@ namespace Game.Player
         {
             if (_hovered == drawer) return;
             _hovered = drawer;
-            if (drawer == null) return;
+            if (drawer == null || drawer == _openDrawer) return;
             _frontPreview.Prepare(drawer.Front);
             _handlePreview.Prepare(drawer.Handle);
         }

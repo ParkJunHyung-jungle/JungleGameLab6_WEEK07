@@ -17,6 +17,7 @@ namespace Game.Player
         [SerializeField, Min(16f)] private float _tabHeight = 22f;
         [SerializeField, Min(0.01f)] private float _slideDuration = 0.22f;
         [SerializeField, Min(1f)] private float _slideDistance = 340f;
+        [SerializeField] private bool _hideDrawerFaces;
         private readonly HashSet<ScrollRect> _configured = new HashSet<ScrollRect>();
         private readonly Dictionary<RectTransform, ScrollRect> _editorPanels = new Dictionary<RectTransform, ScrollRect>();
         private readonly List<Transform> _pendingPanels = new List<Transform>();
@@ -79,6 +80,13 @@ namespace Game.Player
                 button.Clicked += HandleDrawerClicked;
                 _labels.Add(button);
                 CreateTopViewTray(face, labels[i]);
+                if (_hideDrawerFaces)
+                {
+                    CanvasGroup faceGroup = face.gameObject.AddComponent<CanvasGroup>();
+                    faceGroup.alpha = 0f;
+                    faceGroup.interactable = false;
+                    faceGroup.blocksRaycasts = false;
+                }
             }
             _modeButtons = _overlay.MoveDrawerModeButtons(_drawerRoot);
             ResetDrawers(_workshopVisible);
@@ -161,7 +169,8 @@ namespace Game.Player
                 face.anchorMin = face.anchorMax = face.pivot = Vector2.zero;
                 face.anchoredPosition = i < 7
                     ? new Vector2(0f, (6 - i) * _labelSpacing + (_selected >= 0 && _selected < 7 && i <= _selected ? revealedHeight : 0f))
-                    : new Vector2((i - 7) * _width * 0.5f, 7f * _labelSpacing + revealedHeight + 4f);
+                    : new Vector2((i - 7) * _width * 0.5f, _hideDrawerFaces
+                        ? canvas.rect.height - _bottomMargin - 62f : 7f * _labelSpacing + revealedHeight + 4f);
                 face.sizeDelta = new Vector2(i < 7 ? _width : _width * 0.5f - 4f, i < 7 ? _labelSpacing - 2f : 30f);
                 _labels[i].targetGraphic.color = i == _selected ? new Color32(165, 112, 65, 255) : new Color32(211, 180, 143, 255);
                 if (i < _categoryTabs.Count)
@@ -175,7 +184,8 @@ namespace Game.Player
             {
                 RectTransform mode = (RectTransform)_modeButtons[i].transform;
                 mode.anchorMin = mode.anchorMax = mode.pivot = Vector2.zero;
-                mode.anchoredPosition = new Vector2(i * _width * 0.5f, 7f * _labelSpacing + revealedHeight + 40f);
+                mode.anchoredPosition = new Vector2(i * _width * 0.5f, _hideDrawerFaces
+                    ? canvas.rect.height - _bottomMargin - 98f : 7f * _labelSpacing + revealedHeight + 40f);
                 mode.sizeDelta = new Vector2(_width * 0.5f - 4f, 30f);
             }
             _listInput.interactable = !_transitioning && _selected >= 0;

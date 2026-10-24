@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -12,6 +12,13 @@ namespace Game.Player
         [SerializeField] private bool _assemblyCatalog;
         [SerializeField] private Material _pcbOutlineMaterial;
         [SerializeField] private Shader _pcbDepthShader;
+        [Header("Screw Position Markers")]
+        [SerializeField] private Shader _screwMarkerShader;
+        [SerializeField, Min(0.01f)] private float _screwMarkerScale = 1.6f;
+        [SerializeField, Min(1f), Tooltip("표시 나사의 축 방향 두께 배율입니다. 실제 나사는 변경하지 않습니다.")] private float _screwMarkerThickness = 4f;
+        [SerializeField, Min(0f)] private float _screwHitPadding = 0.08f;
+        [SerializeField] private Color _screwLooseColor = new Color(1f, 0.65f, 0.2f, 0.8f);
+        [SerializeField] private Color _screwFixedColor = new Color(0.3f, 1f, 0.45f, 0.8f);
         private KeyboardEditButton _pcbButton;
         private KeyboardEditButton _upperButton;
         private RectTransform _assemblyActions;
@@ -53,6 +60,8 @@ namespace Game.Player
         {
             _screwAssembly = gameObject.AddComponent<WorkshopPcbScrewAssembly>();
             _screwAssembly.Initialize(_pullerController, _pcbOutlineMaterial, _pcbDepthShader);
+            _screwAssembly.ConfigureMarkers(_screwMarkerShader, _screwMarkerScale, _screwHitPadding,
+                _screwLooseColor, _screwFixedColor, _screwMarkerThickness);
             _pcbButton = Instantiate(_caseButton, _caseButton.transform.parent);
             _pcbButton.name = "PcbButton";
             _upperButton = Instantiate(_caseButton, _caseButton.transform.parent);

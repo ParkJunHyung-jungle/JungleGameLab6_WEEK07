@@ -3217,7 +3217,6 @@ GameObject:
   - component: {fileID: 7646569941975711829}
   - component: {fileID: 8778081355741779353}
   - component: {fileID: 64603817734621813}
-  - component: {fileID: 2169863164485907018}
   m_Layer: 0
   m_Name: WeightedBase
   m_TagString: Untagged
@@ -3297,27 +3296,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &2169863164485907018
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6849529249505744577}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.22, y: 0.012, z: 0.16}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &7638304056920660422
 GameObject:
   m_ObjectHideFlags: 0

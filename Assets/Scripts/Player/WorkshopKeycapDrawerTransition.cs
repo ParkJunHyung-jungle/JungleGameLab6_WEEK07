@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -45,22 +46,52 @@ namespace Game.Player
         private int _fittedWidth;
         private int _fittedHeight;
         private ScrollRect _catalogScroll;
+        private WorkshopKeycapPlacement _placement;
+        private WorkshopDrawerCategory _category;
+        private WorkshopDrawerCategory? _nextCategory;
+        private readonly Dictionary<WorkshopDrawerCategory, ScrollRect> _catalogs = new Dictionary<WorkshopDrawerCategory, ScrollRect>();
+
+        public event Action<WorkshopDrawerCategory, bool> TrayStateChanged;
 
         public bool CanInteractWithTray => _state == DrawerState.Open && _drawerInput.IsInputAllowed;
+        public bool IsTrayOpen => _state == DrawerState.Open;
+        public WorkshopDrawerCategory Category => _category;
         public bool IsTrayVisible => _trayGroup.alpha > 0f;
 
-        /// <summary>기존 키캡 scroll을 트레이 입력 대상으로 연결한다. 현재 전환 상태로 스크롤 허용 여부를 즉시 맞춘다.</summary>
-        public void ConnectCatalogScroll(ScrollRect scroll)
+        /// <summary>
+        /// 완전히 열린 트레이의 고정 Viewport 중앙을 화면 좌표 destination으로 반환한다.
+        /// 카드와 스크롤 위치는 사용하지 않으며 집중 종료·전환·숨김 또는 화면 밖이면 false를 반환한다.
+        /// </summary>
+        public bool TryGetReturnDestination(out Vector2 destination)
         {
-            _catalogScroll = scroll;
+            destination = Vector2.zero;
+            if (!IsTrayOpen || !_workshopView.IsKeyboardEditing || _trayGroup.alpha < 1f
+                || !_trayRoot.gameObject.activeInHierarchy || _catalogScroll == null
+                || !_catalogScroll.gameObject.activeInHierarchy) return false;
+            RectTransform viewport = _catalogScroll.viewport;
+            if (viewport.rect.width <= 0f || viewport.rect.height <= 0f) return false;
+            Camera camera = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+            destination = RectTransformUtility.WorldToScreenPoint(camera, viewport.TransformPoint(viewport.rect.center));
+            return new Rect(0f, 0f, Screen.width, Screen.height).Contains(destination);
+        }
+
+        /// <summary>category의 독립 scroll과 placement 목록 점유를 연결한다. 현재 전환과 출고 상태로 스크롤 및 닫기 허용 여부를 맞춘다.</summary>
+        public void ConnectCatalogScroll(ScrollRect scroll, WorkshopKeycapPlacement placement, WorkshopDrawerCategory category = WorkshopDrawerCategory.Keycaps)
+        {
+            _catalogs[category] = scroll;
+            _placement = placement;
+            SelectCatalog();
             UpdateTrayInput();
         }
 
         /// <summary>기존 열림 상태와 입력 조건으로 트레이 버튼 및 목록 스크롤 입력만 갱신한다.</summary>
         private void UpdateTrayInput()
         {
-            _trayGroup.interactable = CanInteractWithTray;
-            if (_catalogScroll != null) _catalogScroll.enabled = CanInteractWithTray;
+            bool canScroll = CanInteractWithTray || (IsTrayOpen && _placement != null
+                && _placement.IsInventoryScrolling && _placement.Pullers.InputAllowed);
+            _trayGroup.interactable = canScroll;
+            _closeButton.interactable = CanInteractWithTray;
+            if (_catalogScroll != null) _catalogScroll.enabled = canScroll;
         }
 
         private enum DrawerState { Closed, Opening, Open, Closing }
@@ -69,6 +100,14 @@ namespace Game.Player
         {
             _canvas = _trayRoot.GetComponentInParent<Canvas>().rootCanvas;
             _trayHome = _trayRoot.anchoredPosition;
+            PrepareDrawer();
+            SetTrayVisible(false);
+        }
+
+        /// <summary>현재 실제 서랍의 메시 경계와 표시 상태 배열을 준비한다. 원래 모델 크기와 자세는 변경하지 않는다.</summary>
+        private void PrepareDrawer()
+        {
+            _visualCorners.Clear();
             _renderers = _keycapDrawer.GetComponentsInChildren<Renderer>(true);
             _colliders = _keycapDrawer.GetComponentsInChildren<Collider>(true);
             _rendererStates = new bool[_renderers.Length];
@@ -83,7 +122,43 @@ namespace Game.Player
                     _visualCorners.Add(_keycapDrawer.InverseTransformPoint(filter.transform.TransformPoint(point)));
                 }
             }
-            SetTrayVisible(false);
+        }
+
+        /// <summary>현재 category에 해당하는 독립 목록만 표시하고 반환 및 입력 대상 ScrollRect를 변경한다. 스크롤 값은 유지한다.</summary>
+        private void SelectCatalog()
+        {
+            foreach (var catalog in _catalogs)
+                catalog.Value.gameObject.SetActive(catalog.Key == _category);
+            _catalogs.TryGetValue(_category, out _catalogScroll);
+            foreach (Text label in _trayRoot.GetComponentsInChildren<Text>(true))
+                if (label.name == "CategoryLabel") label.text = _category switch
+                {
+                    WorkshopDrawerCategory.Keycaps => "키캡",
+                    WorkshopDrawerCategory.Switches => "스위치",
+                    WorkshopDrawerCategory.ScrewsTools => "나사·도구",
+                    WorkshopDrawerCategory.LedCustomImage => "LED·커스텀 이미지",
+                    WorkshopDrawerCategory.UpperHousing => "상부 하우징",
+                    WorkshopDrawerCategory.Plate => "보강판",
+                    WorkshopDrawerCategory.Pcb => "PCB",
+                    _ => "하부 하우징"
+                };
+        }
+
+        /// <summary>category의 닫힌 실제 서랍과 독립 목록을 연결하고 열기를 시작한다. 이전 서랍은 닫힌 상태여야 한다.</summary>
+        private void OpenCategory(WorkshopDrawerCategory category)
+        {
+            _category = category;
+            _keycapDrawer = _drawerInput.GetDrawer(category);
+            PrepareDrawer();
+            SelectCatalog();
+            CaptureClosedPose();
+            BeginTransition(true);
+        }
+
+        /// <summary>category가 완전히 열린 현재 트레이인지 반환한다. 다른 목록과 전환 중 입력은 허용하지 않는다.</summary>
+        public bool IsCategoryOpen(WorkshopDrawerCategory category)
+        {
+            return IsTrayOpen && _category == category;
         }
 
         void OnEnable()
@@ -101,16 +176,28 @@ namespace Game.Player
                 FitTray();
         }
 
-        /// <summary>category가 키캡이고 기존 입력이 허용되면 닫힌 서랍을 열거나 열린 수납칸의 닫기를 시작한다.</summary>
+        /// <summary>category의 기존 서랍 입력이 허용되면 같은 전환기로 전환한다. 다른 서랍은 현재 닫기를 마친 뒤 열며 추가 클릭은 잠근다.</summary>
         private void HandleDrawerClicked(WorkshopDrawerCategory category)
         {
-            if (category != WorkshopDrawerCategory.Keycaps || !_drawerInput.IsInputAllowed) return;
-            if (_state == DrawerState.Closed)
+            if (!_drawerInput.IsInputAllowed) return;
+            if (_state == DrawerState.Closed) OpenCategory(category);
+            else if (_state == DrawerState.Open)
             {
-                CaptureClosedPose();
-                BeginTransition(true);
+                _nextCategory = category == _category ? null : category;
+                BeginTransition(false);
             }
-            else if (_state == DrawerState.Open) BeginTransition(false);
+        }
+
+        /// <summary>category의 기존 클릭 경로로 열기 또는 닫기를 요청한다. 전환·도구 조작·모달 중 요청은 기존 입력 조건으로 무시한다.</summary>
+        public void RequestDrawer(WorkshopDrawerCategory category)
+        {
+            HandleDrawerClicked(category);
+        }
+
+        /// <summary>완전히 열린 현재 트레이의 닫기를 요청한다. 기존 입력 조건을 재검사하며 재고와 적용된 편집값은 변경하지 않는다.</summary>
+        public void RequestClose()
+        {
+            if (_state == DrawerState.Open && _drawerInput.IsInputAllowed) BeginTransition(false);
         }
 
         /// <summary>button의 닫기 요청을 기존 집중 및 조립 입력 조건으로 검사하고 열린 트레이의 복귀를 시작한다.</summary>
@@ -136,6 +223,7 @@ namespace Game.Player
         private void BeginTransition(bool opening)
         {
             _state = opening ? DrawerState.Opening : DrawerState.Closing;
+            TrayStateChanged?.Invoke(_category, false);
             _drawerInput.SetTransitionLocked(true);
             _trayGroup.interactable = false;
             UpdateTrayInput();
@@ -150,7 +238,7 @@ namespace Game.Player
                 yield return MoveDrawer(false, false);
                 yield return MoveDrawer(true, false);
                 SetDrawerVisible(false);
-                _drawerInput.SetDrawerOpen(WorkshopDrawerCategory.Keycaps, true);
+                _drawerInput.SetDrawerOpen(_category, true);
                 FitTray();
                 _trayRoot.anchoredPosition = HiddenTrayPosition();
                 SetTrayVisible(true);
@@ -166,12 +254,19 @@ namespace Game.Player
                 yield return MoveDrawer(true, true);
                 yield return MoveDrawer(false, true);
                 ApplyClosedPose();
-                _drawerInput.SetDrawerOpen(WorkshopDrawerCategory.Keycaps, false);
+                _drawerInput.SetDrawerOpen(_category, false);
             }
             _state = opening ? DrawerState.Open : DrawerState.Closed;
             _transition = null;
             _drawerInput.SetTransitionLocked(false);
             UpdateTrayInput();
+            if (opening) TrayStateChanged?.Invoke(_category, true);
+            if (!opening && _nextCategory.HasValue)
+            {
+                WorkshopDrawerCategory next = _nextCategory.Value;
+                _nextCategory = null;
+                OpenCategory(next);
+            }
         }
 
         /// <summary>travel이면 화면 밖 구간을, 아니면 로컬 인출 구간을 reverse 방향에 맞춰 보간한다. 모델 스케일은 유지한다.</summary>
@@ -298,20 +393,22 @@ namespace Game.Player
         {
             if (_transition != null) StopCoroutine(_transition);
             _transition = null;
+            _nextCategory = null;
+            TrayStateChanged?.Invoke(_category, false);
             if (_hasClosedPose && _keycapDrawer != null && _closedParent != null) ApplyClosedPose();
             _state = DrawerState.Closed;
             if (_trayGroup != null) SetTrayVisible(false);
             if (_catalogScroll != null) _catalogScroll.enabled = false;
             if (_drawerInput != null)
             {
-                _drawerInput.SetDrawerOpen(WorkshopDrawerCategory.Keycaps, false);
+                _drawerInput.SetDrawerOpen(_category, false);
                 _drawerInput.SetTransitionLocked(false);
             }
         }
 
         void OnApplicationFocus(bool focused)
         {
-            if (!focused) RestoreClosed();
+            if (!focused && !InGameCursor.IsSystemDialogOpen) RestoreClosed();
         }
 
         void OnDisable()

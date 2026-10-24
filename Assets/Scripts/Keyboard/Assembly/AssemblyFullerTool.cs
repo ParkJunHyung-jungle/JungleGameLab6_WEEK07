@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -31,6 +31,12 @@ namespace KeyboardModeling.Assembly
         {
             _context = context;
             _followCameraPlane = followCameraPlane;
+        }
+
+        /// <summary>트레이에서 누른 ray로 기존 실물 풀러 집기를 시작한다. 공통 입력이 허용되고 미선택 상태이면 기존 자세 저장·추적 경로를 실행한 결과를 반환한다.</summary>
+        public bool BeginTrayHold(Ray ray)
+        {
+            return Context.InputAllowed && isActiveAndEnabled && !_selected && SelectFuller(ray);
         }
 
         /// <summary>ray가 현재 도구에 가장 먼저 닿는지 반환한다. 선택 및 물리 상태는 변경하지 않는다.</summary>
@@ -358,7 +364,8 @@ namespace KeyboardModeling.Assembly
                 if (hit == null)
                     continue;
                 AssemblyDraggablePart assemblyPart = hit.GetComponentInParent<AssemblyDraggablePart>();
-                Component target = assemblyPart != null && assemblyPart.IsSwitch == _extractSwitches
+                Component target = assemblyPart != null && (assemblyPart.CatalogEntry == null || !assemblyPart.CatalogEntry.IsStructure)
+                    && assemblyPart.IsSwitch == _extractSwitches
                     ? assemblyPart
                     : _extractSwitches ? hit.GetComponentInParent<KeyboardSwitch>() : hit.GetComponentInParent<KeycapHealth>();
                 if (target == null || !_attemptedTargets.Add(target.GetInstanceID()))

@@ -25,7 +25,23 @@ public sealed class KeyboardDispenser : MonoBehaviour
     public bool TryDispense(out GameObject keyboardRoot)
     {
         keyboardRoot = null;
-        if (_keyboardPrefabs.Count == 0 || _outputPoint == null)
+        if (_outputPoint == null || !TryCreateKeyboard(_outputPoint.position, _outputPoint.rotation, out keyboardRoot)) return false;
+        Rigidbody keyboardBody = keyboardRoot.GetComponent<Rigidbody>();
+        if (keyboardBody == null)
+            keyboardBody = keyboardRoot.GetComponentInChildren<Rigidbody>();
+
+        if (keyboardBody != null)
+            keyboardBody.AddForce(_outputPoint.forward * _ejectImpulse, ForceMode.Impulse);
+
+        AudioManager.instance.PlayOneShot(FMODEvents.instance.VendingMachineThud, _outputPoint.position);
+        return true;
+    }
+
+    /// <summary>등록된 기존 키보드 원본을 position과 rotation에 생성하고 기존 집기·편집 참조를 연결한다. 배출 충격·소리 없이 keyboardRoot와 성공 여부를 반환한다.</summary>
+    public bool TryCreateKeyboard(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
+    {
+        keyboardRoot = null;
+        if (_keyboardPrefabs.Count == 0)
             return false;
 
         GameObject stockPrefab = null;
@@ -48,7 +64,7 @@ public sealed class KeyboardDispenser : MonoBehaviour
             ? variant.GamePrefab
             : stockPrefab;
 
-        keyboardRoot = Instantiate(playablePrefab, _outputPoint.position, _outputPoint.rotation);
+        keyboardRoot = Instantiate(playablePrefab, position, rotation);
         keyboardRoot.transform.localScale = stockPrefab.transform.localScale;
         if (playablePrefab != stockPrefab && keyboardRoot.GetComponent<BoxCollider>() == null)
         {
@@ -71,14 +87,6 @@ public sealed class KeyboardDispenser : MonoBehaviour
         Vector3 visualCenter = keyboardRoot.transform.TransformPoint(
             pickup.GetVisualCenterLocalPosition(keyboardRoot.transform));
         keyboardRoot.transform.RotateAround(visualCenter, Vector3.up, _keyboardFacingYaw);
-        Rigidbody keyboardBody = keyboardRoot.GetComponent<Rigidbody>();
-        if (keyboardBody == null)
-            keyboardBody = keyboardRoot.GetComponentInChildren<Rigidbody>();
-
-        if (keyboardBody != null)
-            keyboardBody.AddForce(_outputPoint.forward * _ejectImpulse, ForceMode.Impulse);
-
-        AudioManager.instance.PlayOneShot(FMODEvents.instance.VendingMachineThud, _outputPoint.position);
         return true;
     }
 }

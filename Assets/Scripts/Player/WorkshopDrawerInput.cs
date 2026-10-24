@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -37,6 +37,20 @@ namespace Game.Player
             public Transform Handle => _handle;
             public Collider[] ClickAreas => _clickAreas;
             public Collider OpenClickArea => _openClickArea;
+
+            /// <summary>열린 수납칸의 명시된 클릭 영역이 없으면 현재 앞판 경계로 고정 트리거를 만든다. parent 아래에 두어 실제 서랍 이동과 독립적으로 닫기 선택을 유지한다.</summary>
+            public void PrepareOpenClickArea(Transform parent)
+            {
+                if (_openClickArea != null) return;
+                Bounds bounds = _clickAreas[0].bounds;
+                GameObject slot = new GameObject(_category + "OpenClickArea");
+                slot.transform.position = bounds.center;
+                slot.transform.SetParent(parent, true);
+                BoxCollider area = slot.AddComponent<BoxCollider>();
+                area.size = bounds.size;
+                area.isTrigger = true;
+                _openClickArea = area;
+            }
         }
 
         [Header("Workshop")]
@@ -67,6 +81,7 @@ namespace Game.Player
         public void SetTransitionLocked(bool locked)
         {
             _transitionLocked = locked;
+            _pullers.SetDrawerTransitionLocked(locked);
             ResetPointer();
         }
 
@@ -80,8 +95,17 @@ namespace Game.Player
             ResetPointer();
         }
 
+        /// <summary>category에 명시적으로 연결된 실제 서랍 Transform을 반환한다. 연결이 없으면 null이며 상태는 변경하지 않는다.</summary>
+        public Transform GetDrawer(WorkshopDrawerCategory category)
+        {
+            foreach (DrawerBinding drawer in _drawers)
+                if (drawer.Category == category) return drawer.Drawer;
+            return null;
+        }
+
         void Awake()
         {
+            foreach (DrawerBinding drawer in _drawers) drawer.PrepareOpenClickArea(transform);
             _frontPreview = new WorkshopKeyboardPlacementPreview(
                 _hoverOutlineMaterial, _hoverDepthShader, _outputCamera, Color.white);
             _handlePreview = new WorkshopKeyboardPlacementPreview(

@@ -43,6 +43,11 @@ namespace Game.Player
         {
             _overlay = GetComponent<KeyboardEditOverlayUI>();
             _pullers = GetComponent<WorkshopKeycapPlacement>().Pullers;
+            if (_overlay.UsesScreenTrays)
+            {
+                _overlay.HideLegacyCatalogDisplay();
+                return;
+            }
             _drawerRoot = CreateRect("WorkshopDrawerCatalog", transform);
             _drawerRoot.anchorMin = _drawerRoot.anchorMax = _drawerRoot.pivot = Vector2.zero;
             _clip = CreateRect("DrawerRevealMask", _drawerRoot);
@@ -94,6 +99,11 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            if (_overlay.UsesScreenTrays)
+            {
+                _overlay.HideLegacyCatalogDisplay();
+                return;
+            }
             if (_menuRoot == null) return;
             _pendingPanels.Clear();
             foreach (Transform child in transform)
@@ -368,20 +378,27 @@ namespace Game.Player
             for (int i = 0; i < Mathf.Min(7, _labels.Count); i++) _labels[i].Clicked -= HandleDrawerClicked;
         }
 
+        /// <summary>기존 panel의 LED 또는 이미지 컨트롤을 trayParent 안의 width 폭 목록으로 이전한다. 편집 기능을 재생성하지 않고 독립 ScrollRect를 반환한다.</summary>
+        public ScrollRect EmbedTrayEditor(RectTransform panel, RectTransform trayParent, float width)
+        {
+            return ConfigureEditorPanel(panel, trayParent, width);
+        }
+
         /// <summary>
         /// panel에서 LED 또는 이미지 조작 항목을 추출해 공통 왼쪽 목록에 배치한다.
-        /// 독립 카드 프레임과 중첩 스크롤은 제거하고 항목의 활성 상태를 호스트와 연결한다. 반환값은 없다.
+        /// trayParent와 trayWidth가 있으면 새 트레이에 배치하고, 없으면 기존 목록의 활성 상태를 연결한다. 생성한 ScrollRect를 반환한다.
         /// </summary>
-        private void ConfigureEditorPanel(RectTransform panel)
+        private ScrollRect ConfigureEditorPanel(RectTransform panel, RectTransform trayParent = null, float trayWidth = 0f)
         {
+            float width = trayParent != null ? trayWidth : _width;
             RectTransform host = new GameObject(panel.name + "CatalogHost", typeof(RectTransform), typeof(Image),
                 typeof(ScrollRect)).GetComponent<RectTransform>();
-            host.SetParent(_menuRoot, false);
+            host.SetParent(trayParent != null ? trayParent : _menuRoot, false);
             host.anchorMin = Vector2.zero;
             host.anchorMax = Vector2.up;
             host.pivot = Vector2.up;
             host.anchoredPosition = new Vector2(24f, -24f);
-            host.sizeDelta = new Vector2(_width, -24f - _bottomMargin);
+            host.sizeDelta = new Vector2(width, -24f - _bottomMargin);
             host.GetComponent<Image>().color = new Color32(37, 52, 68, 255);
             RectTransform clip = new GameObject("EditorClip", typeof(RectTransform), typeof(RectMask2D))
                 .GetComponent<RectTransform>();
@@ -397,9 +414,10 @@ namespace Game.Player
             content.pivot = Vector2.up;
             content.anchoredPosition = Vector2.zero;
             if (panel.TryGetComponent<KeyboardLEDPanelUI>(out var led))
-                led.EmbedControls(content, _width - 24f);
+                led.EmbedControls(content, width - 24f);
             else
-                panel = GetComponent<KeyboardCustomizationTestUI>().EmbedControls(content, _width - 24f);
+                panel = GetComponent<KeyboardCustomizationTestUI>().EmbedControls(content, width - 24f);
+            content.sizeDelta = new Vector2(0f, panel.rect.height * panel.localScale.y);
             ScrollRect scroll = host.GetComponent<ScrollRect>();
             scroll.viewport = clip;
             scroll.content = content;
@@ -410,7 +428,15 @@ namespace Game.Player
             scroll.verticalScrollbar = CreateEditorScrollbar(host);
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             _configured.Add(scroll);
-            _editorPanels.Add(panel, scroll);
+            if (trayParent == null) _editorPanels.Add(panel, scroll);
+            else
+            {
+                host.anchorMin = Vector2.zero;
+                host.anchorMax = Vector2.one;
+                host.offsetMin = Vector2.zero;
+                host.offsetMax = new Vector2(0f, -60f);
+            }
+            return scroll;
         }
 
         /// <summary>
@@ -440,6 +466,22 @@ namespace Game.Player
             bar.targetGraphic = image;
             bar.direction = Scrollbar.Direction.BottomToTop;
             return bar;
+        }
+
+        /// <summary>scroll의 기존 보강판 탭·카드·드래그를 parent 트레이의 세로 목록으로 이전한다. 기존 컨트롤과 이벤트를 유지하고 재고나 조립 상태는 변경하지 않는다.</summary>
+        public void EmbedTrayCatalog(ScrollRect scroll, RectTransform parent)
+        {
+            _overlay = GetComponent<KeyboardEditOverlayUI>();
+            scroll.transform.SetParent(parent, false);
+            ConfigureCatalog(scroll);
+            _configured.Add(scroll);
+            RectTransform panel = (RectTransform)scroll.transform;
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.one;
+            panel.offsetMin = new Vector2(0f, 100f);
+            panel.offsetMax = new Vector2(0f, -12f);
+            foreach (GridLayoutGroup grid in panel.GetComponentsInChildren<GridLayoutGroup>(true))
+                grid.cellSize = new Vector2(Mathf.Max(1f, (parent.rect.width - 48f) * 0.5f), grid.cellSize.y);
         }
 
         /// <summary>

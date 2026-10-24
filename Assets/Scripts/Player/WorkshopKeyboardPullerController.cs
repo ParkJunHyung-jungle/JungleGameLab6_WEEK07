@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -36,21 +36,72 @@ namespace Game.Player
         private float _dragWorldHeight;
         private bool _pcbDragging;
         private bool _screwPointerCaptured;
+        private bool _drawerTransitionLocked;
+        private WorkshopKeycapDrawerTransition _toolTray;
+        private WorkshopPullerTrayItem[] _toolItems;
 
         public bool IsEditing => _workshopView != null ? _workshopView.IsKeyboardEditing
             : _interaction != null && _interaction.IsKeyboardEditing;
         public KeyboardInputController EditingKeyboard => _workshopView != null ? _workshopView.EditingKeyboard
             : _interaction != null ? _interaction.EditingKeyboard : null;
 
-        public bool InputAllowed => IsEditing && EditingKeyboard != null
+        public bool InputAllowed => IsEditing && EditingKeyboard != null && !_drawerTransitionLocked
             && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen
             && InGameCursor.CanProcessVirtualPointer;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
-            || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && _keycapPlacement.IsDragging);
+            || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling));
         public bool IsPcbDragging => _pcbDragging;
         public bool IsScrewPointerCaptured => _screwPointerCaptured;
+        public KeyboardDispenser KeyboardDispenser => _workshopView.KeyboardDispenser;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
+
+        /// <summary>tray와 두 items를 기존 실물 풀러에 연결한다. C# 누름 이벤트를 구독하며 기존 작업대의 직접 접근은 숨긴다.</summary>
+        public void ConnectToolTray(WorkshopKeycapDrawerTransition tray, WorkshopPullerTrayItem[] items)
+        {
+            SetToolTraySubscriptions(false);
+            _toolTray = tray;
+            _toolItems = items;
+            if (isActiveAndEnabled) SetToolTraySubscriptions(true);
+            RefreshToolVisibility();
+        }
+
+        /// <summary>subscribe에 따라 트레이 카드의 누름 이벤트를 연결 또는 해제한다. 도구와 이미 예약된 회수는 변경하지 않는다.</summary>
+        private void SetToolTraySubscriptions(bool subscribe)
+        {
+            if (_toolItems == null) return;
+            foreach (WorkshopPullerTrayItem item in _toolItems)
+            {
+                if (subscribe) item.Pressed += HandleToolTrayPressed;
+                else item.Pressed -= HandleToolTrayPressed;
+            }
+        }
+
+        /// <summary>item에 대응하는 기존 풀러를 누른 동안 선택한다. 열린 도구 트레이와 공통 조작 점유를 확인하고 기존 집기 경로만 호출한다.</summary>
+        private void HandleToolTrayPressed(WorkshopPullerTrayItem item)
+        {
+            if (!InputAllowed || IsManipulatingPart || !_toolTray.CanInteractWithTray
+                || !_toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools)
+                || Mouse.current == null || !Mouse.current.leftButton.isPressed) return;
+            AssemblyFullerTool tool = item.ExtractsSwitches ? _switchPuller : _keycapPuller;
+            tool.ToolTransform.gameObject.SetActive(true);
+            tool.BeginTrayHold(_camera.ScreenPointToRay(InGameCursor.Position));
+            RefreshToolVisibility();
+        }
+
+        /// <summary>트레이에 연결된 실물 풀러는 선택 중에만 표시한다. 미선택 도구의 기존 자세는 유지하고 월드 직접 접근을 차단한다.</summary>
+        private void RefreshToolVisibility()
+        {
+            if (_toolTray == null) return;
+            _keycapPuller.ToolTransform.gameObject.SetActive(_keycapPuller.IsSelected);
+            _switchPuller.ToolTransform.gameObject.SetActive(_switchPuller.IsSelected);
+        }
+
+        /// <summary>locked로 서랍 전환 중 공통 부품·도구 입력을 차단한다. 재고와 장착 상태는 변경하지 않는다.</summary>
+        public void SetDrawerTransitionLocked(bool locked)
+        {
+            _drawerTransitionLocked = locked;
+        }
 
         /// <summary>dragging으로 PCB·보강판·상단부가 공통 포인터를 사용하는지 기록한다. 다른 부품 드래그와 풀러 입력을 막으며 조립 상태는 변경하지 않는다.</summary>
         public void SetPcbDragging(bool dragging)
@@ -90,6 +141,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            RefreshToolVisibility();
             if (_keycapHoverPreview == null || !Application.isFocused || !InputAllowed
                 || IsManipulatingPart || IsPointerOverUI(InGameCursor.Position))
                 return;
@@ -110,6 +162,7 @@ namespace Game.Player
         void OnEnable()
         {
             InGameCursor.PointerCanceled += CancelDrag;
+            SetToolTraySubscriptions(true);
             _keycapPuller.HeldToolChanged += HandleHeldToolChanged;
             _switchPuller.HeldToolChanged += HandleHeldToolChanged;
         }
@@ -134,11 +187,11 @@ namespace Game.Player
                 UpdateDragHeight();
             }
             if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
-            if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && _keycapPlacement.IsDragging) return;
+            if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling)) return;
             Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);
-            if (_keycapPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
-            if (_switchPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
+            if ((_toolTray == null || _keycapPuller.IsSelected) && _keycapPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
+            if ((_toolTray == null || _switchPuller.IsSelected) && _switchPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
             if (Mouse.current.leftButton.wasPressedThisFrame && !IsPointerOverUI(pointer))
                 TryRemoveClickedPart(ray);
         }
@@ -434,7 +487,9 @@ namespace Game.Player
         void OnDisable()
         {
             InGameCursor.PointerCanceled -= CancelDrag;
+            SetToolTraySubscriptions(false);
             CancelDrag();
+            RefreshToolVisibility();
             _keycapPuller.HeldToolChanged -= HandleHeldToolChanged;
             _switchPuller.HeldToolChanged -= HandleHeldToolChanged;
             _editingKeyboard = null;

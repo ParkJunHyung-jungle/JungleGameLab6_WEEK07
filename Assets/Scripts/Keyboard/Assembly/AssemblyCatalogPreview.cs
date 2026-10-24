@@ -1,3 +1,5 @@
+﻿using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -8,26 +10,39 @@ namespace KeyboardModeling.Assembly
         private const int PREVIEW_LAYER = 31;
         private const int TEXTURE_SIZE = 128;
 
+        /// <summary>parts의 실제 메시와 재질을 기존 카탈로그 렌더러로 표시해 텍스처를 반환한다. 원본 부품·활성 상태는 변경하지 않으며 표시 가능한 메시가 없으면 null을 반환한다.</summary>
+        public static Texture2D RenderParts(IReadOnlyList<Transform> parts, Material shellMaterial = null)
+        {
+            return Render(null, null, parts, shellMaterial);
+        }
+
         /// <summary>
         /// mesh와 materials를 격리된 미리보기에서 렌더링하여 아이콘 텍스처를 반환한다.
-        /// 원본 에셋과 씬 배치는 변경하지 않으며 호출자가 반환 텍스처를 해제한다.
+        /// parts가 있으면 각 원본 메시를 읽기 복사 없이 표시한다. 원본 에셋과 씬 배치는 변경하지 않으며 호출자가 반환 텍스처를 해제한다.
         /// </summary>
-        public static Texture2D Render(Mesh mesh, Material[] materials)
+        public static Texture2D Render(Mesh mesh, Material[] materials, IReadOnlyList<Transform> parts = null, Material shellMaterial = null)
         {
             GameObject stage = new GameObject("AssemblyCatalogPreviewStage");
             stage.hideFlags = HideFlags.HideAndDontSave;
             stage.transform.position = new Vector3(10000f, 10000f, 10000f);
-            GameObject model = new GameObject("PreviewModel", typeof(MeshFilter), typeof(MeshRenderer));
-            model.transform.SetParent(stage.transform, false);
-            model.layer = PREVIEW_LAYER;
-            model.GetComponent<MeshFilter>().sharedMesh = mesh;
-            MeshRenderer renderer = model.GetComponent<MeshRenderer>();
-            renderer.sharedMaterials = materials;
-            renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-            renderer.lightProbeUsage = LightProbeUsage.Off;
-            renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
-            KeyboardToonSurface.ApplyBounds(renderer);
+            var renderers = new List<MeshRenderer>();
+            if (parts == null) renderers.Add(CreatePreviewModel(stage.transform, mesh, materials, null, null));
+            else
+                foreach (Transform part in parts)
+                foreach (MeshRenderer source in part.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    MeshFilter filter = source.GetComponent<MeshFilter>();
+                    if (!source.enabled || filter == null || filter.sharedMesh == null) continue;
+                    Material[] previewMaterials = source.sharedMaterials;
+                    if (shellMaterial != null && source.transform == part)
+                        for (int index = 0; index < previewMaterials.Length; index++) previewMaterials[index] = shellMaterial;
+                    renderers.Add(CreatePreviewModel(stage.transform, filter.sharedMesh, previewMaterials, source.transform, parts[0]));
+                }
+            if (renderers.Count == 0)
+            {
+                Object.Destroy(stage);
+                return null;
+            }
 
             GameObject lightObject = new GameObject("PreviewLight", typeof(Light));
             lightObject.transform.SetParent(stage.transform, false);
@@ -49,7 +64,8 @@ namespace KeyboardModeling.Assembly
             camera.nearClipPlane = 0.01f;
             camera.allowHDR = false;
             camera.allowMSAA = false;
-            Bounds bounds = renderer.bounds;
+            Bounds bounds = renderers[0].bounds;
+            for (int index = 1; index < renderers.Count; index++) bounds.Encapsulate(renderers[index].bounds);
             float radius = bounds.extents.magnitude;
             float distance = Mathf.Max(3f, radius * 3f);
             camera.transform.position = bounds.center + new Vector3(0.65f, 0.82f, -1f).normalized * distance;
@@ -79,6 +95,28 @@ namespace KeyboardModeling.Assembly
                 stage.SetActive(false);
                 Object.Destroy(stage);
             }
+        }
+        /// <summary>parent의 격리된 모델에 mesh와 materials를 직접 연결한다. source와 origin이 있으면 상대 자세를 복사하며 원본 메시의 CPU 읽기 설정은 변경하지 않는다.</summary>
+        private static MeshRenderer CreatePreviewModel(Transform parent, Mesh mesh, Material[] materials, Transform source, Transform origin)
+        {
+            GameObject model = new GameObject("PreviewModel", typeof(MeshFilter), typeof(MeshRenderer));
+            model.transform.SetParent(parent, false);
+            model.layer = PREVIEW_LAYER;
+            if (source != null)
+            {
+                model.transform.localPosition = origin.InverseTransformPoint(source.position);
+                model.transform.localRotation = Quaternion.Inverse(origin.rotation) * source.rotation;
+                model.transform.localScale = (origin.worldToLocalMatrix * source.localToWorldMatrix).lossyScale;
+            }
+            model.GetComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer renderer = model.GetComponent<MeshRenderer>();
+            renderer.sharedMaterials = materials;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            KeyboardToonSurface.ApplyBounds(renderer);
+            return renderer;
         }
     }
 }

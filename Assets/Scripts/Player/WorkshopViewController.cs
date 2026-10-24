@@ -53,6 +53,7 @@ namespace Game.Player
         private bool _viewSwitchingAllowed = true;
 
         public bool ViewSwitchingAllowed => _viewSwitchingAllowed;
+        public KeyboardDispenser KeyboardDispenser => _dispenser;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
         public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && !_brain.IsBlending

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -20,10 +20,15 @@ namespace KeyboardModeling.Assembly
 
         [Header("Inventory")]
         [SerializeField, Min(0)] private int _initialQuantity = 1;
+        private bool _isStructure;
+        private AssemblyStructurePart _structureKind;
         private int _quantity;
         private int _reservedQuantity;
         private readonly Stack<AssemblyDraggablePart> _storedParts = new Stack<AssemblyDraggablePart>();
 
+        public bool IsStructure => _isStructure;
+        public AssemblyStructurePart StructureKind => _structureKind;
+        public Material StructureMaterial => _keycapMaterial;
         public AssemblyDraggablePart Prefab => _prefab;
         public Material KeycapMaterial => _keycapMaterial;
         public KeycapDefinition KeycapDefinition => _keycapDefinition;
@@ -31,6 +36,15 @@ namespace KeyboardModeling.Assembly
         public bool IsArtisan => _keycapDefinition != null && _keycapDefinition.IsArtisan;
         public bool IsSwitch => _switchData != null;
         public int AvailableQuantity => _quantity - _reservedQuantity;
+
+        /// <summary>kind와 material의 새 구조 부품 항목을 quantity로 초기화해 반환한다. 기존 항목의 수량·예약·보관은 건드리지 않는다.</summary>
+        public static AssemblyCatalogEntry CreateStructure(AssemblyStructurePart kind, Material material, int quantity)
+        {
+            var entry = new AssemblyCatalogEntry { _isStructure = true, _structureKind = kind,
+                _keycapMaterial = material, _initialQuantity = quantity };
+            entry.InitializeInventory();
+            return entry;
+        }
 
         /// <summary>
         /// Inspector의 initialQuantity로 이번 실행의 재고와 예약을 초기화한다.

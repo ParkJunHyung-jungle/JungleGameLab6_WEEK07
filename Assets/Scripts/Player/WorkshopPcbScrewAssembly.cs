@@ -93,12 +93,18 @@ namespace Game.Player
                 }
             }
             _selected = selected;
+            if (!selected)
+            {
+                _captured = false;
+                _pullers.SetScrewPointerCaptured(false);
+            }
         }
 
         void Update()
         {
             Mouse mouse = Mouse.current;
-            if (_captured && (mouse == null || !mouse.leftButton.isPressed && !mouse.leftButton.wasReleasedThisFrame))
+            if (_captured && (!Application.isFocused || !_pullers.InputAllowed || mouse == null
+                || !mouse.leftButton.isPressed && !mouse.leftButton.wasReleasedThisFrame))
                 _captured = false;
             _pullers.SetScrewPointerCaptured(_captured);
             if (_captured || !_selected || _assembly == null || !_assembly.PcbPlaced || _assembly.PlateInstalled || _assembly.UpperInstalled || Time.timeScale <= 0f

@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+using Game.Logging;
+
 namespace Game.Player
 {
     public sealed class MonitorMailGame : MonitorMiniGame
@@ -247,14 +249,14 @@ namespace Game.Player
         /// </summary>
         private void HandleSelected(MonitorMailListItem row)
         {
-            SelectMessage(_rows.IndexOf(row));
+            SelectMessage(_rows.IndexOf(row), true);
         }
 
         /// <summary>
         /// index의 메일 발신자와 날짜 및 본문을 표시한다.
-        /// 목록 선택 강조와 본문 스크롤 위치를 갱신하며 읽기 외 의뢰 상태는 변경하지 않는다.
+        /// userSelected로 직접 선택 여부를 구분해 표시 로그를 남기고 목록 강조와 스크롤 위치를 갱신한다.
         /// </summary>
-        private void SelectMessage(int index)
+        private void SelectMessage(int index, bool userSelected = false)
         {
             _selectedIndex = index;
             for (int i = 0; i < _rows.Count; i++) _rows[i].SetSelected(i == index);
@@ -274,6 +276,9 @@ namespace Game.Player
             RefreshRequestUI();
             LayoutRebuilder.ForceRebuildLayoutImmediate(_bodyScroll.content);
             _bodyScroll.verticalNormalizedPosition = 1f;
+            if (message.Request != null)
+                CustomizationLogger.RecordRequestEvent("RequestMailViewed", message.Request.RequestId,
+                    message.MailId, userSelected ? "UserSelection" : "AutoSelection");
         }
 
         /// <summary>
@@ -411,8 +416,8 @@ namespace Game.Player
         public override void HandleKeyPressed(Key key)
         {
             if (_rows.Count == 0) return;
-            if (key == Key.UpArrow) SelectMessage(Mathf.Max(0, _selectedIndex - 1));
-            if (key == Key.DownArrow) SelectMessage(Mathf.Min(_rows.Count - 1, _selectedIndex + 1));
+            if (key == Key.UpArrow) SelectMessage(Mathf.Max(0, _selectedIndex - 1), true);
+            if (key == Key.DownArrow) SelectMessage(Mathf.Min(_rows.Count - 1, _selectedIndex + 1), true);
         }
     }
 }

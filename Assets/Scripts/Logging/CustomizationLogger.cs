@@ -162,6 +162,30 @@ namespace Game.Logging
         }
 
         /// <summary>
+        /// 의뢰 이벤트의 종류와 requestId를 기존 CSV에 기록한다.
+        /// mailId, actionSource, result와 failureReason을 해당 열에 저장하며 제작 회차 상태는 변경하지 않는다.
+        /// </summary>
+        public static void RecordRequestEvent(string type, string requestId, string mailId = "",
+            string actionSource = "", string result = "", string failureReason = "")
+        {
+            if (!Application.isPlaying || string.IsNullOrWhiteSpace(requestId)) return;
+            EnsureLogger();
+            if (_instance == null || _instance._closed) return;
+
+            string[] row = _instance.CreateRow(type);
+            row[4] = "";
+            row[5] = "";
+            row[6] = SceneManager.GetActiveScene().path;
+            row[12] = mailId;
+            row[42] = requestId;
+            row[43] = actionSource;
+            row[44] = result;
+            row[24] = failureReason;
+            _instance.WriteRow(row);
+            _instance.Flush();
+        }
+
+        /// <summary>
         /// source의 미니게임 실행이 끝나면 appId와 runId 및 시작·종료 시각을 v5 CSV에 한 행 기록한다.
         /// 제작 회차와 무관하게 실제 체류 시간을 duration_seconds에 저장한다.
         /// </summary>

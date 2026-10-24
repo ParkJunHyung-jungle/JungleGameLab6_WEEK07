@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using UnityEngine;
 
 using Game.Economy;
+using Game.Logging;
 
 namespace Game.Player
 {
@@ -147,6 +148,7 @@ namespace Game.Player
         {
             if (!TryGetState(requestId, KeyboardRequestPhase.Unaccepted, out KeyboardRequestState state)) return false;
             state.Phase = KeyboardRequestPhase.InProgress;
+            CustomizationLogger.RecordRequestEvent("RequestAccepted", requestId);
             NotifyChanged();
             return true;
         }
@@ -160,7 +162,10 @@ namespace Game.Player
             if (_processingRequest != null) return false;
             KeyboardRequestState state = null;
             if (requestId != null && !TryGetState(requestId, KeyboardRequestPhase.InProgress, out state)) return false;
+            bool changed = _submissionTarget != state;
             _submissionTarget = state;
+            if (changed && state != null)
+                CustomizationLogger.RecordRequestEvent("RequestTargetSelected", requestId);
             NotifyChanged();
             return true;
         }
@@ -179,6 +184,8 @@ namespace Game.Player
             state.FailureReason = passed ? string.Empty : failureReason;
             state.Phase = KeyboardRequestPhase.AwaitingConfirmation;
             _submissionTarget = null;
+            CustomizationLogger.RecordRequestEvent("RequestResult", requestId,
+                result: state.Result.ToString(), failureReason: state.FailureReason);
             NotifyChanged();
             return true;
         }
@@ -204,6 +211,7 @@ namespace Game.Player
             request = _submissionTarget;
             _processingRequest = request;
             _processingKeyboard = keyboard;
+            CustomizationLogger.RecordRequestEvent("RequestSubmissionStarted", request.Definition.RequestId);
             return true;
         }
 
@@ -214,6 +222,8 @@ namespace Game.Player
         internal static void CancelSubmission(KeyboardRequestState request)
         {
             if (_processingRequest != request) return;
+            if (request.Phase == KeyboardRequestPhase.InProgress)
+                CustomizationLogger.RecordRequestEvent("RequestSubmissionCancelled", request.Definition.RequestId);
             _processingRequest = null;
             _processingKeyboard = null;
         }
@@ -249,6 +259,8 @@ namespace Game.Player
             _submittedKeyboards.Add(_processingKeyboard);
             _submissionTarget = null;
             CancelSubmission(request);
+            CustomizationLogger.RecordRequestEvent("RequestResult", request.Definition.RequestId,
+                result: request.Result.ToString(), failureReason: request.FailureReason);
             NotifyChanged();
             if (notificationError != null)
                 throw new InvalidOperationException("골드는 반영되었으나 지갑 알림에 실패했습니다. 결과와 지급 기록을 유지하고 키보드는 삭제하지 않습니다.", notificationError);
@@ -346,6 +358,7 @@ namespace Game.Player
             }
             state.Phase = KeyboardRequestPhase.Closed;
             state.ResultMailSent = true;
+            CustomizationLogger.RecordRequestEvent("RequestClosed", requestId, result: state.Result.ToString());
             NotifyMailReceived(entry);
             if (nextEntry != null) NotifyMailReceived(nextEntry);
             return true;

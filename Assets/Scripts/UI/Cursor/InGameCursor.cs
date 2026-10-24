@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -42,11 +41,10 @@ public sealed class InGameCursor : MonoBehaviour
 #if UNITY_EDITOR
     private bool _editorPointerReleased;
 #endif
-#if UNITY_EDITOR_WIN
-    private bool _editorCursorConfined;
-#endif
 
     [Header("Runtime UI")]
+    private bool _destroying;
+    private readonly Dictionary<InputSystemUIInputModule, InGameCursorInputModule> _virtualModules = new Dictionary<InputSystemUIInputModule, InGameCursorInputModule>();
     private RawImage _graphic;
     private InGameCursorDevice _device;
     private InputActionAsset _pointerAsset;
@@ -283,15 +281,11 @@ public sealed class InGameCursor : MonoBehaviour
         ApplyPresentation();
     }
 
-    /// <summary>게임 조작 중 실제 마우스를 창 안에 제한하고 가상 커서를 표시한다. 포커스 상실과 시스템 창에서는 제한을 해제한다.</summary>
+    /// <summary>게임 조작 중 실제 마우스를 잠그고 가상 커서를 표시한다. 포커스 상실과 시스템 창에서는 제한을 해제한다.</summary>
     private void ApplyPresentation()
     {
         bool external = !HasPointerFocus || _dialogDepth > 0;
-        Cursor.lockState = external ? CursorLockMode.None
-            : _requestedLock == CursorLockMode.Locked ? CursorLockMode.Locked : CursorLockMode.Confined;
-#if UNITY_EDITOR_WIN
-        ApplyEditorConfinement(external || _requestedLock == CursorLockMode.Locked);
-#endif
+        Cursor.lockState = external ? CursorLockMode.None : CursorLockMode.Locked;
         Cursor.visible = external;
         if (_graphic == null) return;
         _graphic.enabled = IsActive;
@@ -304,57 +298,7 @@ public sealed class InGameCursor : MonoBehaviour
         SetModulesSuspended(external || _waitRelease);
     }
 
-#if UNITY_EDITOR_WIN
-    /// <summary>
-    /// released이면 OS 커서 제한을 해제하고 그 외에는 Game 뷰의 내부 화면에 제한한다.
-    /// 에디터 창 좌표와 DPI 배율을 사용하며 Unity UI가 클릭과 드래그를 처리할 수 있도록 Locked는 사용하지 않는다.
-    /// </summary>
-    private void ApplyEditorConfinement(bool released)
-    {
-        if (released)
-        {
-            if (_editorCursorConfined) ReleaseEditorCursor(IntPtr.Zero);
-            _editorCursorConfined = false;
-            return;
-        }
-        Rect view = UnityEditor.EditorWindow.focusedWindow.position;
-        float scale = UnityEditor.EditorGUIUtility.pixelsPerPoint;
-        CursorClipRect clip = new CursorClipRect(
-            Mathf.CeilToInt((view.xMin + 4f) * scale),
-            Mathf.CeilToInt((view.yMin + 26f) * scale),
-            Mathf.FloorToInt((view.xMax - 4f) * scale),
-            Mathf.FloorToInt((view.yMax - 4f) * scale));
-        _editorCursorConfined = ConfineEditorCursor(ref clip);
-    }
 
-    /// <summary>rect로 지정한 OS 화면 영역에 실제 커서를 제한하고 성공 여부를 반환한다.</summary>
-    [DllImport("user32.dll", EntryPoint = "ClipCursor")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ConfineEditorCursor(ref CursorClipRect rect);
-
-    /// <summary>rect가 IntPtr.Zero이면 OS 커서 제한을 해제하고 성공 여부를 반환한다.</summary>
-    [DllImport("user32.dll", EntryPoint = "ClipCursor")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ReleaseEditorCursor(IntPtr rect);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct CursorClipRect
-    {
-        private int _left;
-        private int _top;
-        private int _right;
-        private int _bottom;
-
-        /// <summary>left, top, right, bottom 픽셀 좌표로 Windows 커서 제한 사각형을 구성한다.</summary>
-        public CursorClipRect(int left, int top, int right, int bottom)
-        {
-            _left = left;
-            _top = top;
-            _right = right;
-            _bottom = bottom;
-        }
-    }
-#endif
 
     /// <summary>새 씬의 UI 모듈을 전용 포인터에 연결한다. 저장된 민감도와 좌표는 유지하고 전환 입력만 대기한다.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -375,16 +319,24 @@ public sealed class InGameCursor : MonoBehaviour
         {
             _modules.Remove(module);
             _suspendedModules.Remove(module);
+            _virtualModules.Remove(module);
         }
     }
 
-    /// <summary>module의 마우스 입력만 전용 포인터 액션으로 연결한다. 키보드 탐색과 확인 및 취소 바인딩은 유지한다.</summary>
+    /// <summary>module에 가상 커서용 UI 모듈과 포인터 액션을 연결한다. 기존 키보드 탐색과 확인 및 취소 바인딩은 유지한다.</summary>
     public static void ConfigureUI(InputSystemUIInputModule module)
     {
-        if (_instance == null || module.point == _instance._pointerActions[0]) return;
+        if (_instance == null || _instance._destroying || module.point == _instance._pointerActions[0]) return;
         if (!_instance._modules.ContainsKey(module))
             _instance._modules.Add(module, new[] { module.point, module.leftClick, module.rightClick, module.middleClick,
                 module.scrollWheel, module.move, module.submit, module.cancel, module.trackedDevicePosition, module.trackedDeviceOrientation });
+        if (!_instance._virtualModules.ContainsKey(module))
+        {
+            InGameCursorInputModule virtualModule = module.gameObject.AddComponent<InGameCursorInputModule>();
+            virtualModule.enabled = false;
+            virtualModule.Initialize(module);
+            _instance._virtualModules.Add(module, virtualModule);
+        }
         InputActionReference[] previous = _instance._modules[module];
         if (module.move == null) module.move = previous[5];
         if (module.submit == null) module.submit = previous[6];
@@ -396,22 +348,26 @@ public sealed class InGameCursor : MonoBehaviour
         module.scrollWheel = _instance._pointerActions[4];
     }
 
-    /// <summary>suspended 동안 UI 모듈 처리를 중단해 창 복귀 클릭을 차단한다. 관리자가 중단한 모듈만 다시 활성화한다.</summary>
+    /// <summary>suspended 동안 UI를 중단하고 가상 커서 활성 상태에 맞게 원본과 전용 모듈을 전환한다. 관리자가 중단한 원본만 복원한다.</summary>
     private void SetModulesSuspended(bool suspended)
     {
         foreach (InputSystemUIInputModule module in _modules.Keys)
         {
             if (module == null) continue;
-            if (suspended && module.enabled)
+            bool virtualPointer = !_destroying && IsActive && _virtualModules.TryGetValue(module, out _);
+            _virtualModules.TryGetValue(module, out InGameCursorInputModule virtualModule);
+            if ((suspended || virtualPointer) && module.enabled)
             {
                 _suspendedModules.Add(module);
                 module.enabled = false;
             }
-            else if (!suspended && _suspendedModules.Remove(module))
+            else if (!suspended && !virtualPointer && _suspendedModules.Remove(module))
             {
                 module.enabled = true;
                 ConfigureUI(module);
             }
+            if (virtualModule != null)
+                virtualModule.enabled = virtualPointer && !suspended && _suspendedModules.Contains(module);
         }
     }
 
@@ -432,9 +388,7 @@ public sealed class InGameCursor : MonoBehaviour
     void OnDestroy()
     {
         if (_instance != this) return;
-#if UNITY_EDITOR_WIN
-        ApplyEditorConfinement(true);
-#endif
+        _destroying = true;
         InputSystem.onAfterUpdate -= UpdatePointer;
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         foreach (var entry in _modules)
@@ -452,6 +406,9 @@ public sealed class InGameCursor : MonoBehaviour
             entry.Key.trackedDeviceOrientation = entry.Value[9];
         }
         SetModulesSuspended(false);
+        foreach (InGameCursorInputModule module in _virtualModules.Values)
+            if (module != null) Destroy(module);
+        _virtualModules.Clear();
         foreach (InputActionReference reference in _pointerActions) Destroy(reference);
         _pointerAsset.Disable();
         Destroy(_pointerAsset);

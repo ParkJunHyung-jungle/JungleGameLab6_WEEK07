@@ -13,6 +13,7 @@ namespace Game.Player
         private const float ROTATION_DURATION = 0.35f;
 
         [Header("Placement Pose")]
+        [SerializeField] private bool _requireRootPickupTarget;
         [SerializeField] private Vector3 _placementCenterOffset;
         [SerializeField] private Vector3 _placementEulerAngles = new Vector3(-57f, 0f, 0f);
         [SerializeField] private Collider _placementSurface;
@@ -105,6 +106,20 @@ namespace Game.Player
 
         void OnTriggerEnter(Collider other)
         {
+            TryStoreKeyboard(other);
+        }
+
+        void OnTriggerStay(Collider other)
+        {
+            if (_requireRootPickupTarget) TryStoreKeyboard(other);
+        }
+
+        /// <summary>
+        /// other에서 손을 놓은 키보드를 찾아 기존 정렬과 고정 경로로 배치한다.
+        /// 배송용 설정은 실제 본체의 집기 표식만 허용하여 개별 부품을 거부한다.
+        /// </summary>
+        private void TryStoreKeyboard(Collider other)
+        {
             if (_keyboardBody != null)
                 return;
 
@@ -115,7 +130,7 @@ namespace Game.Player
             KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
             if (pickupTarget == null)
                 pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
-            if (pickupTarget == null)
+            if (pickupTarget == null || (_requireRootPickupTarget && pickupTarget.gameObject != body.gameObject))
                 return;
 
             if (body.TryGetComponent(out KeyboardAssemblyState assembly) && assembly.Initialized)

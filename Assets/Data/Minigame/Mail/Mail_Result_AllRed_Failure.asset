@@ -16,6 +16,6 @@ MonoBehaviour:
   _request: {fileID: 11400000, guid: 7aedbe6bcc0946f98257f646da3414f2, type: 2}
   _sender: "첫 의뢰 고객"
   _address: "customer@workshop.local"
-  _subject: "제작 조건이 충족되지 않았습니다"
+  _subject: "받은 키보드에 확인이 필요합니다"
   _date: "오늘"
-  _body: "제출한 키보드가 요청한 제작 조건을 충족하지 못했습니다. 이번 의뢰는 보상 없이 종료합니다."
+  _body: "받은 키보드를 확인했는데 요청한 조건과 다른 부분이 있습니다.\n다음에는 요청 내용을 확인해 주세요."

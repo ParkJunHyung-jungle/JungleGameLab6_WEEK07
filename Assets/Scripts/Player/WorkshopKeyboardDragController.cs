@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -85,7 +85,7 @@ namespace Game.Player
         {
             Mouse mouse = Mouse.current;
             if (!_inputAllowed || !Application.isFocused || !InGameCursor.CanProcessPointer
-                || FirstEncounterTutorial.IsBlocking || PlaytestResearchSession.IsUploadConfirmationOpen
+                || (FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) || PlaytestResearchSession.IsUploadConfirmationOpen
                 || mouse == null)
             {
                 HandlePointerCanceled();
@@ -364,6 +364,13 @@ namespace Game.Player
             if (!dragPlane.Raycast(ray, out float distance) || distance > _maximumDragDistance)
                 return false;
 
+            Transform previousParent = _keyboardBody.transform.parent;
+            if (previousParent != null && previousParent.TryGetComponent(out Game.Workshop.WorkshopDeliveryTray tray))
+            {
+                if (tray.IsSending) return false;
+                previousParent.GetComponent<WorkbenchKeyboardHolder>().ReleaseKeyboard(_keyboardBody);
+                _keyboardBody.transform.SetParent(null, true);
+            }
             _workbenchHolder.ReleaseKeyboard(_keyboardBody);
             bool detach = _keyboardBody.transform.parent == _workbenchHolder.transform;
             if (_monitorHolder != null && _monitorHolder.KeyboardBody == _keyboardBody)

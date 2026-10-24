@@ -206,7 +206,7 @@ namespace Game.Player
         {
             UpdateUploadConfirmationInput();
             if (Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
-                || Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+                || (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)) return;
             if (_isKeyboardEditMode && _cameraTransition == null
                 && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
@@ -258,7 +258,7 @@ namespace Game.Player
         private void HandleClickStarted(InputAction.CallbackContext context)
         {
             if (Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen) return;
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) return;
             if (_isMonitorFocusMode || _monitorFocusTransition != null)
                 return;
             if (_isKeyboardEditMode)
@@ -288,7 +288,7 @@ namespace Game.Player
         /// </summary>
         private void HandleKeyboardResetStarted(InputAction.CallbackContext context)
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) return;
             if (!_isKeyboardEditMode || _cameraTransition != null || _editingKeyboard == null || _editingKeyboardBody == null)
                 return;
 
@@ -308,7 +308,7 @@ namespace Game.Player
         /// </summary>
         private void HandleCoverStarted(InputAction.CallbackContext context)
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) return;
             if (_cameraTransition != null || _monitorFocusTransition != null)
                 return;
 
@@ -475,7 +475,7 @@ namespace Game.Player
 
         /// <summary>현재 입력 차단과 전환 상태로 안내 표시 가능 여부를 반환한다. 시스템 창과 팝업 중에는 false이다.</summary>
         public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && Time.timeScale > 0f
-            && InGameCursor.CanProcessPointer && !Game.Tutorials.FirstEncounterTutorial.IsBlocking
+            && InGameCursor.CanProcessPointer && !(Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
             && !Game.Logging.PlaytestResearchSession.IsUploadConfirmationOpen
             && _cameraTransition == null && _monitorFocusTransition == null;
 

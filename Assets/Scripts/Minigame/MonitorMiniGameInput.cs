@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -171,7 +171,7 @@ namespace Game.Player
         private bool CanReceiveInput()
         {
             return _keyboard != null && _keyboard.isActiveAndEnabled && _keyboard.InputEnabled
-                && Application.isFocused && Time.timeScale > 0f && !Game.Tutorials.FirstEncounterTutorial.IsBlocking;
+                && Application.isFocused && Time.timeScale > 0f && !(Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked);
         }
 
         /// <summary>키보드 및 문자 입력 구독을 해제하고 게임을 종료한다. 입력값과 반환값 없이 포커스 진입 전에 보관한 타건 및 공격 설정을 복원한다.</summary>

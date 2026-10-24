@@ -430,6 +430,18 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     }
 
     /// <summary>
+    /// keycapIndex에 명시적으로 캐시된 키캡 외피의 실제 첫 재질 슬롯을 반환한다.
+    /// 공통 선택값이나 글자 및 부속 재질은 읽지 않으며 외피 참조 누락은 설정 오류로 알린다.
+    /// </summary>
+    public Material GetKeycapSurfaceMaterial(int keycapIndex)
+    {
+        if (_keycaps == null) CacheKeycaps();
+        if (keycapIndex < 0 || keycapIndex >= _keycapSlotShells.Length || _keycapSlotShells[keycapIndex] == null)
+            throw new InvalidOperationException("필수 키캡 외피 렌더러 참조가 없습니다.");
+        return _keycapSlotShells[keycapIndex].sharedMaterial;
+    }
+
+    /// <summary>
     /// 진행 중인 미리보기를 제외한 적용 재질을 범위에 맞춰 반환한다.
     /// allKeycaps이면 공통 재질을 반환하고 아니면 keycapIndex의 개별 재질을 반환한다.
     /// </summary>

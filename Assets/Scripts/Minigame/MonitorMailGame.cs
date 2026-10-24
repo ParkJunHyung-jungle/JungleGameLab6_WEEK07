@@ -18,6 +18,13 @@ namespace Game.Player
         private int _selectedIndex = -1;
         private string _selectedMailId;
 
+        [Header("Mailbox UI")]
+        [SerializeField] private MonitorOSButton _deleteMail;
+        [SerializeField] private MonitorOSButton _restoreMail;
+        private readonly List<MonitorMailListItem> _folders = new List<MonitorMailListItem>();
+        private readonly HashSet<string> _expandedCustomers = new HashSet<string>();
+        private bool _trashExpanded;
+
         [Header("Message UI")]
         [SerializeField] private GameObject _messagePanel;
         [SerializeField] private Text _subject;
@@ -52,6 +59,9 @@ namespace Game.Player
         {
             KeyboardRequestRuntime.Initialize((MonitorMailGameDefinition)Definition);
             KeyboardRequestRuntime.MailReceived += HandleMailReceived;
+            KeyboardRequestRuntime.MailboxChanged += RefreshInbox;
+            _deleteMail.Clicked += HandleDeleteMail;
+            _restoreMail.Clicked += HandleRestoreMail;
             KeyboardRequestRuntime.Changed += RefreshRequestUI;
             _acceptRequest.Clicked += HandleAcceptRequest;
             _selectSubmissionTarget.Clicked += HandleSelectSubmissionTarget;
@@ -69,16 +79,35 @@ namespace Game.Player
             Vector2 bodyPosition = _bodyScroll.content.anchoredPosition;
             ClearRows();
             _rowTemplate.gameObject.SetActive(false);
+            var customers = new Dictionary<string, List<MonitorMailEntry>>();
+            var trash = new List<MonitorMailEntry>();
+            int inboxCount = 0;
             foreach (MonitorMailEntry message in KeyboardRequestRuntime.Inbox)
             {
                 if (message == null) continue;
-                MonitorMailListItem row = Instantiate(_rowTemplate, _listRoot, false);
-                row.Initialize(message);
-                row.Selected += HandleSelected;
-                row.gameObject.SetActive(true);
-                _rows.Add(row);
+                if (message.IsDeleted)
+                {
+                    trash.Add(message);
+                    continue;
+                }
+                string key = GetCustomerKey(message);
+                if (!customers.TryGetValue(key, out List<MonitorMailEntry> messages))
+                {
+                    messages = new List<MonitorMailEntry>();
+                    customers.Add(key, messages);
+                }
+                messages.Add(message);
+                inboxCount++;
             }
-            _count.text = $"받은편지함  /  {_rows.Count}통";
+            foreach (KeyValuePair<string, List<MonitorMailEntry>> customer in customers)
+            {
+                bool expanded = _expandedCustomers.Contains(customer.Key);
+                CreateFolder(customer.Key, customer.Value[0].Sender, customer.Value.Count, expanded);
+                if (expanded) foreach (MonitorMailEntry message in customer.Value) CreateMailRow(message);
+            }
+            CreateFolder(null, "휴지통", trash.Count, _trashExpanded);
+            if (_trashExpanded) foreach (MonitorMailEntry message in trash) CreateMailRow(message);
+            _count.text = $"받은편지함 {inboxCount}통 / 휴지통 {trash.Count}통";
             _emptyState.SetActive(_rows.Count == 0);
             _messagePanel.SetActive(_rows.Count > 0);
             int selectedIndex = _rows.FindIndex(row => row.Message.MailId == _selectedMailId);
@@ -86,6 +115,8 @@ namespace Game.Player
             else
             {
                 _selectedMailId = null;
+                _emptyState.GetComponent<Text>().text = inboxCount + trash.Count == 0
+                    ? "도착한 메일이 없습니다." : "고객 또는 휴지통을 펼쳐 메일을 선택하세요.";
                 RefreshRequestUI();
             }
             RestoreScrollPosition(_listScroll, listPosition);
@@ -99,6 +130,9 @@ namespace Game.Player
         protected override void OnStopped()
         {
             KeyboardRequestRuntime.MailReceived -= HandleMailReceived;
+            KeyboardRequestRuntime.MailboxChanged -= RefreshInbox;
+            _deleteMail.Clicked -= HandleDeleteMail;
+            _restoreMail.Clicked -= HandleRestoreMail;
             KeyboardRequestRuntime.Changed -= RefreshRequestUI;
             _acceptRequest.Clicked -= HandleAcceptRequest;
             _selectSubmissionTarget.Clicked -= HandleSelectSubmissionTarget;
@@ -123,6 +157,13 @@ namespace Game.Player
         /// </summary>
         private void ClearRows()
         {
+            foreach (MonitorMailListItem folder in _folders)
+            {
+                folder.Selected -= HandleFolderSelected;
+                folder.gameObject.SetActive(false);
+                Destroy(folder.gameObject);
+            }
+            _folders.Clear();
             foreach (MonitorMailListItem row in _rows)
             {
                 row.Selected -= HandleSelected;
@@ -131,6 +172,73 @@ namespace Game.Player
             }
             _rows.Clear();
             _selectedIndex = -1;
+        }
+
+        /// <summary>
+        /// message의 주소를 고객 그룹 식별자로 반환한다.
+        /// 주소가 없는 메일은 발신자 이름을 사용하며 원본 데이터를 변경하지 않는다.
+        /// </summary>
+        private string GetCustomerKey(MonitorMailEntry message)
+        {
+            return string.IsNullOrWhiteSpace(message.Address)
+                ? message.Sender : message.Address.Trim().ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// key와 label 및 count로 현재 expanded 상태의 폴더 행을 생성한다.
+        /// 클릭 이벤트를 연결하고 생성된 행을 정리 목록에 등록한다.
+        /// </summary>
+        private void CreateFolder(string key, string label, int count, bool expanded)
+        {
+            MonitorMailListItem folder = Instantiate(_rowTemplate, _listRoot, false);
+            folder.InitializeFolder(key, label, count, expanded);
+            folder.Selected += HandleFolderSelected;
+            folder.gameObject.SetActive(true);
+            _folders.Add(folder);
+        }
+
+        /// <summary>
+        /// message를 표시하는 하위 메일 행을 생성하고 선택 이벤트를 연결한다.
+        /// 제목과 발신자 정보를 들여쓰기하여 고객 하위 목록을 구성한다.
+        /// </summary>
+        private void CreateMailRow(MonitorMailEntry message)
+        {
+            MonitorMailListItem row = Instantiate(_rowTemplate, _listRoot, false);
+            row.Initialize(message);
+            row.Selected += HandleSelected;
+            row.gameObject.SetActive(true);
+            _rows.Add(row);
+        }
+
+        /// <summary>
+        /// folder의 식별자로 고객 또는 휴지통의 펼침 상태를 반전한다.
+        /// 변경된 상태로 목록을 재구성하며 메일과 의뢰 데이터는 유지한다.
+        /// </summary>
+        private void HandleFolderSelected(MonitorMailListItem folder)
+        {
+            if (folder.FolderKey == null) _trashExpanded = !_trashExpanded;
+            else if (!_expandedCustomers.Remove(folder.FolderKey)) _expandedCustomers.Add(folder.FolderKey);
+            RefreshInbox();
+        }
+
+        /// <summary>
+        /// button 클릭으로 선택 메일을 휴지통으로 이동한다.
+        /// 의뢰 진행과 보상은 변경하지 않고 런타임 메일함만 갱신한다.
+        /// </summary>
+        private void HandleDeleteMail(MonitorOSButton button)
+        {
+            if (_selectedIndex >= 0) KeyboardRequestRuntime.TrySetMailDeleted(_selectedMailId, true);
+        }
+
+        /// <summary>
+        /// button 클릭으로 선택한 휴지통 메일을 원래 고객 목록에 복원한다.
+        /// 복원할 고객을 펼치며 기존 의뢰 상태와 메일 식별자는 유지한다.
+        /// </summary>
+        private void HandleRestoreMail(MonitorOSButton button)
+        {
+            if (_selectedIndex < 0) return;
+            _expandedCustomers.Add(GetCustomerKey(_rows[_selectedIndex].Message));
+            KeyboardRequestRuntime.TrySetMailDeleted(_selectedMailId, false);
         }
 
         /// <summary>
@@ -175,6 +283,7 @@ namespace Game.Player
         private KeyboardRequestState GetSelectedRequest()
         {
             if (_selectedIndex < 0 || _selectedIndex >= _rows.Count) return null;
+            if (_rows[_selectedIndex].Message.IsDeleted) return null;
             KeyboardRequestDefinition definition = _rows[_selectedIndex].Message.Request;
             if (definition == null || string.IsNullOrWhiteSpace(definition.RequestId)) return null;
             return KeyboardRequestRuntime.Requests.TryGetValue(definition.RequestId, out KeyboardRequestState state)
@@ -187,6 +296,10 @@ namespace Game.Player
         /// </summary>
         private void RefreshRequestUI()
         {
+            bool hasSelection = _selectedIndex >= 0 && _selectedIndex < _rows.Count;
+            bool deleted = hasSelection && _rows[_selectedIndex].Message.IsDeleted;
+            _deleteMail.SetInteractable(hasSelection && !deleted);
+            _restoreMail.SetInteractable(hasSelection && deleted);
             Vector2 bodyPosition = _bodyScroll.content.anchoredPosition;
             KeyboardRequestState state = GetSelectedRequest();
             KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
@@ -216,17 +329,25 @@ namespace Game.Player
                 KeyboardRequestResult.Failure => " · 실패",
                 _ => string.Empty
             };
-            string switchName = definition.RequiredSwitchType == SwitchType.Red
-                ? "적축" : definition.RequiredSwitchType.ToString();
+            string switchName = definition.RequiredSwitchType switch
+            {
+                SwitchType.Red => "적축",
+                SwitchType.Sans => "샌즈 축",
+                _ => definition.RequiredSwitchType.ToString()
+            };
             string requirements = definition.RequiresAllRequiredSwitchSlots
                 ? $"\n요구사항: 모든 필수 스위치 슬롯에 {switchName} 설치" : string.Empty;
             if (definition.RequiresCompleteAssembly)
                 requirements += "\n전체 조립: 하단부 · PCB · 나사 6개 · 보강판 · 상단부 · 필수 키캡";
+            if (!definition.RequiresAllRequiredSwitchSlots && !definition.RequiresCompleteAssembly && !definition.RequiresGlassSurfaces)
+                requirements = "\n요구사항: 키보드 본체라면 구성과 조립 상태 제한 없음";
             string failure = state.Result == KeyboardRequestResult.Failure
                 ? $"\n실패 사유: {state.FailureReason}" : string.Empty;
             _requestInfo.text = $"의뢰: {definition.DisplayName}\n상태: {phase}{result}"
                 + (state == target ? " · 현재 제출 대상" : string.Empty)
-                + requirements + "\n재질과 키캡 디자인 제한 없음"
+                + requirements + (definition.RequiresGlassSurfaces
+                    ? "\n재질: 하단부 · 상단부 · 모든 필수 키캡은 유리 (PCB·보강판 제한 없음)"
+                    : "\n재질과 키캡 디자인 제한 없음")
                 + $"\n성공 보상: {definition.RewardGold}골드" + failure
                 + (string.IsNullOrEmpty(_requestNotice) ? string.Empty : $"\n{_requestNotice}");
             _acceptRequest.SetInteractable(state.Phase == KeyboardRequestPhase.Unaccepted);

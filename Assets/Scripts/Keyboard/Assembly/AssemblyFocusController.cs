@@ -54,7 +54,7 @@ namespace KeyboardModeling.Assembly
 
         void Update()
         {
-            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
                 return;
 
             if (_isFocused)
@@ -118,7 +118,7 @@ namespace KeyboardModeling.Assembly
                 return;
             if (!hasFocus)
                 _dragInput.CancelDrag();
-            else if (!Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            else if (!(Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked))
                 ApplyCursor();
         }
 

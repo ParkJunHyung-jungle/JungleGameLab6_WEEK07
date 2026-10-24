@@ -167,7 +167,7 @@ namespace KeyboardModeling.Assembly
 
         void Update()
         {
-            if (!_inputAllowed || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (!_inputAllowed || (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked))
             {
                 CancelDrag();
                 return;
@@ -292,7 +292,7 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         public bool TryBeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 screenPosition)
         {
-            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (!_inputAllowed || _isDragging || !isActiveAndEnabled || (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked))
                 return false;
 
             if (_fullerTool != null)

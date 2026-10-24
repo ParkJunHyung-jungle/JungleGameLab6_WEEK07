@@ -43,7 +43,7 @@ namespace Game.Player
             : _interaction != null ? _interaction.EditingKeyboard : null;
 
         public bool InputAllowed => IsEditing && EditingKeyboard != null
-            && !Game.Tutorials.FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen
+            && !(Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen
             && InGameCursor.CanProcessVirtualPointer;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
             || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && _keycapPlacement.IsDragging);

@@ -88,7 +88,8 @@ namespace Game.Player
                     foreach (Transform part in _parts)
                     {
                         var outline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _pullers.InputCamera);
-                        outline.Prepare(part, true);
+                        outline.Prepare(part, true, _kind == AssemblyStructurePart.Pcb
+                            ? part.Find("PCB_Board").GetComponent<MeshRenderer>() : null);
                         _outlines.Add(outline);
                     }
                     BuildIcon();

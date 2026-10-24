@@ -279,15 +279,31 @@ namespace Game.Player
                 || (state.Result == KeyboardRequestResult.Failure && string.IsNullOrWhiteSpace(state.FailureReason))) return false;
             MonitorMailMessage message = state.Result == KeyboardRequestResult.Success
                 ? state.Definition.SuccessMail : state.Definition.FailureMail;
-            if (message == null || string.IsNullOrWhiteSpace(message.MailId) || message == state.Definition.InitialMail
-                || _receivedMailIds.Contains(message.MailId)) return false;
+            MonitorMailMessage customer = state.Definition.InitialMail;
+            string resultMailId = $"request-result:{requestId}:{state.Result}";
+            if (message == null || customer == null || string.IsNullOrWhiteSpace(message.MailId) || message == customer
+                || _receivedMailIds.Contains(resultMailId)) return false;
 
-            string body = state.Result == KeyboardRequestResult.Failure
-                ? $"{message.Body}\n\n제출 당시 확인된 부족 내역\n{state.FailureReason}" : message.Body;
-            var entry = new MonitorMailEntry(message, body, true);
+            string body = $"의뢰: {state.Definition.DisplayName}\n\n{message.Body}";
+            if (state.Result == KeyboardRequestResult.Failure)
+            {
+                var reasons = new HashSet<string>(StringComparer.Ordinal);
+                body += "\n\n제출 당시 확인된 부족 내역";
+                foreach (string line in state.FailureReason.Split('\n'))
+                {
+                    string reason = line.Trim();
+                    if (reason.Length > 0 && reasons.Add(reason)) body += $"\n- {reason}";
+                }
+            }
+            var entry = new MonitorMailEntry(message, body, true, resultMailId, customer);
 
             _receivedMailIds.Add(entry.MailId);
-            _inbox.Add(entry);
+            try { _inbox.Add(entry); }
+            catch
+            {
+                _receivedMailIds.Remove(entry.MailId);
+                throw;
+            }
             state.Phase = KeyboardRequestPhase.Closed;
             state.ResultMailSent = true;
             NotifyMailReceived(entry);

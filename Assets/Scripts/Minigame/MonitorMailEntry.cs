@@ -15,14 +15,15 @@ namespace Game.Player
 
         /// <summary>
         /// definition의 공통 메일 정보와 조합된 body를 이번 실행의 읽기 전용 수신 기록으로 복사한다.
-        /// isResult가 참이면 의뢰 수락 연결을 제공하지 않으며 원본 SO와 제출 키보드는 변경하지 않는다.
+        /// isResult가 참이면 mailId와 customer로 결과 식별자와 고객을 지정하고 의뢰 수락 연결을 제공하지 않는다.
         /// </summary>
-        internal MonitorMailEntry(MonitorMailMessage definition, string body, bool isResult)
+        internal MonitorMailEntry(MonitorMailMessage definition, string body, bool isResult,
+            string mailId = null, MonitorMailMessage customer = null)
         {
             Definition = definition;
-            MailId = definition.MailId;
-            Sender = definition.Sender;
-            Address = definition.Address;
+            MailId = mailId ?? definition.MailId;
+            Sender = customer != null ? customer.Sender : definition.Sender;
+            Address = customer != null ? customer.Address : definition.Address;
             Subject = definition.Subject;
             Date = definition.Date;
             Body = body;

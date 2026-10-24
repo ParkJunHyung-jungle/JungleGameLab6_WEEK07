@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -34,6 +34,7 @@ namespace Game.Player
             data.renderPostProcessing = false;
             data.renderShadows = false;
             _sourceData.cameraStack.Add(_overlay);
+            RenderPipelineManager.beginCameraRendering -= HandleBeginCameraRendering;
             RenderPipelineManager.beginCameraRendering += HandleBeginCameraRendering;
         }
 
@@ -81,13 +82,23 @@ namespace Game.Player
         /// </summary>
         private void HandleBeginCameraRendering(ScriptableRenderContext context, Camera camera)
         {
-            if (camera != _source || !_overlay.enabled) return;
+            if (_source == null || _overlay == null || camera != _source || !_overlay.enabled) return;
             _overlay.CopyFrom(_source);
             _overlay.cullingMask = 1 << PREVIEW_LAYER;
             _overlay.transform.SetPositionAndRotation(_source.transform.position, _source.transform.rotation);
         }
 
-        void OnDisable() { Hide(); }
+        void OnDisable()
+        {
+            RenderPipelineManager.beginCameraRendering -= HandleBeginCameraRendering;
+            Hide();
+        }
+
+        void OnEnable()
+        {
+            RenderPipelineManager.beginCameraRendering -= HandleBeginCameraRendering;
+            RenderPipelineManager.beginCameraRendering += HandleBeginCameraRendering;
+        }
 
         void OnDestroy()
         {

@@ -1,7 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 using KeyboardModeling.Assembly;
 
@@ -11,14 +12,21 @@ namespace Game.Player
     [DisallowMultipleComponent]
     public sealed class WorkshopPcbScrewAssembly : MonoBehaviour
     {
-        private const float HIT_PADDING = 0.06f;
+        [Header("Screw Position Markers")]
+        [SerializeField, Min(0.01f)] private float _markerScale = 1.6f;
+        [SerializeField, Min(1f)] private float _markerThickness = 4f;
+        [SerializeField, Min(0f)] private float _hitPadding = 0.08f;
+        [SerializeField] private Color _looseColor = new Color(1f, 0.65f, 0.2f, 0.8f);
+        [SerializeField] private Color _fixedColor = new Color(0.3f, 1f, 0.45f, 0.8f);
 
         [Header("Screw Interaction")]
         private WorkshopKeyboardPullerController _pullers;
         private KeyboardAssemblyState _assembly;
         private Material _outlineMaterial;
         private Shader _depthShader;
+        private Material _markerMaterial;
         private readonly List<WorkshopKeyboardPlacementPreview> _outlines = new List<WorkshopKeyboardPlacementPreview>();
+        private MaterialPropertyBlock _markerProperties;
         private readonly List<MeshCollider> _blockers = new List<MeshCollider>();
         private bool _selected;
         private bool _captured;
@@ -26,9 +34,34 @@ namespace Game.Player
         /// <summary>pullers와 기존 아웃라인 에셋을 연결한다. 가상 커서 카메라를 재사용하며 나사 진행 상태는 변경하지 않는다.</summary>
         public void Initialize(WorkshopKeyboardPullerController pullers, Material outlineMaterial, Shader depthShader)
         {
+            _markerProperties = new MaterialPropertyBlock();
             _pullers = pullers;
             _outlineMaterial = outlineMaterial;
             _depthShader = depthShader;
+        }
+
+        /// <summary>shader와 Inspector 설정으로 나사 표시 전용 재질과 크기를 준비한다. 원본 재질과 나사 상태는 유지한다.</summary>
+        public void ConfigureMarkers(Shader shader, float scale, float padding, Color looseColor, Color fixedColor, float thickness)
+        {
+            if (shader == null) return;
+            _markerMaterial = new Material(shader);
+            _markerScale = scale;
+            _markerThickness = thickness;
+            _hitPadding = padding;
+            _looseColor = looseColor;
+            _fixedColor = fixedColor;
+        }
+
+        /// <summary>index의 최종 체결 위치와 머리 중심으로 표시 행렬을 반환한다. 중심과 축을 유지하고 표시 모델만 확대한다.</summary>
+        private Matrix4x4 GetMarkerMatrix(int index)
+        {
+            Transform screw = _assembly.GetScrew(index);
+            Pose pose = _assembly.GetScrewPose(index);
+            Vector3 center = GetHeadBounds(screw).center;
+            if (_markerMaterial == null) return Matrix4x4.TRS(pose.position, pose.rotation, screw.lossyScale);
+            return Matrix4x4.TRS(pose.position, pose.rotation, screw.lossyScale)
+                * Matrix4x4.Translate(center) * Matrix4x4.Scale(new Vector3(1f, Mathf.Max(1f, _markerThickness), 1f) * Mathf.Max(0.01f, _markerScale))
+                * Matrix4x4.Translate(-center);
         }
 
         /// <summary>assembly와 selected로 PCB 탭의 나사 조립 대상을 갱신한다. 대상 변경 시 안내만 다시 준비하며 시작한 체결 연출은 유지한다.</summary>
@@ -40,13 +73,13 @@ namespace Game.Player
                 _assembly = assembly;
                 if (assembly != null)
                 {
-                    for (int index = 0; index < 6; index++)
-                    {
-                        Color color = assembly.FixedScrews[index] ? new Color(0.3f, 1f, 0.45f) : new Color(1f, 0.65f, 0.2f);
-                        var outline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _pullers.InputCamera, color);
-                        outline.Prepare(assembly.GetScrew(index), true);
-                        _outlines.Add(outline);
-                    }
+                    if (_markerMaterial == null)
+                        for (int index = 0; index < 6; index++)
+                        {
+                            var outline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _pullers.InputCamera);
+                            outline.Prepare(assembly.GetScrew(index), true);
+                            _outlines.Add(outline);
+                        }
                     foreach (MeshRenderer renderer in assembly.UpperRenderers)
                     {
                         GameObject proxy = new GameObject("ScrewPointerOcclusion");
@@ -87,14 +120,23 @@ namespace Game.Player
             for (int index = 0; index < 6; index++)
             {
                 if (!_assembly.CanFixScrew(index) && !_assembly.CanReleaseScrew(index)) continue;
-                _outlines[index].SetOutlineColor(_assembly.FixedScrews[index]
-                    ? new Color(0.3f, 1f, 0.45f) : new Color(1f, 0.65f, 0.2f));
-                Pose pose = _assembly.GetScrewPose(index);
+                if (_markerMaterial == null)
+                {
+                    _outlines[index].SetOutlineColor(_assembly.FixedScrews[index] ? new Color(0.3f, 1f, 0.45f) : new Color(1f, 0.65f, 0.2f));
+                    _outlines[index].Show(_assembly.GetScrewPose(index));
+                    continue;
+                }
                 Transform screw = _assembly.GetScrew(index);
-                Vector3 center = Matrix4x4.TRS(pose.position, pose.rotation, screw.lossyScale).MultiplyPoint3x4(GetHeadBounds(screw).center);
+                Matrix4x4 matrix = GetMarkerMatrix(index);
+                Vector3 center = matrix.MultiplyPoint3x4(GetHeadBounds(screw).center);
                 Vector3 direction = center - _pullers.InputCamera.transform.position;
                 Ray ray = new Ray(_pullers.InputCamera.transform.position, direction);
-                if (!IsBlocked(ray, direction.magnitude)) _outlines[index].Show(pose);
+                if (IsBlocked(ray, direction.magnitude)) continue;
+                _markerProperties.SetColor("_Color", _assembly.FixedScrews[index] ? _fixedColor : _looseColor);
+                Mesh mesh = screw.GetComponent<MeshFilter>().sharedMesh;
+                for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+                    Graphics.DrawMesh(mesh, matrix, _markerMaterial, 2, _pullers.InputCamera, submesh,
+                        _markerProperties, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
             }
         }
 
@@ -105,11 +147,12 @@ namespace Game.Player
             int nearest = -1;
             for (int index = 0; index < 6; index++)
             {
+                if (!_assembly.CanFixScrew(index) && !_assembly.CanReleaseScrew(index)) continue;
                 Transform screw = _assembly.GetScrew(index);
-                Pose pose = _assembly.GetScrewPose(index);
-                float candidate = GetHitDistance(ray, GetHeadBounds(screw), Matrix4x4.TRS(pose.position, pose.rotation, screw.lossyScale));
-                if (_assembly.IsScrewRunning(index))
-                    candidate = Mathf.Min(candidate, GetHitDistance(ray, GetHeadBounds(screw), screw.localToWorldMatrix));
+                Bounds bounds = GetHeadBounds(screw);
+                bounds.Expand(_hitPadding);
+                bounds.size *= 1.5f;
+                float candidate = GetHitDistance(ray, bounds, GetMarkerMatrix(index));
                 if (candidate >= distance) continue;
                 distance = candidate;
                 nearest = index;
@@ -124,7 +167,7 @@ namespace Game.Player
             float top = bounds.max.y;
             bounds.center = new Vector3(bounds.center.x, top * 0.5f, bounds.center.z);
             bounds.size = new Vector3(bounds.size.x, top, bounds.size.z);
-            bounds.Expand(HIT_PADDING);
+
             return bounds;
         }
 
@@ -162,6 +205,7 @@ namespace Game.Player
         {
             foreach (var outline in _outlines) outline.Dispose();
             _outlines.Clear();
+
             foreach (MeshCollider blocker in _blockers)
                 if (blocker != null) Destroy(blocker.gameObject);
             _blockers.Clear();
@@ -175,6 +219,6 @@ namespace Game.Player
                 if (blocker != null) blocker.enabled = false;
         }
 
-        void OnDestroy() { ClearGeometry(); }
+        void OnDestroy() { ClearGeometry(); if (_markerMaterial != null) Destroy(_markerMaterial); }
     }
 }

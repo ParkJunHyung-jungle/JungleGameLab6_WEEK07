@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -56,14 +56,14 @@ namespace Game.Player
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
         public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && !_brain.IsBlending
-            && !FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen;
+            && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
 
         public bool CanEnterKeyboardFocus => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
             && !_monitorFocused && !_monitorTransition
             && _viewSwitchingAllowed && _viewIndex == 0 && !_brain.IsBlending
             && _brain.ActiveVirtualCamera == (ICinemachineCamera)_views[0]
             && !_keyboardDrag.IsDragging && Application.isFocused && InGameCursor.CanProcessPointer
-            && !FirstEncounterTutorial.IsBlocking && !PlaytestResearchSession.IsUploadConfirmationOpen;
+            && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
 
         /// <summary>
         /// 선택한 body가 현재 Holder의 스냅 키보드이면 집중 전환을 시작한다.
@@ -99,7 +99,7 @@ namespace Game.Player
         void Update()
         {
             if (!Application.isFocused
-                || FirstEncounterTutorial.IsBlocking || PlaytestResearchSession.IsUploadConfirmationOpen
+                || (FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) || PlaytestResearchSession.IsUploadConfirmationOpen
                 || !InGameCursor.CanProcessPointer)
                 return;
 

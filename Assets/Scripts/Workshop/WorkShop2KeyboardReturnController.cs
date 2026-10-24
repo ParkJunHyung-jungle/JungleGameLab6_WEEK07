@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -29,9 +29,19 @@ namespace Game.Workshop
         [SerializeField] private WorkshopKeyboardStateController _workshopState;
 
         [Header("Request Submission")]
-        [SerializeField] private bool _enableRequestSubmission;
         [SerializeField] private GameSession _gameSession;
         private readonly HashSet<Rigidbody> _submissionBodies = new HashSet<Rigidbody>();
+        private Rigidbody _deliveryKeyboard;
+        private KeyboardRequestState _deliveryRequest;
+        private Action<bool> _deliveryFinished;
+        private int _returnsBeforeDelivery;
+        private KeyboardAssemblyState _deliveryAssembly;
+        private bool _deliveryAssemblyWasEnabled;
+        private readonly List<Collider> _deliveryColliders = new List<Collider>();
+        private readonly List<Rigidbody> _deliveryBodies = new List<Rigidbody>();
+        private readonly List<bool> _deliveryKinematic = new List<bool>();
+        private readonly List<bool> _deliveryGravity = new List<bool>();
+        private readonly List<bool> _deliveryCollisions = new List<bool>();
 
         [Header("Movement")]
         [SerializeField, Min(0.01f)] private float _moveDuration = 0.6f;
@@ -111,6 +121,7 @@ namespace Game.Workshop
         void OnDisable()
         {
             StopAllCoroutines();
+            FinishDelivery(false);
             foreach (Rigidbody keyboard in _pendingKeyboards)
             {
                 if (keyboard == null) continue;
@@ -138,7 +149,6 @@ namespace Game.Workshop
                 return;
             }
 
-            if (_enableRequestSubmission && TrySubmitKeyboard(other)) return;
             Rigidbody keyboard = other.attachedRigidbody;
             if (keyboard == null || keyboard.isKinematic || !IsKeyboard(keyboard)) return;
             RequestReturn(keyboard);
@@ -181,83 +191,139 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// other가 유효한 제출 의뢰에 도착한 키보드이면 반환 대기열보다 먼저 검수와 지급을 처리한다.
-        /// 고정된 의뢰에 결과를 보관한 뒤 소유 실물을 회수하며 내부 오류는 실패 판정 없이 실물을 보존하고 알린다.
+        /// 트레이의 keyboard와 requestId를 검증하여 수거를 예약하고 성공 여부를 반환한다.
+        /// 제출 대상을 고정하고 실물 조작을 차단하며 기존 에미넴 연출에서 finished로 결과를 알린다.
         /// </summary>
-        private bool TrySubmitKeyboard(Collider other)
+        public bool RequestDelivery(Rigidbody keyboard, string requestId, Action<bool> finished)
         {
-            if (_submissionBodies.Contains(other.attachedRigidbody)) return true;
-            if (KeyboardRequestRuntime.SubmissionTarget == null) return false;
-            if (!TryResolveSubmissionRoot(other, out Rigidbody arrival, out KeyboardAssemblyState assembly)) return false;
-            if (arrival != null && (arrival.isKinematic || _queuedKeyboards.Contains(arrival))) return false;
-
-            Rigidbody owner = assembly != null ? assembly.GetComponent<Rigidbody>() : arrival;
-            if (owner != null && _queuedKeyboards.Contains(owner)) return false;
-            if (owner != null && _submissionBodies.Contains(owner))
+            if (!isActiveAndEnabled || _deliveryRequest != null || keyboard == null
+                || keyboard.GetComponent<KeyboardPickupTarget>() == null || _queuedKeyboards.Contains(keyboard)
+                || KeyboardRequestRuntime.SubmissionTarget?.Definition.RequestId != requestId) return false;
+            if (_gameSession == null || _gameSession.Wallet == null)
             {
-                if (arrival != null) HoldSubmissionObject(arrival.gameObject);
-                return true;
+                Debug.LogError("배송 작업실 지갑 연결이 없습니다. 키보드와 의뢰를 유지합니다.", this);
+                return false;
             }
-            KeyboardRequestState request = null;
+            if (!KeyboardRequestRuntime.TryBeginSubmission(keyboard, out KeyboardRequestState request)) return false;
+            _deliveryKeyboard = keyboard;
+            _deliveryRequest = request;
+            _deliveryFinished = finished;
+            _returnsBeforeDelivery = _pendingKeyboards.Count;
             try
             {
-                if (owner == null || arrival == null)
-                    throw new InvalidOperationException("조립 키보드 소유 루트 또는 제출 실물의 Rigidbody 연결이 없습니다.");
-                if (KeyboardRequestRuntime.IsSubmittedOrProcessing(owner)) return true;
-                if (!KeyboardRequestRuntime.TryBeginSubmission(owner, out request)) return true;
-                if (_gameSession == null || _gameSession.Wallet == null)
-                    throw new InvalidOperationException("의뢰 제출 존의 작업실 골드 세션 연결이 없습니다.");
+                _deliveryAssembly = keyboard.GetComponent<KeyboardAssemblyState>();
+                if (_deliveryAssembly != null)
+                {
+                    _deliveryAssemblyWasEnabled = _deliveryAssembly.enabled;
+                    _deliveryAssembly.enabled = false;
+                }
+                foreach (Collider collider in keyboard.GetComponentsInChildren<Collider>(true))
+                {
+                    if (!collider.enabled) continue;
+                    _deliveryColliders.Add(collider);
+                    collider.enabled = false;
+                }
+                foreach (Rigidbody body in keyboard.GetComponentsInChildren<Rigidbody>(true))
+                {
+                    _deliveryBodies.Add(body);
+                    _deliveryKinematic.Add(body.isKinematic);
+                    _deliveryGravity.Add(body.useGravity);
+                    _deliveryCollisions.Add(body.detectCollisions);
+                    _submissionBodies.Add(body);
+                    if (!body.isKinematic)
+                    {
+                        body.linearVelocity = Vector3.zero;
+                        body.angularVelocity = Vector3.zero;
+                    }
+                    body.isKinematic = true;
+                    body.useGravity = false;
+                    body.detectCollisions = false;
+                }
+                if (!_sequenceRunning)
+                {
+                    _sequenceRunning = true;
+                    StartCoroutine(ReturnKeyboardSequence());
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                FinishDelivery(false);
+                return false;
+            }
+        }
 
-                KeyboardRequestInspection inspection = KeyboardRequestInspection.Inspect(arrival, assembly, request.Definition);
-                List<GameObject> objects = CollectSubmissionObjects(assembly, arrival);
-                foreach (GameObject keyboard in objects) HoldSubmissionObject(keyboard);
-                KeyboardRequestRuntime.CompleteSubmission(request, inspection, _gameSession.Wallet);
+        /// <summary>
+        /// 예약된 키보드의 실제 구성으로 기존 검수와 보상을 확정한 뒤 실물을 수거한다.
+        /// 검수 전에 삭제하지 않으며 설정 오류는 고객 실패로 기록하지 않고 조작 상태를 복원한다.
+        /// </summary>
+        private void CollectDelivery()
+        {
+            bool collected = false;
+            try
+            {
+                if (_deliveryKeyboard == null) throw new InvalidOperationException("수거할 키보드가 없습니다.");
+                KeyboardAssemblyState assembly = _deliveryKeyboard.GetComponent<KeyboardAssemblyState>();
+                KeyboardRequestInspection inspection = KeyboardRequestInspection.Inspect(
+                    _deliveryKeyboard, assembly, _deliveryRequest.Definition);
+                List<GameObject> objects = CollectSubmissionObjects(assembly, _deliveryKeyboard);
+                try { KeyboardRequestRuntime.CompleteSubmission(_deliveryRequest, inspection, _gameSession.Wallet); }
+                catch (Exception exception)
+                {
+                    if (_deliveryRequest.Phase != KeyboardRequestPhase.AwaitingConfirmation) throw;
+                    // 결과와 지급이 확정된 뒤 알림에서 발생한 오류는 재지급하지 않는다.
+                    Debug.LogException(exception, this);
+                }
                 foreach (GameObject keyboard in objects)
                 {
                     keyboard.SetActive(false);
                     Destroy(keyboard);
                 }
+                collected = true;
             }
             catch (Exception exception)
             {
-                if (request != null) KeyboardRequestRuntime.CancelSubmission(request);
-                if (owner != null) HoldSubmissionObject(owner.gameObject);
-                if (arrival != null) HoldSubmissionObject(arrival.gameObject);
-                Debug.LogError($"의뢰 제출 내부 오류: 고객 실패로 판정하지 않고 키보드를 존에 보존합니다. {exception}", this);
+                Debug.LogError($"배송 내부 오류: 키보드와 의뢰를 보존합니다. {exception}", this);
             }
-            return true;
+            FinishDelivery(collected);
         }
 
         /// <summary>
-        /// other의 실제 계층과 조립 상태의 PCB 및 하단부 소유 참조로 제출 실물 arrival과 assembly를 찾는다.
-        /// 분리된 PCB 묶음도 식별하며 개별 키캡과 축 및 도구는 슬롯이나 근접 위치로 추정하지 않는다.
+        /// collected에 따라 수거 잠금을 해제하고 실패 시 저장한 물리와 Collider를 복원한다.
+        /// 예약과 임시 참조를 정리한 뒤 콜백을 한 번 알리며 보상과 검수 결과는 변경하지 않는다.
         /// </summary>
-        private bool TryResolveSubmissionRoot(Collider other, out Rigidbody arrival, out KeyboardAssemblyState assembly)
+        private void FinishDelivery(bool collected)
         {
-            assembly = other.GetComponentInParent<KeyboardAssemblyState>();
-            if (assembly != null)
+            if (_deliveryRequest == null) return;
+            KeyboardRequestRuntime.CancelSubmission(_deliveryRequest);
+            if (!collected && _deliveryAssembly != null) _deliveryAssembly.enabled = _deliveryAssemblyWasEnabled;
+            _deliveryAssembly = null;
+            for (int index = 0; index < _deliveryBodies.Count; index++)
             {
-                arrival = assembly.GetComponent<Rigidbody>();
-                return true;
+                Rigidbody body = _deliveryBodies[index];
+                _submissionBodies.Remove(body);
+                if (collected || body == null) continue;
+                body.isKinematic = _deliveryKinematic[index];
+                body.useGravity = _deliveryGravity[index];
+                body.detectCollisions = _deliveryCollisions[index];
+                if (!body.isKinematic) body.WakeUp();
             }
-            foreach (KeyboardAssemblyState candidate in FindObjectsByType<KeyboardAssemblyState>(FindObjectsSortMode.None))
-            {
-                if (!candidate.Initialized) continue;
-                foreach (AssemblyStructurePart kind in new[] { AssemblyStructurePart.Pcb, AssemblyStructurePart.Lower })
-                {
-                    IReadOnlyList<Transform> parts = candidate.GetStructureParts(kind);
-                    if (parts == null) continue;
-                    foreach (Transform part in parts)
-                    {
-                        if (part == null || part.IsChildOf(candidate.transform) || !other.transform.IsChildOf(part)) continue;
-                        assembly = candidate;
-                        arrival = part.GetComponent<Rigidbody>();
-                        return true;
-                    }
-                }
-            }
-            arrival = other.attachedRigidbody;
-            return arrival != null && arrival.GetComponent<KeyboardPickupTarget>() != null;
+            if (!collected)
+                foreach (Collider collider in _deliveryColliders)
+                    if (collider != null) collider.enabled = true;
+            Action<bool> finished = _deliveryFinished;
+            _deliveryRequest = null;
+            _deliveryKeyboard = null;
+            _deliveryFinished = null;
+            _returnsBeforeDelivery = 0;
+            _deliveryBodies.Clear();
+            _deliveryKinematic.Clear();
+            _deliveryGravity.Clear();
+            _deliveryCollisions.Clear();
+            _deliveryColliders.Clear();
+            try { finished?.Invoke(collected); }
+            catch (Exception exception) { Debug.LogException(exception, this); }
         }
 
         /// <summary>
@@ -271,27 +337,6 @@ namespace Game.Workshop
                 foreach (Transform part in assembly.GetStructureParts(kind))
                     if (!part.IsChildOf(assembly.transform)) objects.Add(part.gameObject);
             return new List<GameObject>(objects);
-        }
-
-        /// <summary>
-        /// keyboard의 모든 Collider와 Rigidbody를 검수 전용으로 고정한다.
-        /// 반환 및 재집기와 부품 재고 회수를 차단하며 오류가 나도 실물은 삭제하지 않는다.
-        /// </summary>
-        private void HoldSubmissionObject(GameObject keyboard)
-        {
-            foreach (Collider collider in keyboard.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
-            foreach (Rigidbody body in keyboard.GetComponentsInChildren<Rigidbody>(true))
-            {
-                _submissionBodies.Add(body);
-                if (!body.isKinematic)
-                {
-                    body.linearVelocity = Vector3.zero;
-                    body.angularVelocity = Vector3.zero;
-                }
-                body.useGravity = false;
-                body.isKinematic = true;
-                body.detectCollisions = false;
-            }
         }
 
         /// <summary>
@@ -329,10 +374,10 @@ namespace Game.Workshop
         {
             while (true)
             {
-                if (!TryPeekKeyboard(out _))
+                if (!TryPeekKeyboard(out _) && _deliveryRequest == null)
                 {
                     yield return MoveActorTo(_hiddenPosition, true);
-                    if (TryPeekKeyboard(out _)) continue;
+                    if (TryPeekKeyboard(out _) || _deliveryRequest != null) continue;
                     _sequenceRunning = false;
                     yield break;
                 }
@@ -343,7 +388,16 @@ namespace Game.Workshop
                     yield return MoveActorTo(_visitPosition, false);
                     yield return WaitFor(_waitBeforeThrow);
                 }
+                if (_deliveryRequest != null && (_returnsBeforeDelivery <= 0 || !TryPeekKeyboard(out _)))
+                {
+                    if (actorAtVisitPosition) yield return WaitFor(_waitBeforeThrow);
+                    CollectDelivery();
+                    yield return WaitFor(_waitAfterThrow);
+                    yield return MoveActorTo(_hiddenPosition, true);
+                    continue;
+                }
                 if (!TryTakeKeyboard(out Rigidbody keyboard)) continue;
+                if (_deliveryRequest != null) _returnsBeforeDelivery--;
 
                 LaunchKeyboard(keyboard);
                 yield return WaitFor(_waitAfterThrow);

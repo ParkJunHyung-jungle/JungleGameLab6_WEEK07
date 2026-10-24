@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -81,7 +81,7 @@ namespace Game.Tutorials
         private int _closeFrame;
 
         public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
-        public bool CanOpenHelp => !Game.Tournament.TournamentController.IsReturnPaused && !IsBlocking
+        public bool CanOpenHelp => !Game.Workshop.WorkshopDeliveryTray.IsInputBlocked && !Game.Tournament.TournamentController.IsReturnPaused && !IsBlocking
             && _pending.Count == 0 && Time.timeScale > 0f;
         private IReadOnlyList<TutorialCard> Cards => _content.Cards;
 
@@ -132,7 +132,7 @@ namespace Game.Tutorials
 
         void Update()
         {
-            if (Game.Tournament.TournamentController.IsReturnPaused) return;
+            if (Game.Tournament.TournamentController.IsReturnPaused || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) return;
             if (!_paused && Keyboard.current != null && Keyboard.current.f10Key.wasPressedThisFrame)
                 HandleHelp(_help);
             if (!_paused) return;
@@ -144,7 +144,7 @@ namespace Game.Tutorials
 
         void LateUpdate()
         {
-            if (Game.Tournament.TournamentController.IsReturnPaused) return;
+            if (Game.Tournament.TournamentController.IsReturnPaused || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) return;
             if (_paused)
             {
                 Time.timeScale = 0f;

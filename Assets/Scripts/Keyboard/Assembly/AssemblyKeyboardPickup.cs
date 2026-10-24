@@ -69,7 +69,7 @@ namespace KeyboardModeling.Assembly
         {
             if (!InGameCursor.CanProcessPointer || !_hasFocus || _focusController.IsFocused || _brain.IsBlending
                 || _brain.ActiveVirtualCamera != (ICinemachineCamera)_inputCamera
-                || Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+                || (Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked))
                 return;
 
             Mouse mouse = Mouse.current;
@@ -99,7 +99,7 @@ namespace KeyboardModeling.Assembly
 
         void FixedUpdate()
         {
-            if (_isHolding && _hasFocus && !Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            if (_isHolding && _hasFocus && !(Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked))
                 FollowHeldKeyboard();
         }
 
@@ -166,6 +166,13 @@ namespace KeyboardModeling.Assembly
         /// </summary>
         private void PickUpKeyboard()
         {
+            Transform parent = _keyboardBody.transform.parent;
+            if (parent != null && parent.TryGetComponent(out Game.Workshop.WorkshopDeliveryTray tray))
+            {
+                if (tray.IsSending) return;
+                parent.GetComponent<WorkbenchKeyboardHolder>().ReleaseKeyboard(_keyboardBody);
+                _keyboardBody.transform.SetParent(null, true);
+            }
             _isPlaced = false;
             _wasKinematic = _keyboardBody.isKinematic;
             _usedGravity = _keyboardBody.useGravity;

@@ -9,7 +9,7 @@ namespace Game.Player
     {
         [InspectorName("키캡")] Keycaps,
         [InspectorName("스위치(축)")] Switches,
-        [InspectorName("나사·도구")] ScrewsTools,
+        [InspectorName("도구")] ScrewsTools,
         [InspectorName("LED·커스텀 이미지")] LedCustomImage,
         [InspectorName("상부 하우징")] UpperHousing,
         [InspectorName("보강판")] Plate,

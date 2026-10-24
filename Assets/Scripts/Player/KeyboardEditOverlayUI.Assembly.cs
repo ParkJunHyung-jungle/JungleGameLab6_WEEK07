@@ -192,7 +192,7 @@ namespace Game.Player
             }
             foreach (KeyboardEditButton button in _plateMaterialButtons)
                 button.GetComponent<WorkshopStructureMaterialDrag>().enabled = plate && assembly != null && assembly.CanInstallPlate;
-            _screwAssembly.SetContext(assembly, pcb);
+            _screwAssembly.SetContext(assembly, _pullerController.IsEditing);
             _pcbCard.SetContext(assembly, pcb);
             _pcbWorldDrag.SetContext(assembly, UsesScreenTrays && pcb);
             _plateCard.SetContext(assembly, plate);

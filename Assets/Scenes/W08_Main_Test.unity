@@ -810,6 +810,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: WorkshopDrawerCabinet
       objectReference: {fileID: 0}
+    - target: {fileID: 2728114147105229594, guid: fcf3aff669552b94bb1801c2b8de9f1b, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: f211feae65314bc09c3c162968764b11, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -2218,6 +2222,7 @@ MonoBehaviour:
   _keycapPuller: {fileID: 989276903}
   _switchPuller: {fileID: 686529946}
   _keycapPlacement: {fileID: 2019032720}
+  _showToolOutlines: 0
   _hoverOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
   _hoverDepthShader: {fileID: 4800000, guid: c15e67eed99449a2a286129ff6aa137e, type: 3}
   _heightOffset: 0.2
@@ -7161,6 +7166,10 @@ PrefabInstance:
       propertyPath: '_keyboardPrefabs.Array.data[0]'
       value: 
       objectReference: {fileID: 7000000000000000700, guid: 30087ed49ad14114872755a667a20ccd, type: 3}
+    - target: {fileID: 7477760555368289054, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
+      propertyPath: _limitLowerHousingInScene
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

@@ -17,6 +17,7 @@ namespace KeyboardModeling.Assembly
         [SerializeField, Tooltip("활성화하면 키캡 대신 스위치만 분리합니다.")] private bool _extractSwitches;
         private IKeyboardPullerContext _context;
         private bool _followCameraPlane;
+        private bool _showReturnOutline = true;
         private IKeyboardPullerContext Context => _context ?? _dragInput;
         public bool IsSelected => _selected;
         public bool ExtractsSwitches => _extractSwitches;
@@ -25,12 +26,13 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// context를 도구 입력과 분리 동작의 대상으로 연결한다.
-        /// followCameraPlane이 true이면 표면이 없는 곳에서 카메라 평행 평면을 사용한다. 반환값은 없다.
+        /// followCameraPlane으로 운반 평면을, showReturnOutline으로 복귀 외형 표시를 정하며 반환값은 없다.
         /// </summary>
-        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false)
+        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false, bool showReturnOutline = true)
         {
             _context = context;
             _followCameraPlane = followCameraPlane;
+            _showReturnOutline = showReturnOutline;
         }
 
         /// <summary>트레이에서 누른 ray로 기존 실물 풀러 집기를 시작한다. 공통 입력이 허용되고 미선택 상태이면 기존 자세 저장·추적 경로를 실행한 결과를 반환한다.</summary>
@@ -255,7 +257,7 @@ namespace KeyboardModeling.Assembly
             {
                 if (!renderer.enabled)
                     continue;
-                CreateReturnMesh(renderer, transforms);
+                if (_showReturnOutline) CreateReturnMesh(renderer, transforms);
                 Bounds bounds = renderer.localBounds;
                 for (int corner = 0; corner < 8; corner++)
                 {

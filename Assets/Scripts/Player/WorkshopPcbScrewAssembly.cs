@@ -64,7 +64,7 @@ namespace Game.Player
                 * Matrix4x4.Translate(-center);
         }
 
-        /// <summary>assembly와 selected로 PCB 탭의 나사 조립 대상을 갱신한다. 대상 변경 시 안내만 다시 준비하며 시작한 체결 연출은 유지한다.</summary>
+        /// <summary>assembly와 selected로 편집 중인 나사 조립 대상을 갱신한다. 탭과 무관하게 안내를 준비하며 시작한 체결·해제 연출은 유지한다.</summary>
         public void SetContext(KeyboardAssemblyState assembly, bool selected)
         {
             if (_assembly != assembly)

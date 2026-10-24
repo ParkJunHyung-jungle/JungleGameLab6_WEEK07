@@ -4,6 +4,7 @@ using UnityEngine;
 
 using Game.Player;
 using KeyboardModeling;
+using KeyboardModeling.Assembly;
 
 public sealed class KeyboardDispenser : MonoBehaviour
 {
@@ -14,9 +15,23 @@ public sealed class KeyboardDispenser : MonoBehaviour
     [SerializeField, InspectorName("배출 위치")] private Transform _outputPoint;
     [SerializeField, InspectorName("키보드 앞뒤 회전 보정")] private float _keyboardFacingYaw;
     [SerializeField, Min(0f)] private float _ejectImpulse = 1.5f;
+    [SerializeField] private bool _limitLowerHousingInScene;
 
     /// <summary>현재 배출 위치와 유효한 재고 프리팹이 있는지 반환한다. 배출과 재고 상태는 변경하지 않는다.</summary>
-    public bool CanDispense => _outputPoint != null && _keyboardPrefabs.Exists(prefab => prefab != null);
+    public bool CanDispense => CanIssueLowerHousing && _outputPoint != null && _keyboardPrefabs.Exists(prefab => prefab != null);
+    public bool CanIssueLowerHousing => !_limitLowerHousingInScene || !HasActiveLowerHousing();
+
+    /// <summary>자판기와 같은 씬의 작업대·바닥에 활성 하단부가 있는지 반환한다. 보관된 비활성 실물과 진열대에 고정된 본체는 제외하며 조립 상태는 변경하지 않는다.</summary>
+    private bool HasActiveLowerHousing()
+    {
+        foreach (KeyboardAssemblyState assembly in FindObjectsByType<KeyboardAssemblyState>(FindObjectsSortMode.None))
+        {
+            if (assembly.gameObject.scene != gameObject.scene
+                || assembly.GetComponentInParent<KeyboardWallRack>() != null) continue;
+            if (assembly.LowerInstalled || assembly.LowerLoose) return true;
+        }
+        return false;
+    }
 
     /// <summary>
     /// 등록된 프리팹 중 하나를 배출 위치에 생성하고 밀어낸 뒤 자판기 배출음을 한 번 재생한다.
@@ -41,7 +56,7 @@ public sealed class KeyboardDispenser : MonoBehaviour
     public bool TryCreateKeyboard(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
     {
         keyboardRoot = null;
-        if (_keyboardPrefabs.Count == 0)
+        if (!CanIssueLowerHousing || _keyboardPrefabs.Count == 0)
             return false;
 
         GameObject stockPrefab = null;

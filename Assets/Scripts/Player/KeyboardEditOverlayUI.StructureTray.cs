@@ -16,6 +16,14 @@ namespace Game.Player
         private readonly Dictionary<GridLayoutGroup, RectTransform> _structureGrids = new Dictionary<GridLayoutGroup, RectTransform>();
         private readonly List<Texture2D> _structurePreviewTextures = new List<Texture2D>();
 
+        /// <summary>material과 일치하는 하부 하우징의 기존 카탈로그 항목을 반환한다. 실물의 반환 대상만 검색하며 재고는 변경하지 않는다.</summary>
+        public AssemblyCatalogEntry GetLowerHousingEntry(Material material)
+        {
+            foreach (AssemblyCatalogEntry entry in _structurePreviews.Keys)
+                if (entry.StructureKind == AssemblyStructurePart.Lower && entry.StructureMaterial == material) return entry;
+            return null;
+        }
+
         /// <summary>기존 구조 부품 처리기에 상부·PCB·하부의 출고 카드를 연결한다. 새 재질 항목만 100개로 생성하며 키캡·스위치 수량과 기존 원본 에셋은 유지한다.</summary>
         private void ConnectStructureTrays()
         {

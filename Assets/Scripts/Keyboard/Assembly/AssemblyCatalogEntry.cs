@@ -36,6 +36,7 @@ namespace KeyboardModeling.Assembly
         public bool IsArtisan => _keycapDefinition != null && _keycapDefinition.IsArtisan;
         public bool IsSwitch => _switchData != null;
         public int AvailableQuantity => _quantity - _reservedQuantity;
+        public bool HasStoredPart => _storedParts.Count > 0;
 
         /// <summary>kind와 material의 새 구조 부품 항목을 quantity로 초기화해 반환한다. 기존 항목의 수량·예약·보관은 건드리지 않는다.</summary>
         public static AssemblyCatalogEntry CreateStructure(AssemblyStructurePart kind, Material material, int quantity)

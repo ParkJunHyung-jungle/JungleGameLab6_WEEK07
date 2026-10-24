@@ -22,6 +22,7 @@ namespace Game.Player
         [SerializeField] private WorkshopKeycapPlacement _keycapPlacement;
 
         [Header("Hover Outline")]
+        [SerializeField] private bool _showToolOutlines = true;
         [SerializeField] private Material _hoverOutlineMaterial;
         [SerializeField] private Shader _hoverDepthShader;
         private WorkshopKeyboardPlacementPreview _keycapHoverPreview;
@@ -126,9 +127,9 @@ namespace Game.Player
 
         void Awake()
         {
-            _keycapPuller.SetContext(this, true);
-            _switchPuller.SetContext(this, true);
-            if (_hoverOutlineMaterial != null && _hoverDepthShader != null)
+            _keycapPuller.SetContext(this, true, _showToolOutlines);
+            _switchPuller.SetContext(this, true, _showToolOutlines);
+            if (_showToolOutlines && _hoverOutlineMaterial != null && _hoverDepthShader != null)
             {
                 _keycapHoverPreview = new WorkshopKeyboardPlacementPreview(
                     _hoverOutlineMaterial, _hoverDepthShader, _camera, Color.white);

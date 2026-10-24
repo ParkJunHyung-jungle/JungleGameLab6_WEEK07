@@ -135,7 +135,7 @@ namespace Game.Player
                 {
                     WorkshopDrawerCategory.Keycaps => "키캡",
                     WorkshopDrawerCategory.Switches => "스위치",
-                    WorkshopDrawerCategory.ScrewsTools => "나사·도구",
+                    WorkshopDrawerCategory.ScrewsTools => "도구",
                     WorkshopDrawerCategory.LedCustomImage => "LED·커스텀 이미지",
                     WorkshopDrawerCategory.UpperHousing => "상부 하우징",
                     WorkshopDrawerCategory.Plate => "보강판",

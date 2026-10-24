@@ -332,7 +332,9 @@ namespace Game.Workshop
         /// </summary>
         private List<GameObject> CollectSubmissionObjects(KeyboardAssemblyState assembly, Rigidbody arrival)
         {
-            var objects = new HashSet<GameObject> { assembly.gameObject, arrival.gameObject };
+            var objects = new HashSet<GameObject> { arrival.gameObject };
+            if (assembly == null) return new List<GameObject>(objects);
+            objects.Add(assembly.gameObject);
             foreach (AssemblyStructurePart kind in Enum.GetValues(typeof(AssemblyStructurePart)))
                 foreach (Transform part in assembly.GetStructureParts(kind))
                     if (!part.IsChildOf(assembly.transform)) objects.Add(part.gameObject);

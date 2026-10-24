@@ -329,17 +329,25 @@ namespace Game.Player
                 KeyboardRequestResult.Failure => " · 실패",
                 _ => string.Empty
             };
-            string switchName = definition.RequiredSwitchType == SwitchType.Red
-                ? "적축" : definition.RequiredSwitchType.ToString();
+            string switchName = definition.RequiredSwitchType switch
+            {
+                SwitchType.Red => "적축",
+                SwitchType.Sans => "샌즈 축",
+                _ => definition.RequiredSwitchType.ToString()
+            };
             string requirements = definition.RequiresAllRequiredSwitchSlots
                 ? $"\n요구사항: 모든 필수 스위치 슬롯에 {switchName} 설치" : string.Empty;
             if (definition.RequiresCompleteAssembly)
                 requirements += "\n전체 조립: 하단부 · PCB · 나사 6개 · 보강판 · 상단부 · 필수 키캡";
+            if (!definition.RequiresAllRequiredSwitchSlots && !definition.RequiresCompleteAssembly && !definition.RequiresGlassSurfaces)
+                requirements = "\n요구사항: 키보드 본체라면 구성과 조립 상태 제한 없음";
             string failure = state.Result == KeyboardRequestResult.Failure
                 ? $"\n실패 사유: {state.FailureReason}" : string.Empty;
             _requestInfo.text = $"의뢰: {definition.DisplayName}\n상태: {phase}{result}"
                 + (state == target ? " · 현재 제출 대상" : string.Empty)
-                + requirements + "\n재질과 키캡 디자인 제한 없음"
+                + requirements + (definition.RequiresGlassSurfaces
+                    ? "\n재질: 하단부 · 상단부 · 모든 필수 키캡은 유리 (PCB·보강판 제한 없음)"
+                    : "\n재질과 키캡 디자인 제한 없음")
                 + $"\n성공 보상: {definition.RewardGold}골드" + failure
                 + (string.IsNullOrEmpty(_requestNotice) ? string.Empty : $"\n{_requestNotice}");
             _acceptRequest.SetInteractable(state.Phase == KeyboardRequestPhase.Unaccepted);

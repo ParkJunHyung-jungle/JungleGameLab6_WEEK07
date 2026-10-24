@@ -269,7 +269,7 @@ namespace Game.Player
 
         /// <summary>
         /// requestId의 확인 대기 의뢰를 종료하고 성공 또는 실패 결과 메일을 한 번 발송한다.
-        /// 저장된 실패 사유를 원본 문구와 조합하고 종료와 수신 기록을 함께 확정하며 재검수와 골드 지급은 하지 않는다.
+        /// 저장된 실패 사유와 명시적 후속 의뢰를 사용해 결과 메일 다음에 새 의뢰를 추가하고 종료를 함께 확정한다.
         /// </summary>
         public static bool TryClose(string requestId)
         {
@@ -297,16 +297,57 @@ namespace Game.Player
             }
             var entry = new MonitorMailEntry(message, body, true, resultMailId, customer);
 
-            _receivedMailIds.Add(entry.MailId);
-            try { _inbox.Add(entry); }
+            KeyboardRequestDefinition next = state.Definition.NextRequest;
+            MonitorMailEntry nextEntry = null;
+            bool addNextState = false;
+            if (next != null)
+            {
+                MonitorMailMessage nextMail = next.InitialMail;
+                if (next == state.Definition || string.IsNullOrWhiteSpace(next.RequestId)
+                    || nextMail == null || nextMail.Request != next || string.IsNullOrWhiteSpace(nextMail.MailId)
+                    || nextMail.MailId == resultMailId) return false;
+                if (_requests.TryGetValue(next.RequestId, out KeyboardRequestState existing))
+                {
+                    if (existing.Definition != next) return false;
+                }
+                else addNextState = true;
+                if (!_receivedMailIds.Contains(nextMail.MailId))
+                    nextEntry = new MonitorMailEntry(nextMail, nextMail.Body, false);
+                else if (addNextState) return false;
+            }
+
+            bool nextStateAdded = false;
+            try
+            {
+                _receivedMailIds.Add(entry.MailId);
+                _inbox.Add(entry);
+                if (nextEntry != null)
+                {
+                    if (addNextState)
+                    {
+                        _requests.Add(next.RequestId, new KeyboardRequestState(next));
+                        nextStateAdded = true;
+                    }
+                    _receivedMailIds.Add(nextEntry.MailId);
+                    _inbox.Add(nextEntry);
+                }
+            }
             catch
             {
+                _inbox.Remove(entry);
                 _receivedMailIds.Remove(entry.MailId);
+                if (nextEntry != null)
+                {
+                    _inbox.Remove(nextEntry);
+                    _receivedMailIds.Remove(nextEntry.MailId);
+                }
+                if (nextStateAdded) _requests.Remove(next.RequestId);
                 throw;
             }
             state.Phase = KeyboardRequestPhase.Closed;
             state.ResultMailSent = true;
             NotifyMailReceived(entry);
+            if (nextEntry != null) NotifyMailReceived(nextEntry);
             return true;
         }
 

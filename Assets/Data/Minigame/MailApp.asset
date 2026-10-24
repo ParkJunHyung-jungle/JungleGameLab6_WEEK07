@@ -17,7 +17,5 @@ MonoBehaviour:
   _icon: {fileID: 21300000, guid: 25c9a128f57f4c65b502d4aa9f99bc07, type: 3}
   _screenPrefab: {fileID: 1004, guid: 25c9a128f57f4c65b502d4aa9f99bc05, type: 3}
   _messages:
-  - {fileID: 11400000, guid: 25c9a128f57f4c65b502d4aa9f99bc11, type: 2}
-  - {fileID: 11400000, guid: 25c9a128f57f4c65b502d4aa9f99bc12, type: 2}
   - {fileID: 11400000, guid: 25c9a128f57f4c65b502d4aa9f99bc13, type: 2}
   - {fileID: 11400000, guid: d1e243417ca740ceb15f5a2dad41d16e, type: 2}

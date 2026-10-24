@@ -24,10 +24,11 @@ namespace Game.Workshop
         private bool _sending;
         private string _notice;
 
-        [Header("Screen HUD")]
+        [Header("Delivery Terminal")]
         [SerializeField] private GameObject _panel;
         [SerializeField] private Text _status;
         [SerializeField] private KeyboardEditButton _send;
+        private readonly List<RaycastResult> _pointerHits = new List<RaycastResult>();
 
         [Header("Confirmation")]
         [SerializeField] private GameObject _confirmation;
@@ -59,7 +60,7 @@ namespace Game.Workshop
         void Awake()
         {
             _confirmation.SetActive(false);
-            _panel.SetActive(false);
+            Refresh();
         }
 
         void OnEnable()
@@ -68,6 +69,7 @@ namespace Game.Workshop
             _send.Clicked += HandleSend;
             _confirm.Clicked += HandleConfirm;
             _back.Clicked += HandleBack;
+            Refresh();
         }
 
         void Update()
@@ -104,16 +106,17 @@ namespace Game.Workshop
 
         /// <summary>
         /// 런타임 제출 대상과 트레이 점유로 배송 상태와 버튼을 갱신한다.
-        /// 의뢰 선택과 수락은 변경하지 않으며 키보드가 없으면 HUD를 숨긴다.
+        /// 의뢰 선택과 수락은 변경하지 않으며 빈 트레이에도 배송 단말기의 안내를 표시한다.
         /// </summary>
         private void Refresh()
         {
-            _panel.SetActive(_holder.KeyboardBody != null);
+            _panel.SetActive(true);
             KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
             bool available = target != null && target.Phase == KeyboardRequestPhase.InProgress;
-            _status.text = _sending ? "고객에게 발송 중입니다." : "배송 대기";
-            _status.text += available ? "\n" + GetCustomerLabel(target)
-                : "\n메일에서 제출할 의뢰를 선택해 주세요.";
+            _status.text = _sending ? "수거 중"
+                : _holder.KeyboardBody == null ? "키보드를 트레이에 올려 주세요."
+                : !available ? "메일에서 제출할 의뢰를 선택해 주세요." : "배송 대기";
+            if (available) _status.text += "\n" + GetCustomerLabel(target);
             if (!string.IsNullOrEmpty(_notice)) _status.text += "\n" + _notice;
             _send.interactable = available && !_sending && !_modalOpen && _holder.KeyboardBody != null;
         }
@@ -137,7 +140,7 @@ namespace Game.Workshop
             KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
             if (_sending || _modalOpen || _holder.KeyboardBody == null || target == null
                 || target.Phase != KeyboardRequestPhase.InProgress || Time.timeScale <= 0f
-                || Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+                || Game.Tutorials.FirstEncounterTutorial.IsBlocking || !CanPointAtSendButton()) return;
             _confirmedKeyboard = _holder.KeyboardBody;
             _confirmedRequestId = target.Definition.RequestId;
             _confirmationBody.text = "선택한 의뢰로 키보드를 발송합니다.\n발송한 키보드는 돌려받을 수 없습니다.\n\n"
@@ -161,6 +164,20 @@ namespace Game.Workshop
             _confirmation.SetActive(true);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
             Refresh();
+        }
+
+        /// <summary>
+        /// 기존 가상 커서 좌표로 UI Raycast를 수행하여 발송 버튼이 맨 앞의 클릭 대상인지 반환한다.
+        /// 월드 Canvas의 이벤트 카메라와 3D 가림 판정을 재사용하며 가려진 버튼의 탐색 입력도 거부한다.
+        /// </summary>
+        private bool CanPointAtSendButton()
+        {
+            if (!InGameCursor.CanProcessVirtualPointer || EventSystem.current == null) return false;
+            _pointerHits.Clear();
+            var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.Position };
+            EventSystem.current.RaycastAll(pointer, _pointerHits);
+            return _pointerHits.Count > 0
+                && ExecuteEvents.GetEventHandler<IPointerClickHandler>(_pointerHits[0].gameObject) == _send.gameObject;
         }
 
         /// <summary>

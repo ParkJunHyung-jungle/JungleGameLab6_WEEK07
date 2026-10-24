@@ -1618,7 +1618,7 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
 
     /// <summary>
     /// keycapIndex 키캡의 루트와 외피 Renderer가 모두 표시 상태인지 반환한다.
-    /// 유효한 키캡 인덱스와 캐시된 Renderer 배열을 사용한다.
+    /// 슬롯별로 캐시한 외피를 직접 조회하며 설치 상태나 외형은 변경하지 않는다.
     /// </summary>
     private bool IsKeycapInstalled(int keycapIndex)
     {
@@ -1629,18 +1629,8 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
         if (keycap == null || !keycap.gameObject.activeSelf)
             return false;
 
-        foreach (MeshRenderer renderer in _keycapRenderers)
-        {
-            if (renderer != null
-                && renderer.name == "PBT_SculptedShell"
-                && renderer.transform.IsChildOf(keycap)
-                && renderer.enabled)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        MeshRenderer shell = _keycapSlotShells[keycapIndex];
+        return shell != null && shell.enabled;
     }
 
     /// <summary>

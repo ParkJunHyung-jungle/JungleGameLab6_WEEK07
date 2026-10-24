@@ -339,7 +339,9 @@ namespace Game.Player
                 return false;
 
             AssemblyDraggablePart part = hit.collider.GetComponentInParent<AssemblyDraggablePart>();
-            if (part != null && (part.Slot == null || part.Slot.InstalledPart != part))
+            bool issuedKeyboard = part != null && part.CatalogEntry != null && part.CatalogEntry.IsStructure
+                && part.CatalogEntry.StructureKind == AssemblyStructurePart.Lower && part.GetComponent<KeyboardPickupTarget>() != null;
+            if (part != null && !issuedKeyboard && (part.Slot == null || part.Slot.InstalledPart != part))
                 return false;
             pickup = hit.collider.GetComponentInParent<KeyboardPickupTarget>();
             if (pickup == null) return false;

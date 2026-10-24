@@ -41,6 +41,7 @@ namespace Game.Player
                 _plateViewport, _pcbViewport };
             foreach (RectTransform area in areas)
                 if (area != null && area.gameObject.activeInHierarchy
+                    && (_keycapTrayContent == null || (area != _viewport && area != _switchSoundViewport) || _keycapTrayTransition.IsTrayVisible)
                     && RectTransformUtility.RectangleContainsScreenPoint(area, point, null)) return true;
             return false;
         }
@@ -191,9 +192,9 @@ namespace Game.Player
             }
             foreach (KeyboardEditButton button in _plateMaterialButtons)
                 button.GetComponent<WorkshopStructureMaterialDrag>().enabled = plate && assembly != null && assembly.CanInstallPlate;
-            _screwAssembly.SetContext(assembly, pcb);
+            _screwAssembly.SetContext(assembly, _pullerController.IsEditing);
             _pcbCard.SetContext(assembly, pcb);
-            _pcbWorldDrag.SetContext(assembly, false);
+            _pcbWorldDrag.SetContext(assembly, UsesScreenTrays && pcb);
             _plateCard.SetContext(assembly, plate);
             _upperCard.SetContext(assembly, upper);
             _lowerCard.SetContext(assembly, _pickerMode == PickerMode.CaseMaterial);
@@ -218,8 +219,8 @@ namespace Game.Player
                 ? $"{(assembly.PcbComplete ? "PCB 조립 완료" : assembly.PcbPlaced ? "PCB 배치됨" : "PCB 미설치")} · 나사 {assembly.ScrewCount}/6\n"
                     + (assembly.PcbPlaced && (assembly.UpperInstalled || assembly.PlateInstalled)
                         ? "상단부·보강판 제거 후 나사 조작"
-                        : assembly.PcbComplete ? "나사 풀기 가능" : assembly.PcbPlaced
-                        ? assembly.CanRemovePcb ? "PCB 좌클릭 드래그로 분리 가능" : "나사 아웃라인 클릭으로 조작"
+                        : assembly.PcbComplete ? "고정된 나사 클릭으로 풀기" : assembly.PcbPlaced
+                        ? assembly.CanRemovePcb ? "나사 클릭으로 체결 · PCB 드래그로 분리" : "나사 클릭: 미고정은 체결 · 고정은 풀기"
                         : assembly.PcbLoose ? "바닥의 PCB를 집어 하단부에 놓기"
                         : assembly.CanInstallPcb ? "하단부 위로 PCB 드래그 배치" : "하단부 설치 필요")
                 : plate ? $"보강판 {(assembly.PlateInstalled ? "설치됨" : "미설치")}\n"
@@ -229,6 +230,8 @@ namespace Game.Player
                 : $"상단부 {(assembly.UpperInstalled ? "설치됨" : "미설치")}\n"
                     + (assembly.CanRemoveUpper ? "좌클릭 드래그로 분리 가능"
                         : assembly.CanInstallUpper ? "재질 카드를 드래그해 설치 가능" : "하단부 설치 후 배치 가능");
+            if (UsesScreenTrays && _pickerMode == PickerMode.CaseMaterial)
+                _assemblyStatus.text = "하부 하우징 출고 · 새 키보드 생성\n기존 운반·작업대·장식장 배치 사용";
             if (upper || _pickerMode == PickerMode.CaseMaterial) RefreshCaseMaterialSelection();
         }
 

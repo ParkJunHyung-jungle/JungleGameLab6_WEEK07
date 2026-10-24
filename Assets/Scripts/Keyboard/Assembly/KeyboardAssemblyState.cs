@@ -61,6 +61,8 @@ namespace KeyboardModeling.Assembly
         private readonly Quaternion[][] _structureRotations = new Quaternion[4][];
         private readonly Vector3[][] _structureScales = new Vector3[4][];
 
+        private readonly Dictionary<AssemblyStructurePart, AssemblyCatalogEntry> _structureInventory = new Dictionary<AssemblyStructurePart, AssemblyCatalogEntry>();
+
         public bool Initialized => _initialized;
         public Transform Pcb => _pcb;
         public IReadOnlyList<MeshRenderer> UpperRenderers => _upperRenderers;
@@ -423,6 +425,33 @@ namespace KeyboardModeling.Assembly
                 : kind == AssemblyStructurePart.Pcb ? _pcbParent : _structureParts[part][index].parent;
             if (parent == null) parent = transform;
             return new Pose(parent.TransformPoint(_structurePositions[part][index]), parent.rotation * _structureRotations[part][index]);
+        }
+
+        /// <summary>kind 부품의 출고 원본 항목을 반환한다. 기록이 없으면 null이며 수량과 설치 상태는 변경하지 않는다.</summary>
+        public AssemblyCatalogEntry GetStructureInventoryEntry(AssemblyStructurePart kind)
+        {
+            _structureInventory.TryGetValue(kind, out AssemblyCatalogEntry entry);
+            return entry;
+        }
+
+        /// <summary>kind 실물에 사용된 entry를 기록한다. 재출고 중복을 막고 반환 시 같은 재질 항목을 복구하는 데 사용한다.</summary>
+        public void SetStructureInventoryEntry(AssemblyStructurePart kind, AssemblyCatalogEntry entry)
+        {
+            _structureInventory[kind] = entry;
+        }
+
+        /// <summary>kind 부품의 출고 기록이 있으면 해당 재질 재고를 한 번 복구한다. 기록을 먼저 제거하여 반복 반환은 수량을 늘리지 않는다.</summary>
+        public void ReturnStructureInventory(AssemblyStructurePart kind)
+        {
+            if (!_structureInventory.TryGetValue(kind, out AssemblyCatalogEntry entry)) return;
+            _structureInventory.Remove(kind);
+            entry.StorePart(null, true);
+        }
+
+        /// <summary>출고한 미설치 PCB를 바닥 실물로 기록한다. 같은 키보드에 추가 PCB를 출고하지 않도록 점유를 유지한다.</summary>
+        public void MarkPcbLoose()
+        {
+            _pcbLoose = true;
         }
 
         /// <summary>kind의 독립적으로 선택된 재질을 반환한다. PCB는 재질 선택 대상이 아니므로 null을 반환한다.</summary>

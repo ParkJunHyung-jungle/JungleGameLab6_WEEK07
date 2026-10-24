@@ -66,8 +66,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// part가 pending 버전으로 영역 밖에 머물면 지연 후 아이콘 비행으로 반환한다.
-        /// 재진입과 재집기는 취소하며 편집 종료 시 아이콘 없이 재고에 반환한다.
+        /// part가 pending 버전으로 영역 밖에 머물면 지연 후 표시된 목적지로 아이콘을 보낸다.
+        /// 재진입과 재집기는 취소하며 집중 종료나 키캡 트레이 숨김·전환 시 연출 없이 반환을 완료한다.
         /// </summary>
         private IEnumerator ReturnAfterExit(AssemblyDraggablePart part, PendingReturn pending)
         {
@@ -82,7 +82,7 @@ namespace Game.Player
                 }
                 elapsed += Time.deltaTime;
             }
-            if (!_placement.IsEditing)
+            if (!_placement.CanAnimateReturn(part.CatalogEntry))
             {
                 CompleteReturn(part, pending);
                 yield break;
@@ -106,6 +106,11 @@ namespace Game.Player
                 if (part == null || part.InteractionVersion != pending.Version || _placement.IsReturnBlocked(part))
                 {
                     CancelReturn(part, pending);
+                    yield break;
+                }
+                if (!_placement.CanAnimateReturn(part.CatalogEntry))
+                {
+                    CompleteReturn(part, pending);
                     yield break;
                 }
                 elapsed += Time.deltaTime;

@@ -62,6 +62,7 @@ namespace Game.Player
         public static KeyboardRequestState SubmissionTarget => _submissionTarget;
 
         public static event Action Changed;
+        public static event Action MailboxChanged;
         public static event Action<MonitorMailEntry> MailReceived;
 
         /// <summary>
@@ -79,6 +80,7 @@ namespace Game.Player
             _processingKeyboard = null;
             _submittedKeyboards.Clear();
             Changed = null;
+            MailboxChanged = null;
             MailReceived = null;
         }
 
@@ -92,6 +94,19 @@ namespace Game.Player
             {
                 TryReceiveMail(message);
             }
+        }
+
+        /// <summary>
+        /// 수신된 mailId의 메일을 deleted에 따라 휴지통으로 이동하거나 복원하고 성공 여부를 반환한다.
+        /// 수신 기록과 의뢰 진행은 유지하며 변경된 메일함을 화면에 알린다.
+        /// </summary>
+        public static bool TrySetMailDeleted(string mailId, bool deleted)
+        {
+            MonitorMailEntry entry = _inbox.Find(mail => mail.MailId == mailId);
+            if (entry == null || entry.IsDeleted == deleted) return false;
+            entry.IsDeleted = deleted;
+            MailboxChanged?.Invoke();
+            return true;
         }
 
         /// <summary>

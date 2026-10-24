@@ -10,6 +10,7 @@ namespace Game.Player
         public string Date { get; }
         public string Body { get; }
         public bool IsResult { get; }
+        public bool IsDeleted { get; internal set; }
         public KeyboardRequestDefinition Request { get; }
 
         /// <summary>

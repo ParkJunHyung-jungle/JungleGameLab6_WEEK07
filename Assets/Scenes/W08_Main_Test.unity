@@ -5929,6 +5929,10 @@ PrefabInstance:
       propertyPath: '_keyboardPrefabs.Array.data[0]'
       value: 
       objectReference: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+    - target: {fileID: 7477760555368289054, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
+      propertyPath: _keyboardFacingYaw
+      value: 180
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

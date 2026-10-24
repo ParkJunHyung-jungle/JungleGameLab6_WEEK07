@@ -87124,6 +87124,7 @@ GameObject:
   - component: {fileID: 786603302744995043}
   - component: {fileID: 1797344829037110172}
   - component: {fileID: 877667483559903443}
+  - component: {fileID: 9923999999}
   m_Layer: 0
   m_Name: Keyboard_Enhanced
   m_TagString: Untagged
@@ -87712,10 +87713,6 @@ MonoBehaviour:
   - {fileID: 2100000, guid: f52e96c37d844b288b135e64f9a7c2d6, type: 2}
   _caseRenderers:
   - {fileID: 7448335059736704784}
-  - {fileID: 8780478049414863374}
-  - {fileID: 4131874619408227893}
-  - {fileID: 903760536120378401}
-  - {fileID: 5999264866688161344}
   _caseMaterial: {fileID: 2100000, guid: eb9bef93fd5c48d4da2e0d9f41939e65, type: 2}
   _caseMaterialIndex: 0
   _keycapRenderers:
@@ -141290,7 +141287,7 @@ Transform:
   m_GameObject: {fileID: 8851000000000000001}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.25, y: 0.54, z: 6.1}
+  m_LocalPosition: {x: 1.25, y: 0.61, z: 6.1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -141380,7 +141377,7 @@ Transform:
   m_GameObject: {fileID: 8851000000000000011}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 9.25, y: 0.54, z: 6.1}
+  m_LocalPosition: {x: 9.25, y: 0.61, z: 6.1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -141470,7 +141467,7 @@ Transform:
   m_GameObject: {fileID: 8851000000000000021}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 17.25, y: 0.54, z: 6.1}
+  m_LocalPosition: {x: 17.25, y: 0.61, z: 6.1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -141560,7 +141557,7 @@ Transform:
   m_GameObject: {fileID: 8851000000000000031}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.25, y: 0.54, z: -0.5}
+  m_LocalPosition: {x: 1.25, y: 0.61, z: -0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -141650,7 +141647,7 @@ Transform:
   m_GameObject: {fileID: 8851000000000000041}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 9.25, y: 0.54, z: -0.5}
+  m_LocalPosition: {x: 9.25, y: 0.61, z: -0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -141740,7 +141737,7 @@ Transform:
   m_GameObject: {fileID: 8851000000000000051}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 17.25, y: 0.54, z: -0.5}
+  m_LocalPosition: {x: 17.25, y: 0.61, z: -0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -165917,7 +165914,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1474237672040320188, guid: 05b4d383e1a0ee04191318579655fd76, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.175
+      value: -0.105
       objectReference: {fileID: 0}
     - target: {fileID: 1474237672040320188, guid: 05b4d383e1a0ee04191318579655fd76, type: 3}
       propertyPath: m_LocalPosition.z
@@ -167819,3 +167816,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d626322e2624714ab14ab507c74b2a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeycapHealth
+--- !u!114 &9923999999
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648102524883158503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10d79e55c3144010a0d2aea6e26ff0f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardModeling.Assembly.KeyboardAssemblyState
+  _customization: {fileID: 3967785068815222441}
+  _installation: {fileID: 16919128326509319}
+  _pcb: {fileID: 7987264179495128253}
+  _screws:
+  - {fileID: 8851000000000000002}
+  - {fileID: 8851000000000000012}
+  - {fileID: 8851000000000000022}
+  - {fileID: 8851000000000000032}
+  - {fileID: 8851000000000000042}
+  - {fileID: 8851000000000000052}
+  _upperRenderers:
+  - {fileID: 8852000000000000004}
+  - {fileID: 8780478049414863374}
+  - {fileID: 4131874619408227893}
+  - {fileID: 903760536120378401}
+  - {fileID: 5999264866688161344}
+  _screwStartHeight: 0.8
+  _screwDuration: 0.65
+  _screwRotationDegrees: 720

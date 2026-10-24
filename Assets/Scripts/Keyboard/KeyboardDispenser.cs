@@ -12,6 +12,7 @@ public sealed class KeyboardDispenser : MonoBehaviour
 
     [Header("Output")]
     [SerializeField, InspectorName("배출 위치")] private Transform _outputPoint;
+    [SerializeField, InspectorName("키보드 앞뒤 회전 보정")] private float _keyboardFacingYaw;
     [SerializeField, Min(0f)] private float _ejectImpulse = 1.5f;
 
     /// <summary>현재 배출 위치와 유효한 재고 프리팹이 있는지 반환한다. 배출과 재고 상태는 변경하지 않는다.</summary>
@@ -67,6 +68,9 @@ public sealed class KeyboardDispenser : MonoBehaviour
         KeyboardPickupTarget pickup = keyboardRoot.GetComponent<KeyboardPickupTarget>();
         if (pickup == null) pickup = keyboardRoot.AddComponent<KeyboardPickupTarget>();
         pickup.SetSourcePrefab(playablePrefab);
+        Vector3 visualCenter = keyboardRoot.transform.TransformPoint(
+            pickup.GetVisualCenterLocalPosition(keyboardRoot.transform));
+        keyboardRoot.transform.RotateAround(visualCenter, Vector3.up, _keyboardFacingYaw);
         Rigidbody keyboardBody = keyboardRoot.GetComponent<Rigidbody>();
         if (keyboardBody == null)
             keyboardBody = keyboardRoot.GetComponentInChildren<Rigidbody>();

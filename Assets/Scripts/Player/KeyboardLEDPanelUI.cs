@@ -144,7 +144,7 @@ namespace Game.Player
 
         /// <summary>
         /// 이미 생성한 LED 조작 항목을 parent의 공통 목록 안으로 옮긴다.
-        /// width에 맞춰 배치하고 독립 카드 장식과 머리말을 숨긴 뒤 콘텐츠 높이를 반환한다.
+        /// width에 맞춰 배치하고 트레이용 글자와 조작 영역을 확대한다. 독립 카드 장식과 머리말을 숨기고 스크롤 콘텐츠 높이를 반환한다.
         /// </summary>
         public float EmbedControls(RectTransform parent, float width)
         {
@@ -153,7 +153,7 @@ namespace Game.Player
             _panel.anchoredPosition = Vector2.zero;
             float scale = width / 414f;
             _panel.localScale = Vector3.one * scale;
-            _panel.sizeDelta = new Vector2(414f, 1100f);
+            _panel.sizeDelta = new Vector2(414f, 1460f);
             GetComponent<Image>().enabled = false;
             GetComponent<Shadow>().enabled = false;
             foreach (RectTransform control in _panel)
@@ -165,17 +165,45 @@ namespace Game.Player
                 }
                 control.anchoredPosition += Vector2.up * 142f;
                 Vector2 position = control.anchoredPosition;
-                position.y *= 1.25f;
+                position.y *= 1.65f;
                 control.anchoredPosition = position;
+                if (control.name == "ColorPicker")
+                {
+                    control.anchoredPosition = new Vector2(32f, position.y);
+                    control.localScale = Vector3.one * (350f / 258f);
+                }
+                else if (control.name == "Power")
+                    control.localScale = Vector3.one * 1.4f;
+                else if (control.name == "PresetFrame")
+                    control.localScale = new Vector3(1f, 1.6f, 1f);
+                else if (control.name == "HexBorder" || control.name == "RGBBorder")
+                    control.localScale = new Vector3(1f, 1.25f, 1f);
+                else if (control.name == "Intensity" || control.name == "Speed")
+                {
+                    control.localScale = new Vector3(1f, 1.4f, 1f);
+                    control.GetComponent<KeyboardLEDSlider>().handleRect.sizeDelta = new Vector2(28f, 20f);
+                }
             }
+            _powerText.rectTransform.anchoredPosition = new Vector2(100f, _powerText.rectTransform.anchoredPosition.y);
             foreach (Text label in _panel.GetComponentsInChildren<Text>(true))
             {
-                label.fontSize = Mathf.Max(20, Mathf.RoundToInt(label.fontSize * 1.5f));
+                label.color = new Color32(53, 35, 24, 255);
+                for (Transform parentTransform = label.transform.parent; parentTransform != _panel; parentTransform = parentTransform.parent)
+                {
+                    if (!parentTransform.TryGetComponent<Image>(out Image background) || !background.enabled || background.color.a < 0.1f)
+                        continue;
+                    if (background.color.grayscale < 0.4f)
+                        label.color = new Color32(255, 244, 226, 255);
+                    break;
+                }
+                label.fontSize = Mathf.Max(28, Mathf.RoundToInt(label.fontSize * 1.8f));
                 Vector2 size = label.rectTransform.sizeDelta;
                 size.y = Mathf.Max(size.y, label.fontSize * 1.5f);
                 label.rectTransform.sizeDelta = size;
                 label.verticalOverflow = VerticalWrapMode.Overflow;
             }
+            _rgbText.fontSize = 20;
+            _patternDescription.fontSize = 24;
             return _panel.sizeDelta.y * scale;
         }
 

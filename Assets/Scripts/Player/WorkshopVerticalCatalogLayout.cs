@@ -399,7 +399,8 @@ namespace Game.Player
             host.pivot = Vector2.up;
             host.anchoredPosition = new Vector2(24f, -24f);
             host.sizeDelta = new Vector2(width, -24f - _bottomMargin);
-            host.GetComponent<Image>().color = new Color32(37, 52, 68, 255);
+            host.GetComponent<Image>().color = trayParent != null && panel.GetComponent<KeyboardLEDPanelUI>() != null
+                ? GetComponent<KeyboardEditOverlayUI>().CatalogCardColor : new Color32(37, 52, 68, 255);
             RectTransform clip = new GameObject("EditorClip", typeof(RectTransform), typeof(RectMask2D))
                 .GetComponent<RectTransform>();
             clip.SetParent(host, false);

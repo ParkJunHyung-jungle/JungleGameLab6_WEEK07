@@ -21,6 +21,7 @@ namespace Game.Player
         [SerializeField] private RectTransform _trayRoot;
         [SerializeField] private CanvasGroup _trayGroup;
         [SerializeField] private KeyboardEditButton _closeButton;
+        [SerializeField, Range(0.1f, 1f)] private float _minimumTrayScale = 0.1f;
 
         [Header("Transition")]
         [SerializeField, Min(0.01f)] private float _pullDistance = 0.13f;
@@ -339,7 +340,7 @@ namespace Game.Player
             return new Vector2(-_trayRoot.rect.width * _trayRoot.localScale.x - 32f, -_trayRoot.rect.height * _trayRoot.localScale.y * 0.12f);
         }
 
-        /// <summary>CanvasScaler 기준 크기와 현재 키보드의 화면 왼쪽 경계로 트레이 배율을 맞춰 조립 영역을 확보한다.</summary>
+        /// <summary>CanvasScaler 크기와 키보드 왼쪽 경계로 트레이 배율을 맞춘다. 최소 표시 배율을 유지하되 화면 안에 들어가는 최대 크기로 제한하며 카드와 입력 상태는 유지한다.</summary>
         private void FitTray()
         {
             _fittedWidth = _outputCamera.pixelWidth;
@@ -359,9 +360,12 @@ namespace Game.Player
                         if (screen.z > _outputCamera.nearClipPlane) available = Mathf.Min(available, screen.x / _canvas.scaleFactor - 16f);
                     }
                 }
-            float fit = Mathf.Min(1f, (available - _trayHome.x) / _trayRoot.rect.width,
+            float maximumScale = Mathf.Max(0.1f, Mathf.Min(1f,
+                (canvasRect.rect.width - _trayHome.x - 16f) / _trayRoot.rect.width,
+                (canvasRect.rect.height - _trayHome.y - 100f) / _trayRoot.rect.height));
+            float fit = Mathf.Min(maximumScale, (available - _trayHome.x) / _trayRoot.rect.width,
                 (canvasRect.rect.height - _trayHome.y - 100f) / _trayRoot.rect.height);
-            _trayRoot.localScale = Vector3.one * Mathf.Max(0.1f, fit);
+            _trayRoot.localScale = Vector3.one * Mathf.Clamp(fit, Mathf.Min(_minimumTrayScale, maximumScale), maximumScale);
         }
 
         /// <summary>visible로 트레이의 표시와 해당 사각형 내부의 Raycast만 변경한다. 내부 처리 컴포넌트는 중단하지 않는다.</summary>

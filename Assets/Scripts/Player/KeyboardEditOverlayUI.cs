@@ -695,6 +695,8 @@ namespace Game.Player
             }
         }
 
+        public Color CatalogCardColor => _pickerCardColor;
+
         public string ControlHintTitle => _pickerMode switch
         {
             PickerMode.Keycap => "키캡 카탈로그",

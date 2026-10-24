@@ -2621,6 +2621,7 @@ MonoBehaviour:
   _trayRoot: {fileID: 1068223448}
   _trayGroup: {fileID: 1068223452}
   _closeButton: {fileID: 1961594193}
+  _minimumTrayScale: 0.9
   _pullDistance: 0.13
   _pullDuration: 0.24
   _travelDuration: 0.62

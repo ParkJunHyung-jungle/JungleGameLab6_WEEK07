@@ -30,15 +30,16 @@ namespace Game.Player
 
         /// <summary>
         /// keyboardRoot의 메시와 본체 기준 변환 및 배율을 저장하며 includeInactive가 참이면 숨긴 설치 대상도 포함한다.
-        /// 메시 자산은 공유하며 원본 외곽선 중복 표시를 제외하고 동작과 물리 컴포넌트는 생성하지 않는다.
+        /// targetRenderer가 지정되면 해당 렌더러만 저장하며 메시 자산과 원본 동작 및 물리 상태는 유지한다.
         /// </summary>
-        public void Prepare(Transform keyboardRoot, bool includeInactive = false)
+        public void Prepare(Transform keyboardRoot, bool includeInactive = false, MeshRenderer targetRenderer = null)
         {
             _meshes.Clear();
             _scale = keyboardRoot.lossyScale;
             foreach (MeshRenderer renderer in keyboardRoot.GetComponentsInChildren<MeshRenderer>(includeInactive))
             {
-                if (!renderer.enabled || (!includeInactive && !renderer.gameObject.activeInHierarchy)
+                if ((targetRenderer != null && renderer != targetRenderer)
+                    || !renderer.enabled || (!includeInactive && !renderer.gameObject.activeInHierarchy)
                     || (renderer.sharedMaterial != null && renderer.sharedMaterial.shader == _outlineMaterial.shader))
                     continue;
                 MeshFilter filter = renderer.GetComponent<MeshFilter>();

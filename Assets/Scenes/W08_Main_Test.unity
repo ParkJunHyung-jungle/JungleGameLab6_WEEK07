@@ -3000,6 +3000,17 @@ PrefabInstance:
       addedObject: {fileID: 7000000000000001211}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+--- !u!114 &894914147 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3274017504402215428, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+  m_PrefabInstance: {fileID: 894914146}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 665555be6ee1c4c4e91a0c715db2b176, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Session.GameSession
 --- !u!1001 &910025451
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -11531,7 +11542,7 @@ MonoBehaviour:
   _storage: {fileID: 9911000150}
   _workshopState: {fileID: 7000000000000000105}
   _enableRequestSubmission: 1
-  _gameSession: {fileID: 7000000000000001502}
+  _gameSession: {fileID: 894914147}
   _moveDuration: 0.6
   _waitBeforeThrow: 1
   _waitAfterThrow: 1
@@ -12241,60 +12252,6 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!1 &7000000000000001500
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7000000000000001501}
-  - component: {fileID: 7000000000000001502}
-  m_Layer: 0
-  m_Name: WorkshopGoldSession
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7000000000000001501
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7000000000000001500}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7000000000000001502
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7000000000000001500}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 665555be6ee1c4c4e91a0c715db2b176, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Game.Session.GameSession
-  _initialBalance: 0
-  _upgradeDefinitions:
-  - {fileID: 11400000, guid: a2f327170fc543b4faa6a7812ae278dc, type: 2}
-  - {fileID: 11400000, guid: 38403b05acb124d40901236152f6a457, type: 2}
-  - {fileID: 11400000, guid: df4cf494358af934a802f8eacb253c81, type: 2}
-  - {fileID: 11400000, guid: af08dd03129bd8a41957b5f6e5fdbf83, type: 2}
-  - {fileID: 11400000, guid: 72624913e5b8d184980d818bb50b0844, type: 2}
-  - {fileID: 11400000, guid: b8f0ccd6c532857438c9803eff8ad4a6, type: 2}
-  _keepWalletForRun: 1
-  _rarityProgression: {fileID: 11400000, guid: 1756cfd78fbcf15428cd7564b5046bfa, type: 2}
 --- !u!1001 &7000000000000001600
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12309,7 +12266,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3842234578716700311, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
       propertyPath: m_Name
-      value: WorkshopWalletHUD
+      value: WorkshopHUD
       objectReference: {fileID: 0}
     - target: {fileID: 3903486087069135616, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
       propertyPath: m_Enabled
@@ -12326,7 +12283,7 @@ PrefabInstance:
     - target: {fileID: 4624352190314092277, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
       propertyPath: _gameSession
       value: 
-      objectReference: {fileID: 7000000000000001502}
+      objectReference: {fileID: 0}
     - target: {fileID: 4967178609598293083, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
       propertyPath: m_LocalScale.x
       value: 0
@@ -12363,8 +12320,11 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedComponents:
+    - {fileID: 4624352190314092277, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
+    m_RemovedGameObjects:
+    - {fileID: 1911140081405279460, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
+    - {fileID: 2614234085679352228, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a018345a92df9c140b93b45b5323e3ee, type: 3}
@@ -12404,6 +12364,5 @@ SceneRoots:
   - {fileID: 894914146}
   - {fileID: 2077483208}
   - {fileID: 7000000000000001401}
-  - {fileID: 7000000000000001501}
   - {fileID: 7000000000000001600}
   - {fileID: 138161768}

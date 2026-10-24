@@ -5,8 +5,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 using Game.Player;
+using Game.Session;
 using Game.Tournament;
 using KeyboardModeling;
+using KeyboardModeling.Assembly;
 
 namespace Game.Workshop
 {
@@ -25,6 +27,11 @@ namespace Game.Workshop
         [SerializeField] private GameObject _workshopKeyboardPrefab;
         [SerializeField] private KeyboardCustomizationStorage _storage;
         [SerializeField] private WorkshopKeyboardStateController _workshopState;
+
+        [Header("Request Submission")]
+        [SerializeField] private bool _enableRequestSubmission;
+        [SerializeField] private GameSession _gameSession;
+        private readonly HashSet<Rigidbody> _submissionBodies = new HashSet<Rigidbody>();
 
         [Header("Movement")]
         [SerializeField, Min(0.01f)] private float _moveDuration = 0.6f;
@@ -131,6 +138,7 @@ namespace Game.Workshop
                 return;
             }
 
+            if (_enableRequestSubmission && TrySubmitKeyboard(other)) return;
             Rigidbody keyboard = other.attachedRigidbody;
             if (keyboard == null || keyboard.isKinematic || !IsKeyboard(keyboard)) return;
             RequestReturn(keyboard);
@@ -143,6 +151,7 @@ namespace Game.Workshop
         public bool RequestReturn(Rigidbody keyboard)
         {
             if (!isActiveAndEnabled || keyboard == null || !IsKeyboard(keyboard)) return false;
+            if (_submissionBodies.Contains(keyboard) || KeyboardRequestRuntime.IsSubmittedOrProcessing(keyboard)) return false;
             if (!_queuedKeyboards.Add(keyboard)) return false;
 
             if (!keyboard.isKinematic)
@@ -172,6 +181,120 @@ namespace Game.Workshop
         }
 
         /// <summary>
+        /// other가 유효한 제출 의뢰에 도착한 키보드이면 반환 대기열보다 먼저 검수와 지급을 처리한다.
+        /// 고정된 의뢰에 결과를 보관한 뒤 소유 실물을 회수하며 내부 오류는 실패 판정 없이 실물을 보존하고 알린다.
+        /// </summary>
+        private bool TrySubmitKeyboard(Collider other)
+        {
+            if (_submissionBodies.Contains(other.attachedRigidbody)) return true;
+            if (KeyboardRequestRuntime.SubmissionTarget == null) return false;
+            if (!TryResolveSubmissionRoot(other, out Rigidbody arrival, out KeyboardAssemblyState assembly)) return false;
+            if (arrival != null && (arrival.isKinematic || _queuedKeyboards.Contains(arrival))) return false;
+
+            Rigidbody owner = assembly != null ? assembly.GetComponent<Rigidbody>() : arrival;
+            if (owner != null && _queuedKeyboards.Contains(owner)) return false;
+            if (owner != null && _submissionBodies.Contains(owner))
+            {
+                if (arrival != null) HoldSubmissionObject(arrival.gameObject);
+                return true;
+            }
+            KeyboardRequestState request = null;
+            try
+            {
+                if (owner == null || arrival == null)
+                    throw new InvalidOperationException("조립 키보드 소유 루트 또는 제출 실물의 Rigidbody 연결이 없습니다.");
+                if (KeyboardRequestRuntime.IsSubmittedOrProcessing(owner)) return true;
+                if (!KeyboardRequestRuntime.TryBeginSubmission(owner, out request)) return true;
+                if (_gameSession == null || _gameSession.Wallet == null)
+                    throw new InvalidOperationException("의뢰 제출 존의 작업실 골드 세션 연결이 없습니다.");
+
+                KeyboardRequestInspection inspection = KeyboardRequestInspection.Inspect(arrival, assembly, request.Definition);
+                List<GameObject> objects = CollectSubmissionObjects(assembly, arrival);
+                foreach (GameObject keyboard in objects) HoldSubmissionObject(keyboard);
+                KeyboardRequestRuntime.CompleteSubmission(request, inspection, _gameSession.Wallet);
+                foreach (GameObject keyboard in objects)
+                {
+                    keyboard.SetActive(false);
+                    Destroy(keyboard);
+                }
+            }
+            catch (Exception exception)
+            {
+                if (request != null) KeyboardRequestRuntime.CancelSubmission(request);
+                if (owner != null) HoldSubmissionObject(owner.gameObject);
+                if (arrival != null) HoldSubmissionObject(arrival.gameObject);
+                Debug.LogError($"의뢰 제출 내부 오류: 고객 실패로 판정하지 않고 키보드를 존에 보존합니다. {exception}", this);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// other의 실제 계층과 조립 상태의 PCB 및 하단부 소유 참조로 제출 실물 arrival과 assembly를 찾는다.
+        /// 분리된 PCB 묶음도 식별하며 개별 키캡과 축 및 도구는 슬롯이나 근접 위치로 추정하지 않는다.
+        /// </summary>
+        private bool TryResolveSubmissionRoot(Collider other, out Rigidbody arrival, out KeyboardAssemblyState assembly)
+        {
+            assembly = other.GetComponentInParent<KeyboardAssemblyState>();
+            if (assembly != null)
+            {
+                arrival = assembly.GetComponent<Rigidbody>();
+                return true;
+            }
+            foreach (KeyboardAssemblyState candidate in FindObjectsByType<KeyboardAssemblyState>(FindObjectsSortMode.None))
+            {
+                if (!candidate.Initialized) continue;
+                foreach (AssemblyStructurePart kind in new[] { AssemblyStructurePart.Pcb, AssemblyStructurePart.Lower })
+                {
+                    IReadOnlyList<Transform> parts = candidate.GetStructureParts(kind);
+                    if (parts == null) continue;
+                    foreach (Transform part in parts)
+                    {
+                        if (part == null || part.IsChildOf(candidate.transform) || !other.transform.IsChildOf(part)) continue;
+                        assembly = candidate;
+                        arrival = part.GetComponent<Rigidbody>();
+                        return true;
+                    }
+                }
+            }
+            arrival = other.attachedRigidbody;
+            return arrival != null && arrival.GetComponent<KeyboardPickupTarget>() != null;
+        }
+
+        /// <summary>
+        /// assembly 소유 루트와 arrival 및 루트에서 분리된 원본 구조 부품을 회수 목록으로 반환한다.
+        /// 명시적인 소유 참조만 사용하며 별도로 분리된 플레이어 자유 키캡과 축은 목록에 추가하지 않는다.
+        /// </summary>
+        private List<GameObject> CollectSubmissionObjects(KeyboardAssemblyState assembly, Rigidbody arrival)
+        {
+            var objects = new HashSet<GameObject> { assembly.gameObject, arrival.gameObject };
+            foreach (AssemblyStructurePart kind in Enum.GetValues(typeof(AssemblyStructurePart)))
+                foreach (Transform part in assembly.GetStructureParts(kind))
+                    if (!part.IsChildOf(assembly.transform)) objects.Add(part.gameObject);
+            return new List<GameObject>(objects);
+        }
+
+        /// <summary>
+        /// keyboard의 모든 Collider와 Rigidbody를 검수 전용으로 고정한다.
+        /// 반환 및 재집기와 부품 재고 회수를 차단하며 오류가 나도 실물은 삭제하지 않는다.
+        /// </summary>
+        private void HoldSubmissionObject(GameObject keyboard)
+        {
+            foreach (Collider collider in keyboard.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
+            foreach (Rigidbody body in keyboard.GetComponentsInChildren<Rigidbody>(true))
+            {
+                _submissionBodies.Add(body);
+                if (!body.isKinematic)
+                {
+                    body.linearVelocity = Vector3.zero;
+                    body.angularVelocity = Vector3.zero;
+                }
+                body.useGravity = false;
+                body.isKinematic = true;
+                body.detectCollisions = false;
+            }
+        }
+
+        /// <summary>
         /// Player 태그 대상의 복귀 요청으로 플레이어를 방 안의 안전 위치로 이동한다.
         /// 지정된 복귀 지점 또는 시작 위치를 사용하며 낙하 속도를 초기화하고 시선 방향은 유지한다.
         /// </summary>
@@ -181,8 +304,12 @@ namespace Game.Workshop
             _playerMovement.TeleportTo(destination);
         }
 
-        /// <summary>body가 반환 대기 또는 던지기 연출 중인지 반환한다. 작업실 보관에서 반환 중인 키보드를 제외한다.</summary>
-        public bool IsReturning(Rigidbody body) { return _queuedKeyboards.Contains(body); }
+        /// <summary>body가 반환 대기, 던지기 연출 또는 의뢰 회수로 고정된 상태인지 반환한다. 해당 키보드는 작업실 보관 목록에서 제외한다.</summary>
+        public bool IsReturning(Rigidbody body)
+        {
+            return _queuedKeyboards.Contains(body) || _submissionBodies.Contains(body)
+                || KeyboardRequestRuntime.IsSubmittedOrProcessing(body);
+        }
 
         /// <summary>
         /// body의 계층에 KeyboardPickupTarget이 있는지 확인해 키보드 여부를 반환한다.

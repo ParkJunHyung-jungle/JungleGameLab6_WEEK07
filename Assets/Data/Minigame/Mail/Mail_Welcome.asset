@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25c9a128f57f4c65b502d4aa9f99bc01, type: 3}
   m_Name: Mail_Welcome
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.MonitorMailMessage
+  _mailId: mail.workshop.welcome
+  _request: {fileID: 0}
   _sender: "워크숍 안내"
   _address: "support@workshop.local"
   _subject: "메일함에 오신 것을 환영합니다"

@@ -19,14 +19,14 @@ namespace Game.Player
         [SerializeField] private Color _normalColor = new Color32(30, 39, 52, 255);
         [SerializeField] private Color _selectedColor = new Color32(40, 66, 84, 255);
 
-        public MonitorMailMessage Message { get; private set; }
+        public MonitorMailEntry Message { get; private set; }
         public event Action<MonitorMailListItem> Selected;
 
         /// <summary>
         /// message의 발신자와 제목 및 날짜를 목록에 표시한다.
-        /// 연결된 메일을 보관하고 선택 강조를 해제한다.
+        /// 원본 SO와 독립된 수신 기록을 보관하고 선택 강조를 해제한다.
         /// </summary>
-        public void Initialize(MonitorMailMessage message)
+        public void Initialize(MonitorMailEntry message)
         {
             Message = message;
             _sender.text = message.Sender;

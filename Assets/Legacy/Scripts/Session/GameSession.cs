@@ -11,9 +11,12 @@ namespace Game.Session
 {
     public sealed class GameSession : MonoBehaviour
     {
+        private static Wallet _workshopWallet;
+
         [Header("Starting State")]
         [SerializeField, Min(0)] private long _initialBalance;
         [SerializeField] private UpgradeDefinition[] _upgradeDefinitions;
+        [SerializeField] private bool _keepWalletForRun;
 
         [Header("Runtime State")]
         private Wallet _wallet;
@@ -37,8 +40,18 @@ namespace Game.Session
         {
             _rarityProgression.Validate();
 
-            _wallet = new Wallet(_initialBalance);
+            _wallet = _keepWalletForRun ? _workshopWallet ??= new Wallet(_initialBalance) : new Wallet(_initialBalance);
             _upgrades = new UpgradeService(_wallet, _upgradeDefinitions);
+        }
+
+        /// <summary>
+        /// 새 게임 실행 시 작업실에서 공유한 지갑 참조를 초기화한다.
+        /// 입력과 반환값 없이 이전 실행의 잔액을 제거하며 원본 세션 설정은 변경하지 않는다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetWorkshopWallet()
+        {
+            _workshopWallet = null;
         }
 
         void OnDestroy()

@@ -197,6 +197,24 @@ namespace KeyboardModeling
         }
 
         /// <summary>
+        /// 실제 입력 바인딩에 정의된 필수 키와 키캡 슬롯의 읽기 전용 매핑을 반환한다.
+        /// 누락 및 중복 슬롯은 설정 오류로 알리며 설치 상태와 기본 외형은 변경하지 않는다.
+        /// </summary>
+        public IReadOnlyDictionary<Key, Transform> GetRequiredKeycapSlots()
+        {
+            var layout = new Dictionary<Key, Transform>();
+            var slots = new HashSet<Transform>();
+            foreach (KeyBinding binding in _bindings)
+            {
+                if (binding.Key == Key.None || binding.Keycap == null || !slots.Add(binding.Keycap))
+                    throw new InvalidOperationException("필수 키캡 슬롯 바인딩이 누락되었거나 중복되었습니다.");
+                layout.Add(binding.Key, binding.Keycap);
+            }
+            if (layout.Count == 0) throw new InvalidOperationException("필수 키캡 슬롯 정의가 없습니다.");
+            return new System.Collections.ObjectModel.ReadOnlyDictionary<Key, Transform>(layout);
+        }
+
+        /// <summary>
         /// key에 바인딩된 물리 키캡 Transform을 찾아 반환한다.
         /// 바인딩이 없으면 false와 null을 반환한다.
         /// </summary>

@@ -45,7 +45,12 @@ namespace Game.Player
             _structurePanels.Add(kind, panel);
             var buttons = new List<KeyboardEditButton>();
             var materials = new List<Material>();
-            if (kind == AssemblyStructurePart.Pcb) materials.Add(null);
+            if (kind == AssemblyStructurePart.Pcb)
+            {
+                foreach (Material material in _pcbMaterials)
+                    if (material != null && !materials.Contains(material)) materials.Add(material);
+                if (materials.Count == 0) materials.Add(null);
+            }
             else foreach (Material material in _keycapMaterials)
                 if (material != null && !materials.Contains(material)) materials.Add(material);
             foreach (Material material in materials)
@@ -108,7 +113,8 @@ namespace Game.Player
             if (assembly == null || !assembly.Initialized) return;
             foreach (var preview in _structurePreviews)
             {
-                Texture2D texture = AssemblyCatalogPreview.RenderParts(assembly.GetStructureParts(preview.Key.StructureKind), preview.Key.StructureMaterial);
+                Texture2D texture = AssemblyCatalogPreview.RenderParts(assembly.GetStructureParts(preview.Key.StructureKind), preview.Key.StructureMaterial,
+                    preview.Key.StructureKind == AssemblyStructurePart.Pcb);
                 if (texture == null) continue;
                 _structurePreviewTextures.Add(texture);
                 preview.Value.texture = texture;

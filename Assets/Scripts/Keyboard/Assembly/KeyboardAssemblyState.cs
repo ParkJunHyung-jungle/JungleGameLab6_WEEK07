@@ -454,18 +454,26 @@ namespace KeyboardModeling.Assembly
             _pcbLoose = true;
         }
 
-        /// <summary>kind의 독립적으로 선택된 재질을 반환한다. PCB는 재질 선택 대상이 아니므로 null을 반환한다.</summary>
+        /// <summary>kind 부품의 현재 독립 재질을 반환한다. PCB는 배선과 LED를 제외한 기판 재질을 사용한다.</summary>
         public Material GetStructureMaterial(AssemblyStructurePart kind)
         {
             return kind == AssemblyStructurePart.Plate ? _customization.PlateMaterial
                 : kind == AssemblyStructurePart.Upper ? UpperMaterial
-                : kind == AssemblyStructurePart.Lower ? _customization.CaseMaterial : null;
+                : kind == AssemblyStructurePart.Lower ? _customization.CaseMaterial
+                : _pcb.Find("PCB_Board").GetComponent<MeshRenderer>().sharedMaterial;
         }
 
-        /// <summary>kind의 하단부·보강판·상단부에 material을 선택한다. 원본 재질 에셋과 설치 상태는 변경하지 않는다.</summary>
+        /// <summary>kind 부품에 material을 선택한다. PCB는 기판 메시만 변경하며 원본 재질 에셋과 설치 상태는 유지한다.</summary>
         public bool SetStructureMaterial(AssemblyStructurePart kind, Material material)
         {
             if (material == null) return false;
+            if (kind == AssemblyStructurePart.Pcb)
+            {
+                MeshRenderer board = _pcb.Find("PCB_Board").GetComponent<MeshRenderer>();
+                board.sharedMaterial = material;
+                KeyboardToonSurface.ApplyBounds(board);
+                return true;
+            }
             if (kind == AssemblyStructurePart.Lower)
             {
                 if (_customization.CaseMaterial != material) _customization.SetCaseMaterial(material);

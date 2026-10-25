@@ -59,6 +59,7 @@ namespace Game.Player
         [Header("Keycap Material Picker")]
         [SerializeField] private GameObject _previewKeycapPrefab;
         [SerializeField] private Material[] _keycapMaterials = new Material[0];
+        [SerializeField] private Material[] _pcbMaterials = new Material[0];
         [SerializeField] private KeycapDefinition[] _keycapDefinitions = new KeycapDefinition[0];
         [SerializeField, Min(1f)] private float _viewportWidth = 860f;
         [SerializeField, Min(1f)] private float _itemWidth = 116f;

@@ -7,7 +7,7 @@ using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
-    public sealed class WorkshopKeycapCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public sealed class WorkshopKeycapCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
     {
         private WorkshopKeycapPlacement _placement;
         private AssemblyCatalogEntry _entry;
@@ -60,6 +60,12 @@ namespace Game.Player
             _placement.SetInventoryScroll(this, true);
             _scroll.OnBeginDrag(eventData);
             _placement.ShowInventoryIcon(_entry, InGameCursor.Position);
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left && !eventData.dragging && _structureDrag != null)
+                _structureDrag.SelectPcbMaterial(_entry);
         }
 
         public void OnDrag(PointerEventData eventData)

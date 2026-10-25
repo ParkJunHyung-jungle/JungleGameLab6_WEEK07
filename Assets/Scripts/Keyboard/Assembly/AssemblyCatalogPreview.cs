@@ -10,17 +10,17 @@ namespace KeyboardModeling.Assembly
         private const int PREVIEW_LAYER = 31;
         private const int TEXTURE_SIZE = 128;
 
-        /// <summary>parts의 실제 메시와 재질을 기존 카탈로그 렌더러로 표시해 텍스처를 반환한다. 원본 부품·활성 상태는 변경하지 않으며 표시 가능한 메시가 없으면 null을 반환한다.</summary>
-        public static Texture2D RenderParts(IReadOnlyList<Transform> parts, Material shellMaterial = null)
+        /// <summary>parts의 메시와 shellMaterial로 카탈로그 텍스처를 반환한다. pcbBoardOnly가 참이면 기판만 재질을 대체하며 원본과 활성 상태는 유지하고 메시가 없으면 null을 반환한다.</summary>
+        public static Texture2D RenderParts(IReadOnlyList<Transform> parts, Material shellMaterial = null, bool pcbBoardOnly = false)
         {
-            return Render(null, null, parts, shellMaterial);
+            return Render(null, null, parts, shellMaterial, pcbBoardOnly);
         }
 
         /// <summary>
         /// mesh와 materials를 격리된 미리보기에서 렌더링하여 아이콘 텍스처를 반환한다.
-        /// parts가 있으면 각 원본 메시를 읽기 복사 없이 표시한다. 원본 에셋과 씬 배치는 변경하지 않으며 호출자가 반환 텍스처를 해제한다.
+        /// parts가 있으면 각 원본 메시를 표시하며 pcbBoardOnly로 shellMaterial의 대상을 기판으로 제한한다. 원본 에셋과 씬 배치는 유지하며 호출자가 반환 텍스처를 해제한다.
         /// </summary>
-        public static Texture2D Render(Mesh mesh, Material[] materials, IReadOnlyList<Transform> parts = null, Material shellMaterial = null)
+        public static Texture2D Render(Mesh mesh, Material[] materials, IReadOnlyList<Transform> parts = null, Material shellMaterial = null, bool pcbBoardOnly = false)
         {
             GameObject stage = new GameObject("AssemblyCatalogPreviewStage");
             stage.hideFlags = HideFlags.HideAndDontSave;
@@ -34,7 +34,7 @@ namespace KeyboardModeling.Assembly
                     MeshFilter filter = source.GetComponent<MeshFilter>();
                     if (!source.enabled || filter == null || filter.sharedMesh == null) continue;
                     Material[] previewMaterials = source.sharedMaterials;
-                    if (shellMaterial != null && source.transform == part)
+                    if (shellMaterial != null && (pcbBoardOnly ? source.transform == part.Find("PCB_Board") : source.transform == part))
                         for (int index = 0; index < previewMaterials.Length; index++) previewMaterials[index] = shellMaterial;
                     renderers.Add(CreatePreviewModel(stage.transform, filter.sharedMesh, previewMaterials, source.transform, parts[0]));
                 }

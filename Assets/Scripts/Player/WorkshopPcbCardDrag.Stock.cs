@@ -81,7 +81,7 @@ namespace Game.Player
                 else
                 {
                     _stockPreviousMaterial = _assembly.GetStructureMaterial(_kind);
-                    if (_kind != AssemblyStructurePart.Pcb) _assembly.SetStructureMaterial(_kind, entry.StructureMaterial);
+                    _assembly.SetStructureMaterial(_kind, entry.StructureMaterial);
                     _stockParts = _parts;
                 }
                 StartStockMotion(point);
@@ -91,6 +91,15 @@ namespace Game.Player
                 CancelStockDrag();
                 throw;
             }
+        }
+
+        /// <summary>entry의 PCB 기판 재질을 현재 편집 실물에 적용한다. 입력 점유를 검사하며 설치 상태와 재고는 변경하지 않는다.</summary>
+        public void SelectPcbMaterial(AssemblyCatalogEntry entry)
+        {
+            if (_kind != AssemblyStructurePart.Pcb || entry.StructureKind != _kind || !_selected
+                || !_stockTray.CanInteractWithTray || !_pullers.InputAllowed || _pullers.IsManipulatingPart
+                || _assembly == null || !_assembly.Initialized) return;
+            _assembly.SetStructureMaterial(_kind, entry.StructureMaterial);
         }
 
         /// <summary>현재 출고 실물의 자세와 충돌 상태를 저장하고 point를 따르는 카메라 평행 평면 드래그를 시작한다. 슬롯 위 이동만으로 설치하지 않는다.</summary>

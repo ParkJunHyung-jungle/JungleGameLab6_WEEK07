@@ -11521,6 +11521,10 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 227931973824b224ba90d10fd191701c, type: 2}
   - {fileID: 2100000, guid: f52e96c37d844b288b135e64f9a7c2d6, type: 2}
   - {fileID: 2100000, guid: e41f85b26c934a179a024d53e8f6b1c5, type: 2}
+  _pcbMaterials:
+  - {fileID: 2100000, guid: 24d710d218aa3184a83f33c24be9e285, type: 2}
+  - {fileID: 2100000, guid: 7ad5e77262b24a24ac1b3af4208455b2, type: 2}
+  - {fileID: 2100000, guid: 8dc27fd3e046458e963bbc9d2f5ac179, type: 2}
   _keycapDefinitions:
   - {fileID: 11400000, guid: 04f71214712b4ca9b7fffc6bfe22f0c4, type: 2}
   - {fileID: 11400000, guid: 1f6e62ccc2594986a83d3a66784734bf, type: 2}

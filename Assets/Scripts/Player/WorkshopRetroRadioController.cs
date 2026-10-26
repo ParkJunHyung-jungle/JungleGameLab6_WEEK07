@@ -77,6 +77,7 @@ namespace Game.Player
         [Header("Workshop Input")]
         private WorkshopViewController _workshopView;
         private Camera _outputCamera;
+        public bool IsInteractionTarget { get; private set; }
 
         [Header("Interaction")]
         [SerializeField, Min(0.1f)] private float _interactionDistance = 12f;
@@ -132,6 +133,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            IsInteractionTarget = false;
             UpdatePowerSound();
             UpdateMusicChange();
 
@@ -146,6 +148,7 @@ namespace Game.Player
                             Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                         && hit.transform.IsChildOf(transform))
                     {
+                        IsInteractionTarget = true;
                         _outline?.Show(new Pose(transform.position, transform.rotation));
                         Mouse mouse = Mouse.current;
                         if (mouse.leftButton.wasPressedThisFrame != mouse.rightButton.wasPressedThisFrame)
@@ -497,6 +500,7 @@ namespace Game.Player
 
         void OnDisable()
         {
+            IsInteractionTarget = false;
             _outline?.Dispose();
             _outline = null;
             _turningOn = false;

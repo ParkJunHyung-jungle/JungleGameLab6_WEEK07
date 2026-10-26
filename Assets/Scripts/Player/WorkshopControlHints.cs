@@ -22,6 +22,7 @@ namespace Game.Player
         [SerializeField] private FirstEncounterTutorial _tutorial;
         [SerializeField] private RectTransform _helpButton;
         [SerializeField] private GameObject _legacyControlBar;
+        private WorkshopRetroRadioController _radio;
 
         [Header("Layout")]
         [SerializeField, Min(280f)] private float _width = 370f;
@@ -67,6 +68,7 @@ namespace Game.Player
 
         void Start()
         {
+            _radio = FindFirstObjectByType<WorkshopRetroRadioController>();
             _parent = (RectTransform)_helpButton.parent;
             _font = _helpButton.GetComponentInChildren<Text>().font;
             _sprite = _helpButton.GetComponent<Image>().sprite;
@@ -112,6 +114,13 @@ namespace Game.Player
                 _workshopView.CollectControlHints(_common);
             else
                 _interaction.CollectControlHints(_common);
+            if (_radio != null && _radio.IsInteractionTarget)
+            {
+                _common.Clear();
+                _common.Title = "라디오";
+                _common.Add("좌클릭", "라디오 켜기 / 채널 변경");
+                _common.Add("우클릭", "라디오 끄기");
+            }
             if (_common.Rows.Count == 0) { Hide(); return; }
             bool isEditing = _workshopView != null ? _workshopView.IsKeyboardEditing : _interaction.IsKeyboardEditing;
             _state.Title = isEditing ? _editOverlay.ControlHintTitle : _common.Title;

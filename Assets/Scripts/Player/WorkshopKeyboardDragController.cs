@@ -70,6 +70,17 @@ namespace Game.Player
                 _placementOutlineMaterial, _placementDepthShader, _outputCamera);
         }
 
+        /// <summary>
+        /// 현재 키보드 배치의 재질과 깊이 셰이더 및 출력 카메라로 독립적인 외곽선 표시기를 반환한다.
+        /// 설정이 누락되면 null을 반환하며 기존 배치 표시기와 공유 에셋은 변경하지 않는다.
+        /// </summary>
+        internal WorkshopKeyboardPlacementPreview CreatePlacementPreview()
+        {
+            if (_placementOutlineMaterial == null || _placementDepthShader == null || _outputCamera == null)
+                return null;
+            return new WorkshopKeyboardPlacementPreview(_placementOutlineMaterial, _placementDepthShader, _outputCamera);
+        }
+
         void OnEnable()
         {
             _acceptPress = false;

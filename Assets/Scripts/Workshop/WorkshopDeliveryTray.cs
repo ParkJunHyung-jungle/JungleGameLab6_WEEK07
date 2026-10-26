@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -105,18 +105,19 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 런타임 제출 대상과 트레이 점유로 배송 상태와 버튼을 갱신한다.
-        /// 의뢰 선택과 수락은 변경하지 않으며 빈 트레이에도 배송 단말기의 안내를 표시한다.
+        /// 런타임 진행 의뢰와 트레이 점유로 배송 상태와 버튼을 갱신한다.
+        /// 의뢰 수락은 변경하지 않으며 빈 트레이에도 배송 단말기의 안내를 표시한다.
         /// </summary>
         private void Refresh()
         {
             _panel.SetActive(true);
-            KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
+            KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
             bool available = target != null && target.Phase == KeyboardRequestPhase.InProgress;
             _status.text = _sending ? "수거 중"
                 : _holder.KeyboardBody == null ? "키보드를 트레이에 올려 주세요."
-                : !available ? "메일에서 제출할 의뢰를 선택해 주세요." : "배송 대기";
-            if (available) _status.text += "\n" + GetCustomerLabel(target);
+                : target == null ? "메일에서 의뢰를 수락해 주세요."
+                : !available ? "의뢰 결과를 확인해 주세요." : "배송 대기";
+            if (target != null) _status.text += "\n" + GetCustomerLabel(target);
             if (!string.IsNullOrEmpty(_notice)) _status.text += "\n" + _notice;
             _send.interactable = available && !_sending && !_modalOpen && _holder.KeyboardBody != null;
         }
@@ -137,13 +138,13 @@ namespace Game.Workshop
         /// </summary>
         private void HandleSend(KeyboardEditButton button)
         {
-            KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
+            KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
             if (_sending || _modalOpen || _holder.KeyboardBody == null || target == null
                 || target.Phase != KeyboardRequestPhase.InProgress || Time.timeScale <= 0f
                 || Game.Tutorials.FirstEncounterTutorial.IsBlocking || !CanPointAtSendButton()) return;
             _confirmedKeyboard = _holder.KeyboardBody;
             _confirmedRequestId = target.Definition.RequestId;
-            _confirmationBody.text = "선택한 의뢰로 키보드를 발송합니다.\n발송한 키보드는 돌려받을 수 없습니다.\n\n"
+            _confirmationBody.text = "진행 중인 의뢰로 키보드를 발송합니다.\n발송한 키보드는 돌려받을 수 없습니다.\n\n"
                 + GetCustomerLabel(target);
             _savedTimeScale = Time.timeScale;
             _savedCursorLock = InGameCursor.LockState;
@@ -188,13 +189,13 @@ namespace Game.Workshop
         {
             if (!_modalOpen || _closing) return;
             bool valid = IsConfirmationValid();
-            if (!valid) _notice = "키보드 또는 제출 대상이 바뀌었습니다. 다시 확인해 주세요.";
+            if (!valid) _notice = "키보드 또는 진행 의뢰가 바뀌었습니다. 다시 확인해 주세요.";
             BeginClose(valid);
         }
 
         /// <summary>
         /// button의 뒤로 클릭으로 소비 없이 팝업 종료를 예약한다.
-        /// 키보드와 의뢰 선택은 그대로 유지한다.
+        /// 키보드와 진행 의뢰 상태는 그대로 유지한다.
         /// </summary>
         private void HandleBack(KeyboardEditButton button)
         {
@@ -202,12 +203,12 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 팝업에 표시한 키보드와 의뢰가 현재도 트레이와 제출 대상으로 유지되는지 반환한다.
+        /// 팝업에 표시한 키보드와 의뢰가 현재도 트레이와 진행 의뢰로 유지되는지 반환한다.
         /// 검수나 보상은 수행하지 않는다.
         /// </summary>
         private bool IsConfirmationValid()
         {
-            KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
+            KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
             return !_sending && _confirmedKeyboard != null && _holder.KeyboardBody == _confirmedKeyboard
                 && _confirmedKeyboard.transform.parent == _holder.transform && target != null
                 && target.Definition.RequestId == _confirmedRequestId && target.Phase == KeyboardRequestPhase.InProgress;

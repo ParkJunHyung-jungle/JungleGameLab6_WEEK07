@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 
 using UnityEngine;
@@ -28,6 +29,7 @@ namespace Game.Player
         /// _keyboardBody를 외부 상호작용 코드가 조회할 수 있게 제공한다.
         /// </summary>
         public Rigidbody KeyboardBody => _keyboardBody;
+        public event Action KeyboardChanged;
 
         /// <summary>
         /// 작업대에 키보드를 고정할 때 결정한 최초 목표 회전을 반환한다.
@@ -92,6 +94,7 @@ namespace Game.Player
                 body.angularVelocity = Vector3.zero;
             }
             _keyboardBody = body;
+            KeyboardChanged?.Invoke();
             _initialKeyboardRotation = pose.rotation;
             body.isKinematic = true;
             body.useGravity = false;
@@ -144,6 +147,7 @@ namespace Game.Player
             }
 
             _keyboardBody = body;
+            KeyboardChanged?.Invoke();
             _initialKeyboardRotation = GetPlacementPose(Vector3.zero).rotation;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
@@ -202,7 +206,10 @@ namespace Game.Player
         public void ReleaseKeyboard(Rigidbody body)
         {
             if (_keyboardBody == body)
+            {
                 _keyboardBody = null;
+                KeyboardChanged?.Invoke();
+            }
         }
     }
 }

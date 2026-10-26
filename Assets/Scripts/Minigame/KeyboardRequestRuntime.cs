@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
@@ -53,14 +53,14 @@ namespace Game.Player
         private static readonly ReadOnlyCollection<MonitorMailEntry> _inboxView = _inbox.AsReadOnly();
         private static readonly ReadOnlyDictionary<string, KeyboardRequestState> _requestsView =
             new ReadOnlyDictionary<string, KeyboardRequestState>(_requests);
-        private static KeyboardRequestState _submissionTarget;
+        private static KeyboardRequestState _activeRequest;
         private static KeyboardRequestState _processingRequest;
         private static Rigidbody _processingKeyboard;
         private static readonly HashSet<Rigidbody> _submittedKeyboards = new HashSet<Rigidbody>();
 
         public static IReadOnlyList<MonitorMailEntry> Inbox => _inboxView;
         public static IReadOnlyDictionary<string, KeyboardRequestState> Requests => _requestsView;
-        public static KeyboardRequestState SubmissionTarget => _submissionTarget;
+        public static KeyboardRequestState ActiveRequest => _activeRequest;
 
         public static event Action Changed;
         public static event Action MailboxChanged;
@@ -76,7 +76,7 @@ namespace Game.Player
             _inbox.Clear();
             _receivedMailIds.Clear();
             _requests.Clear();
-            _submissionTarget = null;
+            _activeRequest = null;
             _processingRequest = null;
             _processingKeyboard = null;
             _submittedKeyboards.Clear();
@@ -141,12 +141,13 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// requestId의 수신된 미수락 의뢰를 진행 중으로 변경하고 성공 여부를 반환한다.
-        /// 다른 의뢰의 수락 상태와 현재 제출 대상은 변경하지 않는다.
+        /// requestId의 수신된 미수락 의뢰를 유일한 진행 의뢰로 변경하고 성공 여부를 반환한다.
+        /// 다른 의뢰가 종료 대기 중이면 수락을 거부하고 성공한 상태를 활성 의뢰로 보관한다.
         /// </summary>
         public static bool TryAccept(string requestId)
         {
-            if (!TryGetState(requestId, KeyboardRequestPhase.Unaccepted, out KeyboardRequestState state)) return false;
+            if (_activeRequest != null || !TryGetState(requestId, KeyboardRequestPhase.Unaccepted, out KeyboardRequestState state)) return false;
+            _activeRequest = state;
             state.Phase = KeyboardRequestPhase.InProgress;
             CustomizationLogger.RecordRequestEvent("RequestAccepted", requestId);
             NotifyChanged();
@@ -154,36 +155,18 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// requestId의 진행 중 의뢰를 유일한 제출 대상으로 지정하고 성공 여부를 반환한다.
-        /// null 입력은 현재 제출 대상만 해제하며 각 의뢰의 진행 상태는 유지한다.
-        /// </summary>
-        public static bool TrySelectSubmissionTarget(string requestId)
-        {
-            if (_processingRequest != null) return false;
-            KeyboardRequestState state = null;
-            if (requestId != null && !TryGetState(requestId, KeyboardRequestPhase.InProgress, out state)) return false;
-            bool changed = _submissionTarget != state;
-            _submissionTarget = state;
-            if (changed && state != null)
-                CustomizationLogger.RecordRequestEvent("RequestTargetSelected", requestId);
-            NotifyChanged();
-            return true;
-        }
-
-        /// <summary>
-        /// 현재 제출 대상과 requestId가 일치하면 passed와 failureReason을 검수 결과로 기록한다.
+        /// 현재 진행 의뢰와 requestId가 일치하면 passed와 failureReason을 검수 결과로 기록한다.
         /// 실패 사유가 없는 실패는 거부하며 성공 시에도 골드는 지급하지 않고 결과 확인 단계로 변경한다.
         /// </summary>
         public static bool TryRecordInspection(string requestId, bool passed, string failureReason)
         {
-            if (_processingRequest != null || _submissionTarget == null || _submissionTarget.Definition.RequestId != requestId
+            if (_processingRequest != null || _activeRequest == null || _activeRequest.Definition.RequestId != requestId
                 || (!passed && string.IsNullOrWhiteSpace(failureReason))) return false;
 
-            KeyboardRequestState state = _submissionTarget;
+            KeyboardRequestState state = _activeRequest;
             state.Result = passed ? KeyboardRequestResult.Success : KeyboardRequestResult.Failure;
             state.FailureReason = passed ? string.Empty : failureReason;
             state.Phase = KeyboardRequestPhase.AwaitingConfirmation;
-            _submissionTarget = null;
             CustomizationLogger.RecordRequestEvent("RequestResult", requestId,
                 result: state.Result.ToString(), failureReason: state.FailureReason);
             NotifyChanged();
@@ -200,15 +183,15 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// keyboard 소유 루트에 현재 유효한 제출 대상을 고정하고 request로 반환한다.
-        /// 진행 중 의뢰만 한 번 예약하며 처리 도중 제출 대상 변경과 중복 검수를 차단한다.
+        /// keyboard 소유 루트에 현재 진행 의뢰를 고정하고 request로 반환한다.
+        /// 진행 중 의뢰만 한 번 예약하며 중복 검수를 차단한다.
         /// </summary>
         internal static bool TryBeginSubmission(Rigidbody keyboard, out KeyboardRequestState request)
         {
             request = null;
             if (keyboard == null || IsSubmittedOrProcessing(keyboard) || _processingRequest != null
-                || _submissionTarget == null || _submissionTarget.Phase != KeyboardRequestPhase.InProgress) return false;
-            request = _submissionTarget;
+                || _activeRequest == null || _activeRequest.Phase != KeyboardRequestPhase.InProgress) return false;
+            request = _activeRequest;
             _processingRequest = request;
             _processingKeyboard = keyboard;
             CustomizationLogger.RecordRequestEvent("RequestSubmissionStarted", request.Definition.RequestId);
@@ -257,7 +240,6 @@ namespace Game.Player
             request.RewardPaid = inspection.Passed;
             request.Phase = KeyboardRequestPhase.AwaitingConfirmation;
             _submittedKeyboards.Add(_processingKeyboard);
-            _submissionTarget = null;
             CancelSubmission(request);
             CustomizationLogger.RecordRequestEvent("RequestResult", request.Definition.RequestId,
                 result: request.Result.ToString(), failureReason: request.FailureReason);
@@ -281,12 +263,12 @@ namespace Game.Player
 
         /// <summary>
         /// requestId의 확인 대기 의뢰를 종료하고 성공 또는 실패 결과 메일을 한 번 발송한다.
-        /// 저장된 실패 사유와 명시적 후속 의뢰를 사용해 결과 메일 다음에 새 의뢰를 추가하고 종료를 함께 확정한다.
+        /// 저장된 실패 사유와 명시적 후속 의뢰를 사용하고 종료 성공 시 활성 의뢰를 해제한다.
         /// </summary>
         public static bool TryClose(string requestId)
         {
             if (!TryGetState(requestId, KeyboardRequestPhase.AwaitingConfirmation, out KeyboardRequestState state)
-                || state.ResultMailSent || state.Result == KeyboardRequestResult.None
+                || _activeRequest != state || state.ResultMailSent || state.Result == KeyboardRequestResult.None
                 || (state.Result == KeyboardRequestResult.Success && !state.RewardPaid)
                 || (state.Result == KeyboardRequestResult.Failure && string.IsNullOrWhiteSpace(state.FailureReason))) return false;
             MonitorMailMessage message = state.Result == KeyboardRequestResult.Success
@@ -358,6 +340,7 @@ namespace Game.Player
             }
             state.Phase = KeyboardRequestPhase.Closed;
             state.ResultMailSent = true;
+            if (_activeRequest == state) _activeRequest = null;
             CustomizationLogger.RecordRequestEvent("RequestClosed", requestId, result: state.Result.ToString());
             NotifyMailReceived(entry);
             if (nextEntry != null) NotifyMailReceived(nextEntry);

@@ -17,7 +17,6 @@ namespace Game.Player
         public bool MissingPcb { get; private set; }
         public bool MissingPlate { get; private set; }
         public bool MissingUpper { get; private set; }
-        public int UnfastenedScrews { get; private set; }
         public int MissingKeycaps { get; private set; }
         public int MissingSwitches { get; private set; }
         public int IncorrectSwitches { get; private set; }
@@ -26,7 +25,7 @@ namespace Game.Player
         public int IncorrectGlassKeycaps { get; private set; }
         public bool Passed => !MissingLower && !MissingPcb && !MissingPlate && !MissingUpper
             && !IncorrectLowerMaterial && !IncorrectUpperMaterial && IncorrectGlassKeycaps == 0
-            && UnfastenedScrews == 0 && MissingKeycaps == 0 && MissingSwitches == 0 && IncorrectSwitches == 0;
+            && MissingKeycaps == 0 && MissingSwitches == 0 && IncorrectSwitches == 0;
         public string FailureReason { get; private set; }
 
         /// <summary>
@@ -67,16 +66,6 @@ namespace Game.Player
                 inspection.MissingPcb = !IsStructureInstalled(assembly, AssemblyStructurePart.Pcb, root, assembly.PcbPlaced);
                 inspection.MissingPlate = !IsStructureInstalled(assembly, AssemblyStructurePart.Plate, root, assembly.PlateInstalled);
                 inspection.MissingUpper = !IsStructureInstalled(assembly, AssemblyStructurePart.Upper, root, assembly.UpperInstalled);
-                IReadOnlyList<bool> fixedScrews = assembly.FixedScrews;
-                if (fixedScrews.Count != 6)
-                    throw new InvalidOperationException("PCB 나사 슬롯은 6개여야 합니다.");
-                for (int index = 0; index < 6; index++)
-                {
-                    Transform screw = assembly.GetScrew(index);
-                    if (screw == null) throw new InvalidOperationException("PCB 나사 슬롯 참조가 없습니다.");
-                    if (!fixedScrews[index] || assembly.IsScrewRunning(index)
-                        || !screw.gameObject.activeInHierarchy || !screw.IsChildOf(root)) inspection.UnfastenedScrews++;
-                }
             }
 
             if (definition.RequiresGlassSurfaces)
@@ -125,7 +114,6 @@ namespace Game.Player
             var reasons = new List<string>();
             if (inspection.MissingLower) reasons.Add("하단부 미설치");
             if (inspection.MissingPcb) reasons.Add("PCB 미설치");
-            if (inspection.UnfastenedScrews > 0) reasons.Add($"PCB 나사 {inspection.UnfastenedScrews}개 미고정");
             if (inspection.MissingPlate) reasons.Add("보강판 미설치");
             if (inspection.MissingUpper) reasons.Add("상단부 미설치");
             if (inspection.IncorrectLowerMaterial) reasons.Add("하단부가 유리 재질이 아님");

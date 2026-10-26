@@ -25,6 +25,8 @@ namespace Game.Tutorials
         CaseEditing = 22, PlateEditing = 23, PCBEditing = 24, LEDEditing = 25,
         ScrewAssembly = 27, UpperCaseEditing = 28, AssemblyOrder = 29,
         WorkbenchPlaced = 30,
+        ToolDrawer = 31, MailInbox = 32, RequestDelivery = 33, MonitorUse = 34,
+        RequestResult = 35,
 
         // 전투 안내는 기존 값을 유지한다.
         Battle = 8, Replenishment = 9, Shop = 10, KeycapPurchase = 11, Unlock = 12,
@@ -79,6 +81,9 @@ namespace Game.Tutorials
         private bool _browsing;
         private int _page;
         private int _closeFrame;
+        private WorkshopKeycapDrawerTransition _drawerTransition;
+        private MonitorMiniGameManager _monitorManager;
+        private MonitorKeyboardHolder _monitorHolder;
 
         public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
         public bool CanOpenHelp => !Game.Workshop.WorkshopDeliveryTray.IsInputBlocked && !Game.Tournament.TournamentController.IsReturnPaused && !IsBlocking
@@ -109,6 +114,13 @@ namespace Game.Tutorials
 
         void OnEnable()
         {
+            _drawerTransition = FindFirstObjectByType<WorkshopKeycapDrawerTransition>();
+            _monitorManager = FindFirstObjectByType<MonitorMiniGameManager>();
+            _monitorHolder = FindFirstObjectByType<MonitorKeyboardHolder>();
+            if (_drawerTransition != null) _drawerTransition.TrayStateChanged += HandleDrawerStateChanged;
+            if (_monitorManager != null) _monitorManager.GameChanged += HandleMonitorGameChanged;
+            if (_monitorHolder != null) _monitorHolder.KeyboardChanged += HandleMonitorKeyboardChanged;
+            KeyboardRequestRuntime.Changed += HandleRequestChanged;
             _next.Clicked += HandleNext;
             _previous.Clicked += HandlePrevious;
             _close.Clicked += HandleClose;
@@ -159,6 +171,10 @@ namespace Game.Tutorials
 
         void OnDisable()
         {
+            if (_drawerTransition != null) _drawerTransition.TrayStateChanged -= HandleDrawerStateChanged;
+            if (_monitorManager != null) _monitorManager.GameChanged -= HandleMonitorGameChanged;
+            if (_monitorHolder != null) _monitorHolder.KeyboardChanged -= HandleMonitorKeyboardChanged;
+            KeyboardRequestRuntime.Changed -= HandleRequestChanged;
             _next.Clicked -= HandleNext;
             _previous.Clicked -= HandlePrevious;
             _close.Clicked -= HandleClose;
@@ -371,6 +387,9 @@ namespace Game.Tutorials
         /// </summary>
         private void HandleAssemblyCustomization(CustomizationObservation observation)
         {
+            if (_drawerTransition != null
+                && (observation.Type == "PartChanged" || observation.Type == "PartPanelOpened")
+                && !_drawerTransition.IsTrayOpen) return;
             if ((observation.Type == "PartChanged" || observation.Type == "PartPanelOpened")
                 && observation.Target == null) return;
             if (observation.Type == "WorkbenchPlaced")
@@ -418,6 +437,56 @@ namespace Game.Tutorials
                 RequestAvailable(TutorialTopic.PartCompatibility);
             if (observation.Type == "CustomizationTestModeChanged" && observation.Element == "AttackEnabled")
                 RequestAvailable(TutorialTopic.AttackPreview);
+        }
+
+        /// <summary>
+        /// category 서랍이 완전히 열린 opened 상태에서 해당 부품의 첫 안내를 예약한다.
+        /// 닫기와 전환 중 알림은 무시하고 현재 콘텐츠에 등록된 카드만 표시한다.
+        /// </summary>
+        private void HandleDrawerStateChanged(WorkshopDrawerCategory category, bool opened)
+        {
+            if (!opened) return;
+            RequestAvailable(TutorialTopic.PartsCatalog);
+            switch (category)
+            {
+                case WorkshopDrawerCategory.Keycaps: RequestAvailable(TutorialTopic.KeycapEditing); break;
+                case WorkshopDrawerCategory.Switches: RequestAvailable(TutorialTopic.AssemblySwitch); break;
+                case WorkshopDrawerCategory.ScrewsTools: RequestAvailable(TutorialTopic.ToolDrawer); break;
+                case WorkshopDrawerCategory.LedCustomImage: RequestAvailable(TutorialTopic.LEDEditing); break;
+                case WorkshopDrawerCategory.UpperHousing: RequestAvailable(TutorialTopic.UpperCaseEditing); break;
+                case WorkshopDrawerCategory.Plate: RequestAvailable(TutorialTopic.PlateEditing); break;
+                case WorkshopDrawerCategory.Pcb: RequestAvailable(TutorialTopic.PCBEditing); break;
+                case WorkshopDrawerCategory.LowerHousing: RequestAvailable(TutorialTopic.CaseEditing); break;
+            }
+        }
+
+        /// <summary>
+        /// game이 메일 앱이면 고객별 목록과 의뢰 수락 안내를 예약한다.
+        /// 다른 앱과 종료 알림은 무시하며 메일과 의뢰 상태는 변경하지 않는다.
+        /// </summary>
+        private void HandleMonitorGameChanged(MonitorMiniGame game)
+        {
+            if (game is MonitorMailGame) RequestAvailable(TutorialTopic.MailInbox);
+        }
+
+        /// <summary>
+        /// installed가 참이면 모니터 사용 안내를 예약한다.
+        /// 키보드 설치 상태는 수정하지 않고 연결된 콘텐츠의 안내만 요청한다.
+        /// </summary>
+        private void HandleMonitorKeyboardChanged(bool installed)
+        {
+            if (installed) RequestAvailable(TutorialTopic.MonitorUse);
+        }
+
+        /// <summary>
+        /// 런타임 의뢰 변경에서 제출 대상 선택과 결과 메일 도착을 확인한다.
+        /// 해당 카드만 한 번 예약하며 의뢰 진행과 보상을 변경하지 않는다.
+        /// </summary>
+        private void HandleRequestChanged()
+        {
+            if (KeyboardRequestRuntime.SubmissionTarget != null) RequestAvailable(TutorialTopic.RequestDelivery);
+            foreach (KeyboardRequestState state in KeyboardRequestRuntime.Requests.Values)
+                if (state.ResultMailSent) { RequestAvailable(TutorialTopic.RequestResult); break; }
         }
 
         /// <summary>source 상점의 open 상태를 받아 첫 상점 진입을 안내한다. 종료 통지는 안내를 만들지 않는다.</summary>

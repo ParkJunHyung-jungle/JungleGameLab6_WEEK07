@@ -295,6 +295,7 @@ namespace Game.Player
             DestroyPreviewTextures(_casePreviewTextures);
             DestroyPreviewTextures(_platePreviewTextures);
             DestroyPreviewTextures(_structurePreviewTextures);
+            DestroyPreviewTextures(_toolPreviewTextures);
         }
 
         /// <summary>
@@ -1048,6 +1049,15 @@ namespace Game.Player
             IReadOnlyList<KeycapDefinition> definitions = null)
         {
             Texture2D[] previews = new Texture2D[materials.Count];
+            if (UsesScreenTrays && (previewName == "Plate" || previewName == "Case"))
+            {
+                for (int index = 0; index < materials.Count; index++)
+                {
+                    previews[index] = AssemblyCatalogPreview.Render(previewMesh, new[] { materials[index] }, widePreview: true);
+                    textures.Add(previews[index]);
+                }
+                return previews;
+            }
             GameObject previewStage = new GameObject(previewName + "MaterialPreviewStage");
             previewStage.hideFlags = HideFlags.HideAndDontSave;
 

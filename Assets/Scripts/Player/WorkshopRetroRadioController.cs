@@ -15,7 +15,7 @@ namespace Game.Player
     {
         private const string MUSIC_PLAYER_PARAMETER = "MusicPlayer";
         private const int EASTER_EGG_TRACK = 5;
-        private const float EASTER_EGG_PROBABILITY = 0.05f;
+        private const float EASTER_EGG_PROBABILITY = 0.1f;
         private const EVENT_CALLBACK_TYPE MUSIC_CALLBACK_MASK =
             EVENT_CALLBACK_TYPE.SOUND_PLAYED | EVENT_CALLBACK_TYPE.SOUND_STOPPED;
         private static readonly string[] TRACK_SOUND_NAMES =
@@ -30,6 +30,7 @@ namespace Game.Player
         private static readonly ConcurrentDictionary<IntPtr, SoundCallbackState> CALLBACK_STATES =
             new ConcurrentDictionary<IntPtr, SoundCallbackState>();
         private static readonly EVENT_CALLBACK MUSIC_CALLBACK = HandleMusicCallback;
+        private static bool _automaticStartHandled;
 
         private readonly struct SoundSignal
         {
@@ -86,6 +87,7 @@ namespace Game.Player
         private EventInstance _powerSound;
         private bool _poweredOn;
         private bool _turningOn;
+        private bool _initialTrackPending;
         private bool _waitingForMusicStop;
         private int _pendingTrack = -1;
         private int _lastTrack = -1;
@@ -95,13 +97,14 @@ namespace Game.Player
         private bool _reportedUnknownSound;
 
         /// <summary>
-        /// 새 플레이 세션에서 이전 FMOD 이벤트 핸들의 콜백 상태를 비운다.
-        /// 입력 없이 정적 콜백 레지스트리를 초기화하며 도메인 재로드 생략 실행의 오래된 참조를 제거한다.
+        /// 새 플레이 세션에서 이전 FMOD 콜백 상태와 자동 켜기 기록을 비운다.
+        /// 입력 없이 정적 상태를 초기화하여 새 게임에서만 시작 자동 재생을 허용한다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetCallbackStates()
         {
             CALLBACK_STATES.Clear();
+            _automaticStartHandled = false;
         }
 
         void Awake()
@@ -118,6 +121,13 @@ namespace Game.Player
                     _outlineMaterial, _outlineDepthShader, _outputCamera, Color.white);
                 _outline.Prepare(transform);
             }
+        }
+
+        void Start()
+        {
+            if (_automaticStartHandled) return;
+            _automaticStartHandled = true;
+            TurnOnOrChange(true);
         }
 
         void LateUpdate()
@@ -252,14 +262,18 @@ namespace Game.Player
 
         /// <summary>
         /// 좌클릭 시 꺼진 라디오는 전원 효과음을 시작하고 켜진 라디오는 다른 곡을 예약한다.
-        /// 현재 전원·곡 전환 상태를 사용하며 중복 클릭은 재생 상태를 변경하지 않는다.
+        /// initialPlayback이 참인 게임 시작 요청은 일반 곡만 예약하며 중복 요청은 재생 상태를 변경하지 않는다.
         /// </summary>
-        private void TurnOnOrChange()
+        private void TurnOnOrChange(bool initialPlayback = false)
         {
             if (_powerSound.isValid() || _waitingForMusicStop) return;
             if (!_poweredOn)
             {
-                if (StartPowerSound()) _turningOn = true;
+                if (StartPowerSound())
+                {
+                    _turningOn = true;
+                    _initialTrackPending = initialPlayback;
+                }
                 return;
             }
 
@@ -295,6 +309,7 @@ namespace Game.Player
             {
                 ReleasePowerSound(true);
                 _turningOn = false;
+                _initialTrackPending = false;
                 StartPowerSound();
                 return;
             }
@@ -342,6 +357,7 @@ namespace Game.Player
             if (!CheckResult(result, "전원 효과음 상태 조회"))
             {
                 _turningOn = false;
+                _initialTrackPending = false;
                 ReleasePowerSound(true);
                 return;
             }
@@ -350,7 +366,9 @@ namespace Game.Player
             ReleasePowerSound(false);
             if (!_turningOn) return;
             _turningOn = false;
-            StartMusic(SelectNextTrack());
+            int track = SelectNextTrack(_initialTrackPending);
+            _initialTrackPending = false;
+            StartMusic(track);
         }
 
         /// <summary>
@@ -420,12 +438,13 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 직전 곡을 제외하여 0~5에서 다음 곡 번호를 뽑는다.
-        /// lastTrack과 5% 이스터에그 확률을 사용하며 정수 곡 번호를 반환한다.
+        /// initialPlayback이면 일반 곡을 균등 선택하고 이후에는 직전 곡을 제외하여 0~5에서 뽑는다.
+        /// lastTrack과 10% 이스터에그 확률을 사용하며 직전 곡이 5이면 일반 곡만 균등하게 반환한다.
         /// </summary>
-        private int SelectNextTrack()
+        private int SelectNextTrack(bool initialPlayback = false)
         {
-            if (_lastTrack == EASTER_EGG_TRACK) return UnityEngine.Random.Range(0, EASTER_EGG_TRACK);
+            if (initialPlayback || _lastTrack == EASTER_EGG_TRACK)
+                return UnityEngine.Random.Range(0, EASTER_EGG_TRACK);
             if (UnityEngine.Random.value < EASTER_EGG_PROBABILITY) return EASTER_EGG_TRACK;
             int normalCount = _lastTrack >= 0 ? EASTER_EGG_TRACK - 1 : EASTER_EGG_TRACK;
             int choice = UnityEngine.Random.Range(0, normalCount);
@@ -481,6 +500,7 @@ namespace Game.Player
             _outline?.Dispose();
             _outline = null;
             _turningOn = false;
+            _initialTrackPending = false;
             _poweredOn = false;
             _waitingForMusicStop = false;
             _pendingTrack = -1;

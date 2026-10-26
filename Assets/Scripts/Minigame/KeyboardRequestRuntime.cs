@@ -57,14 +57,19 @@ namespace Game.Player
         private static KeyboardRequestState _processingRequest;
         private static Rigidbody _processingKeyboard;
         private static readonly HashSet<Rigidbody> _submittedKeyboards = new HashSet<Rigidbody>();
+        private static bool _hasNewMail;
+        private static bool _initialNotificationAnnounced;
 
         public static IReadOnlyList<MonitorMailEntry> Inbox => _inboxView;
         public static IReadOnlyDictionary<string, KeyboardRequestState> Requests => _requestsView;
         public static KeyboardRequestState ActiveRequest => _activeRequest;
+        public static bool HasNewMail => _initialNotificationAnnounced && _hasNewMail;
 
         public static event Action Changed;
         public static event Action MailboxChanged;
         public static event Action<MonitorMailEntry> MailReceived;
+        public static event Action NewMailChanged;
+        public static event Action EmailNotificationRequested;
 
         /// <summary>
         /// 새 게임 실행 시 받은편지함, 의뢰 진행 및 이벤트 구독을 비운다.
@@ -80,9 +85,13 @@ namespace Game.Player
             _processingRequest = null;
             _processingKeyboard = null;
             _submittedKeyboards.Clear();
+            _hasNewMail = false;
+            _initialNotificationAnnounced = false;
             Changed = null;
             MailboxChanged = null;
             MailReceived = null;
+            NewMailChanged = null;
+            EmailNotificationRequested = null;
         }
 
         /// <summary>
@@ -95,6 +104,29 @@ namespace Game.Player
             {
                 TryReceiveMail(message);
             }
+        }
+
+        /// <summary>
+        /// 초기 메일 등록과 모니터 OS 준비가 끝난 뒤 이번 게임의 시작 알림을 한 번 발행한다.
+        /// 새 메일 표시를 공개하고 받은편지함에 메일이 있으면 EmailNotificationRequested를 한 번 알린다.
+        /// </summary>
+        public static void AnnounceInitialInbox()
+        {
+            if (_initialNotificationAnnounced) return;
+            _initialNotificationAnnounced = true;
+            NotifySubscribers(NewMailChanged);
+            if (_inbox.Count > 0) NotifySubscribers(EmailNotificationRequested);
+        }
+
+        /// <summary>
+        /// 메일 앱에 목록을 표시한 뒤 새 메일 표시를 해제한다.
+        /// 입력과 반환값 없이 HasNewMail을 false로 바꾸고 표시 구독자에게 알린다.
+        /// </summary>
+        public static void MarkNewMailSeen()
+        {
+            if (!_hasNewMail) return;
+            _hasNewMail = false;
+            NotifySubscribers(NewMailChanged);
         }
 
         /// <summary>
@@ -353,6 +385,11 @@ namespace Game.Player
         /// </summary>
         private static void NotifyMailReceived(MonitorMailEntry entry)
         {
+            if (!_hasNewMail)
+            {
+                _hasNewMail = true;
+                NotifySubscribers(NewMailChanged);
+            }
             if (MailReceived != null)
             {
                 foreach (Action<MonitorMailEntry> observer in MailReceived.GetInvocationList())
@@ -361,7 +398,22 @@ namespace Game.Player
                     catch (Exception exception) { Debug.LogException(exception); }
                 }
             }
+            if (_initialNotificationAnnounced) NotifySubscribers(EmailNotificationRequested);
             NotifyChanged();
+        }
+
+        /// <summary>
+        /// observers의 무인자 알림을 오류가 나더라도 다음 구독자까지 전달한다.
+        /// 입력된 구독 목록을 실행하며 메일 수신 상태와 의뢰 상태는 변경하지 않는다.
+        /// </summary>
+        private static void NotifySubscribers(Action observers)
+        {
+            if (observers == null) return;
+            foreach (Action observer in observers.GetInvocationList())
+            {
+                try { observer(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
         }
 
         /// <summary>

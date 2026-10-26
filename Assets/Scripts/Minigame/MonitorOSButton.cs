@@ -15,6 +15,7 @@ namespace Game.Player
         [Header("App Display")]
         [SerializeField] private Image _icon;
         [SerializeField] private Text _label;
+        private Image _notificationDot;
 
         public MonitorMiniGameDefinition Definition { get; private set; }
         public event Action<MonitorOSButton> Clicked;
@@ -26,6 +27,37 @@ namespace Game.Player
             _label.text = definition.DisplayName;
             _icon.sprite = definition.Icon;
             _icon.enabled = definition.Icon != null;
+        }
+
+        /// <summary>
+        /// sprite를 아이콘 오른쪽 위의 작은 빨간 알림 점에 적용한다.
+        /// 클릭을 가로채지 않는 Image를 한 번 생성하고 기본 상태는 숨김으로 둔다.
+        /// </summary>
+        public void ConfigureNotificationDot(Sprite sprite)
+        {
+            if (_notificationDot != null) return;
+            var dot = new GameObject("NewMailDot", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            dot.transform.SetParent(_icon.transform, false);
+            RectTransform rect = (RectTransform)dot.transform;
+            rect.anchorMin = Vector2.one;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(-3f, -3f);
+            rect.sizeDelta = new Vector2(24f, 24f);
+            _notificationDot = dot.GetComponent<Image>();
+            _notificationDot.sprite = sprite;
+            _notificationDot.color = new Color(0.95f, 0.12f, 0.12f);
+            _notificationDot.raycastTarget = false;
+            dot.SetActive(false);
+        }
+
+        /// <summary>
+        /// visible에 따라 구성된 메일 알림 점의 표시를 변경한다.
+        /// 버튼의 클릭 영역과 앱 실행 상태는 유지한다.
+        /// </summary>
+        public void SetNotificationDot(bool visible)
+        {
+            if (_notificationDot != null) _notificationDot.gameObject.SetActive(visible);
         }
 
         /// <summary>
@@ -43,8 +75,10 @@ namespace Game.Player
         public void OnPointerClick(PointerEventData eventData)
         {
             if (!_interactable) return;
-            if (eventData.button != PointerEventData.InputButton.Left || (_doubleClick && eventData.clickCount != 2)) return;
+            if (eventData.button != PointerEventData.InputButton.Left) return;
             if (Game.Tutorials.FirstEncounterTutorial.IsBlocking) return;
+            if (AudioManager.instance != null) AudioManager.instance.PlayButtonSound();
+            if (_doubleClick && eventData.clickCount != 2) return;
             Clicked?.Invoke(this);
         }
     }

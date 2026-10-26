@@ -22,4 +22,4 @@ MonoBehaviour:
   _initialMail: {fileID: 11400000, guid: be36edf415be460dbc50bccd44e7b1f9, type: 2}
   _successMail: {fileID: 11400000, guid: eede1754f85a4148813f367bb79b2d7c, type: 2}
   _failureMail: {fileID: 0}
-  _nextRequest: {fileID: 11400000, guid: 6693840b90144a6a9ff00594eb53126c, type: 2}
+  _nextRequest: {fileID: 0}

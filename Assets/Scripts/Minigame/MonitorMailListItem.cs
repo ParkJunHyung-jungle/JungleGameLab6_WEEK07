@@ -79,7 +79,10 @@ namespace Game.Player
         {
             if (eventData.button == PointerEventData.InputButton.Left
                 && !Game.Tutorials.FirstEncounterTutorial.IsBlocking)
+            {
+                if (AudioManager.instance != null) AudioManager.instance.PlayButtonSound();
                 Selected?.Invoke(this);
+            }
         }
     }
 }

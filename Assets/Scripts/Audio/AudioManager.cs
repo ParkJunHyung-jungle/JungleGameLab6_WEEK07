@@ -6,6 +6,8 @@ using UnityEngine;
 using FMOD.Studio;
 using FMODUnity;
 
+using Game.Player;
+
 public class AudioManager : MonoBehaviour
 {
     private static bool _reportedMissingPartAudio;
@@ -68,12 +70,14 @@ public class AudioManager : MonoBehaviour
     void OnEnable()
     {
         if (instance != this) return;
+        KeyboardRequestRuntime.EmailNotificationRequested += PlayEmailNotification;
         Ready?.Invoke(this);
         if (_selectionVersion == 0 && _initialKeyboard != null) SelectKeyboardEffects(_initialKeyboard);
     }
 
     void OnDisable()
     {
+        KeyboardRequestRuntime.EmailNotificationRequested -= PlayEmailNotification;
         if (_activeKeyboard != null) ApplyPlateEffects(PlateEffect.None);
         DetachPlate();
     }
@@ -306,6 +310,20 @@ public class AudioManager : MonoBehaviour
     public void PlayButtonSound()
     {
         RuntimeManager.PlayOneShot(FMODEvents.instance.Button);
+    }
+
+    /// <summary>
+    /// 실제 메일 수신 또는 새 게임의 시작 알림에 기존 Email 이벤트를 한 번 재생한다.
+    /// 입력과 반환값 없이 FMODEvents의 UI 효과음을 시작하며 메일함 상태는 변경하지 않는다.
+    /// </summary>
+    private void PlayEmailNotification()
+    {
+        if (FMODEvents.instance == null || FMODEvents.instance.Email.IsNull)
+        {
+            Debug.LogWarning("[FMOD] FmodManager의 Email 이벤트 참조가 비어 있습니다.", this);
+            return;
+        }
+        RuntimeManager.PlayOneShot(FMODEvents.instance.Email);
     }
 
     /// <summary>

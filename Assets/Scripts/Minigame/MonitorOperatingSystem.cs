@@ -5,6 +5,8 @@ namespace Game.Player
 {
     public sealed class MonitorOperatingSystem : MonoBehaviour
     {
+        private const float INITIAL_MAIL_NOTIFICATION_DELAY = 1f;
+
         [Header("Connections")]
         [SerializeField] private MonitorMiniGameManager _manager;
         [SerializeField] private MonitorMiniGameInput _input;
@@ -16,6 +18,11 @@ namespace Game.Player
         [SerializeField] private GameObject _desktop;
         [SerializeField] private Transform _appRoot;
         [SerializeField] private MonitorOSButton _appTemplate;
+        [SerializeField] private Sprite _mailNotificationDotSprite;
+        private MonitorMailGameDefinition _mailDefinition;
+        private MonitorOSButton _mailIcon;
+        private bool _initialMailNotificationPending;
+        private float _initialMailNotificationElapsed;
 
         [Header("App Layout")]
         [SerializeField, Min(1)] private int _appColumns = 6;
@@ -42,6 +49,12 @@ namespace Game.Player
                     appIndex % columns * _appSpacing.x, -(appIndex / columns) * _appSpacing.y);
                 appIndex++;
                 icon.Configure(definition);
+                if (definition is MonitorMailGameDefinition mailDefinition)
+                {
+                    _mailDefinition = mailDefinition;
+                    _mailIcon = icon;
+                    icon.ConfigureNotificationDot(_mailNotificationDotSprite);
+                }
                 icon.Clicked += HandleAppClicked;
                 icon.gameObject.SetActive(true);
             }
@@ -49,6 +62,7 @@ namespace Game.Player
 
         void OnEnable()
         {
+            KeyboardRequestRuntime.NewMailChanged += HandleNewMailChanged;
             _manager.GameChanged += HandleGameChanged;
             _input.FocusChanged += HandleFocusChanged;
             _closeButton.Clicked += HandleCloseClicked;
@@ -56,10 +70,28 @@ namespace Game.Player
             HandleKeyboardChanged(_holder.KeyboardBody != null);
             HandleFocusChanged(_input.HasFocus);
             HandleGameChanged(_manager.CurrentGame);
+            HandleNewMailChanged();
+        }
+
+        void Start()
+        {
+            if (_mailDefinition == null) return;
+            KeyboardRequestRuntime.Initialize(_mailDefinition);
+            _initialMailNotificationPending = true;
+        }
+
+        void Update()
+        {
+            if (!_initialMailNotificationPending) return;
+            _initialMailNotificationElapsed += Time.deltaTime;
+            if (_initialMailNotificationElapsed < INITIAL_MAIL_NOTIFICATION_DELAY) return;
+            _initialMailNotificationPending = false;
+            KeyboardRequestRuntime.AnnounceInitialInbox();
         }
 
         void OnDisable()
         {
+            KeyboardRequestRuntime.NewMailChanged -= HandleNewMailChanged;
             _manager.GameChanged -= HandleGameChanged;
             _input.FocusChanged -= HandleFocusChanged;
             _closeButton.Clicked -= HandleCloseClicked;
@@ -83,6 +115,15 @@ namespace Game.Player
         private void HandleAppClicked(MonitorOSButton button)
         {
             if (_input.HasFocus) _manager.StartGame(button.Definition);
+        }
+
+        /// <summary>
+        /// 받은편지함의 새 메일 상태를 이메일 앱 아이콘의 빨간 점에 반영한다.
+        /// 입력과 반환값 없이 런타임 상태를 읽으며 메일이나 알림 소리는 변경하지 않는다.
+        /// </summary>
+        private void HandleNewMailChanged()
+        {
+            if (_mailIcon != null) _mailIcon.SetNotificationDot(KeyboardRequestRuntime.HasNewMail);
         }
 
         /// <summary>닫기 button 요청으로 현재 앱을 종료한다. 포커스 중일 때만 처리하며 GameChanged를 통해 바탕화면을 복원한다.</summary>

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -32,6 +32,7 @@ namespace Game.Player
         [SerializeField] private AssemblyCatalogEntry[] _switchEntries = new AssemblyCatalogEntry[0];
         private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
+        private readonly Dictionary<SwitchType, Texture2D> _switchPreviewTextures = new Dictionary<SwitchType, Texture2D>();
         private WorkshopKeycapDrawerTransition _keycapTray;
         private WorkshopKeycapCardDrag _inventoryScrollOwner;
         private RectTransform _trayPlacementModes;
@@ -153,12 +154,45 @@ namespace Game.Player
             foreach (AssemblyCatalogEntry entry in _switchEntries)
             {
                 if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
+                _entryTextures[entry] = GetSwitchPreview(type);
                 if (tray != null) button.enabled = false;
                 button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry, tray);
                 BindQuantityLabel(button, entry);
                 return;
             }
             button.interactable = false;
+        }
+
+        /// <summary>type의 출고 프리팹과 축 재질을 격리된 모델에 적용해 썸네일을 반환한다. 생성한 이미지는 재사용하며 원본 모델·재질·재고는 변경하지 않는다.</summary>
+        public Texture2D GetSwitchPreview(SwitchType type)
+        {
+            if (_switchPreviewTextures.TryGetValue(type, out Texture2D texture)) return texture;
+            foreach (AssemblyCatalogEntry entry in _switchEntries)
+            {
+                if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
+                GameObject stage = new GameObject("SwitchCardPreview");
+                stage.hideFlags = HideFlags.HideAndDontSave;
+                stage.SetActive(false);
+                try
+                {
+                    GameObject model = Instantiate(entry.Prefab.gameObject, stage.transform, false);
+                    foreach (MeshRenderer renderer in model.GetComponentsInChildren<MeshRenderer>(true))
+                    {
+                        Material material = renderer.name == "Switch_TopHousing" ? entry.SwitchData.TopHousingMaterial
+                            : renderer.name == "Switch_BottomHousing" ? entry.SwitchData.BottomHousingMaterial
+                            : renderer.name.StartsWith("MX_Stem") ? entry.SwitchData.StemMaterial : null;
+                        if (material != null) renderer.sharedMaterial = material;
+                    }
+                    texture = AssemblyCatalogPreview.RenderParts(new[] { model.transform });
+                    _switchPreviewTextures[type] = texture;
+                    return texture;
+                }
+                finally
+                {
+                    Destroy(stage);
+                }
+            }
+            return null;
         }
 
         /// <summary>구조 부품 entry의 카드에 기존 수량·아이콘·스크롤 출고 입력을 연결한다. structureDrag만 실물 설치 경로를 담당하며 기존 키캡·스위치 재고는 변경하지 않는다.</summary>
@@ -527,9 +561,7 @@ namespace Game.Player
             if (entry == null) return;
             _entryTextures.TryGetValue(entry, out Texture texture);
             _dragIcon.texture = texture != null ? texture : Texture2D.whiteTexture;
-            _dragIcon.color = entry.IsSwitch && entry.SwitchData.StemMaterial != null
-                && entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
-                ? entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
+            _dragIcon.color = Color.white;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, point, null, out Vector2 local);
             _dragIcon.rectTransform.localPosition = local;
         }
@@ -1067,9 +1099,7 @@ namespace Game.Player
             icon.name = "BoundaryReturnIcon";
             _entryTextures.TryGetValue(entry, out Texture texture);
             icon.texture = texture != null ? texture : Texture2D.whiteTexture;
-            icon.color = entry.IsSwitch && entry.SwitchData.StemMaterial != null
-                && entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
-                ? entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
+            icon.color = Color.white;
             icon.gameObject.SetActive(true);
             return icon;
         }
@@ -1126,6 +1156,7 @@ namespace Game.Player
         void OnApplicationFocus(bool focused) { if (!focused) CancelDrag(); }
         void OnDestroy()
         {
+            foreach (Texture2D texture in _switchPreviewTextures.Values) if (texture != null) Destroy(texture);
             foreach (KeyboardEditButton button in _singlePlacementButtons) button.Clicked -= HandlePlacementModeClicked;
             foreach (KeyboardEditButton button in _bulkPlacementButtons) button.Clicked -= HandlePlacementModeClicked;
             if (_dragIcon != null) Destroy(_dragIcon.gameObject);

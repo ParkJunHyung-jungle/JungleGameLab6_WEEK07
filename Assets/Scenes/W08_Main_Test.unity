@@ -14375,6 +14375,7 @@ MonoBehaviour:
   _monitorHolder: {fileID: 7000000000000001100}
   _monitorInput: {fileID: 7000000000000001101}
   _monitorScreen: {fileID: 7000000000000001212}
+  _startInMonitorFocus: 1
   _keyboardDrag: {fileID: 7000000000000000306}
   _workbenchHolder: {fileID: 9911000310}
   _pullers: {fileID: 500387865}

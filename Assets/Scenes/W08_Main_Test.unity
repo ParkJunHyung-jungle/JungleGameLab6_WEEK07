@@ -14363,6 +14363,7 @@ MonoBehaviour:
   _editOverlay: {fileID: 9911000090}
   _inventoryGroup: {fileID: 7000000000000000600}
   _dispenser: {fileID: 0}
+  _lowerHousingPrefab: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
 --- !u!114 &7000000000000000306
 MonoBehaviour:
   m_ObjectHideFlags: 0

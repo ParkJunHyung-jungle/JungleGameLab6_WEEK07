@@ -49,6 +49,7 @@ namespace Game.Player
 
         [Header("World Interaction")]
         [SerializeField] private KeyboardDispenser _dispenser;
+        [SerializeField] private GameObject _lowerHousingPrefab;
 
         [Header("View State")]
         private int _viewIndex;
@@ -56,9 +57,27 @@ namespace Game.Player
 
         public bool ViewSwitchingAllowed => _viewSwitchingAllowed;
         public KeyboardDispenser KeyboardDispenser => _dispenser;
+        public bool CanCreateLowerHousing => _lowerHousingPrefab != null || _dispenser != null && _dispenser.CanCreateKeyboard;
+        public GameObject LowerHousingPreviewPrefab => _lowerHousingPrefab != null ? _lowerHousingPrefab
+            : _dispenser != null ? _dispenser.GetPreviewPrefab() : null;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
         public bool IsWorkbenchEmpty => _workbenchHolder.KeyboardBody == null;
+
+        /// <summary>position과 rotation에 작업 UI의 하단부 키보드를 생성해 keyboardRoot로 반환한다. 빈 작업대와 편집 상태를 재검사하며 직접 프리팹이 없는 기존 씬은 자판기 생성 경로를 사용한다.</summary>
+        public bool TryCreateLowerHousing(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
+        {
+            keyboardRoot = null;
+            if (!IsKeyboardEditing || !IsWorkbenchEmpty) return false;
+            if (_lowerHousingPrefab == null)
+                return _dispenser != null && _dispenser.TryCreateKeyboard(position, rotation, out keyboardRoot, respectSceneLimit: false);
+            keyboardRoot = Instantiate(_lowerHousingPrefab, position, rotation);
+            keyboardRoot.GetComponent<KeyboardInputController>().SetInputEnabled(false);
+            KeyboardPickupTarget pickup = keyboardRoot.GetComponent<KeyboardPickupTarget>();
+            if (pickup == null) pickup = keyboardRoot.AddComponent<KeyboardPickupTarget>();
+            pickup.SetSourcePrefab(_lowerHousingPrefab);
+            return true;
+        }
         public bool CanProcessGeneralInput => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
             && !_monitorFocused && !_monitorTransition && _viewSwitchingAllowed && !_brain.IsBlending
             && Application.isFocused && InGameCursor.CanProcessPointer

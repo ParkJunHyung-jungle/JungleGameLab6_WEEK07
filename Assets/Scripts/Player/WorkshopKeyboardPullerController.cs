@@ -57,9 +57,17 @@ namespace Game.Player
         public bool IsPcbDragging => _pcbDragging;
         public bool IsScrewPointerCaptured => _screwPointerCaptured;
         public KeyboardDispenser KeyboardDispenser => _workshopView.KeyboardDispenser;
+        public bool CanCreateLowerHousing => _workshopView.CanCreateLowerHousing;
+        public GameObject LowerHousingPreviewPrefab => _workshopView.LowerHousingPreviewPrefab;
         public bool CanIssueLowerHousing => _workshopView != null && _workshopView.IsWorkbenchEmpty && IsEditing;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
+
+        /// <summary>position과 rotation을 기존 작업 뷰의 하부 하우징 생성 경로로 전달하고 keyboardRoot와 성공 여부를 반환한다. 재고 예약과 설치는 호출자가 관리한다.</summary>
+        public bool TryCreateLowerHousing(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
+        {
+            return _workshopView.TryCreateLowerHousing(position, rotation, out keyboardRoot);
+        }
 
         /// <summary>extractsSwitches에 해당하는 씬의 실제 풀러 모델을 카탈로그 이미지로 렌더링해 반환한다. 원본 자세와 활성 상태는 유지하며 호출자가 이미지 수명을 관리한다.</summary>
         public Texture2D CreateToolPreview(bool extractsSwitches)

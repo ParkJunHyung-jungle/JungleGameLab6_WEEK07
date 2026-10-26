@@ -92,7 +92,6 @@ namespace Game.Player
 
         void Start()
         {
-            GetComponent<KeyboardEditOverlayUI>().ConnectKeycapPlacement(this);
             _canvasRect = (RectTransform)GetComponentInParent<Canvas>().transform;
             _dragIcon = new GameObject("WorkshopKeycapDragIcon", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
             _dragIcon.transform.SetParent(_canvasRect, false);
@@ -101,6 +100,7 @@ namespace Game.Player
             _dragIcon.gameObject.SetActive(false);
             _previewRenderer = gameObject.AddComponent<WorkshopDragPreviewRenderer>();
             _previewRenderer.Initialize(InputCamera);
+            GetComponent<KeyboardEditOverlayUI>().ConnectKeycapPlacement(this);
         }
 
         void OnEnable()

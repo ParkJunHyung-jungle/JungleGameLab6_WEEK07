@@ -402,7 +402,8 @@ namespace Game.Player
 
         void LateUpdate()
         {
-            if (!_stockDragging && _selected && _assembly != null && _assembly.CanInstallStructure(_kind) && _pullers.InputAllowed)
+            bool showPlacement = _kind == AssemblyStructurePart.Pcb ? _dragging && !_returning : !_stockDragging;
+            if (showPlacement && _selected && _assembly != null && _assembly.CanInstallStructure(_kind) && _pullers.InputAllowed)
                 for (int index = 0; index < _outlines.Count; index++)
                     _outlines[index].Show(_assembly.GetStructurePose(_kind, index));
         }

@@ -36,7 +36,7 @@ namespace Game.Player
             if (!_stockEnabled || !_selected || !_stockTray.CanInteractWithTray || !StockInputAllowed
                 || _pullers.IsManipulatingPart || entry.AvailableQuantity <= 0 || entry.StructureKind != _kind) return false;
             if (_kind == AssemblyStructurePart.Lower) return _pullers.CanIssueLowerHousing
-                && (entry.HasStoredPart || _pullers.KeyboardDispenser.CanCreateKeyboard);
+                && (entry.HasStoredPart || _pullers.CanCreateLowerHousing);
             return _assembly != null && _assembly.CanInstallStructure(_kind)
                 && _assembly.GetStructureInventoryEntry(_kind) == null
                 && (_kind != AssemblyStructurePart.Pcb || !_assembly.PcbLoose);
@@ -64,7 +64,7 @@ namespace Game.Player
                     if (_stockKeyboard == null)
                     {
                         Transform origin = _assembly != null ? _assembly.transform : _pullers.transform;
-                        if (!_pullers.KeyboardDispenser.TryCreateKeyboard(origin.position, origin.rotation, out GameObject root, respectSceneLimit: false))
+                        if (!_pullers.TryCreateLowerHousing(origin.position, origin.rotation, out GameObject root))
                         {
                             entry.FinishReservation(false);
                             _stockEntry = null;

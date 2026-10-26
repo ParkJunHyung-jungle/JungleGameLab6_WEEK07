@@ -181,13 +181,13 @@ namespace Game.Player
             SetPlatePickerTabSelection(_plateEffectTabButton, _platePickerSection == PlatePickerSection.Effect);
         }
 
-        /// <summary>작업대 실물 또는 자판기의 조립 원본과 각 항목 재질로 썸네일을 갱신한다. 빈 작업대에서도 원본 메시를 읽으며 실물 생성과 재고·조립 변경 없이 같은 모델의 이미지를 재사용한다.</summary>
+        /// <summary>작업대 실물 또는 작업 UI의 조립 원본과 각 항목 재질로 썸네일을 갱신한다. 빈 작업대에서도 원본 메시를 읽으며 실물 생성과 재고·조립 변경 없이 같은 모델의 이미지를 재사용한다.</summary>
         private void RefreshStructureTrayPreviews()
         {
             if (!_structureTraysReady) return;
             KeyboardAssemblyState assembly = _plateCustomization != null ? _plateCustomization.GetComponent<KeyboardAssemblyState>() : null;
             GameObject sourcePrefab = assembly != null && assembly.TryGetComponent(out KeyboardPickupTarget pickup)
-                ? pickup.SourcePrefab : _pullerController.KeyboardDispenser.GetPreviewPrefab();
+                ? pickup.SourcePrefab : _pullerController.LowerHousingPreviewPrefab;
             if (assembly == _structurePreviewSource && sourcePrefab == _structurePreviewPrefab && _structurePreviewTextures.Count > 0) return;
             if (sourcePrefab != null && sourcePrefab == _structurePreviewPrefab && _structurePreviewTextures.Count > 0)
             {

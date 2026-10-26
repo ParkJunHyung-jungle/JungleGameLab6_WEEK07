@@ -95,6 +95,17 @@ namespace Game.Player
             UpdateTrayInput();
         }
 
+        /// <summary>
+        /// category에 등록된 scroll이 교체되거나 파괴되기 전에 연결을 해제한다.
+        /// 일치하는 목록만 제거하며 현재 선택된 목록이면 _catalogScroll도 비운다.
+        /// </summary>
+        public void DisconnectCatalogScroll(ScrollRect scroll, WorkshopDrawerCategory category)
+        {
+            if (!_catalogs.TryGetValue(category, out ScrollRect registered) || registered != scroll) return;
+            _catalogs.Remove(category);
+            if (_catalogScroll == scroll) _catalogScroll = null;
+        }
+
         /// <summary>기존 열림 상태와 입력 조건으로 트레이 버튼 및 목록 스크롤 입력만 갱신한다.</summary>
         private void UpdateTrayInput()
         {

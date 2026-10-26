@@ -1811,6 +1811,9 @@ namespace Game.Player
             }
             if (_plateViewport != null)
             {
+                if (_keycapTrayTransition != null)
+                    _keycapTrayTransition.DisconnectCatalogScroll(
+                        _plateViewport.GetComponent<ScrollRect>(), WorkshopDrawerCategory.Plate);
                 Destroy(_plateViewport.gameObject);
                 _plateViewport = null;
             }

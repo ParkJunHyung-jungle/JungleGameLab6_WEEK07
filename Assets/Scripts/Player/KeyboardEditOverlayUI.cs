@@ -1210,38 +1210,8 @@ namespace Game.Player
         /// </summary>
         private Material CreatePreviewMaterial(Material material, List<Material> ownedMaterials)
         {
-            if (material.HasProperty("_Opacity") && material.HasProperty("_EdgeOpacity"))
-            {
-                var glassPreview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
-                glassPreview.SetFloat("_Opacity", 1f);
-                glassPreview.SetFloat("_EdgeOpacity", 1f);
-                ownedMaterials.Add(glassPreview);
-                return glassPreview;
-            }
-            if (!material.HasProperty("_Surface") || material.GetFloat("_Surface") < 0.5f ||
-                !material.HasProperty("_BaseColor")) return material;
-
-            Color color = material.GetColor("_BaseColor");
-            var preview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
-            color.a = 1f;
-            preview.SetColor("_BaseColor", color);
-            if (preview.HasProperty("_Color")) preview.SetColor("_Color", color);
-            preview.SetFloat("_Surface", 0f);
-            preview.SetFloat("_SrcBlend", (float)BlendMode.One);
-            preview.SetFloat("_DstBlend", (float)BlendMode.Zero);
-            preview.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
-            preview.SetFloat("_DstBlendAlpha", (float)BlendMode.Zero);
-            preview.SetFloat("_ZWrite", 1f);
-            preview.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            preview.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            preview.DisableKeyword("_ALPHAMODULATE_ON");
-            preview.SetOverrideTag("RenderType", "Opaque");
-            preview.renderQueue = (int)RenderQueue.Geometry;
-            preview.SetShaderPassEnabled("DepthOnly", true);
-            ownedMaterials.Add(preview);
-            return preview;
+            return AssemblyCatalogPreview.CreatePreviewMaterial(material, ownedMaterials);
         }
-
         /// <summary>
         /// 화면 상단에 잘리는 투명 viewport와 그 안의 가로 콘텐츠 영역을 만든다.
         /// overlay 크기와 itemCount를 사용하며 이후 목록 스크롤이 적용될 RectTransform을 저장한다.

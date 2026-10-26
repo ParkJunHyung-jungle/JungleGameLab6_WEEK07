@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -26,7 +26,8 @@ namespace KeyboardModeling.Assembly
             stage.hideFlags = HideFlags.HideAndDontSave;
             stage.transform.position = new Vector3(10000f, 10000f, 10000f);
             var renderers = new List<MeshRenderer>();
-            if (parts == null) renderers.Add(CreatePreviewModel(stage.transform, mesh, materials, null, null));
+            var ownedMaterials = new List<Material>();
+            if (parts == null) renderers.Add(CreatePreviewModel(stage.transform, mesh, materials, null, null, ownedMaterials));
             else
                 foreach (Transform part in parts)
                 foreach (MeshRenderer source in part.GetComponentsInChildren<MeshRenderer>(true))
@@ -36,7 +37,7 @@ namespace KeyboardModeling.Assembly
                     Material[] previewMaterials = source.sharedMaterials;
                     if (shellMaterial != null && (pcbBoardOnly ? source.transform == part.Find("PCB_Board") : source.transform == part))
                         for (int index = 0; index < previewMaterials.Length; index++) previewMaterials[index] = shellMaterial;
-                    renderers.Add(CreatePreviewModel(stage.transform, filter.sharedMesh, previewMaterials, source.transform, parts[0]));
+                    renderers.Add(CreatePreviewModel(stage.transform, filter.sharedMesh, previewMaterials, source.transform, parts[0], ownedMaterials));
                 }
             if (renderers.Count == 0)
             {
@@ -110,10 +111,11 @@ namespace KeyboardModeling.Assembly
                 Object.Destroy(target);
                 stage.SetActive(false);
                 Object.Destroy(stage);
+                foreach (Material material in ownedMaterials) Object.Destroy(material);
             }
         }
-        /// <summary>parent의 격리된 모델에 mesh와 materials를 직접 연결한다. source와 origin이 있으면 상대 자세를 복사하며 원본 메시의 CPU 읽기 설정은 변경하지 않는다.</summary>
-        private static MeshRenderer CreatePreviewModel(Transform parent, Mesh mesh, Material[] materials, Transform source, Transform origin)
+        /// <summary>parent의 격리 모델에 mesh와 materials의 미리보기 재질을 연결한다. source와 origin의 상대 자세를 복사하고 복제 재질은 ownedMaterials에 보관하며 원본 에셋은 유지한다.</summary>
+        private static MeshRenderer CreatePreviewModel(Transform parent, Mesh mesh, Material[] materials, Transform source, Transform origin, List<Material> ownedMaterials)
         {
             GameObject model = new GameObject("PreviewModel", typeof(MeshFilter), typeof(MeshRenderer));
             model.transform.SetParent(parent, false);
@@ -126,7 +128,10 @@ namespace KeyboardModeling.Assembly
             }
             model.GetComponent<MeshFilter>().sharedMesh = mesh;
             MeshRenderer renderer = model.GetComponent<MeshRenderer>();
-            renderer.sharedMaterials = materials;
+            var previewMaterials = new Material[materials.Length];
+            for (int index = 0; index < materials.Length; index++)
+                previewMaterials[index] = CreatePreviewMaterial(materials[index], ownedMaterials);
+            renderer.sharedMaterials = previewMaterials;
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             renderer.receiveShadows = false;
             renderer.lightProbeUsage = LightProbeUsage.Off;
@@ -134,5 +139,41 @@ namespace KeyboardModeling.Assembly
             KeyboardToonSurface.ApplyBounds(renderer);
             return renderer;
         }
+        /// <summary>material이 유리 또는 투명 재질이면 불투명 미리보기 복제본을 반환한다. 복제본은 ownedMaterials에 등록하며 원본은 변경하지 않고 null 슬롯은 그대로 반환한다.</summary>
+        public static Material CreatePreviewMaterial(Material material, List<Material> ownedMaterials)
+        {
+            if (material == null) return null;
+            if (material.HasProperty("_Opacity") && material.HasProperty("_EdgeOpacity"))
+            {
+                var glassPreview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
+                glassPreview.SetFloat("_Opacity", 1f);
+                glassPreview.SetFloat("_EdgeOpacity", 1f);
+                ownedMaterials.Add(glassPreview);
+                return glassPreview;
+            }
+            if (!material.HasProperty("_Surface") || material.GetFloat("_Surface") < 0.5f ||
+                !material.HasProperty("_BaseColor")) return material;
+
+            Color color = material.GetColor("_BaseColor");
+            var preview = new Material(material) { name = material.name + " (Preview)", hideFlags = HideFlags.HideAndDontSave };
+            color.a = 1f;
+            preview.SetColor("_BaseColor", color);
+            if (preview.HasProperty("_Color")) preview.SetColor("_Color", color);
+            preview.SetFloat("_Surface", 0f);
+            preview.SetFloat("_SrcBlend", (float)BlendMode.One);
+            preview.SetFloat("_DstBlend", (float)BlendMode.Zero);
+            preview.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+            preview.SetFloat("_DstBlendAlpha", (float)BlendMode.Zero);
+            preview.SetFloat("_ZWrite", 1f);
+            preview.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            preview.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            preview.DisableKeyword("_ALPHAMODULATE_ON");
+            preview.SetOverrideTag("RenderType", "Opaque");
+            preview.renderQueue = (int)RenderQueue.Geometry;
+            preview.SetShaderPassEnabled("DepthOnly", true);
+            ownedMaterials.Add(preview);
+            return preview;
+        }
+
     }
 }

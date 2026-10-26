@@ -88,14 +88,15 @@ namespace Game.Player
             return _editOverlay.TryGetHeldReturnPart(out part, out category, out parts);
         }
 
-        /// <summary>position과 rotation에 작업 UI의 하단부 키보드를 생성해 keyboardRoot로 반환한다. 빈 작업대와 편집 상태를 재검사하며 직접 프리팹이 없는 기존 씬은 자판기 생성 경로를 사용한다.</summary>
-        public bool TryCreateLowerHousing(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
+        /// <summary>작업대 배치 자세에 하단부 키보드를 생성해 keyboardRoot와 성공 여부를 반환한다. 빈 작업대와 편집 상태를 검사하며 재고와 작업대 점유는 변경하지 않는다.</summary>
+        public bool TryCreateLowerHousing(out GameObject keyboardRoot)
         {
             keyboardRoot = null;
             if (!IsKeyboardEditing || !IsWorkbenchEmpty) return false;
+            Pose pose = _workbenchHolder.GetPlacementPose(Vector3.zero);
             if (_lowerHousingPrefab == null)
-                return _dispenser != null && _dispenser.TryCreateKeyboard(position, rotation, out keyboardRoot, respectSceneLimit: false);
-            keyboardRoot = Instantiate(_lowerHousingPrefab, position, rotation);
+                return _dispenser != null && _dispenser.TryCreateKeyboard(pose.position, pose.rotation, out keyboardRoot, respectSceneLimit: false);
+            keyboardRoot = Instantiate(_lowerHousingPrefab, pose.position, pose.rotation);
             keyboardRoot.GetComponent<KeyboardInputController>().SetInputEnabled(false);
             KeyboardPickupTarget pickup = keyboardRoot.GetComponent<KeyboardPickupTarget>();
             if (pickup == null) pickup = keyboardRoot.AddComponent<KeyboardPickupTarget>();

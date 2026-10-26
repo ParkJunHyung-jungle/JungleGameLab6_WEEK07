@@ -14357,9 +14357,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopViewController
   _requestChecklistLeftOffset: 56.6667
   _requestChecklistTopOffset: 51.6667
-  _requestChecklistPanelWidth: 460
-  _requestChecklistTitleFontSize: 24
-  _requestChecklistBodyFontSize: 22
+  _requestChecklistPanelWidth: 320
+  _requestChecklistTitleFontSize: 18
+  _requestChecklistBodyFontSize: 16
   _requestChecklistFadeDistance: 140
   _requestChecklistMinimumOpacity: 0.25
   _requestChecklistFadeDuration: 0.2

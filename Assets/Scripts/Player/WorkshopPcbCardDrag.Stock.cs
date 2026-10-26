@@ -134,8 +134,7 @@ namespace Game.Player
                     _stockKeyboard = entry.TakeStoredPart();
                     if (_stockKeyboard == null)
                     {
-                        Transform origin = _assembly != null ? _assembly.transform : _pullers.transform;
-                        if (!_pullers.TryCreateLowerHousing(origin.position, origin.rotation, out GameObject root))
+                        if (!_pullers.TryCreateLowerHousing(out GameObject root))
                         {
                             _stockEntry = null;
                             _stockReservation = false;
@@ -265,7 +264,7 @@ namespace Game.Player
             }
             CommitStockReservation();
             FinishStockMotion();
-            if (installed && _kind == AssemblyStructurePart.Pcb)
+            if (installed)
                 RecordStructureEvent("PartInstallAttempted", true, "InventoryDrag");
             if (!installed)
             {

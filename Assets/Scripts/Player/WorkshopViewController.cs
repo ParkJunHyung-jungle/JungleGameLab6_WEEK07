@@ -65,6 +65,29 @@ namespace Game.Player
         public KeyboardInputController EditingKeyboard { get; private set; }
         public bool IsWorkbenchEmpty => _workbenchHolder.KeyboardBody == null;
 
+        /// <summary>보관된 keyboard가 현재 편집 대상이고 작업대가 비었다면 기존 입력·오디오 상태를 정리하고 빈 편집 대상으로 갱신한다. 집중과 열린 트레이는 종료하지 않는다.</summary>
+        public void RefreshStoredKeyboard(KeyboardInputController keyboard)
+        {
+            if (!IsKeyboardEditing || EditingKeyboard != keyboard || !IsWorkbenchEmpty) return;
+            if (AudioManager.instance != null)
+                AudioManager.instance.ReleaseKeyboardEffects(keyboard.GetComponent<KeyboardCustomization>());
+            keyboard.SetInputEnabled(_keyboardInputWasEnabled);
+            keyboard.SetAttackEnabled(_keyboardAttackWasEnabled);
+            OpenAssembly();
+        }
+
+        /// <summary>기존 도구·부품 처리기로부터 들고 있는 part와 category 및 복합 실물 parts를 반환한다. 집기·드롭·편집 상태는 변경하지 않는다.</summary>
+        public bool TryGetHeldReturnPart(out Transform part, out WorkshopDrawerCategory category, out IReadOnlyList<Transform> parts)
+        {
+            if (_pullers.TryGetHeldReturnTool(out part))
+            {
+                category = WorkshopDrawerCategory.ScrewsTools;
+                parts = null;
+                return true;
+            }
+            return _editOverlay.TryGetHeldReturnPart(out part, out category, out parts);
+        }
+
         /// <summary>position과 rotation에 작업 UI의 하단부 키보드를 생성해 keyboardRoot로 반환한다. 빈 작업대와 편집 상태를 재검사하며 직접 프리팹이 없는 기존 씬은 자판기 생성 경로를 사용한다.</summary>
         public bool TryCreateLowerHousing(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
         {

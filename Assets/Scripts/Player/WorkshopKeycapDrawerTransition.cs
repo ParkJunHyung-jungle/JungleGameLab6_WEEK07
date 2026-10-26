@@ -194,6 +194,7 @@ namespace Game.Player
         /// <summary>category의 닫힌 실제 서랍과 독립 목록을 연결하고 열기를 시작한다. 이전 서랍은 닫힌 상태여야 한다.</summary>
         private void OpenCategory(WorkshopDrawerCategory category)
         {
+            _drawerInput.ResetReturnPresentation();
             _category = category;
             _keycapDrawer = _drawerInput.GetDrawer(category);
             PrepareDrawer();
@@ -206,6 +207,18 @@ namespace Game.Player
         public bool IsCategoryOpen(WorkshopDrawerCategory category)
         {
             return IsTrayOpen && _category == category;
+        }
+
+        /// <summary>Drop할 part를 연결된 수납장 입력의 최종 후보 판정에 전달하고 반납 가능 여부를 반환한다. 트레이와 부품 상태는 변경하지 않는다.</summary>
+        public bool CanReturnHeldPart(Transform part)
+        {
+            return _drawerInput.CanReturnHeldPart(part);
+        }
+
+        /// <summary>part의 기존 보관 완료를 수납장 입력에 알린다. 후보와 임시 인출만 정리하며 열린 UI·콘텐츠·스크롤은 유지한다.</summary>
+        public void CompletePartReturn(Transform part)
+        {
+            _drawerInput.CompletePartReturn(part);
         }
 
         /// <summary>point가 현재 완전히 열린 서랍의 실제 목록 Viewport 안인지 반환한다. 닫힘·전환 중이거나 숨긴 UI는 반환 영역으로 보지 않는다.</summary>

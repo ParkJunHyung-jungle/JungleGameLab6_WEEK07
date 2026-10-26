@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+
+using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -33,6 +35,22 @@ namespace Game.Player
         private KeyboardAssemblyState ActiveAssembly => _caseCustomization != null
             ? _caseCustomization.GetComponent<KeyboardAssemblyState>() : null;
         public bool AssemblyCatalogEnabled => _assemblyCatalog;
+
+        /// <summary>기존 종류별 처리기에서 집은 part와 category 및 복합 실물 parts를 반환한다. 도구·전체 키보드·목록 아이콘은 조회하지 않으며 병렬 실물 목록을 만들지 않는다.</summary>
+        public bool TryGetHeldReturnPart(out Transform part, out WorkshopDrawerCategory category, out IReadOnlyList<Transform> parts)
+        {
+            parts = null;
+            if (_keycapPlacement.TryGetHeldReturnPart(out part, out category)) return true;
+            if ((_lowerCard != null && _lowerCard.TryGetHeldReturnParts(out parts, out category))
+                || (_pcbWorldDrag != null && _pcbWorldDrag.TryGetHeldReturnParts(out parts, out category))
+                || (_plateCard != null && _plateCard.TryGetHeldReturnParts(out parts, out category))
+                || (_upperCard != null && _upperCard.TryGetHeldReturnParts(out parts, out category)))
+            {
+                part = parts[0];
+                return true;
+            }
+            return false;
+        }
 
         /// <summary>point가 현재 열린 부품 목록 영역인지 반환한다. 탭과 무관하게 목록 패널만 검사하며 상태를 변경하지 않는다.</summary>
         public bool IsInAssemblyReturnArea(Vector2 point)

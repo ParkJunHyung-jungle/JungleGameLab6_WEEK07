@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -478,12 +478,10 @@ namespace KeyboardModeling.Assembly
             _structureInventory[kind] = entry;
         }
 
-        /// <summary>kind 부품의 출고 기록이 있으면 해당 재질 재고를 한 번 복구한다. 기록을 먼저 제거하여 반복 반환은 수량을 늘리지 않는다.</summary>
+        /// <summary>kind 부품의 작업실 출고 기록을 해제한다. 반복 반환으로 실물 소유가 남지 않도록 기록만 제거하며 수량은 변경하지 않는다.</summary>
         public void ReturnStructureInventory(AssemblyStructurePart kind)
         {
-            if (!_structureInventory.TryGetValue(kind, out AssemblyCatalogEntry entry)) return;
             _structureInventory.Remove(kind);
-            entry.StorePart(null, true);
         }
 
         /// <summary>출고한 미설치 PCB를 바닥 실물로 기록한다. 같은 키보드에 추가 PCB를 출고하지 않도록 점유를 유지한다.</summary>

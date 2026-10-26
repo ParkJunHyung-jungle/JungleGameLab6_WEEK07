@@ -2604,6 +2604,9 @@ MonoBehaviour:
   - {fileID: 138161769}
   _hoverOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
   _hoverDepthShader: {fileID: 4800000, guid: c15e67eed99449a2a286129ff6aa137e, type: 3}
+  _returnPullDistance: 0.035
+  _returnOpenDuration: 0.18
+  _returnCloseDuration: 0.16
 --- !u!114 &617487714
 MonoBehaviour:
   m_ObjectHideFlags: 0

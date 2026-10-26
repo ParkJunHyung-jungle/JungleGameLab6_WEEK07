@@ -68,7 +68,7 @@ namespace Game.Player
             {
                 AssemblyCatalogEntry entry = AssemblyCatalogEntry.CreateStructure(kind, material, 100);
                 KeyboardEditButton button = CreatePickerItemButton(content, kind + "_" + (material != null ? material.name : "PCB"),
-                    buttons.Count, material != null ? material.name : "PCB", out Image background, out Text indicator);
+                    buttons.Count, material != null ? KeyboardPartDisplayNames.MaterialName(material) : "기판", out Image background, out Text indicator);
                 indicator.gameObject.SetActive(false);
                 RawImage preview = new GameObject("StructurePreview", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
                 preview.transform.SetParent(button.transform, false);

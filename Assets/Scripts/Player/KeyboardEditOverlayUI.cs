@@ -1365,7 +1365,7 @@ namespace Game.Player
                     content,
                     "SwitchSound_" + type,
                     index,
-                    type.ToString(),
+                    KeyboardPartDisplayNames.SwitchName(type),
                     out Image cardBackground,
                     out Text selectionIndicator);
                 CreateSwitchPreview(button.transform, type);
@@ -1623,7 +1623,7 @@ namespace Game.Player
 
                 Material material = materials[index];
                 KeycapDefinition definition = definitions[index];
-                string label = definition != null ? definition.DisplayName : material.name;
+                string label = KeyboardPartDisplayNames.KeycapName(definition, material);
                 KeyboardEditButton previewButton = CreatePickerItemButton(
                     _content,
                     "KeycapMaterial_" + (definition != null ? definition.Id : material.name),
@@ -1804,12 +1804,15 @@ namespace Game.Player
             _plateEffectSelectionIndicators.Clear();
             DestroyPreviewTextures(_platePreviewTextures);
 
-            _plateButton.interactable = _plateCustomization != null
-                && _plateCustomization.PlateRenderer != null;
+            KeyboardCustomization previewCustomization = _plateCustomization;
+            if (previewCustomization == null && UsesScreenTrays && _pullerController.LowerHousingPreviewPrefab != null)
+                previewCustomization = _pullerController.LowerHousingPreviewPrefab.GetComponent<KeyboardCustomization>();
+            _plateButton.interactable = previewCustomization != null
+                && previewCustomization.PlateRenderer != null;
             if (!_plateButton.interactable)
                 return;
 
-            MeshFilter plateMeshFilter = _plateCustomization.PlateRenderer.GetComponent<MeshFilter>();
+            MeshFilter plateMeshFilter = previewCustomization.PlateRenderer.GetComponent<MeshFilter>();
             if (plateMeshFilter == null || plateMeshFilter.sharedMesh == null)
             {
                 _plateButton.interactable = false;
@@ -1822,7 +1825,7 @@ namespace Game.Player
                     continue;
 
                 _plateMaterials.Add(material);
-                _plateMaterialLabels.Add(material.name);
+                _plateMaterialLabels.Add(KeyboardPartDisplayNames.MaterialName(material));
             }
 
             if (_plateMaterials.Count == 0)
@@ -1831,7 +1834,7 @@ namespace Game.Player
                 return;
             }
 
-            _plateEffects.AddRange(_plateCustomization.AvailablePlateEffects);
+            _plateEffects.AddRange(previewCustomization.AvailablePlateEffects);
             Texture2D[] previews = CreateMaterialPreviewTextures(
                 plateMeshFilter.sharedMesh,
                 _plateMaterials,
@@ -2241,7 +2244,7 @@ namespace Game.Player
                     content,
                     "CaseMaterial_" + material.name,
                     _casePreviewButtons.Count,
-                    material.name,
+                    KeyboardPartDisplayNames.MaterialName(material),
                     out Image cardBackground,
                     out Text selectionIndicator);
                 CreateMaterialPreviewImage(

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: switch-switch_sans
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.SwitchDefinition
   _id: switch-switch_sans
-  _displayName: Sans
+  _displayName: "\uc0cc\uc988\ucd95"
   _price: 60
   _quantity: 1
   _data: {fileID: 11400000, guid: 9853aa6392209dc499418f1beb5a43fb, type: 2}

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: keycap-Phoebe
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapDefinition
   _id: keycap-Phoebe
-  _displayName: "Phoebe \uD0A4\uCEA1"
+  _displayName: "\ud53c\ube44 \ud0a4\ucea1"
   _price: 60
   _quantity: 3
   _material: {fileID: 2100000, guid: 7d0d722e6733b7a4f8607de7942537a7, type: 2}

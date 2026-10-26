@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 
+using KeyboardModeling.Assembly;
+
 namespace Game.Player
 {
     public sealed partial class KeyboardEditOverlayUI
@@ -43,7 +45,7 @@ namespace Game.Player
             for (int index = 0; index < items.Length; index++)
             {
                 KeyboardEditButton button = CreatePickerItemButton(content, index == 0 ? "KeycapPuller" : "SwitchPuller",
-                    index, index == 0 ? "키캡 Puller" : "스위치 Puller", out Image background, out Text indicator);
+                    index, index == 0 ? "키캡 풀러" : "스위치 풀러", out Image background, out Text indicator);
                 indicator.gameObject.SetActive(false);
                 items[index] = button.gameObject.AddComponent<WorkshopPullerTrayItem>();
                 items[index].Initialize(index == 1);

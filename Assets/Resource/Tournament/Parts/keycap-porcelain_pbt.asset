@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: keycap-porcelain_pbt
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapDefinition
   _id: keycap-porcelain_pbt
-  _displayName: "PBT \uD0A4\uCEA1"
+  _displayName: "\ud53c\ube44\ud2f0 \ud0a4\ucea1"
   _price: 10
   _quantity: 3
   _material: {fileID: 2100000, guid: 0a1a2ec0d6ed18c459f87b5d181564bf, type: 2}

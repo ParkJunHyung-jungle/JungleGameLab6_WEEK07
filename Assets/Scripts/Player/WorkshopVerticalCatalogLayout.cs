@@ -399,7 +399,7 @@ namespace Game.Player
             host.pivot = Vector2.up;
             host.anchoredPosition = new Vector2(24f, -24f);
             host.sizeDelta = new Vector2(width, -24f - _bottomMargin);
-            host.GetComponent<Image>().color = trayParent != null && panel.GetComponent<KeyboardLEDPanelUI>() != null
+            host.GetComponent<Image>().color = trayParent != null
                 ? GetComponent<KeyboardEditOverlayUI>().CatalogCardColor : new Color32(37, 52, 68, 255);
             RectTransform clip = new GameObject("EditorClip", typeof(RectTransform), typeof(RectMask2D))
                 .GetComponent<RectTransform>();
@@ -426,7 +426,7 @@ namespace Game.Player
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 35f;
-            scroll.verticalScrollbar = CreateEditorScrollbar(host);
+            scroll.verticalScrollbar = CreateEditorScrollbar(host, trayParent != null);
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             _configured.Add(scroll);
             if (trayParent == null) _editorPanels.Add(panel, scroll);
@@ -442,10 +442,11 @@ namespace Game.Player
 
         /// <summary>
         /// host 오른쪽에 재료 목록과 같은 색상과 두께의 세로 스크롤바를 만든다.
-        /// 생성된 핸들을 연결한 Scrollbar를 반환하며 조작 항목의 값은 변경하지 않는다.
+        /// trayStyle이면 이동 영역을 투명하게 하고 갈색 손잡이를 사용한다. 생성한 Scrollbar를 반환하며 조작 값은 유지한다.
         /// </summary>
-        private Scrollbar CreateEditorScrollbar(RectTransform host)
+        private Scrollbar CreateEditorScrollbar(RectTransform host, bool trayStyle = false)
         {
+            if (trayStyle) return GetComponent<KeyboardEditOverlayUI>().CreateTrayEditorScrollbar(host);
             RectTransform track = new GameObject("EditorScrollbar", typeof(RectTransform), typeof(Image),
                 typeof(Scrollbar)).GetComponent<RectTransform>();
             track.SetParent(host, false);

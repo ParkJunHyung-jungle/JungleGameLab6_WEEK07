@@ -18,7 +18,7 @@ namespace KeyboardModeling.Assembly
             { "KeycapGlassClear", "유리" },
             { "KeycapMarbleWhite", "대리석" },
             { "KeycapCelestial", "우주" },
-            { "NeonGraphite", "네온 흑연" },
+            { "NeonGraphite", "네온" },
             { "GundamPanel_Blue", "파란 건담 패널" },
             { "GundamPanel_Red", "빨간 건담 패널" },
             { "GundamPanel_White", "흰 건담 패널" },

@@ -3441,10 +3441,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8295343963888643263, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
-      propertyPath: _initialKeyboardPrefab
-      value: 
-      objectReference: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
     - target: {fileID: 6790844235589385906, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
       propertyPath: _useWorkshopFocus
       value: 1
@@ -3465,6 +3461,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Monitor_OS
       objectReference: {fileID: 0}
+    - target: {fileID: 8295343963888643263, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: _initialKeyboardPrefab
+      value: 
+      objectReference: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
     - target: {fileID: 9162336399170649921, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0.422
@@ -8005,6 +8005,12 @@ MonoBehaviour:
     _switchData: {fileID: 11400000, guid: 963f322bc845e694b9bcd79c59717f6a, type: 2}
     _prefab: {fileID: 2389093803382289243, guid: 6ff119df42b41a94e873ec2ada47af39, type: 3}
     _initialQuantity: 100
+  _modeSelectedColor: {r: 0.36078432, g: 0.22745098, b: 0.12941177, a: 1}
+  _modeNormalColor: {r: 0.8392157, g: 0.7294118, b: 0.6039216, a: 1}
+  _modeSelectedOutlineColor: {r: 1, g: 0.87058824, b: 0.6784314, a: 1}
+  _modeNormalOutlineColor: {r: 0.5803922, g: 0.4509804, b: 0.32156864, a: 1}
+  _modeSelectedTextColor: {r: 1, g: 0.98039216, b: 0.9411765, a: 1}
+  _modeNormalTextColor: {r: 0.4117647, g: 0.29411766, b: 0.1882353, a: 1}
 --- !u!1 &2055193287
 GameObject:
   m_ObjectHideFlags: 0
@@ -14817,7 +14823,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7000000000000001401
 Transform:
   m_ObjectHideFlags: 0

@@ -117,7 +117,7 @@ namespace Game.Player
 
         void Update()
         {
-            if (!CanReceiveInput() || _textDevice == null || !_textDevice.backspaceKey.isPressed)
+            if (!CanReceiveKey(Key.Backspace) || _textDevice == null || !_textDevice.backspaceKey.isPressed)
             {
                 _backspaceHeld = false;
                 return;
@@ -135,7 +135,7 @@ namespace Game.Player
         private void HandleFocusChanged(MonitorKeyboardHolder holder)
         {
             Disconnect();
-            if (holder != _holder || holder.KeyboardBody == null) return;
+            if (holder == null || holder != _holder || holder.KeyboardBody == null) return;
             _keyboard = holder.KeyboardBody.GetComponent<KeyboardInputController>();
             if (_keyboard == null) return;
             _previousInput = _keyboard.InputEnabled;
@@ -152,7 +152,7 @@ namespace Game.Player
         /// <summary>실제 거치 키보드의 key를 현재 게임에 전달하고 Backspace면 반복 삭제 대기를 시작한다. 튜토리얼 또는 일시정지 중 입력은 무시하며 타건 연출은 기존 컨트롤러가 처리한다.</summary>
         private void HandleKeyPressed(Key key)
         {
-            if (!CanReceiveInput()) return;
+            if (!CanReceiveKey(key)) return;
             _manager.SendKeyPressed(key);
             if (key == Key.Backspace)
             {
@@ -164,7 +164,60 @@ namespace Game.Player
         /// <summary>장치가 입력한 character를 포커스된 게임에 전달한다. 키보드 입력이 꺼졌거나 튜토리얼 및 일시정지 중이면 무시한다.</summary>
         private void HandleTextInput(char character)
         {
-            if (CanReceiveInput()) _manager.SendTextInput(character);
+            if (CanReceiveInput() && CanReceiveCharacter(character)) _manager.SendTextInput(character);
+        }
+
+        /// <summary>
+        /// key에 대응하는 거치 키보드의 축과 입력 허용 상태를 검사해 반환한다.
+        /// 연결된 키보드만 조회하며 축이 없거나 포커스가 없으면 false를 반환한다.
+        /// </summary>
+        public bool CanReceiveKey(Key key)
+        {
+            return CanReceiveInput() && _keyboard.IsSwitchInstalled(key);
+        }
+
+        /// <summary>
+        /// character를 현재 배열의 키 또는 두벌식 구성 키로 변환해 축 장착 여부를 반환한다.
+        /// 대소문자와 기호 및 한글 조합을 검사하며 대응 키를 확인할 수 없는 문자는 전달하지 않는다.
+        /// </summary>
+        private bool CanReceiveCharacter(char character)
+        {
+            if (_textDevice == null) return false;
+            if ((_textDevice.leftShiftKey.isPressed && !CanReceiveKey(Key.LeftShift))
+                || (_textDevice.rightShiftKey.isPressed && !CanReceiveKey(Key.RightShift))) return false;
+            if (character >= '\uac00' && character <= '\ud7a3')
+            {
+                int syllable = character - '\uac00';
+                string initial = "rRseEfaqQtTdwWczxvg";
+                string[] vowels = { "k", "o", "i", "O", "j", "p", "u", "P", "h", "hk", "ho", "hl", "y", "n", "nj", "np", "nl", "b", "m", "ml", "l" };
+                string[] finals = { "", "r", "R", "rt", "s", "sw", "sg", "e", "f", "fr", "fa", "fq", "ft", "fx", "fv", "fg", "a", "q", "qt", "t", "T", "d", "w", "c", "z", "x", "v", "g" };
+                return CanReceiveCharacters(initial[syllable / 588] + vowels[syllable / 28 % 21] + finals[syllable % 28]);
+            }
+            const string JAMO = "ㄱㄲㄳㄴㄵㄶㄷㄸㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅃㅄㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+            string[] jamoKeys = { "r", "R", "rt", "s", "sw", "sg", "e", "E", "f", "fr", "fa", "fq", "ft", "fx", "fv", "fg", "a", "q", "Q", "qt", "t", "T", "d", "w", "W", "c", "z", "x", "v", "g", "k", "o", "i", "O", "j", "p", "u", "P", "h", "hk", "ho", "hl", "y", "n", "nj", "np", "nl", "b", "m", "ml", "l" };
+            int jamoIndex = JAMO.IndexOf(character);
+            if (jamoIndex >= 0) return CanReceiveCharacters(jamoKeys[jamoIndex]);
+            const string SHIFTED = "~!@#$%^&*()_+{}|:\"<>?";
+            const string UNSHIFTED = "`1234567890-=[]\\;',./";
+            int shiftedIndex = SHIFTED.IndexOf(character);
+            char keyCharacter = shiftedIndex >= 0 ? UNSHIFTED[shiftedIndex] : char.ToLowerInvariant(character);
+            if (keyCharacter == ' ') return CanReceiveKey(Key.Space);
+            var control = _textDevice.FindKeyOnCurrentKeyboardLayout(keyCharacter.ToString());
+            return control != null && CanReceiveKey(control.keyCode);
+        }
+
+        /// <summary>
+        /// characters를 구성하는 모든 영문 물리 키의 축 장착 여부를 반환한다.
+        /// 두벌식 조합에 필요한 키를 검사하며 입력이나 조합 상태는 변경하지 않는다.
+        /// </summary>
+        private bool CanReceiveCharacters(string characters)
+        {
+            foreach (char character in characters)
+            {
+                Key key = (Key)((int)Key.A + char.ToLowerInvariant(character) - 'a');
+                if (!CanReceiveKey(key)) return false;
+            }
+            return true;
         }
 
         /// <summary>현재 키보드와 앱 포커스 및 튜토리얼 상태로 게임 입력 허용 여부를 반환한다. 게임이나 키보드 상태는 변경하지 않는다.</summary>

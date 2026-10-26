@@ -418,6 +418,7 @@ namespace Game.Player
             if (!bulk && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
+            GetComponent<KeyboardEditOverlayUI>().SelectInventoryCard(entry);
             _fromInventory = true;
             _isBulkDragging = bulk;
             _bulkInteractionId = _isBulkDragging ? System.Guid.NewGuid().ToString("N") : null;
@@ -504,14 +505,14 @@ namespace Game.Player
             _entry = part.CatalogEntry;
             part.BeginDrag();
             _dragPlane = new Plane(InputCamera.transform.forward, part.transform.position);
-            if (_entry.IsSwitch) PrepareSwitchClearance(part);
+            PrepareSwitchClearance(part);
             foreach (Collider collider in part.GetComponentsInChildren<Collider>()) collider.enabled = false;
             _previewRenderer.Show(part.transform);
             MoveDrag(point);
         }
 
         /// <summary>
-        /// part의 메시 크기와 편집 키보드의 현재 표면으로 스위치 이동의 최소 높이를 저장한다.
+        /// part의 메시 크기와 편집 키보드의 현재 표면으로 키캡과 스위치 이동의 최소 높이를 저장한다.
         /// 키보드의 위쪽 방향을 사용하며 슬롯 위치와 부품 크기는 변경하지 않는다.
         /// </summary>
         private void PrepareSwitchClearance(AssemblyDraggablePart part)
@@ -583,7 +584,7 @@ namespace Game.Player
             if (_dragPlane.Raycast(ray, out float distance))
             {
                 Vector3 position = ray.GetPoint(distance);
-                if (_entry.IsSwitch && _switchClearancePlane.GetDistanceToPoint(position) < 0f
+                if (_switchClearancePlane.GetDistanceToPoint(position) < 0f
                     && _switchClearancePlane.Raycast(ray, out float clearanceDistance))
                     position = ray.GetPoint(clearanceDistance);
                 _activePart.transform.position = position;
@@ -770,17 +771,26 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// part가 customization의 PCB와 보강판 및 상단부와 다시 충돌하도록 준비한다.
-        /// 런타임 구조 부품에 필요한 충돌체를 만들고 분리 시 설정된 충돌 무시를 해제한다.
+        /// part가 customization의 실제 부품들과 다시 충돌하도록 준비한다.
+        /// PCB·보강판·상단부 충돌체를 준비하고 스위치·키캡을 포함한 충돌 무시를 해제하며 본체 집기용 충돌체는 제외한다.
         /// </summary>
         private void PrepareDetachedPartCollisions(AssemblyDraggablePart part, KeyboardCustomization customization)
         {
+            Rigidbody body = part.GetComponent<Rigidbody>();
+            if (!body.isKinematic) body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             if (!customization.TryGetComponent<KeyboardAssemblyState>(out var assembly) || !assembly.Initialized) return;
             Transform pcb = assembly.GetStructureParts(AssemblyStructurePart.Pcb)[0];
             EnableFailedDropCollision(pcb.Find("PCB_Board").GetComponent<MeshRenderer>(), part);
             EnableFailedDropCollision(customization.PlateRenderer, part);
             foreach (MeshRenderer upper in assembly.UpperRenderers)
                 EnableFailedDropCollision(upper, part, true);
+            foreach (Collider detached in part.GetComponentsInChildren<Collider>())
+            foreach (Collider installed in customization.GetComponentsInChildren<Collider>())
+            {
+                if (!installed.enabled || installed.isTrigger || installed.transform == customization.transform
+                    || installed.transform.IsChildOf(part.transform)) continue;
+                Physics.IgnoreCollision(detached, installed, false);
+            }
         }
 
         /// <summary>
@@ -1028,6 +1038,10 @@ namespace Game.Player
                 return;
             }
             part.DropWithPhysics();
+            PrepareDetachedPartCollisions(part, EditingKeyboard.GetComponent<KeyboardCustomization>());
+            PrepareSwitchClearance(part);
+            float clearance = _switchClearancePlane.GetDistanceToPoint(part.transform.position);
+            if (clearance < 0f) part.transform.position -= _switchClearancePlane.normal * clearance;
             Rigidbody body = part.GetComponent<Rigidbody>();
             body.linearVelocity = velocity;
             body.angularVelocity = angularVelocity;

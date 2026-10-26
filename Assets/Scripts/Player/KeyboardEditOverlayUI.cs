@@ -340,6 +340,19 @@ namespace Game.Player
             RefreshSwitchSoundSelection();
         }
 
+        /// <summary>entry에 대응하는 키캡 또는 스위치 카드의 선택 강조를 갱신한다. 출고 항목의 재질·정의·축 타입만 읽으며 실제 설치와 사운드 및 재고는 변경하지 않는다.</summary>
+        public void SelectInventoryCard(AssemblyCatalogEntry entry)
+        {
+            if (entry.IsSwitch)
+            {
+                SetSelectedSwitchSound(entry.SwitchData.Type);
+                return;
+            }
+            _selectedMaterial = entry.KeycapMaterial;
+            _selectedKeycapDefinition = entry.KeycapDefinition;
+            RefreshSelectionIndicators();
+        }
+
         /// <summary>
         /// 편집할 키보드의 케이스 재질과 미리보기 원본을 지정한다.
         /// customization을 저장하며 다음 활성화 시 해당 키보드의 목록을 만든다.

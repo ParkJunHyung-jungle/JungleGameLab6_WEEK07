@@ -307,7 +307,6 @@ namespace Game.Player
             proxy.SetActive(false);
             collider = proxy.AddComponent<MeshCollider>();
             collider.sharedMesh = filter.sharedMesh;
-            collider.isTrigger = true;
             _upperSurfaceColliders[filter] = collider;
             return collider;
         }
@@ -402,7 +401,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
-            bool showPlacement = _kind == AssemblyStructurePart.Pcb ? _dragging && !_returning : !_stockDragging;
+            bool showPlacement = _kind == AssemblyStructurePart.Lower ? !_stockDragging : _dragging && !_returning;
             if (showPlacement && _selected && _assembly != null && _assembly.CanInstallStructure(_kind) && _pullers.InputAllowed)
                 for (int index = 0; index < _outlines.Count; index++)
                     _outlines[index].Show(_assembly.GetStructurePose(_kind, index));

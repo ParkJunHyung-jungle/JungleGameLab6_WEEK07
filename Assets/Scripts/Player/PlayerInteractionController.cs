@@ -29,6 +29,9 @@ namespace Game.Player
     {
         private const float KEYBOARD_EDIT_ROTATION_SENSITIVITY = 0.2f;
         private const float INTERACTION_PROMPT_CURSOR_OFFSET = 24f;
+        private static bool _hasHeldKeyboard;
+        public static event System.Action<bool> KeyboardCarryChanged;
+        public static bool HasHeldKeyboard => _hasHeldKeyboard;
 
         [Header("Interaction")]
         [SerializeField] private Camera _camera;
@@ -100,6 +103,17 @@ namespace Game.Player
         private bool _isDraggingEditingKeyboard;
         private Vector2 _pendingKeyboardRotationDelta;
         private readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
+
+        /// <summary>
+        /// 새 실행에서 키보드 운반 상태와 Action 구독을 초기화한다.
+        /// 이전 실행의 정적 상태와 구독자가 새 게임에 남지 않게 한다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetKeyboardCarryState()
+        {
+            _hasHeldKeyboard = false;
+            KeyboardCarryChanged = null;
+        }
 
         [Header("Monitor Focus")]
         [SerializeField, Min(0.1f)] private float _monitorFocusDistance = 2.5f;
@@ -1328,6 +1342,7 @@ namespace Game.Player
             }
 
             _heldKeyboardBody = body;
+            SetKeyboardCarryState(true);
             _heldKeyboardWasKinematic = body.isKinematic;
             _heldKeyboardUsedGravity = body.useGravity;
             IgnoreHeldKeyboardCollisions(body);
@@ -1410,6 +1425,7 @@ namespace Game.Player
             if (_heldKeyboardBody != body) return;
             RestoreHeldKeyboardCollisions();
             _heldKeyboardBody = null;
+            SetKeyboardCarryState(false);
         }
 
         /// <summary>
@@ -1420,10 +1436,14 @@ namespace Game.Player
         {
             RestoreHeldKeyboardCollisions();
             if (_heldKeyboardBody == null)
+            {
+                SetKeyboardCarryState(false);
                 return;
+            }
 
             Rigidbody body = _heldKeyboardBody;
             _heldKeyboardBody = null;
+            SetKeyboardCarryState(false);
             body.isKinematic = _heldKeyboardWasKinematic;
             body.useGravity = _heldKeyboardUsedGravity;
 
@@ -1442,14 +1462,30 @@ namespace Game.Player
         {
             RestoreHeldKeyboardCollisions();
             if (_heldKeyboardBody == null)
+            {
+                SetKeyboardCarryState(false);
                 return;
+            }
 
             Rigidbody body = _heldKeyboardBody;
             _heldKeyboardBody = null;
+            SetKeyboardCarryState(false);
             body.isKinematic = false;
             body.useGravity = true;
             body.linearVelocity = _camera.transform.forward * _keyboardThrowSpeed;
             body.angularVelocity = Vector3.zero;
+        }
+
+        /// <summary>
+        /// 키보드 운반 상태가 바뀌면 정적 상태와 C# Action 구독자에게 알린다.
+        /// isHeld를 저장하며 상태가 실제로 바뀐 경우에만 이벤트를 호출한다.
+        /// </summary>
+        private static void SetKeyboardCarryState(bool isHeld)
+        {
+            if (_hasHeldKeyboard == isHeld)
+                return;
+            _hasHeldKeyboard = isHeld;
+            KeyboardCarryChanged?.Invoke(isHeld);
         }
     }
 }

@@ -24,6 +24,14 @@ namespace Game.Workshop
         private bool _sending;
         private string _notice;
 
+        [Header("Carry Highlight")]
+        [SerializeField] private MeshRenderer[] _outlineRenderers;
+        [SerializeField] private Camera _outputCamera;
+        [SerializeField] private Material _outlineMaterial;
+        [SerializeField] private Shader _depthShader;
+        private WorkshopKeyboardPlacementPreview _carryOutline;
+        private bool _keyboardHeld;
+
         [Header("Delivery Terminal")]
         [SerializeField] private GameObject _panel;
         [SerializeField] private Text _status;
@@ -73,6 +81,8 @@ namespace Game.Workshop
             _confirmation.SetActive(false);
             _confirmLabel = _confirm.GetComponentInChildren<Text>(true);
             _backLabel = _back.GetComponentInChildren<Text>(true);
+            _carryOutline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _outputCamera);
+            _carryOutline.PrepareSelectedRenderers(transform, _outlineRenderers);
             Refresh();
         }
 
@@ -82,7 +92,15 @@ namespace Game.Workshop
             _send.Clicked += HandleSend;
             _confirm.Clicked += HandleConfirm;
             _back.Clicked += HandleBack;
+            PlayerInteractionController.KeyboardCarryChanged += HandleKeyboardCarryChanged;
+            _keyboardHeld = PlayerInteractionController.HasHeldKeyboard;
             Refresh();
+        }
+
+        void LateUpdate()
+        {
+            if (_keyboardHeld && !_sending && !_modalOpen && !_confirmationOpen && _holder.KeyboardBody == null)
+                _carryOutline.Show(new Pose(transform.position, transform.rotation));
         }
 
         void Update()
@@ -120,11 +138,27 @@ namespace Game.Workshop
             _send.Clicked -= HandleSend;
             _confirm.Clicked -= HandleConfirm;
             _back.Clicked -= HandleBack;
+            PlayerInteractionController.KeyboardCarryChanged -= HandleKeyboardCarryChanged;
+            _keyboardHeld = false;
             Action<bool> externalResult = _externalConfirmation ? _externalConfirmationResult : null;
             if (_modalOpen) RestoreInput();
             if (_confirmation != null) _confirmation.SetActive(false);
             if (_panel != null) _panel.SetActive(false);
             externalResult?.Invoke(false);
+        }
+
+        void OnDestroy()
+        {
+            _carryOutline.Dispose();
+        }
+
+        /// <summary>
+        /// 플레이어의 키보드 운반 Action에 따라 트레이 강조 표시 상태를 갱신한다.
+        /// held가 참일 때만 빈 트레이 외곽선을 표시하도록 다음 LateUpdate에 반영한다.
+        /// </summary>
+        private void HandleKeyboardCarryChanged(bool held)
+        {
+            _keyboardHeld = held;
         }
 
         /// <summary>

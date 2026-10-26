@@ -16,7 +16,7 @@ namespace KeyboardModeling.Assembly
     {
         private static readonly Color _panelColor = new Color32(37, 52, 68, 255);
         private static readonly Color _cardColor = new Color32(48, 66, 84, 255);
-        private static readonly Color _selectedColor = new Color32(39, 80, 100, 255);
+        private static readonly Color _selectedColor = new Color32(24, 110, 142, 255);
         private static readonly Color _accentColor = new Color32(87, 214, 243, 255);
 
         [Header("WorkShop2 Keycap Choices")]
@@ -717,7 +717,15 @@ namespace KeyboardModeling.Assembly
         private void SetSelected(AssemblyCatalogButton button, bool selected)
         {
             button.GetComponent<Image>().color = selected ? _selectedColor : _cardColor;
-            button.GetComponent<Outline>().effectColor = selected ? _accentColor : new Color32(80, 103, 122, 255);
+            Outline outline = button.GetComponent<Outline>();
+            if (outline != null)
+                outline.effectColor = selected ? _accentColor : new Color32(80, 103, 122, 255);
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.color = selected ? Color.white : new Color(0.82f, 0.88f, 0.92f);
+                label.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
+            }
         }
 
         /// <summary>

@@ -13390,6 +13390,9 @@ MonoBehaviour:
   _border: {r: 0.271, g: 0.357, b: 0.439, a: 0.86}
   _textColor: {r: 0.925, g: 0.906, b: 0.839, a: 1}
   _accent: {r: 0.451, g: 0.863, b: 0.89, a: 1}
+  _focusFadeDistance: 140
+  _focusMinimumOpacity: 0.25
+  _focusFadeDuration: 0.2
 --- !u!223 &332623946365953821
 Canvas:
   m_ObjectHideFlags: 0
@@ -14402,6 +14405,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a938942ed784b779504361978dddbee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopViewController
+  _requestChecklistLeftOffset: 56.6667
+  _requestChecklistTopOffset: 51.6667
+  _requestChecklistPanelWidth: 460
+  _requestChecklistTitleFontSize: 24
+  _requestChecklistBodyFontSize: 22
+  _requestChecklistFadeDistance: 140
+  _requestChecklistMinimumOpacity: 0.25
+  _requestChecklistFadeDuration: 0.2
   _brain: {fileID: 330585548}
   _views:
   - {fileID: 1302916166}

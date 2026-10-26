@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -12,18 +13,43 @@ namespace Game.Player
     /// </summary>
     public sealed class KeyboardPickupTarget : MonoBehaviour
     {
+        private static readonly List<KeyboardPickupTarget> _activeTargets = new List<KeyboardPickupTarget>();
         [Header("Spawn Source")]
         private GameObject _sourcePrefab;
         private readonly Dictionary<Collider, Vector3> _supportNormals = new Dictionary<Collider, Vector3>();
         public GameObject SourcePrefab => _sourcePrefab;
+        public static IReadOnlyList<KeyboardPickupTarget> ActiveTargets => _activeTargets;
+        public static event Action RegistryChanged;
 
         /// <summary>prefab 자산을 생성 출처로 보관한다. 씬 인스턴스가 제거되어도 같은 키보드 종류를 찾는 데 사용한다.</summary>
         public void SetSourcePrefab(GameObject prefab) { _sourcePrefab = prefab; }
 
+        /// <summary>
+        /// 새 실행에서 키보드 목록과 관찰 구독을 초기화한다.
+        /// 이전 플레이 세션에 남은 정적 참조를 비운다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry()
+        {
+            _activeTargets.Clear();
+            RegistryChanged = null;
+        }
+
+        void OnEnable()
+        {
+            if (_activeTargets.Contains(this)) return;
+            _activeTargets.Add(this);
+            RegistryChanged?.Invoke();
+        }
+
         void OnCollisionEnter(Collision collision) { RecordSupport(collision); }
         void OnCollisionStay(Collision collision) { RecordSupport(collision); }
         void OnCollisionExit(Collision collision) { _supportNormals.Remove(collision.collider); }
-        void OnDisable() { _supportNormals.Clear(); }
+        void OnDisable()
+        {
+            _supportNormals.Clear();
+            if (_activeTargets.Remove(this)) RegistryChanged?.Invoke();
+        }
 
         /// <summary>collision의 실제 접촉 법선 중 가장 위를 향하는 값을 기록한다. 바닥 식별은 외부에서 지정한 Collider로 별도 판정한다.</summary>
         private void RecordSupport(Collision collision)

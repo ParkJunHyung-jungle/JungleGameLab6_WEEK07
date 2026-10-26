@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -38,9 +38,8 @@ namespace Game.Player
         [Header("Request UI")]
         [SerializeField] private Text _requestInfo;
         [SerializeField] private GameObject _requestActions;
-        [SerializeField] private Text _submissionTarget;
+        [SerializeField] private Text _activeRequestText;
         [SerializeField] private MonitorOSButton _acceptRequest;
-        [SerializeField] private MonitorOSButton _selectSubmissionTarget;
         [SerializeField] private MonitorOSButton _closeRequest;
         private string _requestNotice;
 
@@ -66,7 +65,6 @@ namespace Game.Player
             _restoreMail.Clicked += HandleRestoreMail;
             KeyboardRequestRuntime.Changed += RefreshRequestUI;
             _acceptRequest.Clicked += HandleAcceptRequest;
-            _selectSubmissionTarget.Clicked += HandleSelectSubmissionTarget;
             _closeRequest.Clicked += HandleCloseRequest;
             RefreshInbox();
         }
@@ -137,7 +135,6 @@ namespace Game.Player
             _restoreMail.Clicked -= HandleRestoreMail;
             KeyboardRequestRuntime.Changed -= RefreshRequestUI;
             _acceptRequest.Clicked -= HandleAcceptRequest;
-            _selectSubmissionTarget.Clicked -= HandleSelectSubmissionTarget;
             _closeRequest.Clicked -= HandleCloseRequest;
             ClearRows();
             _selectedMailId = null;
@@ -296,7 +293,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 런타임의 현재 의뢰 상태와 제출 대상으로 정보 및 버튼만 갱신한다.
+        /// 런타임의 선택 메일과 단일 진행 의뢰 상태로 정보 및 버튼만 갱신한다.
         /// 목록과 메일 본문 및 선택 ID는 유지하며 완료 버튼에서는 보상을 지급하지 않는다.
         /// </summary>
         private void RefreshRequestUI()
@@ -307,9 +304,9 @@ namespace Game.Player
             _restoreMail.SetInteractable(hasSelection && deleted);
             Vector2 bodyPosition = _bodyScroll.content.anchoredPosition;
             KeyboardRequestState state = GetSelectedRequest();
-            KeyboardRequestState target = KeyboardRequestRuntime.SubmissionTarget;
-            _submissionTarget.text = target == null ? "현재 제출 대상: 없음"
-                : $"현재 제출 대상: {target.Definition.DisplayName}";
+            KeyboardRequestState activeRequest = KeyboardRequestRuntime.ActiveRequest;
+            _activeRequestText.text = activeRequest == null ? "진행 의뢰: 없음"
+                : $"진행 의뢰: {activeRequest.Definition.DisplayName}";
             _requestInfo.gameObject.SetActive(state != null);
             _requestActions.SetActive(state != null);
             RectTransform scrollRect = (RectTransform)_bodyScroll.transform;
@@ -343,20 +340,21 @@ namespace Game.Player
             string requirements = definition.RequiresAllRequiredSwitchSlots
                 ? $"\n요구사항: 모든 필수 스위치 슬롯에 {switchName} 설치" : string.Empty;
             if (definition.RequiresCompleteAssembly)
-                requirements += "\n전체 조립: 하단부 · PCB · 나사 6개 · 보강판 · 상단부 · 필수 키캡";
+                requirements += "\n전체 조립: 하단부 · PCB · 보강판 · 상단부 · 필수 키캡";
             if (!definition.RequiresAllRequiredSwitchSlots && !definition.RequiresCompleteAssembly && !definition.RequiresGlassSurfaces)
                 requirements = "\n요구사항: 키보드 본체라면 구성과 조립 상태 제한 없음";
             string failure = state.Result == KeyboardRequestResult.Failure
                 ? $"\n실패 사유: {state.FailureReason}" : string.Empty;
             _requestInfo.text = $"의뢰: {definition.DisplayName}\n상태: {phase}{result}"
-                + (state == target ? " · 현재 제출 대상" : string.Empty)
+                + (state == activeRequest && state.Phase == KeyboardRequestPhase.InProgress ? " · 발송 대상 의뢰"
+                    : state == activeRequest ? " · 진행 의뢰" : activeRequest != null
+                        && state.Phase == KeyboardRequestPhase.Unaccepted ? " · 다른 의뢰 진행 중" : string.Empty)
                 + requirements + (definition.RequiresGlassSurfaces
                     ? "\n재질: 하단부 · 상단부 · 모든 필수 키캡은 유리 (PCB·보강판 제한 없음)"
                     : "\n재질과 키캡 디자인 제한 없음")
                 + $"\n성공 보상: {definition.RewardGold}골드" + failure
                 + (string.IsNullOrEmpty(_requestNotice) ? string.Empty : $"\n{_requestNotice}");
-            _acceptRequest.SetInteractable(state.Phase == KeyboardRequestPhase.Unaccepted);
-            _selectSubmissionTarget.SetInteractable(state.Phase == KeyboardRequestPhase.InProgress && state != target);
+            _acceptRequest.SetInteractable(state.Phase == KeyboardRequestPhase.Unaccepted && activeRequest == null);
             _closeRequest.SetInteractable(state.Phase == KeyboardRequestPhase.AwaitingConfirmation);
             RestoreScrollPosition(_bodyScroll, bodyPosition);
         }
@@ -375,22 +373,12 @@ namespace Game.Player
 
         /// <summary>
         /// button 클릭으로 현재 메일의 의뢰 수락을 런타임에 요청한다.
-        /// 런타임이 미수락 여부를 다시 검사하며 제출 대상과 골드는 변경하지 않는다.
+        /// 런타임이 미수락 여부와 다른 진행 의뢰를 재검사하고 상태를 갱신한다.
         /// </summary>
         private void HandleAcceptRequest(MonitorOSButton button)
         {
             KeyboardRequestState state = GetSelectedRequest();
             if (state != null) KeyboardRequestRuntime.TryAccept(state.Definition.RequestId);
-        }
-
-        /// <summary>
-        /// button 클릭으로 현재 의뢰를 제출 대상으로 선택하도록 런타임에 요청한다.
-        /// 런타임이 진행 중 여부를 다시 검사하며 다른 의뢰의 수락 상태는 유지한다.
-        /// </summary>
-        private void HandleSelectSubmissionTarget(MonitorOSButton button)
-        {
-            KeyboardRequestState state = GetSelectedRequest();
-            if (state != null) KeyboardRequestRuntime.TrySelectSubmissionTarget(state.Definition.RequestId);
         }
 
         /// <summary>

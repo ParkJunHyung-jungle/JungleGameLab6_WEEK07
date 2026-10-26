@@ -30,6 +30,14 @@ namespace Game.Player
 
         [Header("Switch Inventory")]
         [SerializeField] private AssemblyCatalogEntry[] _switchEntries = new AssemblyCatalogEntry[0];
+
+        [Header("Placement Mode Style")]
+        [SerializeField] private Color _modeSelectedColor = new Color32(92, 58, 33, 255);
+        [SerializeField] private Color _modeNormalColor = new Color32(214, 186, 154, 255);
+        [SerializeField] private Color _modeSelectedOutlineColor = new Color32(255, 222, 173, 255);
+        [SerializeField] private Color _modeNormalOutlineColor = new Color32(148, 115, 82, 255);
+        [SerializeField] private Color _modeSelectedTextColor = new Color32(255, 250, 240, 255);
+        [SerializeField] private Color _modeNormalTextColor = new Color32(105, 75, 48, 255);
         private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
         private readonly Dictionary<SwitchType, Texture2D> _switchPreviewTextures = new Dictionary<SwitchType, Texture2D>();
@@ -124,6 +132,13 @@ namespace Game.Player
                 if (Mouse.current.leftButton.wasReleasedThisFrame) EndDrag(point);
                 else CancelDrag();
             }
+        }
+
+        /// <summary>눌린 entry의 키캡·스위치 카드 선택 표시만 갱신한다. 조작 가능 상태를 검사하며 실물 생성과 재고 예약 및 설치는 수행하지 않는다.</summary>
+        public void SelectInventoryCard(AssemblyCatalogEntry entry)
+        {
+            if (entry.IsStructure || !_pullers.InputAllowed || _pullers.IsManipulatingPart) return;
+            GetComponent<KeyboardEditOverlayUI>().SelectInventoryCard(entry);
         }
 
         /// <summary>
@@ -286,6 +301,8 @@ namespace Game.Player
             button.transform.SetParent(parent, false);
             button.targetGraphic = button.GetComponent<Image>();
             button.Clicked += HandlePlacementModeClicked;
+            Outline outline = button.gameObject.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
             Text label = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             label.transform.SetParent(button.transform, false);
             label.rectTransform.anchorMin = Vector2.zero;
@@ -311,8 +328,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 배치 모드에 따라 두 버튼의 색상을 갱신한다.
-        /// 재고와 설치 상태는 변경하지 않으며 반환값은 없다.
+        /// 현재 배치 모드에 따라 두 버튼의 색상과 스타일을 갱신한다.
+        /// _bulkPlacement 상태를 사용하며 각 버튼의 배경, 테두리, 텍스트 스타일을 갱신한다.
         /// </summary>
         private void RefreshPlacementModes()
         {
@@ -321,14 +338,45 @@ namespace Game.Player
             foreach (KeyboardEditButton button in _singlePlacementButtons)
             {
                 button.interactable = CanChangePlacementMode(button);
-                button.GetComponent<Image>().color = !_bulkPlacement
-                    ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+                ApplyPlacementModeButtonStyle(button, !_bulkPlacement);
             }
             foreach (KeyboardEditButton button in _bulkPlacementButtons)
             {
                 button.interactable = CanChangePlacementMode(button);
-                button.GetComponent<Image>().color = _bulkPlacement
-                    ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+                ApplyPlacementModeButtonStyle(button, _bulkPlacement);
+            }
+        }
+
+        /// <summary>
+        /// 배치 모드 버튼에 선택 상태에 따른 배경색, 외곽선, 텍스트 스타일을 적용한다.
+        /// button과 selected 여부를 사용하며, 버튼의 Image, Outline, Text 컴포넌트 상태를 변경한다.
+        /// </summary>
+        public void ApplyPlacementModeButtonStyle(KeyboardEditButton button, bool selected)
+        {
+            Image background = button.GetComponent<Image>();
+            if (background != null)
+            {
+                background.color = selected ? _modeSelectedColor : _modeNormalColor;
+            }
+
+            Outline outline = button.GetComponent<Outline>();
+            if (outline == null)
+            {
+                outline = button.gameObject.AddComponent<Outline>();
+                outline.effectDistance = new Vector2(1.5f, -1.5f);
+            }
+            outline.effectColor = selected ? _modeSelectedOutlineColor : _modeNormalOutlineColor;
+
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.color = selected ? _modeSelectedTextColor : _modeNormalTextColor;
+                label.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
+                label.fontSize = 18;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 15;
+                label.resizeTextMaxSize = 18;
+                label.lineSpacing = 1f;
             }
         }
 
@@ -407,6 +455,94 @@ namespace Game.Player
             return true;
         }
 
+        /// <summary>customization에 실제 장착된 키캡·스위치와 구조 카탈로그 항목을 확인해 각 재고를 반환한다. 대상 상태를 먼저 검사하고 성공 후 수량과 카드 표시를 갱신한다.</summary>
+        public bool TryReturnKeyboardInventory(KeyboardCustomization customization)
+        {
+            if (customization == null || IsDragging || _pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured) return false;
+            var returns = new List<AssemblyCatalogEntry>();
+            for (int index = 0; index < customization.KeycapCount; index++)
+            {
+                if (customization.IsPcbKeycapInstalled(index))
+                {
+                    AssemblyCatalogEntry keycap = FindEntry(customization.GetKeycapMaterial(index), customization.GetKeycapDefinition(index));
+                    if (keycap == null) return false;
+                    returns.Add(keycap);
+                }
+                if (!customization.IsPcbSwitchInstalled(index)) continue;
+                Transform switchPart = customization.GetSwitchSlotTransform(index);
+                SwitchType type = customization.GetInstalledSwitchType(switchPart.GetComponent<KeyboardSwitch>());
+                AssemblyCatalogEntry found = null;
+                foreach (AssemblyCatalogEntry entry in _switchEntries)
+                    if (entry.IsSwitch && entry.SwitchData.Type == type) { found = entry; break; }
+                if (found == null) return false;
+                returns.Add(found);
+            }
+
+            KeyboardAssemblyState assembly = customization.GetComponent<KeyboardAssemblyState>();
+            AssemblyCatalogEntry lowerEntry = null;
+            var structureReturns = new List<AssemblyCatalogEntry>();
+            var detachedStructures = new List<Transform>();
+            if (assembly != null && assembly.Initialized)
+            {
+                for (int index = 0; index < assembly.FixedScrews.Count; index++)
+                    if (assembly.IsScrewRunning(index)) return false;
+                KeyboardEditOverlayUI overlay = FindFirstObjectByType<KeyboardEditOverlayUI>();
+                AssemblyDraggablePart rootPart = customization.GetComponent<AssemblyDraggablePart>();
+                lowerEntry = rootPart != null && rootPart.CatalogEntry != null
+                    && rootPart.CatalogEntry.IsStructure
+                    && rootPart.CatalogEntry.StructureKind == AssemblyStructurePart.Lower
+                    && rootPart.CatalogEntry.StructureMaterial == assembly.GetStructureMaterial(AssemblyStructurePart.Lower)
+                    ? rootPart.CatalogEntry : GetStructureEntry(assembly, overlay, AssemblyStructurePart.Lower);
+                if (lowerEntry == null) return false;
+                if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Upper,
+                    assembly.UpperInstalled, structureReturns, detachedStructures)) return false;
+                if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Pcb,
+                    assembly.PcbPlaced || assembly.PcbLoose, structureReturns, detachedStructures)) return false;
+                if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Plate,
+                    assembly.PlateInstalled, structureReturns, detachedStructures)) return false;
+            }
+            else return false;
+
+            lowerEntry.StorePart(null, true);
+            foreach (AssemblyCatalogEntry entry in returns) entry.StorePart(null, true);
+            foreach (AssemblyCatalogEntry entry in structureReturns) entry.StorePart(null, true);
+            foreach (Transform part in detachedStructures)
+            {
+                part.gameObject.SetActive(false);
+                Destroy(part.gameObject);
+            }
+            try { RefreshInventory(); }
+            catch (System.Exception exception) { Debug.LogError("키보드 해체 후 재고 표시 갱신에 실패했습니다. 재고 반환은 완료되었습니다. " + exception, customization); }
+            return true;
+        }
+
+        /// <summary>assembly의 kind별 재질과 기존 출고 기록으로 정확한 카탈로그 항목을 반환한다. 원본 기록을 우선 사용하고 없으면 overlay 카탈로그를 조회한다.</summary>
+        private static AssemblyCatalogEntry GetStructureEntry(KeyboardAssemblyState assembly, KeyboardEditOverlayUI overlay,
+            AssemblyStructurePart kind)
+        {
+            AssemblyCatalogEntry entry = assembly.GetStructureInventoryEntry(kind);
+            if (entry != null) return entry;
+            return overlay != null ? overlay.GetStructureEntry(kind, assembly.GetStructureMaterial(kind)) : null;
+        }
+
+        /// <summary>kind의 실제 활성 부품을 찾아 기존 재고 항목에 추가한다. 외부에 분리된 부품은 반환 확정 후 제거 목록에 둔다.</summary>
+        private static bool AddStructureReturn(KeyboardAssemblyState assembly, KeyboardEditOverlayUI overlay,
+            AssemblyStructurePart kind, bool installed, List<AssemblyCatalogEntry> returns, List<Transform> detached)
+        {
+            IReadOnlyList<Transform> parts = assembly.GetStructureParts(kind);
+            bool hasPhysicalPart = installed;
+            foreach (Transform part in parts)
+                if (part != null && part.gameObject.activeSelf) hasPhysicalPart = true;
+            if (!hasPhysicalPart) return true;
+            AssemblyCatalogEntry entry = GetStructureEntry(assembly, overlay, kind);
+            if (entry == null) return kind == AssemblyStructurePart.Plate;
+            returns.Add(entry);
+            Transform root = assembly.transform.root;
+            foreach (Transform part in parts)
+                if (part != null && part.gameObject.activeSelf && !part.IsChildOf(root)) detached.Add(part);
+            return true;
+        }
+
         /// <summary>
         /// entry의 키캡 또는 축을 point에서 드래그하며 한 개 배치에서는 재고 한 개를 예약한다.
         /// 일괄 배치에서는 표시용 실물만 준비하고 재고가 없으면 시작하지 않는다. 반환값은 없다.
@@ -418,7 +554,6 @@ namespace Game.Player
             if (!bulk && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
-            GetComponent<KeyboardEditOverlayUI>().SelectInventoryCard(entry);
             _fromInventory = true;
             _isBulkDragging = bulk;
             _bulkInteractionId = _isBulkDragging ? System.Guid.NewGuid().ToString("N") : null;
@@ -1153,6 +1288,7 @@ namespace Game.Player
         {
             foreach (var label in _quantityLabels)
             {
+                if (label.Value == null) continue;
                 string quantity = "×" + label.Key.AvailableQuantity;
                 if (label.Value.text != quantity) label.Value.text = quantity;
                 if (_keycapTray == null) continue;

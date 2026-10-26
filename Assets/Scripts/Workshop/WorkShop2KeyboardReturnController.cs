@@ -192,13 +192,13 @@ namespace Game.Workshop
 
         /// <summary>
         /// 트레이의 keyboard와 requestId를 검증하여 수거를 예약하고 성공 여부를 반환한다.
-        /// 제출 대상을 고정하고 실물 조작을 차단하며 기존 에미넴 연출에서 finished로 결과를 알린다.
+        /// 진행 의뢰를 고정하고 실물 조작을 차단하며 기존 에미넴 연출에서 finished로 결과를 알린다.
         /// </summary>
         public bool RequestDelivery(Rigidbody keyboard, string requestId, Action<bool> finished)
         {
             if (!isActiveAndEnabled || _deliveryRequest != null || keyboard == null
                 || keyboard.GetComponent<KeyboardPickupTarget>() == null || _queuedKeyboards.Contains(keyboard)
-                || KeyboardRequestRuntime.SubmissionTarget?.Definition.RequestId != requestId) return false;
+                || KeyboardRequestRuntime.ActiveRequest?.Definition.RequestId != requestId) return false;
             if (_gameSession == null || _gameSession.Wallet == null)
             {
                 Debug.LogError("배송 작업실 지갑 연결이 없습니다. 키보드와 의뢰를 유지합니다.", this);

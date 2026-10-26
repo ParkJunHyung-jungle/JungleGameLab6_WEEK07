@@ -69,13 +69,13 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// installed에 따라 모니터 화면의 전원을 변경한다.
-        /// 키보드 거치 상태를 사용하며 제거 시 현재 앱을 종료하고 Canvas 표시를 끈다.
+        /// installed에 따라 앱과 조작 상태를 갱신하고 모니터 화면을 켜진 상태로 유지한다.
+        /// 키보드 거치 상태를 사용하며 제거 시 현재 앱을 종료하고 바탕화면을 표시한다.
         /// </summary>
         private void HandleKeyboardChanged(bool installed)
         {
             if (!installed) _manager.StopGame();
-            _canvas.enabled = installed;
+            _canvas.enabled = true;
             HandleFocusChanged(installed && _input.HasFocus);
         }
 

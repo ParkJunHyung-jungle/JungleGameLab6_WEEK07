@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.KeyboardRequestDefinition
   _requestId: keyboard.sans-glass.003
   _displayName: "샌즈 축 유리 키보드"
-  _description: "필수 스위치 전체에 샌즈 축을 설치하고, 유리 하단부와 상단부 및 모든 필수 유리 키캡을 조립하세요. PCB, 나사 6개와 보강판도 모두 조립해야 합니다. PCB와 보강판 재질은 자유입니다."
+  _description: "필수 스위치 전체에 샌즈 축을 설치하고, 유리 하단부와 상단부 및 모든 필수 유리 키캡을 조립하세요. PCB와 보강판도 모두 조립해야 합니다. PCB와 보강판 재질은 자유입니다."
   _requiredSwitchType: 3
   _requiresAllRequiredSwitchSlots: 1
   _requiresCompleteAssembly: 1

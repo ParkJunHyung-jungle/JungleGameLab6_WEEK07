@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -34,12 +34,19 @@ namespace Game.Player
         [SerializeField] private Color _border = new Color32(69, 91, 112, 220);
         [SerializeField] private Color _textColor = new Color32(236, 231, 214, 255);
         [SerializeField] private Color _accent = new Color32(115, 220, 227, 255);
+
+        [Header("Focus Fade")]
+        [SerializeField, Min(0f)] private float _focusFadeDistance = 140f;
+        [SerializeField, Range(0f, 1f)] private float _focusMinimumOpacity = 0.25f;
+        [SerializeField, Min(0f)] private float _focusFadeDuration = 0.2f;
         private readonly WorkshopControlHintState _state = new WorkshopControlHintState();
         private readonly WorkshopControlHintState _common = new WorkshopControlHintState();
         private readonly List<HintRow> _rows = new List<HintRow>();
         private readonly List<RaycastResult> _hits = new List<RaycastResult>();
         private readonly Vector3[] _corners = new Vector3[4];
         private RectTransform _panel;
+        private CanvasGroup _panelGroup;
+        private readonly Vector3[] _fadeCorners = new Vector3[4];
         private RectTransform _parent;
         private Text _title;
         private Font _font;
@@ -72,9 +79,9 @@ namespace Game.Player
             Outline outline = _panel.gameObject.AddComponent<Outline>();
             outline.effectColor = _border;
             outline.effectDistance = new Vector2(1f, -1f);
-            CanvasGroup group = _panel.gameObject.AddComponent<CanvasGroup>();
-            group.interactable = false;
-            group.blocksRaycasts = false;
+            _panelGroup = _panel.gameObject.AddComponent<CanvasGroup>();
+            _panelGroup.interactable = false;
+            _panelGroup.blocksRaycasts = false;
             _title = CreateText("StateTitle", _panel, _accent);
             _title.fontStyle = FontStyle.Bold;
             _title.rectTransform.anchoredPosition = new Vector2(16f, -14f);
@@ -120,6 +127,47 @@ namespace Game.Player
                 if (!choosingKey || row.Input != "키보드 입력") _state.Add(row.Input, row.Action);
             if (_tutorial.CanOpenHelp) _state.Add("F10", "도움말");
             Present();
+            UpdatePanelOpacity(_workshopView != null && isEditing);
+        }
+
+        /// <summary>area의 화면 가장자리, cursorPosition, fadeDistance와 minimumOpacity를 사용해 목표 불투명도를 반환한다. screenCorners는 재사용하며 UI 상태는 변경하지 않는다.</summary>
+        public static float GetProximityOpacity(RectTransform area, Vector2 cursorPosition, float fadeDistance,
+            float minimumOpacity, Vector3[] screenCorners)
+        {
+            area.GetWorldCorners(screenCorners);
+            Vector2 first = RectTransformUtility.WorldToScreenPoint(null, screenCorners[0]);
+            float minX = first.x;
+            float maxX = first.x;
+            float minY = first.y;
+            float maxY = first.y;
+            for (int index = 1; index < screenCorners.Length; index++)
+            {
+                Vector2 point = RectTransformUtility.WorldToScreenPoint(null, screenCorners[index]);
+                minX = Mathf.Min(minX, point.x);
+                maxX = Mathf.Max(maxX, point.x);
+                minY = Mathf.Min(minY, point.y);
+                maxY = Mathf.Max(maxY, point.y);
+            }
+            float horizontalDistance = cursorPosition.x < minX ? minX - cursorPosition.x
+                : cursorPosition.x > maxX ? cursorPosition.x - maxX : 0f;
+            float verticalDistance = cursorPosition.y < minY ? minY - cursorPosition.y
+                : cursorPosition.y > maxY ? cursorPosition.y - maxY : 0f;
+            float distance = Mathf.Sqrt(horizontalDistance * horizontalDistance + verticalDistance * verticalDistance);
+            float proximity = fadeDistance <= 0f ? (distance > 0f ? 1f : 0f)
+                : Mathf.Clamp01(distance / fadeDistance);
+            return Mathf.Lerp(minimumOpacity, 1f, proximity);
+        }
+
+        /// <summary>isEditing과 공통 가상 커서를 사용해 현재 표시 중인 안내 패널의 CanvasGroup alpha를 부드럽게 갱신한다. 일반 뷰와 숨김 상태는 기존 불투명도로 복구한다.</summary>
+        private void UpdatePanelOpacity(bool isEditing)
+        {
+            if (_panelGroup == null || !_panel.gameObject.activeSelf) return;
+            float target = isEditing
+                ? GetProximityOpacity(_panel, InGameCursor.Position, _focusFadeDistance,
+                    _focusMinimumOpacity, _fadeCorners)
+                : 1f;
+            float step = _focusFadeDuration <= 0f ? 1f : Time.unscaledDeltaTime / _focusFadeDuration;
+            _panelGroup.alpha = Mathf.MoveTowards(_panelGroup.alpha, target, step);
         }
 
         /// <summary>공통 커서 아래 최상위 UI와 현재 드래그 중인 UI로 가능한 조작을 추가한다. 뒤쪽 월드와 비활성 컨트롤은 조회하지 않는다.</summary>
@@ -278,7 +326,11 @@ namespace Game.Player
         private void HandlePointerCanceled() { _capturedUI = null; Hide(); }
 
         /// <summary>현재 패널만 숨긴다. 기존 상호작용 상태나 입력은 변경하지 않는다.</summary>
-        private void Hide() { if (_panel != null) _panel.gameObject.SetActive(false); }
+        private void Hide()
+        {
+            if (_panelGroup != null) _panelGroup.alpha = 1f;
+            if (_panel != null) _panel.gameObject.SetActive(false);
+        }
 
         void OnDisable()
         {

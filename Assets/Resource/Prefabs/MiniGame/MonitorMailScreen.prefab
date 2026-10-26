@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &1000
 GameObject:
@@ -97,9 +97,8 @@ MonoBehaviour:
   _bodyScroll: {fileID: 1204}
   _requestInfo: {fileID: 1313}
   _requestActions: {fileID: 1320}
-  _submissionTarget: {fileID: 1373}
+  _activeRequestText: {fileID: 1373}
   _acceptRequest: {fileID: 1334}
-  _selectSubmissionTarget: {fileID: 1344}
   _closeRequest: {fileID: 1354}
 --- !u!1 &1010
 GameObject:
@@ -2241,9 +2240,9 @@ GameObject:
   - component: {fileID: 1343}
   - component: {fileID: 1344}
   m_Layer: 5
-  m_Name: SelectSubmissionTarget
+  m_Name: RemovedRequestAction
   m_TagString: Untagged
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1341
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2381,7 +2380,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1.15
-  m_Text: "제출 대상으로 선택"
+  m_Text: ""
 --- !u!1 &1350
 GameObject:
   m_ObjectHideFlags: 0
@@ -2548,7 +2547,7 @@ GameObject:
   - component: {fileID: 1372}
   - component: {fileID: 1373}
   m_Layer: 5
-  m_Name: SubmissionTarget
+  m_Name: ActiveRequestInfo
   m_TagString: Untagged
   m_IsActive: 1
 --- !u!224 &1371
@@ -2608,7 +2607,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1.15
-  m_Text: "현재 제출 대상: 없음"
+  m_Text: "진행 의뢰: 없음"
 --- !u!1 &1500
 GameObject:
   m_ObjectHideFlags: 0

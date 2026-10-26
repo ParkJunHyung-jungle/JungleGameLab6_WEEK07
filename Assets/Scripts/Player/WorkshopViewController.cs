@@ -21,6 +21,7 @@ namespace Game.Player
         [SerializeField] private CinemachineBrain _brain;
         [SerializeField] private CinemachineCamera[] _views;
         [SerializeField] private CinemachineCamera _focusCamera;
+        [SerializeField] private WorkshopLookCamera _lookCamera;
 
         [Header("Monitor Mode")]
         [SerializeField] private Camera _monitorOutputCamera;
@@ -56,6 +57,21 @@ namespace Game.Player
         public KeyboardDispenser KeyboardDispenser => _dispenser;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
+        public bool CanLookAround => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
+            && !_monitorFocused && !_monitorTransition && _viewSwitchingAllowed && !_brain.IsBlending
+            && Application.isFocused && InGameCursor.CanProcessPointer
+            && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
+            && !PlaytestResearchSession.IsUploadConfirmationOpen && !_pullers.IsManipulatingPart
+            && !IsPointerOverUI();
+
+        /// <summary>reference의 일반 방향이 현재 선택 영역인지 반환한다. 단일 카메라는 가장 가까운 기준 각도를 사용하고 기존 씬은 카메라 동일성을 유지한다.</summary>
+        public bool IsGeneralView(CinemachineCamera reference)
+        {
+            if (_isFocused || _modeTransitionPending || _monitorFocused || _monitorTransition || _brain.IsBlending) return false;
+            return _lookCamera != null
+                ? _brain.ActiveVirtualCamera == (ICinemachineCamera)_lookCamera.Camera && _lookCamera.CurrentReference == reference
+                : _brain.ActiveVirtualCamera == (ICinemachineCamera)reference;
+        }
 
         /// <summary>body를 ray가 가리키는 빈 작업대에 장착한 결과를 반환한다. 성공하면 기존 편집 연결을 종료하고 새 실물을 연결하며 카메라와 재고는 유지한다.</summary>
         public bool TryPlaceInventoryKeyboard(Rigidbody body, Ray ray)
@@ -70,19 +86,17 @@ namespace Game.Player
 
         public bool CanEnterKeyboardFocus => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
             && !_monitorFocused && !_monitorTransition
-            && _viewSwitchingAllowed && _viewIndex == 0 && !_brain.IsBlending
-            && _brain.ActiveVirtualCamera == (ICinemachineCamera)_views[0]
+            && _viewSwitchingAllowed && IsGeneralView(_views[0])
             && !_keyboardDrag.IsDragging && Application.isFocused && InGameCursor.CanProcessPointer
             && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
 
         /// <summary>
-        /// 선택한 body가 현재 Holder의 스냅 키보드이면 집중 전환을 시작한다.
-        /// 작업대 뷰와 입력 및 UI 조건을 재검사하며 유효하지 않으면 기존 상태를 유지한다.
+        /// 현재 커서가 작업대 선택 영역에 있으면 키보드 유무와 관계없이 집중 전환을 시작한다.
+        /// 작업대 방향과 입력 및 UI와 가림 조건을 재검사하며 유효하지 않으면 기존 상태를 유지한다.
         /// </summary>
-        public void TryEnterKeyboardFocus(Rigidbody body)
+        private void TryEnterKeyboardFocus()
         {
-            if (CanEnterKeyboardFocus && body != null && _workbenchHolder.KeyboardBody == body
-                && !IsPointerOverUI())
+            if (CanEnterKeyboardFocus && !IsPointerOverUI() && _keyboardDrag.IsWorkbenchFocusTarget())
                 SetFocused(true);
         }
 
@@ -128,11 +142,17 @@ namespace Game.Player
             if (!_viewSwitchingAllowed || _modeTransitionPending || _brain.IsBlending)
                 return;
 
+            if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
+            {
+                TryEnterKeyboardFocus();
+                if (_modeTransitionPending) return;
+            }
+
             if (!_keyboardDrag.IsDragging && Mouse.current != null
                 && Mouse.current.leftButton.wasPressedThisFrame && TryClickDispenser())
                 return;
 
-            if (_monitorHolder != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_monitorCamera
+            if (_monitorHolder != null && IsGeneralView(_monitorCamera)
                 && !_keyboardDrag.IsDragging && _monitorHolder.KeyboardBody != null
                 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && IsMonitorScreenSelected())
             {
@@ -143,7 +163,7 @@ namespace Game.Player
                 ApplyCursor();
                 return;
             }
-            if (Keyboard.current == null)
+            if (_lookCamera != null || Keyboard.current == null)
                 return;
 
             GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
@@ -162,7 +182,8 @@ namespace Game.Player
         {
             if (_monitorTransition)
             {
-                ICinemachineCamera monitorDestination = _monitorFocused ? _monitorFocusCamera : _monitorCamera;
+                ICinemachineCamera monitorDestination = _monitorFocused ? _monitorFocusCamera
+                    : _lookCamera != null ? _lookCamera.Camera : _monitorCamera;
                 if (_brain.IsBlending || _brain.ActiveVirtualCamera != monitorDestination) return;
                 _monitorTransition = false;
                 if (_monitorFocused) _monitorInput.SetWorkshopFocus(true);
@@ -170,7 +191,7 @@ namespace Game.Player
             }
             if (!_modeTransitionPending || _brain.IsBlending)
                 return;
-            ICinemachineCamera destination = _isFocused ? _focusCamera : _views[0];
+            ICinemachineCamera destination = _isFocused ? _focusCamera : _lookCamera != null ? _lookCamera.Camera : _views[0];
             if (_brain.ActiveVirtualCamera != destination)
                 return;
 
@@ -226,6 +247,7 @@ namespace Game.Player
             _monitorFocused = false;
             _monitorTransition = true;
             _monitorFocusCamera.Priority = -1;
+            if (_lookCamera != null) _lookCamera.ResetToReference(_monitorCamera);
             ApplyCursor();
         }
 
@@ -423,14 +445,16 @@ namespace Game.Player
             foreach (RaycastResult hit in _uiHits)
                 if (hit.module is GraphicRaycaster
                     && (ExecuteEvents.GetEventHandler<IPointerDownHandler>(hit.gameObject) != null
-                        || ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit.gameObject) != null))
+                        || ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit.gameObject) != null
+                        || ExecuteEvents.GetEventHandler<IScrollHandler>(hit.gameObject) != null
+                        || ExecuteEvents.GetEventHandler<IDragHandler>(hit.gameObject) != null))
                     return true;
             return false;
         }
 
         /// <summary>
         /// 현재 일반 뷰와 작업 모드 및 운반 상태에 맞는 공통 조작 안내를 state에 추가한다.
-        /// Holder에 배치된 키보드의 클릭과 드래그를 구분하여 안내한다.
+        /// 키보드 좌클릭 운반과 작업대 우클릭 집중 진입을 구분하여 안내한다.
         /// </summary>
         public void CollectControlHints(WorkshopControlHintState state)
         {
@@ -447,14 +471,19 @@ namespace Game.Player
                 state.Add("Esc", "작업대 뷰 복귀");
             else
             {
-                if (_viewSwitchingAllowed)
+                if (_viewSwitchingAllowed && _lookCamera == null)
                     state.Add("Q / E", "이전 / 다음 뷰");
+                else if (_viewSwitchingAllowed)
+                    state.Add("마우스 이동", "둘러보기");
                 if (_keyboardDrag.IsDragging)
-                    state.Add("좌클릭 놓기", "배치 또는 내려놓기");
-                else if (_monitorHolder != null && _viewIndex == 1 && _monitorHolder.KeyboardBody != null)
+                    state.Add("좌클릭", "배치 또는 내려놓기");
+                else if (_monitorHolder != null && IsGeneralView(_monitorCamera) && _monitorHolder.KeyboardBody != null)
                     state.Add("화면 좌클릭", "모니터 사용");
-                else if (_viewIndex == 0 && _keyboardDrag.IsPlaced)
-                    state.Add("좌클릭 / 드래그", "배치된 키보드 작업 모드 / 운반");
+                else if (IsGeneralView(_views[0]))
+                {
+                    state.Add("키보드 좌클릭", "전체 운반");
+                    state.Add("작업대 우클릭", "작업 모드");
+                }
             }
         }
 
@@ -474,6 +503,12 @@ namespace Game.Player
         private void SelectView(int index)
         {
             _viewIndex = index;
+            if (_lookCamera != null)
+            {
+                _lookCamera.ResetToReference(_views[index]);
+                _lookCamera.Camera.Priority = 1;
+                return;
+            }
             for (int i = 0; i < _views.Length; i++)
                 _views[i].Priority = i == index ? 1 : 0;
         }

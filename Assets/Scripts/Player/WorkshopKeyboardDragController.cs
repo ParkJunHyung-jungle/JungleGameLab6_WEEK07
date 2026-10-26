@@ -44,7 +44,6 @@ namespace Game.Player
         [SerializeField] private float _hangerWorldX = -3.18f;
         private bool _usingHangerPlane;
         private float _hangerDragWorldX;
-        private bool _awaitingHangerPlacement;
 
         [Header("Drag Plane")]
         [SerializeField, Min(0.5f)] private float _maximumDragDistance = 10f;
@@ -62,13 +61,10 @@ namespace Game.Player
         private bool _inputAllowed = true;
         private bool _acceptPress;
         private bool _releasePending;
-        private bool _clickCandidate;
-        private Vector2 _pressPosition;
 
         public bool IsDragging => _isDragging;
 
         public bool IsPlaced => !_isDragging && _workbenchHolder.KeyboardBody != null;
-        private bool IsSelectedOnWorkbench => _keyboardBody != null && _workbenchHolder.KeyboardBody == _keyboardBody;
 
         void Awake()
         {
@@ -95,41 +91,8 @@ namespace Game.Player
 
             if (_isDragging)
             {
-                if (_awaitingHangerPlacement)
-                {
-                    if (mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI())
-                        _releasePending = true;
-                    else if (mouse.leftButton.wasReleasedThisFrame)
-                        _releasePending = true;
-                }
-                else if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
+                if (mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI())
                     _releasePending = true;
-                return;
-            }
-
-            if (_clickCandidate)
-            {
-                if (!IsSelectedOnWorkbench || !_viewController.CanEnterKeyboardFocus)
-                {
-                    _clickCandidate = false;
-                    _acceptPress = false;
-                    return;
-                }
-                float threshold = EventSystem.current.pixelDragThreshold;
-                if (((Vector2)InGameCursor.Position - _pressPosition).sqrMagnitude > threshold * threshold)
-                {
-                    _clickCandidate = false;
-                    _acceptPress = false;
-                    if (!IsPointerOverUI() && TryBeginDrag(false) && !mouse.leftButton.isPressed)
-                        _releasePending = true;
-                }
-                else if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
-                {
-                    _clickCandidate = false;
-                    _acceptPress = false;
-                    if (!IsPointerOverUI() && IsKeyboardUnderCursor())
-                        _viewController.TryEnterKeyboardFocus(_keyboardBody);
-                }
                 return;
             }
 
@@ -146,13 +109,7 @@ namespace Game.Player
                     return;
                 _pickupTarget = pickup;
                 _keyboardBody = body;
-                if (IsSelectedOnWorkbench && _viewController.CanEnterKeyboardFocus)
-                {
-                    _clickCandidate = true;
-                    _pressPosition = InGameCursor.Position;
-                }
-                else
-                    TryBeginDrag(false);
+                TryBeginDrag();
             }
         }
 
@@ -168,15 +125,13 @@ namespace Game.Player
 
             if (!_brain.IsBlending)
             {
-                bool hangerPlane = _hangerCamera != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_hangerCamera;
+                bool hangerPlane = _hangerCamera != null && _viewController.IsGeneralView(_hangerCamera);
                 if (hangerPlane != _usingHangerPlane)
                 {
                     _usingHangerPlane = hangerPlane;
                     CacheDragPointer();
                 }
             }
-            if (!_brain.IsBlending && !_usingHangerPlane && _awaitingHangerPlacement)
-                _releasePending = true;
             Quaternion rotation = _outputCamera.transform.rotation * _dragRotation;
             // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
             Physics.SyncTransforms();
@@ -209,13 +164,11 @@ namespace Game.Player
                     }
                     _isDragging = false;
                     _releasePending = false;
-                    _awaitingHangerPlacement = false;
                     _acceptPress = false;
                 }
                 else if (_usingHangerPlane)
                 {
                     _releasePending = false;
-                    _awaitingHangerPlacement = true;
                 }
                 else
                     DropKeyboard();
@@ -263,7 +216,7 @@ namespace Game.Player
         /// </summary>
         private bool IsHolderUnderCursor()
         {
-            if (_brain.IsBlending || _brain.ActiveVirtualCamera != (ICinemachineCamera)_workbenchCamera
+            if (_brain.IsBlending || !_viewController.IsGeneralView(_workbenchCamera)
                 || _workbenchHolder.KeyboardBody != null || IsPointerOverUI())
                 return false;
 
@@ -273,6 +226,26 @@ namespace Game.Player
                 return false;
 
             return !IsPlacementOccluded(ray, areaHit.distance);
+        }
+
+        /// <summary>
+        /// 공통 커서와 출력 카메라로 작업대 선택 영역을 가리키는지 반환한다.
+        /// 현재 Holder에 스냅된 본체와 자식만 가림에서 제외하고 UI와 다른 물체는 차단한다.
+        /// </summary>
+        public bool IsWorkbenchFocusTarget()
+        {
+            if (_isDragging || _brain.IsBlending || !_viewController.IsGeneralView(_workbenchCamera)
+                || IsPointerOverUI()) return false;
+            Physics.SyncTransforms();
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane)) return false;
+            Rigidbody snappedBody = _workbenchHolder.KeyboardBody;
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, areaHit.distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (hit.collider != _placementArea && hit.distance < areaHit.distance
+                    && (snappedBody == null || !hit.transform.IsChildOf(snappedBody.transform)))
+                    return false;
+            return true;
         }
 
         /// <summary>body를 ray가 닿는 작업대 영역에 기존 자세와 높이 보정으로 장착한 결과를 반환한다. 자기 Collider를 제외한 가림과 점유를 확인하며 재고와 편집 상태는 변경하지 않는다.</summary>
@@ -304,7 +277,7 @@ namespace Game.Player
         private bool IsMonitorUnderCursor()
         {
             if (_monitorHolder == null || _brain.IsBlending || IsPointerOverUI()
-                || _brain.ActiveVirtualCamera != (ICinemachineCamera)_monitorCamera || _monitorHolder.KeyboardBody != null)
+                || !_viewController.IsGeneralView(_monitorCamera) || _monitorHolder.KeyboardBody != null)
                 return false;
             Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
             return _monitorPlacementArea.Raycast(ray, out RaycastHit hit, _outputCamera.farClipPlane)
@@ -339,15 +312,6 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 커서의 가장 가까운 유효 키보드가 현재 선택 본체인지 반환한다.
-        /// 클릭 후보 해제 시 같은 키보드를 계속 가리키는지 확인하며 선택 참조는 변경하지 않는다.
-        /// </summary>
-        private bool IsKeyboardUnderCursor()
-        {
-            return TryGetKeyboardUnderCursor(out _, out Rigidbody body) && body == _keyboardBody;
-        }
-
-        /// <summary>
         /// 출력 카메라의 커서 Ray에서 가장 가까운 키보드의 집기 표식과 본체를 반환한다.
         /// 가림 물체와 제거 도구 및 분리 부품은 거부하며 기존 배치 키보드와 런타임 배출 인스턴스를 모두 허용한다.
         /// </summary>
@@ -375,16 +339,14 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// requireHit이 true면 본체 선택을 검사하고 현재 커서에서 고정 깊이 운반을 시작한다.
+        /// 선택한 본체와 현재 커서로 고정 깊이 운반을 시작한다.
         /// 오프셋과 상대 회전을 저장하고 기존 Holder 점유를 해제하며 시작 성공 여부를 반환한다.
         /// </summary>
-        private bool TryBeginDrag(bool requireHit)
+        private bool TryBeginDrag()
         {
-            if (requireHit && !IsKeyboardUnderCursor())
-                return false;
             Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
 
-            _usingHangerPlane = _hangerCamera != null && _brain.ActiveVirtualCamera == (ICinemachineCamera)_hangerCamera;
+            _usingHangerPlane = _hangerCamera != null && _viewController.IsGeneralView(_hangerCamera);
             CacheDragPointer();
             Plane dragPlane = GetDragPlane();
             if (!dragPlane.Raycast(ray, out float distance) || distance > _maximumDragDistance)
@@ -426,7 +388,6 @@ namespace Game.Player
             CacheDragBounds();
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             _releasePending = false;
-            _awaitingHangerPlacement = false;
             _placementPreview.Prepare(_keyboardBody.transform);
             _isDragging = true;
             return true;
@@ -641,7 +602,6 @@ namespace Game.Player
                 return;
             _isDragging = false;
             _releasePending = false;
-            _awaitingHangerPlacement = false;
             _acceptPress = false;
             if (_keyboardBody == null) return;
             _keyboardBody.isKinematic = false;
@@ -658,8 +618,6 @@ namespace Game.Player
         /// </summary>
         private void HandlePointerCanceled()
         {
-            _clickCandidate = false;
-            _awaitingHangerPlacement = false;
             _releasePending = false;
             DropKeyboard();
             _acceptPress = false;

@@ -11070,6 +11070,13 @@ MonoBehaviour:
       Data3: -1073541248
       Data4: -637734744
     Path: event:/SFX/KeyBoard/Thump/Thump
+  <Email>k__BackingField:
+    Guid:
+      Data1: 1862088215
+      Data2: 1207027367
+      Data3: -802496874
+      Data4: -2118550270
+    Path: event:/SFX/OtherObject/Email
 --- !u!114 &6017198698611276618
 MonoBehaviour:
   m_ObjectHideFlags: 0

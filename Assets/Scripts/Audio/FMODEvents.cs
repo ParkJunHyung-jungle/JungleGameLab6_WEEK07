@@ -26,6 +26,14 @@ public class FMODEvents : MonoBehaviour
     [field: SerializeField] public EventReference Trash { get; private set; }
     [field: SerializeField] public EventReference VendingMachineThud { get; private set; }
     [field: SerializeField] public EventReference ThumpKeyBoard { get; private set; }
+    [field: SerializeField] public EventReference Email { get; private set; }
+    [field: SerializeField] public EventReference DrawerOpen { get; private set; }
+    [field: SerializeField] public EventReference DrawerClose { get; private set; }
+    [field: Header("Radio SFX")]
+    [field: SerializeField] public EventReference RadioChange { get; private set; }
+    [field: SerializeField] public EventReference RadioTurnOnOff { get; private set; }
+    [field: Header("Radio Music")]
+    [field: SerializeField] public EventReference RadioMusic { get; private set; }
 
 
     public static FMODEvents instance { get; private set; }

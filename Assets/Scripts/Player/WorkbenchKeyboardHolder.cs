@@ -103,6 +103,9 @@ namespace Game.Player
             body.position = pose.position;
             body.rotation = pose.rotation;
             body.transform.SetPositionAndRotation(pose.position, pose.rotation);
+            KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickupTarget == null) pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
+            if (pickupTarget != null) pickupTarget.PlayPlacementSound(body.position);
             Game.Logging.CustomizationTelemetry.Emit(body.GetComponent<KeyboardCustomization>(), "WorkbenchPlaced");
             return true;
         }
@@ -157,7 +160,7 @@ namespace Game.Player
 
             Vector3 localCenterOffset = pickupTarget.GetVisualCenterLocalPosition(body.transform);
             body.position = transform.position - body.transform.TransformVector(localCenterOffset);
-            StartCoroutine(RotateKeyboardToHolder(body, localCenterOffset));
+            StartCoroutine(RotateKeyboardToHolder(body, localCenterOffset, pickupTarget));
 
             KeyboardProtectionCover cover = body.GetComponentInChildren<KeyboardProtectionCover>();
             if (cover != null)
@@ -166,9 +169,9 @@ namespace Game.Player
 
         /// <summary>
         /// 키보드의 시각적 중앙을 holder 위치에 유지하며 body를 목표 회전까지 보간한다.
-        /// body와 localCenterOffset을 사용하며 키보드가 해제되면 회전을 중단한다.
+        /// body와 centerOffset을 사용하며 해제 시 중단하고 완료 시 pickupTarget의 거치음 예약을 소비한다.
         /// </summary>
-        private IEnumerator RotateKeyboardToHolder(Rigidbody body, Vector3 centerOffset)
+        private IEnumerator RotateKeyboardToHolder(Rigidbody body, Vector3 centerOffset, KeyboardPickupTarget pickupTarget)
         {
             Quaternion startRotation = body.rotation;
             Quaternion targetRotation = _initialKeyboardRotation;
@@ -197,6 +200,7 @@ namespace Game.Player
 
             body.rotation = targetRotation;
             body.position = transform.position - body.transform.TransformVector(centerOffset);
+            pickupTarget.PlayPlacementSound(body.position);
         }
 
         /// <summary>

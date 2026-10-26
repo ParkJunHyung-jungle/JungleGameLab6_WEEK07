@@ -2124,6 +2124,7 @@ MonoBehaviour:
   _desktop: {fileID: 8677213233991749163}
   _appRoot: {fileID: 3630397083374722933}
   _appTemplate: {fileID: 7797232148971470380}
+  _mailNotificationDotSprite: {fileID: 21300000, guid: eb4293f127eb42e1ad072734e2bc3b11, type: 3}
   _appColumns: 6
   _appSpacing: {x: 190, y: 180}
   _window: {fileID: 5104396112521622562}

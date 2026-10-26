@@ -76,6 +76,9 @@ namespace Game.Player
             body.transform.SetPositionAndRotation(pose.position, pose.rotation);
             _keyboardBody = body;
             KeyboardChanged?.Invoke(true);
+            KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickupTarget == null) pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
+            if (pickupTarget != null) pickupTarget.PlayPlacementSound(body.position);
             return true;
         }
 
@@ -125,6 +128,7 @@ namespace Game.Player
                 cover.RemoveFrom(body.transform);
 
             KeyboardChanged?.Invoke(true);
+            pickupTarget.PlayPlacementSound(body.position);
         }
 
         /// <summary>

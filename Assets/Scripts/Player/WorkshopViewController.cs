@@ -61,6 +61,7 @@ namespace Game.Player
         public bool CanCreateLowerHousing => _lowerHousingPrefab != null || _dispenser != null && _dispenser.CanCreateKeyboard;
         public GameObject LowerHousingPreviewPrefab => _lowerHousingPrefab != null ? _lowerHousingPrefab
             : _dispenser != null ? _dispenser.GetPreviewPrefab() : null;
+        public Camera OutputCamera => _monitorOutputCamera;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
         public bool IsWorkbenchEmpty => _workbenchHolder.KeyboardBody == null;
@@ -119,6 +120,24 @@ namespace Game.Player
             return _lookCamera != null
                 ? _brain.ActiveVirtualCamera == (ICinemachineCamera)_lookCamera.Camera && _lookCamera.CurrentReference == reference
                 : _brain.ActiveVirtualCamera == (ICinemachineCamera)reference;
+        }
+
+        /// <summary>
+        /// 표시 중인 조준선의 화면 좌표를 반환하고 라디오 입력이 다른 조작과 겹치지 않는지 확인한다.
+        /// 조준선과 출력 카메라, UI 및 키보드·풀러 점유 상태를 사용하며 허용 시 aimPosition을 설정한다.
+        /// </summary>
+        public bool TryGetRadioAimPosition(out Vector2 aimPosition)
+        {
+            aimPosition = default;
+            if (!CanProcessGeneralInput || !InGameCursor.IsWorldAim || Time.timeScale <= 0f
+                || _centerReticle == null || !_centerReticle.isActiveAndEnabled
+                || _keyboardDrag.IsDragging || _pullers.IsManipulatingPart) return false;
+
+            Canvas canvas = _centerReticle.canvas;
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            aimPosition = RectTransformUtility.WorldToScreenPoint(uiCamera, _centerReticle.rectTransform.position);
+            return _monitorOutputCamera.pixelRect.Contains(aimPosition)
+                && !_pullers.IsPointerOverUI(aimPosition) && !_pullers.ConsumesPointer();
         }
 
         /// <summary>body를 ray가 가리키는 빈 작업대에 장착한 결과를 반환한다. 성공하면 기존 편집 연결을 종료하고 새 실물을 연결하며 카메라와 재고는 유지한다.</summary>

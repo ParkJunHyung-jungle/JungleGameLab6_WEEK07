@@ -304,9 +304,10 @@ namespace Game.Player
             _transition = StartCoroutine(Transition(opening));
         }
 
-        /// <summary>opening 순서에 맞춰 실제 인출·화면 밖 이동·트레이 UI를 교대한다. Time.deltaTime으로만 시간을 누적한다.</summary>
+        /// <summary>opening에 맞는 개폐음을 한 번 재생하고 실제 인출·화면 밖 이동·트레이 UI를 교대한다. Time.deltaTime으로만 시간을 누적하며 표현 교대에서는 소리를 반복하지 않는다.</summary>
         private IEnumerator Transition(bool opening)
         {
+            AudioManager.PlayDrawerSound(opening);
             if (opening)
             {
                 yield return MoveDrawer(false, false);

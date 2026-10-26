@@ -121,6 +121,7 @@ namespace Game.Player
             }
             RestoreScrollPosition(_listScroll, listPosition);
             if (selectedIndex >= 0) RestoreScrollPosition(_bodyScroll, bodyPosition);
+            KeyboardRequestRuntime.MarkNewMailSeen();
         }
 
         /// <summary>

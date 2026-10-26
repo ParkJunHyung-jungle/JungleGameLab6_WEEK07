@@ -6,6 +6,8 @@ using UnityEngine;
 using FMOD.Studio;
 using FMODUnity;
 
+using Game.Player;
+
 public class AudioManager : MonoBehaviour
 {
     private static bool _reportedMissingPartAudio;
@@ -68,12 +70,14 @@ public class AudioManager : MonoBehaviour
     void OnEnable()
     {
         if (instance != this) return;
+        KeyboardRequestRuntime.EmailNotificationRequested += PlayEmailNotification;
         Ready?.Invoke(this);
         if (_selectionVersion == 0 && _initialKeyboard != null) SelectKeyboardEffects(_initialKeyboard);
     }
 
     void OnDisable()
     {
+        KeyboardRequestRuntime.EmailNotificationRequested -= PlayEmailNotification;
         if (_activeKeyboard != null) ApplyPlateEffects(PlateEffect.None);
         DetachPlate();
     }
@@ -309,6 +313,40 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>
+    /// opening에 따라 기존 DrawerOpen 또는 DrawerClose 2D 이벤트를 한 번 재생한다.
+    /// 관리자나 이벤트 참조가 없으면 경고하며 서랍 전환과 재고 상태는 변경하지 않는다.
+    /// </summary>
+    public static void PlayDrawerSound(bool opening)
+    {
+        if (instance == null || FMODEvents.instance == null)
+        {
+            Debug.LogWarning("[FMOD] 서랍 효과음의 AudioManager 또는 FMODEvents가 없습니다.");
+            return;
+        }
+        EventReference sound = opening ? FMODEvents.instance.DrawerOpen : FMODEvents.instance.DrawerClose;
+        if (sound.IsNull)
+        {
+            Debug.LogWarning($"[FMOD] FmodManager의 {(opening ? "DrawerOpen" : "DrawerClose")} 참조가 비어 있습니다.", instance);
+            return;
+        }
+        instance.PlayOneShot(sound, Vector3.zero);
+    }
+
+    /// <summary>
+    /// 실제 메일 수신 또는 새 게임의 시작 알림에 기존 Email 이벤트를 한 번 재생한다.
+    /// 입력과 반환값 없이 FMODEvents의 UI 효과음을 시작하며 메일함 상태는 변경하지 않는다.
+    /// </summary>
+    private void PlayEmailNotification()
+    {
+        if (FMODEvents.instance == null || FMODEvents.instance.Email.IsNull)
+        {
+            Debug.LogWarning("[FMOD] FmodManager의 Email 이벤트 참조가 비어 있습니다.", this);
+            return;
+        }
+        RuntimeManager.PlayOneShot(FMODEvents.instance.Email);
+    }
+
+    /// <summary>
     /// worldPosition에서 설치 또는 제거 이벤트를 한 번 재생한다.
     /// removing이 참이면 인스턴스별 미세 피치를 적용하며 누락 및 실패는 기록하고 조립 처리는 유지한다.
     /// </summary>
@@ -396,6 +434,24 @@ public class AudioManager : MonoBehaviour
         EventInstance eventInstance = RuntimeManager.CreateInstance(eventReference);
         eventInstances.Add(eventInstance);
         return eventInstance;
+    }
+
+    /// <summary>
+    /// eventInstance를 관리 목록에서 제거하고 필요하면 재생을 정지한 뒤 해제한다.
+    /// stopPlayback이 참이면 즉시 정지하며, FMOD 실패 여부를 기록하고 등록 상태를 해제한다.
+    /// </summary>
+    public void ReleaseEventInstance(EventInstance eventInstance, bool stopPlayback)
+    {
+        if (!eventInstances.Remove(eventInstance) || !eventInstance.isValid()) return;
+        if (stopPlayback)
+        {
+            FMOD.RESULT stopResult = eventInstance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
+            if (stopResult != FMOD.RESULT.OK)
+                Debug.LogWarning($"[FMOD] 관리 이벤트 정지 실패: {stopResult}.", this);
+        }
+        FMOD.RESULT releaseResult = eventInstance.release();
+        if (releaseResult != FMOD.RESULT.OK)
+            Debug.LogWarning($"[FMOD] 관리 이벤트 해제 실패: {releaseResult}.", this);
     }
 
     /// <summary>

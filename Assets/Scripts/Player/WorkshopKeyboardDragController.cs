@@ -144,6 +144,7 @@ namespace Game.Player
             }
             if (_releasePending && !_brain.IsBlending)
             {
+                _pickupTarget.SetPlacementSoundPending(true);
                 bool placed = hanger != null ? hanger.TryAttachKeyboard(_keyboardBody, true)
                     : hasMonitor ? _monitorHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset)
                     : hasHolder && _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset);
@@ -152,6 +153,7 @@ namespace Game.Player
                     RestoreDragCollisions();
                     if (hanger != null)
                     {
+                        _pickupTarget.SetPlacementSoundPending(false);
                         Pose pose = hanger.GetPlacementPose(_centerOffset);
                         _keyboardBody.position = pose.position;
                         _keyboardBody.rotation = pose.rotation;
@@ -166,7 +168,7 @@ namespace Game.Player
                     _releasePending = false;
                 }
                 else
-                    DropKeyboard();
+                    DropKeyboard(true);
             }
         }
 
@@ -262,6 +264,7 @@ namespace Game.Player
             KeyboardPickupTarget pickup = body.GetComponent<KeyboardPickupTarget>();
             Vector3 centerOffset = Quaternion.Inverse(body.rotation)
                 * body.transform.TransformVector(pickup.GetVisualCenterLocalPosition(body.transform));
+            pickup.SetPlacementSoundPending(true);
             return _workbenchHolder.TryPlaceKeyboard(body, centerOffset);
         }
 
@@ -369,6 +372,7 @@ namespace Game.Player
             }
             if (detach) _keyboardBody.transform.SetParent(null, true);
 
+            _pickupTarget.SetPlacementSoundPending(false);
             Vector3 center = _keyboardBody.transform.TransformPoint(
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
             _centerOffset = Quaternion.Inverse(_keyboardBody.rotation) * (center - _keyboardBody.position);
@@ -479,9 +483,9 @@ namespace Game.Player
 
         /// <summary>
         /// 운반 중인 본체를 현재 위치에서 중력 낙하 상태로 전환한다.
-        /// 해제 보류와 클릭 허용을 초기화하고 속도와 각속도를 비우며 외부 전환 차단과 슬롯 및 재고는 변경하지 않는다.
+        /// userReleased로 거치음 예약 여부를 정하고 해제 보류와 클릭 허용 및 속도를 초기화한다.
         /// </summary>
-        private void DropKeyboard()
+        private void DropKeyboard(bool userReleased = false)
         {
             if (!_isDragging)
                 return;
@@ -490,6 +494,7 @@ namespace Game.Player
             _acceptPress = false;
             RestoreDragCollisions();
             if (_keyboardBody == null) return;
+            _pickupTarget.SetPlacementSoundPending(userReleased);
             _keyboardBody.isKinematic = false;
             _keyboardBody.useGravity = true;
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;

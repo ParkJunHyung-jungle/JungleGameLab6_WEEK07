@@ -50,6 +50,25 @@ namespace Game.Player
         }
 
         /// <summary>
+        /// root 아래 지정한 렌더러들의 메시와 변환만 외곽선 대상으로 저장한다.
+        /// renderers를 사용하여 같은 루트의 글씨나 UI 메시를 대상에서 제외한다.
+        /// </summary>
+        public void PrepareSelectedRenderers(Transform root, params MeshRenderer[] renderers)
+        {
+            _meshes.Clear();
+            _scale = root.lossyScale;
+            foreach (MeshRenderer renderer in renderers)
+            {
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                    continue;
+                MeshFilter filter = renderer.GetComponent<MeshFilter>();
+                if (filter == null || filter.sharedMesh == null)
+                    continue;
+                _meshes.Add((filter.sharedMesh, root.worldToLocalMatrix * renderer.localToWorldMatrix));
+            }
+        }
+
+        /// <summary>
         /// pose의 최종 배치 자세에 캐시한 메시 외곽선을 이번 프레임의 출력 카메라에만 그린다.
         /// 색상 없는 깊이 마스크로 내부 면을 가리고 기존 외곽선 재질을 사용하며 표시 오브젝트는 생성하지 않는다.
         /// </summary>

@@ -189,3 +189,45 @@ MonoBehaviour:
       Data3: -1073541248
       Data4: -637734744
     Path: event:/SFX/KeyBoard/Thump/Thump
+  <Email>k__BackingField:
+    Guid:
+      Data1: 1862088215
+      Data2: 1207027367
+      Data3: -802496874
+      Data4: -2118550270
+    Path: event:/SFX/OtherObject/Email
+  <DrawerOpen>k__BackingField:
+    Guid:
+      Data1: 2030538015
+      Data2: 1085007255
+      Data3: -316536908
+      Data4: 2130315617
+    Path: event:/SFX/OtherObject/DrawerOpen
+  <DrawerClose>k__BackingField:
+    Guid:
+      Data1: 66834287
+      Data2: 1084492545
+      Data3: -1742529911
+      Data4: -1568766927
+    Path: event:/SFX/OtherObject/DrawerClose
+  <RadioChange>k__BackingField:
+    Guid:
+      Data1: 1850124655
+      Data2: 1209657142
+      Data3: 136334498
+      Data4: -413750513
+    Path: event:/SFX/Radio/RadioChange
+  <RadioTurnOnOff>k__BackingField:
+    Guid:
+      Data1: -767259266
+      Data2: 1319183177
+      Data3: 1706372240
+      Data4: 68850873
+    Path: event:/SFX/Radio/RadioTurnOn
+  <RadioMusic>k__BackingField:
+    Guid:
+      Data1: 904751254
+      Data2: 1217279695
+      Data3: 1012826797
+      Data4: 152907510
+    Path: event:/Music/RadioMusic

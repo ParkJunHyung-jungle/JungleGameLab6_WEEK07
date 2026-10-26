@@ -1350,6 +1350,7 @@ namespace Game.Player
             if (pickupTarget == null)
                 pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
 
+            if (pickupTarget != null) pickupTarget.SetPlacementSoundPending(false);
             Vector3 localCenter = pickupTarget != null
                 ? pickupTarget.GetVisualCenterLocalPosition(body.transform)
                 : Vector3.zero;
@@ -1442,6 +1443,9 @@ namespace Game.Player
             }
 
             Rigidbody body = _heldKeyboardBody;
+            KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickupTarget == null) pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
+            if (pickupTarget != null) pickupTarget.SetPlacementSoundPending(false);
             _heldKeyboardBody = null;
             SetKeyboardCarryState(false);
             body.isKinematic = _heldKeyboardWasKinematic;
@@ -1468,6 +1472,9 @@ namespace Game.Player
             }
 
             Rigidbody body = _heldKeyboardBody;
+            KeyboardPickupTarget pickupTarget = body.GetComponentInParent<KeyboardPickupTarget>();
+            if (pickupTarget == null) pickupTarget = body.GetComponentInChildren<KeyboardPickupTarget>();
+            if (pickupTarget != null) pickupTarget.SetPlacementSoundPending(true);
             _heldKeyboardBody = null;
             SetKeyboardCarryState(false);
             body.isKinematic = false;

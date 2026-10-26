@@ -196,6 +196,20 @@ MonoBehaviour:
       Data3: -802496874
       Data4: -2118550270
     Path: event:/SFX/OtherObject/Email
+  <DrawerOpen>k__BackingField:
+    Guid:
+      Data1: 2030538015
+      Data2: 1085007255
+      Data3: -316536908
+      Data4: 2130315617
+    Path: event:/SFX/OtherObject/DrawerOpen
+  <DrawerClose>k__BackingField:
+    Guid:
+      Data1: 66834287
+      Data2: 1084492545
+      Data3: -1742529911
+      Data4: -1568766927
+    Path: event:/SFX/OtherObject/DrawerClose
   <RadioChange>k__BackingField:
     Guid:
       Data1: 1850124655

@@ -343,10 +343,11 @@ namespace Game.Player
                 _returnMotion = StartCoroutine(AnimateReturnDrawer());
         }
 
-        /// <summary>최신 후보 목표로 임시 인출과 닫기를 한 번에 하나씩 진행한다. Time.deltaTime과 현재 인출량을 사용하여 반대 요청도 현재 위치에서 이어가며 닫힌 뒤 정상 로컬 자세를 복원한다.</summary>
+        /// <summary>최신 후보 목표로 임시 인출과 닫기를 진행하고 실제 이동 방향이 바뀔 때만 개폐음을 재생한다. Time.deltaTime과 현재 인출량으로 이동하며 닫힌 뒤 정상 로컬 자세를 복원한다.</summary>
         private IEnumerator AnimateReturnDrawer()
         {
             yield return null;
+            bool? lastOpening = null;
             while (_returnAnimatedDrawer != null || _returnTarget != null)
             {
                 if (_returnAnimatedDrawer == null)
@@ -357,8 +358,14 @@ namespace Game.Player
                     _returnClosedRotation = drawer.localRotation;
                     _returnClosedScale = drawer.localScale;
                     _returnAmount = 0f;
+                    lastOpening = null;
                 }
                 bool opening = _returnAnimatedDrawer == _returnTarget;
+                if (lastOpening != opening && _returnAmount != (opening ? 1f : 0f))
+                {
+                    AudioManager.PlayDrawerSound(opening);
+                    lastOpening = opening;
+                }
                 float duration = opening ? _returnOpenDuration : _returnCloseDuration;
                 _returnAmount = Mathf.MoveTowards(_returnAmount, opening ? 1f : 0f, Time.deltaTime / Mathf.Max(0.01f, duration));
                 _returnAnimatedDrawer.Drawer.localPosition = _returnClosedPosition

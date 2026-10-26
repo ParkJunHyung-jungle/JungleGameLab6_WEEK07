@@ -23,6 +23,34 @@ namespace Game.Player
         public static IReadOnlyList<KeyboardPickupTarget> ActiveTargets => _activeTargets;
         public static event Action RegistryChanged;
 
+        [Header("Placement Sound")]
+        private bool _placementSoundPending;
+
+        /// <summary>
+        /// pending으로 사용자가 내려놓은 본체의 다음 거치음 재생 여부를 기록한다.
+        /// 집기와 취소에는 false를 사용하여 자동 생성이나 원위치 복원으로 소리가 나지 않게 한다.
+        /// </summary>
+        public void SetPlacementSoundPending(bool pending)
+        {
+            _placementSoundPending = pending;
+        }
+
+        /// <summary>
+        /// 거치가 확정된 position에서 예약된 ThumpKeyBoard를 한 번 재생한다.
+        /// 사용자 내려놓기 기록을 먼저 소비하며 참조가 없으면 경고하고 거치 상태는 유지한다.
+        /// </summary>
+        public void PlayPlacementSound(Vector3 position)
+        {
+            if (!_placementSoundPending) return;
+            _placementSoundPending = false;
+            if (AudioManager.instance == null || FMODEvents.instance == null || FMODEvents.instance.ThumpKeyBoard.IsNull)
+            {
+                Debug.LogWarning("[FMOD] 키보드 거치음의 AudioManager 또는 ThumpKeyBoard 참조가 없습니다.", this);
+                return;
+            }
+            AudioManager.instance.PlayOneShot(FMODEvents.instance.ThumpKeyBoard, position);
+        }
+
         /// <summary>prefab 자산을 생성 출처로 보관한다. 씬 인스턴스가 제거되어도 같은 키보드 종류를 찾는 데 사용한다.</summary>
         public void SetSourcePrefab(GameObject prefab) { _sourcePrefab = prefab; }
 
@@ -57,6 +85,7 @@ namespace Game.Player
         void OnCollisionExit(Collision collision) { _supportNormals.Remove(collision.collider); }
         void OnDisable()
         {
+            _placementSoundPending = false;
             _supportNormals.Clear();
             if (_activeTargets.Remove(this)) RegistryChanged?.Invoke();
         }

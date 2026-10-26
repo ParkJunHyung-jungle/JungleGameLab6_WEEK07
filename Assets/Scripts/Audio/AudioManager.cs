@@ -313,6 +313,26 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>
+    /// opening에 따라 기존 DrawerOpen 또는 DrawerClose 2D 이벤트를 한 번 재생한다.
+    /// 관리자나 이벤트 참조가 없으면 경고하며 서랍 전환과 재고 상태는 변경하지 않는다.
+    /// </summary>
+    public static void PlayDrawerSound(bool opening)
+    {
+        if (instance == null || FMODEvents.instance == null)
+        {
+            Debug.LogWarning("[FMOD] 서랍 효과음의 AudioManager 또는 FMODEvents가 없습니다.");
+            return;
+        }
+        EventReference sound = opening ? FMODEvents.instance.DrawerOpen : FMODEvents.instance.DrawerClose;
+        if (sound.IsNull)
+        {
+            Debug.LogWarning($"[FMOD] FmodManager의 {(opening ? "DrawerOpen" : "DrawerClose")} 참조가 비어 있습니다.", instance);
+            return;
+        }
+        instance.PlayOneShot(sound, Vector3.zero);
+    }
+
+    /// <summary>
     /// 실제 메일 수신 또는 새 게임의 시작 알림에 기존 Email 이벤트를 한 번 재생한다.
     /// 입력과 반환값 없이 FMODEvents의 UI 효과음을 시작하며 메일함 상태는 변경하지 않는다.
     /// </summary>

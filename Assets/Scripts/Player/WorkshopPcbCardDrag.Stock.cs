@@ -192,6 +192,8 @@ namespace Game.Player
             }
             CommitStockReservation();
             FinishStockMotion();
+            if (installed && _kind == AssemblyStructurePart.Pcb)
+                RecordStructureEvent("PartInstallAttempted", true, "InventoryDrag");
             if (!installed)
             {
                 if (_kind == AssemblyStructurePart.Pcb)

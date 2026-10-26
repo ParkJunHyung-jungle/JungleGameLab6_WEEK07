@@ -16,15 +16,18 @@ namespace Game.Player
         private RectTransform _requestChecklistPanel;
         private Text _requestChecklistTitle;
         private Text _requestChecklistBody;
+        private Text _requestChecklistStatus;
+        private Image _requestChecklistProgress;
+        private RectTransform _requestChecklistProgressTrack;
         private Rigidbody _requestChecklistKeyboard;
         private string _requestChecklistId;
 
         [Header("Request Checklist Layout")]
         [SerializeField, Min(0f)] private float _requestChecklistLeftOffset = 56.6667f;
         [SerializeField, Min(0f)] private float _requestChecklistTopOffset = 51.6667f;
-        [SerializeField, Min(220f)] private float _requestChecklistPanelWidth = 460f;
-        [SerializeField, Min(12)] private int _requestChecklistTitleFontSize = 24;
-        [SerializeField, Min(12)] private int _requestChecklistBodyFontSize = 22;
+        [SerializeField, Min(220f)] private float _requestChecklistPanelWidth = 320f;
+        [SerializeField, Min(12)] private int _requestChecklistTitleFontSize = 18;
+        [SerializeField, Min(12)] private int _requestChecklistBodyFontSize = 16;
 
         [Header("Request Checklist Fade")]
         [SerializeField, Min(0f)] private float _requestChecklistFadeDistance = 140f;
@@ -65,15 +68,26 @@ namespace Game.Player
             _requestChecklistGroup = panel.GetComponent<CanvasGroup>();
             _requestChecklistGroup.interactable = false;
             _requestChecklistGroup.blocksRaycasts = false;
-            background.color = new Color32(37, 52, 68, 238);
+            background.color = new Color32(22, 30, 39, 245);
             background.raycastTarget = false;
+            Outline border = panel.AddComponent<Outline>();
+            border.effectColor = new Color32(135, 170, 184, 50);
+            border.effectDistance = new Vector2(1f, -1f);
+            _requestChecklistStatus = CreateRequestChecklistText(_requestChecklistPanel, "Status", font,
+                13, FontStyle.Bold, new Color32(145, 201, 209, 255));
+            Image track = CreateRequestChecklistImage(_requestChecklistPanel, "ProgressTrack", new Color32(49, 62, 73, 255));
+            _requestChecklistProgressTrack = track.rectTransform;
+            _requestChecklistProgress = CreateRequestChecklistImage(track.transform, "Progress", new Color32(118, 211, 181, 255));
+            _requestChecklistProgress.rectTransform.anchorMax = Vector2.one;
+            _requestChecklistProgress.rectTransform.offsetMin = Vector2.zero;
+            _requestChecklistProgress.rectTransform.offsetMax = Vector2.zero;
             _requestChecklistTitle = CreateRequestChecklistText(_requestChecklistPanel, "Title", font,
-                _requestChecklistTitleFontSize, FontStyle.Bold, new Color32(128, 234, 255, 255));
+                _requestChecklistTitleFontSize, FontStyle.Bold, new Color32(235, 240, 243, 255));
             _requestChecklistTitle.rectTransform.anchoredPosition = new Vector2(20f, -16f);
             _requestChecklistTitle.rectTransform.sizeDelta = new Vector2(_requestChecklistPanelWidth - 40f, 60f);
             _requestChecklistBody = CreateRequestChecklistText(_requestChecklistPanel, "Requirements", font,
                 _requestChecklistBodyFontSize, FontStyle.Normal, Color.white);
-            _requestChecklistBody.lineSpacing = 1.08f;
+            _requestChecklistBody.lineSpacing = 1.15f;
             _requestChecklistBody.resizeTextForBestFit = false;
             _requestChecklistBody.rectTransform.anchoredPosition = new Vector2(20f, -90f);
             _requestChecklistBody.rectTransform.sizeDelta = new Vector2(_requestChecklistPanelWidth - 40f, 120f);
@@ -128,9 +142,14 @@ namespace Game.Player
             _requestChecklistPanel.anchoredPosition = new Vector2(leftOffset, -_requestChecklistTopOffset);
             _requestChecklistPanel.sizeDelta = new Vector2(panelWidth, _requestChecklistPanel.sizeDelta.y);
 
-            float horizontalPadding = 20f * unitPerPixel;
+            float horizontalPadding = 16f * unitPerPixel;
+            _requestChecklistStatus.fontSize = Mathf.RoundToInt(13f * unitPerPixel);
+            _requestChecklistStatus.rectTransform.anchoredPosition = new Vector2(horizontalPadding, -12f * unitPerPixel);
+            _requestChecklistStatus.rectTransform.sizeDelta = new Vector2(panelWidth - horizontalPadding * 2f, 22f * unitPerPixel);
+            _requestChecklistProgressTrack.anchoredPosition = new Vector2(horizontalPadding, -32f * unitPerPixel);
+            _requestChecklistProgressTrack.sizeDelta = new Vector2(panelWidth - horizontalPadding * 2f, 3f * unitPerPixel);
             _requestChecklistTitle.fontSize = Mathf.RoundToInt(_requestChecklistTitleFontSize * unitPerPixel);
-            _requestChecklistTitle.rectTransform.anchoredPosition = new Vector2(horizontalPadding, -16f * unitPerPixel);
+            _requestChecklistTitle.rectTransform.anchoredPosition = new Vector2(horizontalPadding, -44f * unitPerPixel);
             _requestChecklistTitle.rectTransform.sizeDelta = new Vector2(panelWidth - horizontalPadding * 2f,
                 60f * unitPerPixel);
             _requestChecklistBody.fontSize = Mathf.RoundToInt(_requestChecklistBodyFontSize * unitPerPixel);
@@ -139,6 +158,21 @@ namespace Game.Player
                 _requestChecklistBody.rectTransform.sizeDelta.y);
             _requestChecklistCanvasSize = canvasRect.rect.size;
             _requestChecklistCanvasScale = _requestChecklistCanvas.scaleFactor;
+        }
+
+        /// <summary>
+        /// parent 아래에 name과 color를 적용한 장식 이미지를 생성해 반환한다.
+        /// 왼쪽 위 기준으로 배치하며 입력을 가로채지 않는다.
+        /// </summary>
+        private static Image CreateRequestChecklistImage(Transform parent, string name, Color color)
+        {
+            Image image = new GameObject(name, typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            image.transform.SetParent(parent, false);
+            image.color = color;
+            image.raycastTarget = false;
+            image.rectTransform.anchorMin = image.rectTransform.anchorMax = Vector2.up;
+            image.rectTransform.pivot = Vector2.up;
+            return image;
         }
 
         /// <summary>
@@ -288,11 +322,25 @@ namespace Game.Player
 
             _requestChecklistBody.text = string.Join("\n", lines);
             float unitPerPixel = 1f / Mathf.Max(0.001f, _requestChecklistCanvas.scaleFactor);
-            float lineHeight = _requestChecklistBody.fontSize * 1.25f;
-            float bodyHeight = Mathf.Max(lineHeight, lineHeight * lines.Count + 8f * unitPerPixel);
             float panelWidth = _requestChecklistPanel.sizeDelta.x;
-            _requestChecklistBody.rectTransform.sizeDelta = new Vector2(panelWidth - 40f * unitPerPixel, bodyHeight);
-            _requestChecklistPanel.sizeDelta = new Vector2(panelWidth, bodyHeight + 120f * unitPerPixel);
+            float contentWidth = panelWidth - 32f * unitPerPixel;
+            _requestChecklistTitle.rectTransform.sizeDelta = new Vector2(contentWidth, 60f * unitPerPixel);
+            float titleHeight = _requestChecklistTitle.preferredHeight;
+            _requestChecklistTitle.rectTransform.sizeDelta = new Vector2(contentWidth, titleHeight);
+            float bodyTop = 44f * unitPerPixel + titleHeight + 12f * unitPerPixel;
+            _requestChecklistBody.rectTransform.anchoredPosition = new Vector2(16f * unitPerPixel, -bodyTop);
+            _requestChecklistBody.rectTransform.sizeDelta = new Vector2(contentWidth, 0f);
+            float bodyHeight = _requestChecklistBody.preferredHeight;
+            _requestChecklistBody.rectTransform.sizeDelta = new Vector2(contentWidth, bodyHeight);
+            _requestChecklistPanel.sizeDelta = new Vector2(panelWidth, bodyTop + bodyHeight + 16f * unitPerPixel);
+            int total = (definition.RequiresCompleteAssembly ? 5 : 0)
+                + (definition.RequiresAllRequiredSwitchSlots ? 1 : 0);
+            if (total == 0) total = 1;
+            int satisfied = CountSatisfiedRequestRows(selectedInspection, definition);
+            _requestChecklistStatus.text = selectedComplete
+                ? $"의뢰 제작  /  제출 준비 완료    {satisfied:00} / {total:00}"
+                : $"의뢰 제작  /  진행 중    {satisfied:00} / {total:00}";
+            _requestChecklistProgress.rectTransform.anchorMax = new Vector2((float)satisfied / total, 1f);
         }
 
         /// <summary>
@@ -324,13 +372,13 @@ namespace Game.Player
 
         /// <summary>
         /// label과 complete 상태로 조건 한 줄을 색상 및 체크 표시와 함께 반환한다.
-        /// 완료는 초록색, 미완료는 빨간색으로 표현하며 조건 진행 상태는 변경하지 않는다.
+        /// 완료는 민트색 체크, 미완료는 붉은색으로 표현하며 조건 진행 상태는 변경하지 않는다.
         /// </summary>
         private static string FormatRequestChecklistLine(string label, bool complete)
         {
-            string color = complete ? "#78E6A0" : "#FF7777";
-            string check = complete ? "✓" : " ";
-            return $"<color={color}>[{check}] {label}</color>";
+            string color = complete ? "#8AD9BA" : "#FF7777";
+            string check = complete ? "✓" : "·";
+            return $"<color={color}>{check}   {label}</color>";
         }
 
         /// <summary>
@@ -344,3 +392,4 @@ namespace Game.Player
         }
     }
 }
+

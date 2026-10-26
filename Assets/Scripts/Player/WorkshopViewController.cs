@@ -22,6 +22,7 @@ namespace Game.Player
         [SerializeField] private CinemachineCamera[] _views;
         [SerializeField] private CinemachineCamera _focusCamera;
         [SerializeField] private WorkshopLookCamera _lookCamera;
+        [SerializeField] private Graphic _centerReticle;
 
         [Header("Monitor Mode")]
         [SerializeField] private Camera _monitorOutputCamera;
@@ -57,12 +58,14 @@ namespace Game.Player
         public KeyboardDispenser KeyboardDispenser => _dispenser;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
-        public bool CanLookAround => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
+        public bool CanProcessGeneralInput => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
             && !_monitorFocused && !_monitorTransition && _viewSwitchingAllowed && !_brain.IsBlending
             && Application.isFocused && InGameCursor.CanProcessPointer
             && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
             && !PlaytestResearchSession.IsUploadConfirmationOpen && !_pullers.IsManipulatingPart
-            && !IsPointerOverUI();
+            && (_lookCamera == null || InGameCursor.IsWorldAim);
+        public bool CanLookAround => CanProcessGeneralInput && (InGameCursor.IsWorldAim || !IsPointerOverUI());
+        public bool CanClickGeneralUI => CanProcessGeneralInput && !_keyboardDrag.IsDragging;
 
         /// <summary>reference의 일반 방향이 현재 선택 영역인지 반환한다. 단일 카메라는 가장 가까운 기준 각도를 사용하고 기존 씬은 카메라 동일성을 유지한다.</summary>
         public bool IsGeneralView(CinemachineCamera reference)
@@ -84,11 +87,8 @@ namespace Game.Player
         public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && !_brain.IsBlending
             && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
 
-        public bool CanEnterKeyboardFocus => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
-            && !_monitorFocused && !_monitorTransition
-            && _viewSwitchingAllowed && IsGeneralView(_views[0])
-            && !_keyboardDrag.IsDragging && Application.isFocused && InGameCursor.CanProcessPointer
-            && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
+        public bool CanEnterKeyboardFocus => CanProcessGeneralInput && IsGeneralView(_views[0])
+            && !_keyboardDrag.IsDragging;
 
         /// <summary>
         /// 현재 커서가 작업대 선택 영역에 있으면 키보드 유무와 관계없이 집중 전환을 시작한다.
@@ -102,6 +102,8 @@ namespace Game.Player
 
         void OnEnable()
         {
+            if (_lookCamera != null) InGameCursor.SetWorldAimCamera(_monitorOutputCamera);
+            if (_centerReticle != null) _centerReticle.raycastTarget = false;
             _focusCamera.Priority = -1;
             if (_monitorFocusCamera != null) _monitorFocusCamera.Priority = -1;
             if (_monitorHolder != null) _monitorHolder.KeyboardChanged += HandleMonitorKeyboardChanged;
@@ -122,6 +124,7 @@ namespace Game.Player
 
         void Update()
         {
+            ApplyCursor();
             if (!Application.isFocused
                 || (FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) || PlaytestResearchSession.IsUploadConfirmationOpen
                 || !InGameCursor.CanProcessPointer)
@@ -139,7 +142,7 @@ namespace Game.Player
                     SetFocused(false);
                 return;
             }
-            if (!_viewSwitchingAllowed || _modeTransitionPending || _brain.IsBlending)
+            if (!CanProcessGeneralInput)
                 return;
 
             if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
@@ -211,7 +214,7 @@ namespace Game.Player
             if (_dispenser == null || !_dispenser.isActiveAndEnabled || !_dispenser.CanDispense || IsPointerOverUI())
                 return false;
             Physics.SyncTransforms();
-            Ray ray = _monitorOutputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _monitorOutputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_monitorOutputCamera));
             if (!Physics.Raycast(ray, out RaycastHit hit, _monitorOutputCamera.farClipPlane,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                 || hit.collider.GetComponentInParent<KeyboardDispenser>() != _dispenser)
@@ -228,7 +231,7 @@ namespace Game.Player
         {
             if (IsPointerOverUI()) return false;
             Physics.SyncTransforms();
-            Ray ray = _monitorOutputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _monitorOutputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_monitorOutputCamera));
             if (!_monitorScreen.Raycast(ray, out RaycastHit screen, _monitorOutputCamera.farClipPlane)) return false;
             foreach (RaycastHit hit in Physics.RaycastAll(ray, screen.distance,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
@@ -440,7 +443,7 @@ namespace Game.Player
         private bool IsPointerOverUI()
         {
             _uiHits.Clear();
-            var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.Position };
+            var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.GetWorldPosition(_monitorOutputCamera) };
             EventSystem.current.RaycastAll(pointer, _uiHits);
             foreach (RaycastResult hit in _uiHits)
                 if (hit.module is GraphicRaycaster
@@ -514,13 +517,25 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 프로젝트 공통 커서 API에 잠금 해제와 표시를 요청한다.
-        /// 입력값 없이 커서 요청 상태를 변경하며 시스템 대화상자와 튜토리얼 정책은 유지한다.
+        /// 기존 집중과 전환 상태로 일반 중앙 조준 또는 집중 자유 포인터의 표시와 잠금을 요청한다.
+        /// 대화상자 정책을 우선하며 기존 원형 이미지는 출력 카메라 영역 중앙에만 표시한다.
         /// </summary>
         private void ApplyCursor()
         {
-            InGameCursor.LockState = CursorLockMode.None;
-            InGameCursor.Visible = true;
+            bool blocked = FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked
+                || PlaytestResearchSession.IsUploadConfirmationOpen || InGameCursor.IsSystemDialogOpen;
+            bool general = isActiveAndEnabled && _lookCamera != null && !_isFocused && !_modeTransitionPending
+                && !_monitorFocused && !_monitorTransition && !_brain.IsBlending;
+            if (!blocked)
+            {
+                InGameCursor.LockState = general ? CursorLockMode.Locked : CursorLockMode.None;
+                InGameCursor.Visible = !general;
+            }
+            if (_centerReticle == null) return;
+            _centerReticle.enabled = general && !blocked && CanProcessGeneralInput;
+            if (_centerReticle.enabled && RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                (RectTransform)_centerReticle.transform.parent, InGameCursor.GetWorldPosition(_monitorOutputCamera),
+                null, out Vector3 position)) _centerReticle.rectTransform.position = position;
         }
 
         void OnApplicationFocus(bool hasFocus)
@@ -531,11 +546,14 @@ namespace Game.Player
             {
                 _pullers.CancelDrag();
                 EndMonitorFocus();
+                if (_centerReticle != null) _centerReticle.enabled = false;
             }
         }
 
         void OnDisable()
         {
+            InGameCursor.SetWorldAimCamera(null);
+            ApplyCursor();
             if (_monitorHolder != null) _monitorHolder.KeyboardChanged -= HandleMonitorKeyboardChanged;
             if (_monitorFocused) _monitorInput.SetWorkshopFocus(false);
             _monitorFocused = false;

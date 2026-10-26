@@ -3172,7 +3172,7 @@ MonoBehaviour:
   _verticalAxis:
     Value: 0
     Center: 0
-    Range: {x: -20, y: 20}
+    Range: {x: -50, y: 50}
     Wrap: 0
     Recentering:
       Enabled: 0
@@ -3606,10 +3606,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8295343963888643263, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
-      propertyPath: _initialKeyboardPrefab
-      value: 
-      objectReference: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
     - target: {fileID: 6790844235589385906, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
       propertyPath: _useWorkshopFocus
       value: 1
@@ -3630,6 +3626,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Monitor_OS
       objectReference: {fileID: 0}
+    - target: {fileID: 8295343963888643263, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
+      propertyPath: _initialKeyboardPrefab
+      value: 
+      objectReference: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
     - target: {fileID: 9162336399170649921, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0.422
@@ -14410,6 +14410,7 @@ MonoBehaviour:
   - {fileID: 818686753}
   _focusCamera: {fileID: 1381246956}
   _lookCamera: {fileID: 808912227}
+  _centerReticle: {fileID: 9911000007}
   _monitorOutputCamera: {fileID: 4985256}
   _monitorCamera: {fileID: 1712647970}
   _monitorFocusCamera: {fileID: 1642641040}
@@ -14460,7 +14461,7 @@ MonoBehaviour:
   - {fileID: 7000000000000000932}
   _hangerWorldX: -3.18
   _maximumDragDistance: 10
-  _dragCollisionSkin: 0.01
+  _dragSurfaceClearance: 0.01
 --- !u!1 &7000000000000000500
 GameObject:
   m_ObjectHideFlags: 0

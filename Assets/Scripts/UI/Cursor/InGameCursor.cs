@@ -38,6 +38,7 @@ public sealed class InGameCursor : MonoBehaviour
     private int _blockedFrame;
     private int _dialogDepth;
     private bool _modeWasActive;
+    private Camera _worldAimCamera;
 #if UNITY_EDITOR
     private bool _editorPointerReleased;
 #endif
@@ -58,6 +59,8 @@ public sealed class InGameCursor : MonoBehaviour
     public static bool CanProcessPointer => _instance == null || (_instance.HasPointerFocus && _instance._dialogDepth == 0 && !_instance._waitRelease && Time.frameCount > _instance._blockedFrame);
     public static bool IsSystemDialogOpen => _instance != null && _instance._dialogDepth > 0;
     public static bool CanProcessVirtualPointer => _instance != null && _instance.IsActive && CanProcessPointer;
+    public static bool IsWorldAim => _instance != null && _instance._worldAimCamera != null
+        && _requestedLock == CursorLockMode.Locked && !_requestedVisible;
     public float Sensitivity => _sensitivity;
     public event Action<float> SensitivityChanged;
 
@@ -86,6 +89,20 @@ public sealed class InGameCursor : MonoBehaviour
     }
 
     private bool IsActive => HasPointerFocus && _dialogDepth == 0 && _requestedVisible && _requestedLock != CursorLockMode.Locked;
+
+    /// <summary>camera의 실제 출력 영역 중앙 또는 기존 자유 포인터 좌표를 반환한다. 일반 조준 잠금 중에만 중앙을 사용하고 집중과 대화상자에서는 논리 포인터를 유지한다.</summary>
+    public static Vector2 GetWorldPosition(Camera camera)
+    {
+        return IsWorldAim ? camera.pixelRect.center : Position;
+    }
+
+    /// <summary>camera를 중앙 조준에 사용하는 출력 카메라로 등록한다. null이면 연결을 해제하며 전환 클릭과 누적 포인터 입력을 재대기한다.</summary>
+    public static void SetWorldAimCamera(Camera camera)
+    {
+        if (_instance == null || _instance._worldAimCamera == camera) return;
+        _instance._worldAimCamera = camera;
+        _instance.Rearm();
+    }
 
     private bool HasPointerFocus
     {
@@ -233,7 +250,7 @@ public sealed class InGameCursor : MonoBehaviour
         _graphic.rectTransform.anchorMax = Vector2.zero;
     }
 
-    /// <summary>실제 마우스 delta에 민감도만 곱해 논리 좌표와 UI 상태를 갱신한다. 시간 배율과 프레임 시간은 사용하지 않는다.</summary>
+    /// <summary>마우스 입력으로 논리 좌표와 UI 상태를 갱신한다. 중앙 조준 카메라의 잠금 해제 상태에서는 실제 화면 좌표를 사용하고 기존 가상 포인터는 delta와 민감도를 유지한다.</summary>
     private void UpdatePointer()
     {
         if (InputState.currentUpdateType != InputUpdateType.Dynamic || _device == null) return;
@@ -252,7 +269,8 @@ public sealed class InGameCursor : MonoBehaviour
             _blockedFrame = Time.frameCount;
         }
         bool accept = active && CanProcessPointer && mouse != null;
-        if (accept) _position += mouse.delta.ReadValue() * _sensitivity;
+        if (accept) _position = _worldAimCamera != null && _requestedLock == CursorLockMode.None
+            ? mouse.position.ReadValue() : _position + mouse.delta.ReadValue() * _sensitivity;
         _position.x = Mathf.Clamp(_position.x, 0f, Mathf.Max(0, Screen.width - 1));
         _position.y = Mathf.Clamp(_position.y, 0f, Mathf.Max(0, Screen.height - 1));
         ushort buttons = 0;
@@ -282,11 +300,11 @@ public sealed class InGameCursor : MonoBehaviour
         ApplyPresentation();
     }
 
-    /// <summary>게임 조작 중 실제 마우스를 잠그고 가상 커서를 표시한다. 포커스 상실과 시스템 창에서는 제한을 해제한다.</summary>
+    /// <summary>요청된 잠금과 가상 포인터 표시를 적용한다. 중앙 조준 중 UI 포인터 처리를 멈추고 포커스 상실과 시스템 창에서는 제한을 해제한다.</summary>
     private void ApplyPresentation()
     {
         bool external = !HasPointerFocus || _dialogDepth > 0;
-        Cursor.lockState = external ? CursorLockMode.None : CursorLockMode.Locked;
+        Cursor.lockState = external ? CursorLockMode.None : _requestedLock;
         Cursor.visible = external;
         if (_graphic == null) return;
         _graphic.enabled = IsActive;
@@ -296,7 +314,7 @@ public sealed class InGameCursor : MonoBehaviour
         Vector2 hotspot = arrow ? _arrowHotspot : _fingerHotspot;
         _graphic.rectTransform.pivot = new Vector2(Mathf.Clamp01(hotspot.x), 1f - Mathf.Clamp01(hotspot.y));
         _graphic.rectTransform.anchoredPosition = _position;
-        SetModulesSuspended(external || _waitRelease);
+        SetModulesSuspended(external || _waitRelease || IsWorldAim);
     }
 
 

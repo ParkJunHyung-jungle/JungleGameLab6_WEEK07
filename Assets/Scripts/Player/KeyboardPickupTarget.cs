@@ -49,6 +49,15 @@ namespace Game.Player
         /// </summary>
         public Vector3 GetVisualCenterLocalPosition(Transform keyboardRoot)
         {
+            return GetVisualBoundsLocal(keyboardRoot).center;
+        }
+
+        /// <summary>
+        /// keyboardRoot 아래 활성 렌더러의 경계를 합쳐 루트 로컬 공간의 Bounds를 반환한다.
+        /// 보호 커버는 제외하며 렌더러가 없으면 집기 표식 위치의 크기 없는 경계를 반환한다.
+        /// </summary>
+        public Bounds GetVisualBoundsLocal(Transform keyboardRoot)
+        {
             Renderer[] renderers = keyboardRoot.GetComponentsInChildren<Renderer>();
             Bounds visualBounds = default;
             bool hasBounds = false;
@@ -80,7 +89,7 @@ namespace Game.Player
                 }
             }
 
-            return hasBounds ? visualBounds.center : keyboardRoot.InverseTransformPoint(transform.position);
+            return hasBounds ? visualBounds : new Bounds(keyboardRoot.InverseTransformPoint(transform.position), Vector3.zero);
         }
     }
 }

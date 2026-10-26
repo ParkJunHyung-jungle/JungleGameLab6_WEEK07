@@ -7,8 +7,6 @@ using UnityEngine.UI;
 
 using Unity.Cinemachine;
 
-using Game.Logging;
-using Game.Tutorials;
 using KeyboardModeling.Assembly;
 
 namespace Game.Player
@@ -47,14 +45,14 @@ namespace Game.Player
 
         [Header("Drag Plane")]
         [SerializeField, Min(0.5f)] private float _maximumDragDistance = 10f;
-        [SerializeField, Min(0.001f)] private float _dragCollisionSkin = 0.01f;
+        [SerializeField, Min(0f)] private float _dragSurfaceClearance = 0.01f;
         private float _dragDepth;
-        private Bounds _dragLocalBounds;
-        private readonly List<Collider> _dragColliders = new List<Collider>();
+        private Bounds _dragVisualBounds;
 
         [Header("Drag State")]
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
-        private Vector3 _pointerOffset;
+        private readonly List<(Rigidbody Body, bool DetectCollisions)> _dragCollisionStates
+            = new List<(Rigidbody Body, bool DetectCollisions)>();
         private Vector3 _centerOffset;
         private Quaternion _dragRotation;
         private bool _isDragging;
@@ -81,8 +79,7 @@ namespace Game.Player
         void Update()
         {
             Mouse mouse = Mouse.current;
-            if (!_inputAllowed || !Application.isFocused || !InGameCursor.CanProcessPointer
-                || (FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) || PlaytestResearchSession.IsUploadConfirmationOpen
+            if (!_inputAllowed || !_viewController.CanProcessGeneralInput
                 || mouse == null)
             {
                 HandlePointerCanceled();
@@ -134,10 +131,7 @@ namespace Game.Player
             }
             Quaternion rotation = _outputCamera.transform.rotation * _dragRotation;
             // Brain이 출력 카메라를 갱신한 뒤 같은 프레임의 자세를 적용한다.
-            Physics.SyncTransforms();
-            if (IsDragPoseBlocked(_keyboardBody.position, rotation)) rotation = _keyboardBody.rotation;
-            if (TryGetDragPosition(out Vector3 position))
-                _keyboardBody.position = LimitDragMovement(position, rotation);
+            _keyboardBody.position = PullDragPositionBeforeSurface(GetDragPosition(rotation), rotation);
             _keyboardBody.rotation = rotation;
             KeyboardWallRack hanger = _usingHangerPlane ? GetHangerUnderCursor() : null;
             bool hasHolder = !_usingHangerPlane && IsHolderUnderCursor();
@@ -155,6 +149,7 @@ namespace Game.Player
                     : hasHolder && _workbenchHolder.TryPlaceKeyboard(_keyboardBody, _centerOffset);
                 if (placed)
                 {
+                    RestoreDragCollisions();
                     if (hanger != null)
                     {
                         Pose pose = hanger.GetPlacementPose(_centerOffset);
@@ -183,7 +178,7 @@ namespace Game.Player
         {
             if (_brain.IsBlending || IsPointerOverUI()) return null;
             Physics.SyncTransforms();
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
             float nearest = _outputCamera.farClipPlane;
             KeyboardWallRack holder = null;
             for (int i = 0; i < _hangerHolders.Length; i++)
@@ -221,7 +216,7 @@ namespace Game.Player
                 return false;
 
             Physics.SyncTransforms();
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
             if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane))
                 return false;
 
@@ -237,7 +232,7 @@ namespace Game.Player
             if (_isDragging || _brain.IsBlending || !_viewController.IsGeneralView(_workbenchCamera)
                 || IsPointerOverUI()) return false;
             Physics.SyncTransforms();
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
             if (!_placementArea.Raycast(ray, out RaycastHit areaHit, _outputCamera.farClipPlane)) return false;
             Rigidbody snappedBody = _workbenchHolder.KeyboardBody;
             foreach (RaycastHit hit in Physics.RaycastAll(ray, areaHit.distance,
@@ -279,7 +274,7 @@ namespace Game.Player
             if (_monitorHolder == null || _brain.IsBlending || IsPointerOverUI()
                 || !_viewController.IsGeneralView(_monitorCamera) || _monitorHolder.KeyboardBody != null)
                 return false;
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
             return _monitorPlacementArea.Raycast(ray, out RaycastHit hit, _outputCamera.farClipPlane)
                 && !IsPlacementOccluded(ray, hit.distance);
         }
@@ -302,7 +297,7 @@ namespace Game.Player
         private bool IsPointerOverUI(bool ignoreEditBackground = false)
         {
             _uiHits.Clear();
-            var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.Position };
+            var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.GetWorldPosition(_outputCamera) };
             EventSystem.current.RaycastAll(pointer, _uiHits);
             foreach (RaycastResult hit in _uiHits)
                 if (hit.module is GraphicRaycaster
@@ -320,7 +315,7 @@ namespace Game.Player
             pickup = null;
             body = null;
             Physics.SyncTransforms();
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
             if (!Physics.Raycast(ray, out RaycastHit hit, _outputCamera.farClipPlane,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                 || hit.collider.GetComponentInParent<AssemblyFullerTool>() != null)
@@ -344,7 +339,7 @@ namespace Game.Player
         /// </summary>
         private bool TryBeginDrag()
         {
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
 
             _usingHangerPlane = _hangerCamera != null && _viewController.IsGeneralView(_hangerCamera);
             CacheDragPointer();
@@ -385,7 +380,8 @@ namespace Game.Player
             }
             _keyboardBody.isKinematic = true;
             _keyboardBody.useGravity = false;
-            CacheDragBounds();
+            DisableDragCollisions();
+            _dragVisualBounds = _pickupTarget.GetVisualBoundsLocal(_keyboardBody.transform);
             _keyboardBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             _releasePending = false;
             _placementPreview.Prepare(_keyboardBody.transform);
@@ -394,8 +390,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 키보드 중심과 커서로 운반 깊이와 집은 지점의 오프셋을 저장한다.
-        /// 일반 운반 오프셋은 카메라 로컬 좌표로 저장해 뷰 전환 후에도 상대 깊이를 유지한다.
+        /// 현재 키보드 중심과 카메라로 운반 깊이 및 장식장 기준 X를 저장한다.
+        /// 집은 지점의 화면 오프셋은 저장하지 않아 시각적 중심이 중앙 조준을 우선 따르게 한다.
         /// </summary>
         private void CacheDragPointer()
         {
@@ -407,178 +403,67 @@ namespace Game.Player
                 _pickupTarget.GetVisualCenterLocalPosition(_keyboardBody.transform));
             _dragDepth = Mathf.Clamp(Vector3.Dot(center - camera.position, camera.forward),
                 _outputCamera.nearClipPlane + 0.25f, _maximumDragDistance * 0.85f);
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
-            if (!GetDragPlane().Raycast(ray, out float distance)) return;
-            Vector3 offset = _keyboardBody.position - ray.GetPoint(distance);
-            _pointerOffset = _usingHangerPlane ? offset : camera.InverseTransformVector(offset);
         }
 
         /// <summary>
-        /// 운반 본체에 연결된 활성 충돌체의 경계를 키보드 로컬 공간에 캐시한다.
-        /// 트리거와 별도 Rigidbody는 제외하며 이동 중 검사할 상자 크기를 저장한다.
+        /// 운반 본체와 장착 자식 Rigidbody의 충돌 감지 설정을 보관하고 끈다.
+        /// 현재 키보드 계층만 사용하며 Collider 형상과 다른 물체의 물리 설정은 변경하지 않는다.
         /// </summary>
-        private void CacheDragBounds()
+        private void DisableDragCollisions()
         {
-            bool found = false;
-            _dragColliders.Clear();
-            foreach (Collider collider in _keyboardBody.GetComponentsInChildren<Collider>())
+            _dragCollisionStates.Clear();
+            foreach (Rigidbody body in _keyboardBody.GetComponentsInChildren<Rigidbody>(true))
             {
-                if (!collider.enabled || collider.isTrigger || collider.attachedRigidbody != _keyboardBody) continue;
-                _dragColliders.Add(collider);
-                Bounds bounds = GetColliderLocalBounds(collider);
-                for (int corner = 0; corner < 8; corner++)
-                {
-                    Vector3 point = _keyboardBody.transform.InverseTransformPoint(collider.transform.TransformPoint(bounds.center
-                        + Vector3.Scale(bounds.extents, new Vector3((corner & 1) == 0 ? -1f : 1f,
-                            (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f))));
-                    if (found) _dragLocalBounds.Encapsulate(point);
-                    else { _dragLocalBounds = new Bounds(point, Vector3.zero); found = true; }
-                }
+                _dragCollisionStates.Add((body, body.detectCollisions));
+                body.detectCollisions = false;
             }
-        }
-
-        /// <summary>collider의 형상 기준 로컬 경계를 반환한다. 회전으로 부풀어진 월드 경계를 제외하며 기타 형상은 월드 경계를 보수적으로 변환한다.</summary>
-        private static Bounds GetColliderLocalBounds(Collider collider)
-        {
-            if (collider is BoxCollider box) return new Bounds(box.center, box.size);
-            if (collider is MeshCollider mesh && mesh.sharedMesh != null) return mesh.sharedMesh.bounds;
-            if (collider is SphereCollider sphere) return new Bounds(sphere.center, Vector3.one * sphere.radius * 2f);
-            if (collider is CapsuleCollider capsule)
-            {
-                Vector3 size = Vector3.one * capsule.radius * 2f;
-                size[capsule.direction] = Mathf.Max(capsule.height, capsule.radius * 2f);
-                return new Bounds(capsule.center, size);
-            }
-            Bounds world = collider.bounds;
-            Bounds local = new Bounds(collider.transform.InverseTransformPoint(world.center), Vector3.zero);
-            for (int corner = 0; corner < 8; corner++)
-                local.Encapsulate(collider.transform.InverseTransformPoint(world.center + Vector3.Scale(world.extents,
-                    new Vector3((corner & 1) == 0 ? -1f : 1f, (corner & 2) == 0 ? -1f : 1f,
-                        (corner & 4) == 0 ? -1f : 1f))));
-            return local;
         }
 
         /// <summary>
-        /// 캐시된 본체 경계와 현재 배율로 접촉 여유를 제외한 월드 반크기를 반환한다.
-        /// 충돌체와 실제 키보드 크기는 변경하지 않는다.
+        /// 운반 시작 시 보관한 각 Rigidbody의 충돌 감지 설정을 복원한다.
+        /// 파괴된 장착 부품은 건너뛰고 보관 목록을 비워 다음 운반에 이전 상태가 남지 않게 한다.
         /// </summary>
-        private Vector3 GetDragHalfExtents()
+        private void RestoreDragCollisions()
         {
-            Vector3 scale = _keyboardBody.transform.lossyScale;
-            scale = new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
-            return Vector3.Max(Vector3.one * 0.001f,
-                Vector3.Scale(_dragLocalBounds.extents, scale) - Vector3.one * _dragCollisionSkin);
-        }
-
-        /// <summary>position과 rotation에서 키보드 경계의 월드 중심을 반환한다. 루트 피벗과 실제 중심의 차이를 반영한다.</summary>
-        private Vector3 GetDragBoundsCenter(Vector3 position, Quaternion rotation)
-        {
-            return position + rotation * Vector3.Scale(_dragLocalBounds.center, _keyboardBody.transform.lossyScale);
-        }
-
-        /// <summary>collider가 자기 본체가 아닌 운반 장애물인지 반환한다. 장착 자식과 트리거는 충돌 검사에서 제외한다.</summary>
-        private bool IsDragObstacle(Collider collider)
-        {
-            return collider.attachedRigidbody != _keyboardBody && !collider.transform.IsChildOf(_keyboardBody.transform);
+            foreach (var state in _dragCollisionStates)
+                if (state.Body != null) state.Body.detectCollisions = state.DetectCollisions;
+            _dragCollisionStates.Clear();
         }
 
         /// <summary>
-        /// obstacle과 접촉한 본체가 direction으로 관통을 악화시키지 않는지 반환한다.
-        /// 실제 분리 방향과 접선 이동을 허용하며 검사 상자의 빈 공간은 실제 접촉으로 취급하지 않는다.
+        /// rotation과 중앙 조준 Ray로 키보드 시각적 중심이 커서를 따르는 본체 목표 위치를 반환한다.
+        /// 운반 평면의 교점을 우선 사용하며 교차 불가 또는 최대 거리 밖에서는 저장 깊이로 중앙 추종을 유지한다.
         /// </summary>
-        private bool IsLeavingDragOverlap(Collider obstacle, Vector3 direction)
-        {
-            foreach (Collider collider in _dragColliders)
-            {
-                if (!Physics.ComputePenetration(collider, collider.transform.position, collider.transform.rotation,
-                    obstacle, obstacle.transform.position, obstacle.transform.rotation, out Vector3 separation, out _)) continue;
-                if (Vector3.Dot(direction, separation) < -0.001f) return false;
-            }
-            return true;
-        }
-
-        /// <summary>position과 rotation의 실제 Collider가 새로 관통하거나 기존 관통을 심화하는지 반환한다. 빈 경계 공간과 기존 지지면 접촉은 회전을 막지 않는다.</summary>
-        private bool IsDragPoseBlocked(Vector3 position, Quaternion rotation)
-        {
-            foreach (Collider collider in Physics.OverlapBox(GetDragBoundsCenter(position, rotation),
-                GetDragHalfExtents(), rotation, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-            {
-                if (!IsDragObstacle(collider)) continue;
-                Quaternion delta = rotation * Quaternion.Inverse(_keyboardBody.rotation);
-                foreach (Collider source in _dragColliders)
-                {
-                    Vector3 candidate = position + delta * (source.transform.position - _keyboardBody.position);
-                    if (!Physics.ComputePenetration(source, candidate, delta * source.transform.rotation,
-                        collider, collider.transform.position, collider.transform.rotation, out _, out float depth)) continue;
-                    Physics.ComputePenetration(source, source.transform.position, source.transform.rotation,
-                        collider, collider.transform.position, collider.transform.rotation, out _, out float previousDepth);
-                    if (depth > Mathf.Max(previousDepth, _dragCollisionSkin) + 0.0001f) return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// target까지 각 Collider의 실제 로컬 경계로 이동 검사하고 장애물 앞 위치를 반환한다.
-        /// rotation과 접촉 여유를 사용하며 자기 충돌과 트리거 및 기존 접촉을 악화시키지 않는 이동은 제외한다.
-        /// </summary>
-        private Vector3 LimitDragMovement(Vector3 target, Quaternion rotation)
-        {
-            Vector3 start = _keyboardBody.position;
-            Vector3 movement = target - start;
-            float distance = movement.magnitude;
-            if (distance < 0.00001f) return start;
-            Vector3 direction = movement / distance;
-            float allowed = distance;
-            Quaternion delta = rotation * Quaternion.Inverse(_keyboardBody.rotation);
-            foreach (Collider source in _dragColliders)
-            {
-                Bounds bounds = GetColliderLocalBounds(source);
-                Vector3 center = start + delta * (source.transform.TransformPoint(bounds.center) - start);
-                Vector3 scale = source.transform.lossyScale;
-                scale = new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
-                Vector3 extents = Vector3.Max(Vector3.one * 0.001f,
-                    Vector3.Scale(bounds.extents, scale) - Vector3.one * _dragCollisionSkin);
-                foreach (RaycastHit hit in Physics.BoxCastAll(center, extents, direction,
-                    delta * source.transform.rotation, distance + _dragCollisionSkin,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-                {
-                    if (!IsDragObstacle(hit.collider)) continue;
-                    if (hit.distance <= _dragCollisionSkin && IsLeavingDragOverlap(hit.collider, direction)) continue;
-                    allowed = Mathf.Min(allowed, Mathf.Max(0f, hit.distance - _dragCollisionSkin));
-                }
-            }
-            if (IsDragPoseBlocked(start + direction * allowed, rotation))
-            {
-                float lower = 0f;
-                float upper = allowed;
-                for (int step = 0; step < 12; step++)
-                {
-                    float middle = (lower + upper) * 0.5f;
-                    if (IsDragPoseBlocked(start + direction * middle, rotation)) upper = middle;
-                    else lower = middle;
-                }
-                allowed = lower;
-            }
-            return start + direction * allowed;
-        }
-
-        /// <summary>
-        /// 현재 커서 Ray와 운반 평면으로 본체 목표 위치를 계산한다.
-        /// 카메라 상대 오프셋을 적용하며 교차 실패와 최대 운반 거리 밖 교점은 false를 반환해 마지막 위치를 유지한다.
-        /// </summary>
-        private bool TryGetDragPosition(out Vector3 position)
+        private Vector3 GetDragPosition(Quaternion rotation)
         {
             Plane dragPlane = GetDragPlane();
-            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.Position);
-            position = _keyboardBody.position;
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
             if (!dragPlane.Raycast(ray, out float distance) || distance > _maximumDragDistance)
-                return false;
-            Vector3 offset = _usingHangerPlane ? _pointerOffset : _outputCamera.transform.TransformVector(_pointerOffset);
-            if (_usingHangerPlane) offset.x = 0f;
-            position = ray.GetPoint(distance) + offset;
-            if (_usingHangerPlane) position.x = _hangerDragWorldX;
-            return true;
+                distance = _dragDepth;
+            return ray.GetPoint(distance) - rotation * _centerOffset;
+        }
+
+        /// <summary>
+        /// position과 rotation의 키보드 경계를 중앙 조준 Ray로 BoxCast하여 표면 앞의 운반 위치를 반환한다.
+        /// 시각적 중심을 Ray 위에 유지한 채 거리만 줄이며 본체 자식과 Trigger 및 물리 충돌 감지는 제외한다.
+        /// </summary>
+        private Vector3 PullDragPositionBeforeSurface(Vector3 position, Quaternion rotation)
+        {
+            Vector3 scale = _keyboardBody.transform.lossyScale;
+            Vector3 centerOffset = rotation * Vector3.Scale(_dragVisualBounds.center, scale);
+            Vector3 halfExtents = Vector3.Max(Vector3.one * 0.001f, Vector3.Scale(_dragVisualBounds.extents,
+                new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z))));
+            Ray ray = _outputCamera.ScreenPointToRay(InGameCursor.GetWorldPosition(_outputCamera));
+            float distance = Mathf.Max(0f, Vector3.Dot(position + centerOffset - ray.origin, ray.direction));
+            float allowed = distance;
+            Physics.SyncTransforms();
+            foreach (RaycastHit hit in Physics.BoxCastAll(ray.origin, halfExtents, ray.direction, rotation,
+                distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.transform.IsChildOf(_keyboardBody.transform)) continue;
+                allowed = Mathf.Min(allowed, Mathf.Max(0f, hit.distance - _dragSurfaceClearance));
+            }
+            return ray.GetPoint(allowed) - centerOffset;
         }
 
         /// <summary>
@@ -603,6 +488,7 @@ namespace Game.Player
             _isDragging = false;
             _releasePending = false;
             _acceptPress = false;
+            RestoreDragCollisions();
             if (_keyboardBody == null) return;
             _keyboardBody.isKinematic = false;
             _keyboardBody.useGravity = true;

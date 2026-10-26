@@ -75,7 +75,11 @@ namespace Game.Player
             if (visible) ShowEditorTraySelection();
             else
             {
-                if (opened && category == WorkshopDrawerCategory.Plate) SetPickerMode(PickerMode.Plate);
+                if (opened && category == WorkshopDrawerCategory.Plate)
+                {
+                    SetPickerMode(PickerMode.Plate);
+                    ResetPlateTrayScroll();
+                }
                 else if (opened && category == WorkshopDrawerCategory.UpperHousing) SetPickerMode(PickerMode.Upper);
                 else if (opened && category == WorkshopDrawerCategory.Pcb) SetPickerMode(PickerMode.Pcb);
                 else if (opened && category == WorkshopDrawerCategory.LowerHousing) SetPickerMode(PickerMode.CaseMaterial);

@@ -30,6 +30,14 @@ namespace Game.Player
 
         [Header("Switch Inventory")]
         [SerializeField] private AssemblyCatalogEntry[] _switchEntries = new AssemblyCatalogEntry[0];
+
+        [Header("Placement Mode Style")]
+        [SerializeField] private Color _modeSelectedColor = new Color32(92, 58, 33, 255);
+        [SerializeField] private Color _modeNormalColor = new Color32(214, 186, 154, 255);
+        [SerializeField] private Color _modeSelectedOutlineColor = new Color32(255, 222, 173, 255);
+        [SerializeField] private Color _modeNormalOutlineColor = new Color32(148, 115, 82, 255);
+        [SerializeField] private Color _modeSelectedTextColor = new Color32(255, 250, 240, 255);
+        [SerializeField] private Color _modeNormalTextColor = new Color32(105, 75, 48, 255);
         private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
         private readonly Dictionary<SwitchType, Texture2D> _switchPreviewTextures = new Dictionary<SwitchType, Texture2D>();
@@ -124,6 +132,13 @@ namespace Game.Player
                 if (Mouse.current.leftButton.wasReleasedThisFrame) EndDrag(point);
                 else CancelDrag();
             }
+        }
+
+        /// <summary>눌린 entry의 키캡·스위치 카드 선택 표시만 갱신한다. 조작 가능 상태를 검사하며 실물 생성과 재고 예약 및 설치는 수행하지 않는다.</summary>
+        public void SelectInventoryCard(AssemblyCatalogEntry entry)
+        {
+            if (entry.IsStructure || !_pullers.InputAllowed || _pullers.IsManipulatingPart) return;
+            GetComponent<KeyboardEditOverlayUI>().SelectInventoryCard(entry);
         }
 
         /// <summary>
@@ -286,6 +301,8 @@ namespace Game.Player
             button.transform.SetParent(parent, false);
             button.targetGraphic = button.GetComponent<Image>();
             button.Clicked += HandlePlacementModeClicked;
+            Outline outline = button.gameObject.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
             Text label = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             label.transform.SetParent(button.transform, false);
             label.rectTransform.anchorMin = Vector2.zero;
@@ -311,8 +328,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 배치 모드에 따라 두 버튼의 색상을 갱신한다.
-        /// 재고와 설치 상태는 변경하지 않으며 반환값은 없다.
+        /// 현재 배치 모드에 따라 두 버튼의 색상과 스타일을 갱신한다.
+        /// _bulkPlacement 상태를 사용하며 각 버튼의 배경, 테두리, 텍스트 스타일을 갱신한다.
         /// </summary>
         private void RefreshPlacementModes()
         {
@@ -321,14 +338,45 @@ namespace Game.Player
             foreach (KeyboardEditButton button in _singlePlacementButtons)
             {
                 button.interactable = CanChangePlacementMode(button);
-                button.GetComponent<Image>().color = !_bulkPlacement
-                    ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+                ApplyPlacementModeButtonStyle(button, !_bulkPlacement);
             }
             foreach (KeyboardEditButton button in _bulkPlacementButtons)
             {
                 button.interactable = CanChangePlacementMode(button);
-                button.GetComponent<Image>().color = _bulkPlacement
-                    ? new Color32(39, 80, 100, 255) : new Color32(48, 66, 84, 255);
+                ApplyPlacementModeButtonStyle(button, _bulkPlacement);
+            }
+        }
+
+        /// <summary>
+        /// 배치 모드 버튼에 선택 상태에 따른 배경색, 외곽선, 텍스트 스타일을 적용한다.
+        /// button과 selected 여부를 사용하며, 버튼의 Image, Outline, Text 컴포넌트 상태를 변경한다.
+        /// </summary>
+        public void ApplyPlacementModeButtonStyle(KeyboardEditButton button, bool selected)
+        {
+            Image background = button.GetComponent<Image>();
+            if (background != null)
+            {
+                background.color = selected ? _modeSelectedColor : _modeNormalColor;
+            }
+
+            Outline outline = button.GetComponent<Outline>();
+            if (outline == null)
+            {
+                outline = button.gameObject.AddComponent<Outline>();
+                outline.effectDistance = new Vector2(1.5f, -1.5f);
+            }
+            outline.effectColor = selected ? _modeSelectedOutlineColor : _modeNormalOutlineColor;
+
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.color = selected ? _modeSelectedTextColor : _modeNormalTextColor;
+                label.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
+                label.fontSize = 18;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 15;
+                label.resizeTextMaxSize = 18;
+                label.lineSpacing = 1f;
             }
         }
 
@@ -506,7 +554,6 @@ namespace Game.Player
             if (!bulk && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
-            GetComponent<KeyboardEditOverlayUI>().SelectInventoryCard(entry);
             _fromInventory = true;
             _isBulkDragging = bulk;
             _bulkInteractionId = _isBulkDragging ? System.Guid.NewGuid().ToString("N") : null;
@@ -1241,6 +1288,7 @@ namespace Game.Player
         {
             foreach (var label in _quantityLabels)
             {
+                if (label.Value == null) continue;
                 string quantity = "×" + label.Key.AvailableQuantity;
                 if (label.Value.text != quantity) label.Value.text = quantity;
                 if (_keycapTray == null) continue;

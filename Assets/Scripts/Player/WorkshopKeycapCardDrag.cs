@@ -7,7 +7,7 @@ using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
-    public sealed class WorkshopKeycapCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+    public sealed class WorkshopKeycapCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler, IPointerDownHandler
     {
         private WorkshopKeycapPlacement _placement;
         private AssemblyCatalogEntry _entry;
@@ -47,6 +47,13 @@ namespace Game.Player
         {
             if (_structureDrag != null) _structureDrag.BeginStockDrag(_entry, point);
             else _placement.BeginInventoryDrag(_entry, point);
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (eventData.button != PointerEventData.InputButton.Left || _entry.IsStructure
+                || _tray != null && !_tray.CanInteractWithTray) return;
+            _placement.SelectInventoryCard(_entry);
         }
 
         public void OnBeginDrag(PointerEventData eventData)

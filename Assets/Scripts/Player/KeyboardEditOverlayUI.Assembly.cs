@@ -191,7 +191,7 @@ namespace Game.Player
                     || _pickerMode == PickerMode.CaseMaterial && assembly.CanInstallLower && !assembly.LowerLoose);
             }
             foreach (KeyboardEditButton button in _plateMaterialButtons)
-                button.GetComponent<WorkshopStructureMaterialDrag>().enabled = plate && assembly != null && assembly.CanInstallPlate;
+                button.GetComponent<WorkshopStructureMaterialDrag>().enabled = !UsesScreenTrays && plate && assembly != null && assembly.CanInstallPlate;
             _screwAssembly.SetContext(assembly, _pullerController.IsEditing);
             _pcbCard.SetContext(assembly, pcb);
             _pcbWorldDrag.SetContext(assembly, UsesScreenTrays && pcb);

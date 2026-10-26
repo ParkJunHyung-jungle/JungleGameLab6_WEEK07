@@ -15,6 +15,8 @@ namespace Game.Player
         private readonly Dictionary<AssemblyStructurePart, RectTransform> _structurePanels = new Dictionary<AssemblyStructurePart, RectTransform>();
         private readonly Dictionary<GridLayoutGroup, RectTransform> _structureGrids = new Dictionary<GridLayoutGroup, RectTransform>();
         private readonly List<Texture2D> _structurePreviewTextures = new List<Texture2D>();
+        private readonly Dictionary<Material, AssemblyCatalogEntry> _plateInventory = new Dictionary<Material, AssemblyCatalogEntry>();
+        private RectTransform _plateTrayTabs;
 
         /// <summary>material과 일치하는 하부 하우징의 기존 카탈로그 항목을 반환한다. 실물의 반환 대상만 검색하며 재고는 변경하지 않는다.</summary>
         public AssemblyCatalogEntry GetLowerHousingEntry(Material material)
@@ -84,18 +86,67 @@ namespace Game.Player
         /// <summary>point가 kind의 현재 열린 트레이 안인지 반환한다. 숨긴 다른 카테고리와 이전 카탈로그는 반환 대상으로 취급하지 않는다.</summary>
         public bool IsInStructureTray(Vector2 point, AssemblyStructurePart kind)
         {
+            if (kind == AssemblyStructurePart.Plate)
+                return _keycapTrayTransition.IsCategoryOpen(WorkshopDrawerCategory.Plate)
+                    && _plateViewport != null && ContainsPointer(_plateViewport, point);
             WorkshopDrawerCategory category = kind == AssemblyStructurePart.Upper ? WorkshopDrawerCategory.UpperHousing
                 : kind == AssemblyStructurePart.Pcb ? WorkshopDrawerCategory.Pcb : WorkshopDrawerCategory.LowerHousing;
             return _keycapTrayTransition.IsCategoryOpen(category) && _structurePanels.TryGetValue(kind, out RectTransform panel)
                 && ContainsPointer(panel, point);
         }
 
-        /// <summary>현재 보강판 목록과 기존 설치·분리 처리기를 새 트레이에 연결한다. 원래 조립 조건과 재질·타건 효과 이벤트는 유지한다.</summary>
+        /// <summary>현재 보강판 카드에 재질별 수량과 기존 출고·반환 처리기를 연결한다. 최초 수량은 다른 구조 부품처럼 100개이며 목록 재생성 시 수량과 타건 효과 메뉴를 유지한다.</summary>
         private void ConnectPlateTray()
         {
             if (!_structureTraysReady || _plateViewport == null) return;
+            _plateCard.ConnectStockTray(_keycapTrayTransition);
+            for (int index = 0; index < _plateMaterialButtons.Count; index++)
+            {
+                KeyboardEditButton button = _plateMaterialButtons[index];
+                if (button.GetComponent<WorkshopKeycapCardDrag>() != null) continue;
+                Material material = _plateMaterialButtonMaterials[index];
+                if (!_plateInventory.TryGetValue(material, out AssemblyCatalogEntry entry))
+                {
+                    entry = AssemblyCatalogEntry.CreateStructure(AssemblyStructurePart.Plate, material, 100);
+                    _plateInventory.Add(material, entry);
+                }
+                _keycapPlacement.BindStructureCard(button, entry, button.GetComponentInChildren<RawImage>().texture,
+                    _keycapTrayTransition, _plateCard);
+            }
             ScrollRect scroll = _plateViewport.GetComponent<ScrollRect>();
             _catalogLayout.EmbedTrayCatalog(scroll, _keycapTrayContent);
+            _plateViewport.GetComponent<Image>().color = Color.clear;
+            _plateViewport.Find("PlatePanelBackground").GetComponent<Image>().color = Color.clear;
+            foreach (Shadow decoration in _plateViewport.GetComponents<Shadow>()) decoration.enabled = false;
+            _plateViewport.offsetMax = new Vector2(0f, -60f);
+            scroll.viewport.offsetMax = new Vector2(-16f, -12f);
+            Scrollbar bar = scroll.verticalScrollbar;
+            bar.GetComponent<Image>().color = Color.clear;
+            RectTransform track = (RectTransform)bar.transform;
+            track.anchorMin = Vector2.right;
+            track.anchorMax = Vector2.one;
+            track.pivot = Vector2.right;
+            track.offsetMin = new Vector2(-10f, 2f);
+            track.offsetMax = new Vector2(0f, -12f);
+            scroll.verticalNormalizedPosition = 1f;
+            if (_plateTrayTabs == null)
+            {
+                RectTransform row = new GameObject("PlatePickerTabs", typeof(RectTransform), typeof(HorizontalLayoutGroup)).GetComponent<RectTransform>();
+                _plateTrayTabs = row;
+                row.SetParent(_keycapTrayContent, false);
+                row.anchorMin = Vector2.up;
+                row.anchorMax = Vector2.one;
+                row.pivot = Vector2.up;
+                row.anchoredPosition = new Vector2(12f, -12f);
+                row.sizeDelta = new Vector2(-36f, 36f);
+                HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+                layout.spacing = 8f;
+                layout.childControlWidth = layout.childControlHeight = true;
+                layout.childForceExpandWidth = layout.childForceExpandHeight = true;
+                _plateMaterialTabButton.transform.SetParent(row, false);
+                _plateEffectTabButton.transform.SetParent(row, false);
+                row.gameObject.SetActive(_pickerMode == PickerMode.Plate);
+            }
             if (_assemblyCatalog)
             {
                 _plateCard.transform.SetParent(_keycapTrayContent, false);
@@ -107,6 +158,26 @@ namespace Game.Player
                 _assemblyActions.offsetMax = new Vector2(-12f, 94f);
             }
             _keycapTrayTransition.ConnectCatalogScroll(scroll, _keycapPlacement, WorkshopDrawerCategory.Plate);
+            ResetPlateTrayScroll();
+        }
+
+        /// <summary>현재 보강판 목록의 레이아웃을 갱신하고 첫 줄이 테두리까지 보이도록 상단에 정렬한다. 카드 여백과 스크롤 위치만 변경하며 재고와 선택 섹션은 유지한다.</summary>
+        private void ResetPlateTrayScroll()
+        {
+            if (!UsesScreenTrays || _plateViewport == null) return;
+            ScrollRect scroll = _plateViewport.GetComponent<ScrollRect>();
+            GridLayoutGroup grid = scroll.content.GetComponent<GridLayoutGroup>();
+            if (grid == null) return;
+            grid.padding = new RectOffset(8, 8, 12, 12);
+            Canvas.ForceUpdateCanvases();
+            grid.cellSize = new Vector2(Mathf.Max(1f, (scroll.viewport.rect.width
+                - grid.padding.horizontal - grid.spacing.x) * 0.5f), grid.cellSize.y);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(scroll.content);
+            scroll.StopMovement();
+            scroll.verticalNormalizedPosition = 1f;
+            scroll.content.anchoredPosition = Vector2.zero;
+            SetPlatePickerTabSelection(_plateMaterialTabButton, _platePickerSection == PlatePickerSection.Material);
+            SetPlatePickerTabSelection(_plateEffectTabButton, _platePickerSection == PlatePickerSection.Effect);
         }
 
         /// <summary>현재 작업대의 실제 구조 메시와 각 항목의 원본 재질로 독립 썸네일을 갱신한다. 원본 부품 재질·재고는 변경하지 않으며 같은 모델의 이미지는 재사용한다.</summary>

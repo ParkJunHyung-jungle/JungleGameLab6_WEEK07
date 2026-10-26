@@ -8251,83 +8251,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2055193287}
   m_CullTransparentMesh: 1
---- !u!1001 &2077483208
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 5234883201959231382, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_Name
-      value: KeyboardDispenser
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.0162945
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 2.822812
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.0081472
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 7.561
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 1.08551
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -3.566
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: -90
-      objectReference: {fileID: 0}
-    - target: {fileID: 6616928919705713713, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7477760555368289054, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: _limitLowerHousingInScene
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7477760555368289054, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-      propertyPath: '_keyboardPrefabs.Array.data[0]'
-      value: 
-      objectReference: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
 --- !u!1001 &2097399042
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14439,7 +14362,7 @@ MonoBehaviour:
   _pullers: {fileID: 500387865}
   _editOverlay: {fileID: 9911000090}
   _inventoryGroup: {fileID: 7000000000000000600}
-  _dispenser: {fileID: 7000000000000001300}
+  _dispenser: {fileID: 0}
 --- !u!114 &7000000000000000306
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14963,17 +14886,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7375881749889340247, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
   m_PrefabInstance: {fileID: 894914146}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &7000000000000001300 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 7477760555368289054, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
-  m_PrefabInstance: {fileID: 2077483208}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 57c022e4b29a4bb5a36048c4c1c44f7e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KeyboardDispenser
 --- !u!1 &7000000000000001400
 GameObject:
   m_ObjectHideFlags: 0
@@ -15337,7 +15249,6 @@ SceneRoots:
   - {fileID: 1642641041}
   - {fileID: 818686754}
   - {fileID: 894914146}
-  - {fileID: 2077483208}
   - {fileID: 7000000000000001401}
   - {fileID: 7000000000000001600}
   - {fileID: 393918234}

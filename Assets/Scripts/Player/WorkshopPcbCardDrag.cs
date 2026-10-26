@@ -45,6 +45,7 @@ namespace Game.Player
         private Vector3[] _worldStartPositions;
         private Quaternion[] _worldStartRotations;
         private readonly List<(Collider Collider, bool Enabled)> _colliders = new List<(Collider, bool)>();
+        private readonly Dictionary<MeshFilter, MeshCollider> _upperSurfaceColliders = new Dictionary<MeshFilter, MeshCollider>();
 
         /// <summary>pullers와 kind 및 기존 아웃라인 에셋을 카드에 연결한다. 트레이로 이동하기 전 소유 UI 참조를 보관하고 아이콘을 만들며 설치 상태는 유지한다.</summary>
         public void Initialize(WorkshopKeyboardPullerController pullers, Material outlineMaterial, Shader depthShader,
@@ -81,6 +82,7 @@ namespace Game.Player
             {
                 CancelDrag();
                 _looseBodies.Clear();
+                ClearUpperSurfaceColliders();
                 foreach (var outline in _outlines) outline.Dispose();
                 _outlines.Clear();
                 _assembly = assembly;
@@ -173,8 +175,11 @@ namespace Game.Player
             Vector3 hitPoint = boardHit ? boardPoint : Vector3.zero;
             float nearest = float.PositiveInfinity;
             if (boardHit) nearest = Vector3.Distance(ray.origin, boardPoint);
-            if (_kind == AssemblyStructurePart.Plate && _assembly.PlateInstalled
-                || _kind == AssemblyStructurePart.Upper && _assembly.UpperInstalled
+            if (_kind == AssemblyStructurePart.Upper && _assembly.UpperInstalled)
+            {
+                if (!TryGetUpperSurfaceHit(ray, out hitPoint, out nearest)) return;
+            }
+            else if (_kind == AssemblyStructurePart.Plate && _assembly.PlateInstalled
                 || _kind == AssemblyStructurePart.Lower && _assembly.LowerInstalled)
             {
                 foreach (Transform part in _parts)
@@ -200,6 +205,11 @@ namespace Game.Player
                 bool belongs = false;
                 foreach (Transform part in _parts)
                     if (candidate.transform == part || candidate.transform.IsChildOf(part)) { belongs = true; break; }
+                if (_kind == AssemblyStructurePart.Upper)
+                {
+                    if (!belongs) obstruction = Mathf.Min(obstruction, candidate.distance);
+                    continue;
+                }
                 if (!candidate.transform.IsChildOf(_assembly.transform) && !belongs)
                     obstruction = Mathf.Min(obstruction, candidate.distance);
                 if (!belongs && customization != null && _assembly.CanRemovePcb)
@@ -254,6 +264,62 @@ namespace Game.Player
             MoveParts(point);
         }
 
+        /// <summary>ray와 상부 하우징의 실제 메시 표면을 검사한다. 가장 가까운 표면 좌표와 거리를 반환해 빈 구멍 선택을 막는다.</summary>
+        private bool TryGetUpperSurfaceHit(Ray ray, out Vector3 hitPoint, out float hitDistance)
+        {
+            hitPoint = Vector3.zero;
+            hitDistance = float.PositiveInfinity;
+            foreach (Transform part in _parts)
+            foreach (MeshFilter filter in part.GetComponentsInChildren<MeshFilter>())
+            {
+                if (filter.sharedMesh == null) continue;
+                MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
+                if (renderer == null || !renderer.enabled) continue;
+                MeshCollider collider = GetUpperSurfaceCollider(filter);
+                Transform meshTransform = filter.transform;
+                collider.transform.SetPositionAndRotation(meshTransform.position, meshTransform.rotation);
+                collider.transform.localScale = meshTransform.lossyScale;
+                collider.gameObject.SetActive(true);
+                try
+                {
+                    Physics.SyncTransforms();
+                    if (!collider.Raycast(ray, out RaycastHit meshHit, _pullers.InputCamera.farClipPlane)) continue;
+                    float distance = Vector3.Distance(ray.origin, meshHit.point);
+                    if (distance >= hitDistance) continue;
+                    hitPoint = meshHit.point;
+                    hitDistance = distance;
+                }
+                finally
+                {
+                    collider.gameObject.SetActive(false);
+                }
+            }
+            return !float.IsPositiveInfinity(hitDistance);
+        }
+
+        /// <summary>filter의 실제 공유 메시를 사용하는 비활성 판정 콜라이더를 반환한다. 메시 가독성 설정과 무관하게 형상을 재사용한다.</summary>
+        private MeshCollider GetUpperSurfaceCollider(MeshFilter filter)
+        {
+            if (_upperSurfaceColliders.TryGetValue(filter, out MeshCollider collider) && collider != null) return collider;
+            GameObject proxy = new GameObject("UpperHousingRaycastProxy");
+            proxy.hideFlags = HideFlags.HideAndDontSave;
+            proxy.layer = 2;
+            proxy.SetActive(false);
+            collider = proxy.AddComponent<MeshCollider>();
+            collider.sharedMesh = filter.sharedMesh;
+            collider.isTrigger = true;
+            _upperSurfaceColliders[filter] = collider;
+            return collider;
+        }
+
+        /// <summary>현재 편집 대상에 만든 임시 표면 콜라이더를 제거한다. 실제 부품과 재질 및 원래 콜라이더는 변경하지 않는다.</summary>
+        private void ClearUpperSurfaceColliders()
+        {
+            foreach (MeshCollider collider in _upperSurfaceColliders.Values)
+                if (collider != null) Destroy(collider.gameObject);
+            _upperSurfaceColliders.Clear();
+        }
+
         /// <summary>가상 커서를 따라 실물을 이동하고 버튼을 놓을 때 목록 반환·설치·바닥 드롭 중 하나를 확정한다.</summary>
         private void UpdateWorldDrag()
         {
@@ -265,7 +331,10 @@ namespace Game.Player
             if (Mouse.current.leftButton.isPressed) return;
             if (!Mouse.current.leftButton.wasReleasedThisFrame) { CancelDrag(); return; }
             KeyboardEditOverlayUI overlay = _overlay;
-            if (overlay != null && (_stockEnabled ? overlay.IsInStructureTray(point, _kind) : overlay.IsInAssemblyReturnArea(point)))
+            bool returnedToTray = overlay != null && (_kind == AssemblyStructurePart.Upper
+                ? _stockTray != null && _stockTray.IsPointerOverOpenTrayViewport(point)
+                : _stockEnabled ? overlay.IsInStructureTray(point, _kind) : overlay.IsInAssemblyReturnArea(point));
+            if (returnedToTray)
             {
                 if (_kind == AssemblyStructurePart.Pcb && !overlay.TryReturnPcbBundle(_assembly))
                 {
@@ -288,6 +357,11 @@ namespace Game.Player
             bool installed = !blocked && _assembly.TryPlaceStructure(_kind, ray);
             RecordStructureEvent("PartInstallAttempted", installed, "WorldDrag",
                 installed ? "" : GetPlacementFailureReason(blocked), _wasInstalled && installed ? "Reinstalled" : "");
+            if (!installed && _kind == AssemblyStructurePart.Upper)
+            {
+                CancelDrag();
+                return;
+            }
             Vector3 position = _parts[0].position;
             FinishWorldDrag();
             if (installed) { AudioManager.PlayPartSound(position, false); return; }
@@ -497,6 +571,7 @@ namespace Game.Player
         void OnDestroy()
         {
             CancelDrag();
+            ClearUpperSurfaceColliders();
             foreach (var outline in _outlines) outline.Dispose();
             if (_texture != null) Destroy(_texture);
             if (_returnIcon != null) Destroy(_returnIcon.gameObject);

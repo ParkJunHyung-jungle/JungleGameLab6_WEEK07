@@ -479,12 +479,12 @@ namespace Game.Tutorials
         }
 
         /// <summary>
-        /// 런타임 의뢰 변경에서 제출 대상 선택과 결과 메일 도착을 확인한다.
-        /// 해당 카드만 한 번 예약하며 의뢰 진행과 보상을 변경하지 않는다.
+        /// 런타임 의뢰 변경에서 진행 의뢰와 결과 메일 도착을 확인한다.
+        /// 해당 안내만 한 번 예약하며 의뢰 진행과 보상은 변경하지 않는다.
         /// </summary>
         private void HandleRequestChanged()
         {
-            if (KeyboardRequestRuntime.SubmissionTarget != null) RequestAvailable(TutorialTopic.RequestDelivery);
+            if (KeyboardRequestRuntime.ActiveRequest != null) RequestAvailable(TutorialTopic.RequestDelivery);
             foreach (KeyboardRequestState state in KeyboardRequestRuntime.Requests.Values)
                 if (state.ResultMailSent) { RequestAvailable(TutorialTopic.RequestResult); break; }
         }

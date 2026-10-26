@@ -365,7 +365,7 @@ namespace Game.Player
 
         /// <summary>
         /// 집중 블렌드 완료 후 Holder의 실제 키보드를 기존 Workshop UI와 조립 입력의 대상으로 연결한다.
-        /// 대상이 있으면 제작 로그 회차를 시작하며, 대상이 없어도 인벤토리는 표시하고 대상 의존 조작을 막는다.
+        /// 대상이 있으면 보강판 오디오 효과를 연결하고 제작 로그 회차를 시작하며, 대상이 없어도 인벤토리는 표시하고 대상 의존 조작을 막는다.
         /// </summary>
         private void OpenAssembly()
         {
@@ -381,6 +381,8 @@ namespace Game.Player
             _editOverlay.SetLEDCustomization(customization);
             if (EditingKeyboard != null)
             {
+                if (AudioManager.instance != null)
+                    AudioManager.instance.SelectKeyboardEffects(customization);
                 CustomizationTelemetry.Emit(customization, "CustomizationStart");
                 _keyboardInputWasEnabled = EditingKeyboard.InputEnabled;
                 _keyboardAttackWasEnabled = EditingKeyboard.AttackEnabled;
@@ -397,7 +399,7 @@ namespace Game.Player
 
         /// <summary>
         /// 기존 Workshop 취소 경로로 부품 드래그와 두 도구를 정리한 뒤 목록을 닫고 인벤토리를 숨긴다.
-        /// 현재 대상의 제작 로그 회차를 마감하고 입력 상태를 복원하며 장착 결과와 재고는 유지한다.
+        /// 현재 대상의 보강판 오디오 효과를 해제하고 제작 로그 회차를 마감하며 입력 상태를 복원하고 장착 결과와 재고는 유지한다.
         /// </summary>
         private void CloseAssembly()
         {
@@ -405,6 +407,8 @@ namespace Game.Player
             _editOverlay.SetWorkshopVisible(false);
             if (EditingKeyboard != null)
             {
+                if (AudioManager.instance != null)
+                    AudioManager.instance.ReleaseKeyboardEffects(EditingKeyboard.GetComponent<KeyboardCustomization>());
                 CustomizationTelemetry.Emit(EditingKeyboard.GetComponent<KeyboardCustomization>(),
                     "CustomizationEnd", details: "FocusClosed");
                 EditingKeyboard.SetInputEnabled(_keyboardInputWasEnabled);

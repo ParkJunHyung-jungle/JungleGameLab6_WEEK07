@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -1543,41 +1543,14 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// type의 색상과 아이콘을 축 사운드 선택 버튼에 추가한다.
-        /// parent를 사용하며 하우징, 축 스템, 십자 표시를 만든다.
+        /// parent 카드에 type의 실제 출고 스위치를 렌더링한 이미지를 배치한다.
+        /// 기존 키캡과 같은 이미지 요소를 사용하며 원본 부품과 재고는 변경하지 않는다.
         /// </summary>
         private void CreateSwitchPreview(Transform parent, SwitchType type)
         {
-            Image housing = CreatePickerImage(
-                parent,
-                "SwitchHousing",
-                new Vector2(64f, 52f),
-                new Vector2(0f, 14f),
-                new Color32(37, 49, 61, 255));
-            CreatePickerImage(
-                housing.transform,
-                "SwitchStem",
-                new Vector2(42f, 30f),
-                Vector2.zero,
-                GetSwitchSoundColor(type));
-
-            GameObject plusObject = new GameObject("SwitchStemMark", typeof(RectTransform), typeof(Text));
-            RectTransform plusRect = plusObject.GetComponent<RectTransform>();
-            plusRect.SetParent(housing.transform, false);
-            plusRect.anchorMin = new Vector2(0.5f, 0.5f);
-            plusRect.anchorMax = new Vector2(0.5f, 0.5f);
-            plusRect.pivot = new Vector2(0.5f, 0.5f);
-            plusRect.sizeDelta = new Vector2(24f, 26f);
-            Text plus = plusObject.GetComponent<Text>();
-            plus.font = _pickerFont;
-            plus.text = "+";
-            plus.fontSize = 24;
-            plus.fontStyle = FontStyle.Bold;
-            plus.alignment = TextAnchor.MiddleCenter;
-            plus.color = Color.white;
-            plus.raycastTarget = false;
+            Texture2D texture = GetComponent<WorkshopKeycapPlacement>().GetSwitchPreview(type);
+            CreateMaterialPreviewImage(parent, "SwitchPreview", texture, new Vector2(96f, 88f), 14f);
         }
-
         /// <summary>
         /// button의 테두리, 배경과 체크 표시를 선택 상태에 맞춰 갱신한다.
         /// isSelected를 사용하며 세 시각 요소의 색상과 활성 상태를 변경한다.

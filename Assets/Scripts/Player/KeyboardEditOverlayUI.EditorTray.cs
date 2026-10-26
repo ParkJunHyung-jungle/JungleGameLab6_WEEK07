@@ -67,6 +67,7 @@ namespace Game.Player
         private void HandleEditorTrayStateChanged(WorkshopDrawerCategory category, bool opened)
         {
             if (_editorTabs == null || _ledTrayScroll == null || _photoTrayScroll == null) return;
+            if (opened) _keycapTrayTransition.ApplyTypography(_pickerFont);
             if (opened && (category == WorkshopDrawerCategory.Pcb || category == WorkshopDrawerCategory.UpperHousing
                 || category == WorkshopDrawerCategory.LowerHousing)) RefreshStructureTrayPreviews();
             bool visible = opened && category == WorkshopDrawerCategory.LedCustomImage;
@@ -102,6 +103,7 @@ namespace Game.Player
             _photoTrayScroll.gameObject.SetActive(_photoTraySelected);
             _keycapTrayTransition.ConnectCatalogScroll(_photoTraySelected ? _photoTrayScroll : _ledTrayScroll,
                 _keycapPlacement, WorkshopDrawerCategory.LedCustomImage);
+            _keycapTrayTransition.ApplyTypography(_pickerFont);
         }
     }
 }

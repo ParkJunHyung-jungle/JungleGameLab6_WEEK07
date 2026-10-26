@@ -209,7 +209,7 @@ namespace KeyboardModeling.Assembly
             RectTransform bulkMode = Rect("BulkPlacement", panel);
             Place(bulkMode, 166f, 98f, 136f, 34f);
             _bulkPlacementButton = CreateButton(bulkMode);
-            Text bulkLabel = Label(bulkMode, "일괄 배치", 14);
+            Text bulkLabel = Label(bulkMode, "연속 배치", 14);
             Stretch(bulkLabel.rectTransform, Vector2.zero, Vector2.zero);
             _bulkPlacementButton.Clicked += HandlePlacementModeClicked;
             SetSelected(_singlePlacementButton, true);

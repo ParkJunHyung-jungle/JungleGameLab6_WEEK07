@@ -197,6 +197,31 @@ namespace KeyboardModeling.Assembly
             _initialized = true;
         }
 
+        /// <summary>
+        /// 신규 조립으로 초기화된 키보드를 완성 상태로 전환한다.
+        /// 캐시한 PCB, 나사, 보강판, 상단부와 기본 축 및 키캡을 복원하고 조립 진행 상태를 갱신한다.
+        /// </summary>
+        public void CompleteInitialAssembly()
+        {
+            if (!_initialized) return;
+            _pcbInstalled = true;
+            _lowerInstalled = true;
+            _plateInstalled = true;
+            _upperInstalled = true;
+            _screwCount = _screws.Length;
+            for (int index = 0; index < _screws.Length; index++)
+            {
+                _fixedScrews[index] = true;
+                _screws[index].SetLocalPositionAndRotation(_screwPositions[index], _screwRotations[index]);
+            }
+            RestorePcbPose();
+            RestoreStructurePose(AssemblyStructurePart.Lower);
+            RestoreStructurePose(AssemblyStructurePart.Plate);
+            RestoreStructurePose(AssemblyStructurePart.Upper);
+            ApplyStructureVisibility();
+            _customization.PrepareCompletedAssembly();
+        }
+
         /// <summary>하단부와 간섭 부품 상태를 재검사해 PCB를 즉시 배치한다. 성공하면 배치 상태를 저장하고 true를 반환하며 연출은 실행하지 않는다.</summary>
         private bool InstallPcb()
         {

@@ -600,6 +600,19 @@ public sealed class KeyboardCustomization : MonoBehaviour, IKeyboardLEDSettings,
     }
 
     /// <summary>
+    /// 신규 조립 초기화에서 숨긴 기본 축과 키캡을 완성 키보드로 표시한다.
+    /// 저장된 축 종류로 입력음을 복원하고 부품과 LED를 활성화한다.
+    /// </summary>
+    public void PrepareCompletedAssembly()
+    {
+        foreach (KeyboardSwitch keyboardSwitch in _switches) keyboardSwitch.gameObject.SetActive(true);
+        if (_keycaps == null) CacheKeycaps();
+        foreach (Transform keycap in _keycaps) keycap.gameObject.SetActive(true);
+        GetComponent<KeyboardInputController>().SetSwitchSound(_switchType);
+        SetLEDEnabled(true);
+    }
+
+    /// <summary>
     /// catalog와 materialIds로 구성을 복사하고 미설치 부품만 defaults의 값으로 채운다.
     /// 전투용 상태를 반환하며 작업실 키보드의 재질과 설치 여부는 유지한다.
     /// </summary>

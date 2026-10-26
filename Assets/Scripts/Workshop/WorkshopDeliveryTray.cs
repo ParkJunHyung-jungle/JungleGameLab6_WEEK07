@@ -122,8 +122,8 @@ namespace Game.Workshop
             _back.Clicked -= HandleBack;
             Action<bool> externalResult = _externalConfirmation ? _externalConfirmationResult : null;
             if (_modalOpen) RestoreInput();
-            _confirmation.SetActive(false);
-            _panel.SetActive(false);
+            if (_confirmation != null) _confirmation.SetActive(false);
+            if (_panel != null) _panel.SetActive(false);
             externalResult?.Invoke(false);
         }
 

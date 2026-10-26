@@ -15,6 +15,7 @@ namespace Game.Player
     {
         private const string MUSIC_PLAYER_PARAMETER = "MusicPlayer";
         private const int EASTER_EGG_TRACK = 5;
+        private const float EASTER_EGG_PROBABILITY = 0.05f;
         private const EVENT_CALLBACK_TYPE MUSIC_CALLBACK_MASK =
             EVENT_CALLBACK_TYPE.SOUND_PLAYED | EVENT_CALLBACK_TYPE.SOUND_STOPPED;
         private static readonly string[] TRACK_SOUND_NAMES =
@@ -76,6 +77,9 @@ namespace Game.Player
         private WorkshopViewController _workshopView;
         private Camera _outputCamera;
 
+        [Header("Interaction")]
+        [SerializeField, Min(0.1f)] private float _interactionDistance = 12f;
+
         [Header("FMOD Playback")]
         private AudioManager _audioManager;
         private EventInstance _music;
@@ -124,12 +128,11 @@ namespace Game.Player
             bool clicked = false;
             if (_workshopView != null && _outputCamera != null && Mouse.current != null)
             {
-                Vector2 pointer = InGameCursor.Position;
-                if (_outputCamera.pixelRect.Contains(pointer) && _workshopView.CanUseRadio(pointer))
+                if (_workshopView.TryGetRadioAimPosition(out Vector2 aimPosition))
                 {
                     Physics.SyncTransforms();
-                    Ray ray = _outputCamera.ScreenPointToRay(pointer);
-                    if (Physics.Raycast(ray, out RaycastHit hit, _outputCamera.farClipPlane,
+                    Ray ray = _outputCamera.ScreenPointToRay(aimPosition);
+                    if (Physics.Raycast(ray, out RaycastHit hit, _interactionDistance,
                             Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                         && hit.transform.IsChildOf(transform))
                     {
@@ -418,12 +421,12 @@ namespace Game.Player
 
         /// <summary>
         /// 직전 곡을 제외하여 0~5에서 다음 곡 번호를 뽑는다.
-        /// lastTrack과 1% 이스터에그 확률을 사용하며 정수 곡 번호를 반환한다.
+        /// lastTrack과 5% 이스터에그 확률을 사용하며 정수 곡 번호를 반환한다.
         /// </summary>
         private int SelectNextTrack()
         {
             if (_lastTrack == EASTER_EGG_TRACK) return UnityEngine.Random.Range(0, EASTER_EGG_TRACK);
-            if (UnityEngine.Random.value < 0.01f) return EASTER_EGG_TRACK;
+            if (UnityEngine.Random.value < EASTER_EGG_PROBABILITY) return EASTER_EGG_TRACK;
             int normalCount = _lastTrack >= 0 ? EASTER_EGG_TRACK - 1 : EASTER_EGG_TRACK;
             int choice = UnityEngine.Random.Range(0, normalCount);
             return _lastTrack >= 0 && choice >= _lastTrack ? choice + 1 : choice;

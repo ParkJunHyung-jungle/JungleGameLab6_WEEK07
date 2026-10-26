@@ -355,6 +355,11 @@ namespace Game.Logging
         /// <summary>편집 대상에 연결된 storage에서 실제 구성을 읽어 식별자를 갱신한다. 실패는 품질 이벤트로 남기며 편집은 유지한다.</summary>
         private void CaptureConfiguration(string reason)
         {
+            if (_target == null)
+            {
+                PlaytestResearchSession.Emit("ConfigurationCaptureFailed", "MissingTarget");
+                return;
+            }
             foreach (KeyboardCustomizationStorage storage in UnityEngine.Object.FindObjectsByType<KeyboardCustomizationStorage>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (storage.Customization != _target) continue;

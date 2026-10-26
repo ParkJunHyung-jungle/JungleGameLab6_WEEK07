@@ -82,6 +82,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopRetroRadioController
   _outlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
   _outlineDepthShader: {fileID: 4800000, guid: c15e67eed99449a2a286129ff6aa137e, type: 3}
+  _interactionDistance: 12
 --- !u!1 &400000000000000004
 GameObject:
   m_ObjectHideFlags: 0

@@ -347,8 +347,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 쓰레기통을 조준하면 손에 든 키보드를 삭제하고, 그 외에는 던지거나 조준 대상을 동작시킨다.
-        /// interactionDistance, interactionLayers와 보유 키보드를 사용하며 실행 성공 여부를 반환한다.
+        /// 쓰레기통을 조준하면 손에 든 키보드의 해체 확인을 열고, 그 외에는 던지거나 조준 대상을 동작시킨다.
+        /// interactionDistance, interactionLayers와 보유 키보드를 사용하며 입력 처리 여부를 반환한다.
         /// </summary>
         private bool TryInteract()
         {
@@ -357,10 +357,9 @@ namespace Game.Player
                 if (TryGetInteractionHit(out RaycastHit trashHit))
                 {
                     KeyboardTrashCan trashCan = trashHit.collider.GetComponentInParent<KeyboardTrashCan>();
-                    if (trashCan != null && trashCan.TryDispose(_heldKeyboardBody))
+                    if (trashCan != null)
                     {
-                        RestoreHeldKeyboardCollisions();
-                        _heldKeyboardBody = null;
+                        trashCan.TryDispose(_heldKeyboardBody, this);
                         return true;
                     }
                 }
@@ -444,7 +443,7 @@ namespace Game.Player
             {
                 if (TryGetInteractionHit(out RaycastHit trashHit)
                     && trashHit.collider.GetComponentInParent<KeyboardTrashCan>() != null)
-                    prompt = "좌클릭으로 키보드 버리기";
+                    prompt = "좌클릭으로 키보드 해체 확인";
                 else prompt = _heldKeyboardBody.GetComponentInChildren<KeyboardProtectionCover>() == null
                     ? "좌클릭 던지기 / 우클릭 커버 덮기"
                     : "좌클릭 던지기 / 우클릭 커버 벗기기";
@@ -509,7 +508,7 @@ namespace Game.Player
             if (_heldKeyboardBody != null)
             {
                 bool trash = TryGetInteractionHit(out RaycastHit trashHit) && trashHit.collider.GetComponentInParent<KeyboardTrashCan>() != null;
-                if (_clickInput.action.enabled) state.Add("좌클릭", trash ? "키보드 버리기" : "키보드 던지기");
+                if (_clickInput.action.enabled) state.Add("좌클릭", trash ? "키보드 해체 확인" : "키보드 던지기");
                 if (_coverInput.action.enabled) state.Add("우클릭", _heldKeyboardBody.GetComponentInChildren<KeyboardProtectionCover>() == null ? "커버 덮기" : "커버 벗기기");
                 return;
             }
@@ -1400,6 +1399,17 @@ namespace Game.Player
                     Physics.IgnoreCollision(state.Keyboard, state.Player, state.WasIgnored);
             }
             _heldCollisionStates.Clear();
+        }
+
+        /// <summary>body가 현재 손에 든 키보드인지 반환한다. held 참조만 비교하며 물리와 홀더는 변경하지 않는다.</summary>
+        public bool IsHoldingKeyboard(Rigidbody body) => _heldKeyboardBody == body;
+
+        /// <summary>성공한 해체 대상의 held 상태와 충돌 무시 설정을 정리한다. 대상이 현재 들린 키보드일 때만 참조를 비운다.</summary>
+        public void ForgetDisposedKeyboard(Rigidbody body)
+        {
+            if (_heldKeyboardBody != body) return;
+            RestoreHeldKeyboardCollisions();
+            _heldKeyboardBody = null;
         }
 
         /// <summary>

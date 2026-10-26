@@ -71,9 +71,9 @@ namespace Game.Tutorials
         [Header("Runtime")]
         private readonly Queue<PendingCard> _pending = new Queue<PendingCard>();
         private readonly HashSet<TutorialTopic> _scheduled = new HashSet<TutorialTopic>();
-        private readonly List<InputAction> _actions = new List<InputAction>();
+        // private readonly List<InputAction> _actions = new List<InputAction>();
         private PendingCard _current;
-        private float _savedTimeScale;
+        // private float _savedTimeScale;
         private CursorLockMode _savedCursorLock;
         private bool _savedCursorVisible;
         private bool _paused;
@@ -84,10 +84,13 @@ namespace Game.Tutorials
         private WorkshopKeycapDrawerTransition _drawerTransition;
         private MonitorMiniGameManager _monitorManager;
         private MonitorKeyboardHolder _monitorHolder;
+        private readonly HashSet<string> _removedPartTypes = new HashSet<string>();
 
-        public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
+        // 안내 표시 중에는 게임 조작을 차단하지 않는다.
+        // public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
+        public static bool IsBlocking => Time.frameCount <= _resumeFrame;
         public bool CanOpenHelp => !Game.Workshop.WorkshopDeliveryTray.IsInputBlocked && !Game.Tournament.TournamentController.IsReturnPaused && !IsBlocking
-            && _pending.Count == 0 && Time.timeScale > 0f;
+            && !_paused && _pending.Count == 0 && Time.timeScale > 0f;
         private IReadOnlyList<TutorialCard> Cards => _content.Cards;
 
         private sealed class PendingCard
@@ -148,7 +151,7 @@ namespace Game.Tutorials
             if (!_paused && Keyboard.current != null && Keyboard.current.f10Key.wasPressedThisFrame)
                 HandleHelp(_help);
             if (!_paused) return;
-            Time.timeScale = 0f;
+            // Time.timeScale = 0f;
             InGameCursor.LockState = CursorLockMode.None;
             InGameCursor.Visible = true;
             if (_closing && Time.frameCount > _closeFrame && InputsReleased()) FinishClose();
@@ -159,7 +162,7 @@ namespace Game.Tutorials
             if (Game.Tournament.TournamentController.IsReturnPaused || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) return;
             if (_paused)
             {
-                Time.timeScale = 0f;
+                // Time.timeScale = 0f;
                 return;
             }
             if (Time.frameCount <= _resumeFrame || _pending.Count == 0 || Time.timeScale <= 0f) return;
@@ -190,6 +193,7 @@ namespace Game.Tutorials
             }
             _pending.Clear();
             _scheduled.Clear();
+            _removedPartTypes.Clear();
             if (_instance == this) _instance = null;
         }
 
@@ -217,13 +221,14 @@ namespace Game.Tutorials
             throw new InvalidOperationException("튜토리얼 카드 누락: " + topic);
         }
 
-        /// <summary>card를 표시하고 현재 시간 배율과 커서 및 게임 입력을 보관한다. UI 입력은 유지한 채 게임을 일시정지한다.</summary>
+        /// <summary>card를 표시하고 기존 커서 상태를 보관한다. 시간과 게임 입력은 유지하며 안내 표시 상태만 활성화한다.</summary>
         private void Open(TutorialCard card)
         {
-            _savedTimeScale = Time.timeScale;
+            // _savedTimeScale = Time.timeScale;
             _savedCursorLock = InGameCursor.LockState;
             _savedCursorVisible = InGameCursor.Visible;
             _paused = true;
+            /*
             _actions.Clear();
             foreach (InputAction action in InputSystem.ListEnabledActions())
             {
@@ -232,6 +237,7 @@ namespace Game.Tutorials
                 action.Disable();
             }
             Time.timeScale = 0f;
+            */
             InGameCursor.LockState = CursorLockMode.None;
             InGameCursor.Visible = true;
             _overlay.SetActive(true);
@@ -293,13 +299,13 @@ namespace Game.Tutorials
             Open(Cards[0]);
         }
 
-        /// <summary>확인 버튼을 비활성화하고 입력 해제를 기다린다. 닫기 입력이 게임으로 전달되지 않도록 정지 상태를 유지한다.</summary>
+        /// <summary>확인 버튼을 비활성화하고 입력 해제를 기다린다. 게임을 정지하지 않고 안내의 닫기 대기 상태만 변경한다.</summary>
         private void BeginClose()
         {
             _closing = true;
             _closeFrame = Time.frameCount;
             _next.interactable = false;
-            _controls.text = "누르고 있는 키와 마우스 버튼에서 손을 떼면 계속합니다.";
+            _controls.text = "누르고 있는 키와 마우스 버튼에서 손을 떼면 안내가 닫힙니다.";
         }
 
         /// <summary>누른 키와 마우스 버튼이 모두 해제됐는지 반환한다. 입력을 소비하거나 게임 상태를 변경하지 않는다.</summary>
@@ -325,12 +331,14 @@ namespace Game.Tutorials
             completed?.Invoke();
         }
 
-        /// <summary>보관한 시간 배율과 입력 및 커서 상태를 복원한다. 종료나 씬 전환에서도 튜토리얼의 정지 소유권을 해제한다.</summary>
+        /// <summary>보관한 커서 상태를 복원하고 안내 표시와 닫기 대기를 해제한다. 현재 시간 배율과 게임 입력은 변경하지 않는다.</summary>
         private void RestorePause()
         {
+            /*
             Time.timeScale = _savedTimeScale;
             foreach (InputAction action in _actions) action.Enable();
             _actions.Clear();
+            */
             InGameCursor.LockState = _savedCursorLock;
             InGameCursor.Visible = _savedCursorVisible;
             _paused = false;
@@ -417,16 +425,17 @@ namespace Game.Tutorials
                     case "CustomImage": RequestAvailable(TutorialTopic.Image); break;
                 }
             }
-            if (observation.Type == "ToolPickedUp") RequestAvailable(TutorialTopic.KeycapPuller, true);
             if (observation.Type == "BulkPlacementStarted") RequestAvailable(TutorialTopic.WholePart, true);
+            if (observation.Type == "InventoryPartPicked" && _removedPartTypes.Remove(observation.Part))
+                RequestAvailable(TutorialTopic.PartReplacement, true);
             if ((observation.Type == "InventoryPartPicked" || observation.Type == "ElementPicked")
                 && observation.KeycapKind == "Artisan") RequestAvailable(TutorialTopic.Artisan);
-            if (observation.Type == "ScrewChanged" || observation.Type == "PartInstallAttempted"
-                && observation.Success && observation.Part == "Pcb") RequestAvailable(TutorialTopic.ScrewAssembly);
+            if (observation.Type == "PartInstallAttempted" && observation.Success && observation.Part == "Pcb")
+                RequestAvailable(TutorialTopic.ScrewAssembly, true);
             if (observation.Type == "PartRemoveAttempted" && observation.Success)
             {
                 if (observation.Part == "Keycap" || observation.Part == "Switch")
-                    RequestAvailable(TutorialTopic.PartReplacement);
+                    _removedPartTypes.Add(observation.Part);
                 else
                     RequestAvailable(TutorialTopic.PartRemoval);
                 RequestAvailable(TutorialTopic.PartReturn);
@@ -451,7 +460,9 @@ namespace Game.Tutorials
             {
                 case WorkshopDrawerCategory.Keycaps: RequestAvailable(TutorialTopic.KeycapEditing); break;
                 case WorkshopDrawerCategory.Switches: RequestAvailable(TutorialTopic.AssemblySwitch); break;
-                case WorkshopDrawerCategory.ScrewsTools: RequestAvailable(TutorialTopic.ToolDrawer); break;
+                case WorkshopDrawerCategory.ScrewsTools:
+                    RequestAvailable(TutorialTopic.KeycapPuller, true);
+                    break;
                 case WorkshopDrawerCategory.LedCustomImage: RequestAvailable(TutorialTopic.LEDEditing); break;
                 case WorkshopDrawerCategory.UpperHousing: RequestAvailable(TutorialTopic.UpperCaseEditing); break;
                 case WorkshopDrawerCategory.Plate: RequestAvailable(TutorialTopic.PlateEditing); break;

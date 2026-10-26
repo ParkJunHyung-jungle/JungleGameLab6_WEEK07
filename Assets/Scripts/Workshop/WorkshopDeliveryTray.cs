@@ -81,8 +81,7 @@ namespace Game.Workshop
             _confirmation.SetActive(false);
             _confirmLabel = _confirm.GetComponentInChildren<Text>(true);
             _backLabel = _back.GetComponentInChildren<Text>(true);
-            _carryOutline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _outputCamera);
-            _carryOutline.PrepareSelectedRenderers(transform, _outlineRenderers);
+            InitializeCarryOutline(eventCamera);
             Refresh();
         }
 
@@ -100,7 +99,7 @@ namespace Game.Workshop
         void LateUpdate()
         {
             if (_keyboardHeld && !_sending && !_modalOpen && !_confirmationOpen && _holder.KeyboardBody == null)
-                _carryOutline.Show(new Pose(transform.position, transform.rotation));
+                _carryOutline?.Show(new Pose(transform.position, transform.rotation));
         }
 
         void Update()
@@ -149,7 +148,32 @@ namespace Game.Workshop
 
         void OnDestroy()
         {
-            _carryOutline.Dispose();
+            _carryOutline?.Dispose();
+        }
+
+        /// <summary>
+        /// 트레이 설정 또는 eventCamera의 기존 키보드 배치 설정으로 외곽선 표시기를 준비한다.
+        /// 렌더러 참조가 없으면 직계 자식의 실제 외형만 수집하여 중첩된 글씨와 UI를 제외한다.
+        /// </summary>
+        private void InitializeCarryOutline(Camera eventCamera)
+        {
+            if (_outlineMaterial != null && _depthShader != null && _outputCamera != null)
+                _carryOutline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _outputCamera);
+            else if (eventCamera != null && eventCamera.TryGetComponent(out WorkshopKeyboardDragController keyboardDrag))
+                _carryOutline = keyboardDrag.CreatePlacementPreview();
+            if (_carryOutline == null)
+            {
+                Debug.LogWarning("배송 트레이 외곽선에 사용할 키보드 배치 설정이 없습니다.", this);
+                return;
+            }
+            if (_outlineRenderers == null || _outlineRenderers.Length == 0)
+            {
+                var renderers = new List<MeshRenderer>();
+                foreach (Transform child in transform)
+                    if (child.TryGetComponent(out MeshRenderer renderer)) renderers.Add(renderer);
+                _outlineRenderers = renderers.ToArray();
+            }
+            _carryOutline.PrepareSelectedRenderers(transform, _outlineRenderers);
         }
 
         /// <summary>

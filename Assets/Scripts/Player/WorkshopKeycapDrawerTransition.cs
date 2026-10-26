@@ -160,6 +160,7 @@ namespace Game.Player
         {
             foreach (Text label in _trayRoot.GetComponentsInChildren<Text>(true))
             {
+                if (label.name == "AssemblyStatus") continue;
                 bool title = label.name == "CategoryLabel";
                 bool quantity = label.name == "Quantity" || label.name == "SelectedIndicator";
                 bool caption = quantity || label.text.Contains(" · ") || label.text.Contains("\n");

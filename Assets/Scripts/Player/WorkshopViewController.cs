@@ -58,10 +58,11 @@ namespace Game.Player
         public KeyboardDispenser KeyboardDispenser => _dispenser;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
+        public bool IsWorkbenchEmpty => _workbenchHolder.KeyboardBody == null;
         public bool CanProcessGeneralInput => isActiveAndEnabled && !_isFocused && !_modeTransitionPending
             && !_monitorFocused && !_monitorTransition && _viewSwitchingAllowed && !_brain.IsBlending
             && Application.isFocused && InGameCursor.CanProcessPointer
-            && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
+            && !(FirstEncounterTutorial.IsVisible || FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
             && !PlaytestResearchSession.IsUploadConfirmationOpen && !_pullers.IsManipulatingPart
             && (_lookCamera == null || InGameCursor.IsWorldAim);
         public bool CanLookAround => CanProcessGeneralInput && (InGameCursor.IsWorldAim || !IsPointerOverUI());
@@ -534,7 +535,7 @@ namespace Game.Player
         /// </summary>
         private void ApplyCursor()
         {
-            bool blocked = FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked
+            bool blocked = FirstEncounterTutorial.IsVisible || FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked
                 || PlaytestResearchSession.IsUploadConfirmationOpen || InGameCursor.IsSystemDialogOpen;
             bool general = isActiveAndEnabled && _lookCamera != null && !_isFocused && !_modeTransitionPending
                 && !_monitorFocused && !_monitorTransition && !_brain.IsBlending;

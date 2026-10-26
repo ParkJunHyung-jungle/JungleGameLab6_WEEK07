@@ -89,6 +89,7 @@ namespace Game.Tutorials
         // 안내 표시 중에는 게임 조작을 차단하지 않는다.
         // public static bool IsBlocking => (_instance != null && _instance._paused) || Time.frameCount <= _resumeFrame;
         public static bool IsBlocking => Time.frameCount <= _resumeFrame;
+        public static bool IsVisible => _instance != null && _instance._paused;
         public bool CanOpenHelp => !Game.Workshop.WorkshopDeliveryTray.IsInputBlocked && !Game.Tournament.TournamentController.IsReturnPaused && !IsBlocking
             && !_paused && _pending.Count == 0 && Time.timeScale > 0f;
         private IReadOnlyList<TutorialCard> Cards => _content.Cards;

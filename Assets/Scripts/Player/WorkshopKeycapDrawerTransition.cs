@@ -99,7 +99,7 @@ namespace Game.Player
         private void UpdateTrayInput()
         {
             bool canScroll = CanInteractWithTray || (IsTrayOpen && _placement != null
-                && _placement.IsInventoryScrolling && _placement.Pullers.InputAllowed);
+                && _placement.IsInventoryScrolling && _placement.Pullers.EditingPointerAllowed);
             _trayGroup.interactable = canScroll;
             _closeButton.interactable = CanInteractWithTray;
             if (_catalogScroll != null) _catalogScroll.enabled = canScroll;

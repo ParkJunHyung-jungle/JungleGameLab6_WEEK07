@@ -20,6 +20,19 @@ public sealed class KeyboardDispenser : MonoBehaviour
     /// <summary>현재 배출 위치와 유효한 재고 프리팹이 있는지 반환한다. 배출과 재고 상태는 변경하지 않는다.</summary>
     public bool CanDispense => CanIssueLowerHousing && _outputPoint != null && _keyboardPrefabs.Exists(prefab => prefab != null);
     public bool CanIssueLowerHousing => !_limitLowerHousingInScene || !HasActiveLowerHousing();
+    public bool CanCreateKeyboard => _keyboardPrefabs.Exists(prefab => prefab != null);
+
+    /// <summary>등록된 첫 유효 재고의 실제 조립용 원본을 반환한다. 실물 생성과 재고 소비 없이 미리보기의 메시 참조로 사용한다.</summary>
+    public GameObject GetPreviewPrefab()
+    {
+        foreach (GameObject prefab in _keyboardPrefabs)
+        {
+            if (prefab == null) continue;
+            KeyboardPlayableVariant variant = prefab.GetComponent<KeyboardPlayableVariant>();
+            return variant != null && variant.GamePrefab != null ? variant.GamePrefab : prefab;
+        }
+        return null;
+    }
 
     /// <summary>자판기와 같은 씬의 작업대·바닥에 활성 하단부가 있는지 반환한다. 보관된 비활성 실물과 진열대·모니터 거치대에 고정된 본체는 제외하며 조립 상태는 변경하지 않는다.</summary>
     private bool HasActiveLowerHousing()
@@ -53,11 +66,11 @@ public sealed class KeyboardDispenser : MonoBehaviour
         return true;
     }
 
-    /// <summary>등록된 기존 키보드 원본을 position과 rotation에 생성하고 기존 집기·편집 참조를 연결한다. 배출 충격·소리 없이 keyboardRoot와 성공 여부를 반환한다.</summary>
-    public bool TryCreateKeyboard(Vector3 position, Quaternion rotation, out GameObject keyboardRoot)
+    /// <summary>등록된 원본을 position과 rotation에 생성하고 집기·편집 참조를 연결한다. respectSceneLimit가 참이면 기존 씬 제한을 검사하며 배출 충격 없이 keyboardRoot와 성공 여부를 반환한다.</summary>
+    public bool TryCreateKeyboard(Vector3 position, Quaternion rotation, out GameObject keyboardRoot, bool respectSceneLimit = true)
     {
         keyboardRoot = null;
-        if (!CanIssueLowerHousing || _keyboardPrefabs.Count == 0)
+        if (respectSceneLimit && !CanIssueLowerHousing || !CanCreateKeyboard)
             return false;
 
         GameObject stockPrefab = null;

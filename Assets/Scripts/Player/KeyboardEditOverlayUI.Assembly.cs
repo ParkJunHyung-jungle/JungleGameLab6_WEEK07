@@ -200,7 +200,7 @@ namespace Game.Player
             _lowerCard.SetContext(assembly, _pickerMode == PickerMode.CaseMaterial);
             _plateCard.gameObject.SetActive(assembly != null);
             _upperCard.gameObject.SetActive(assembly != null);
-            _lowerCard.gameObject.SetActive(assembly != null);
+            _lowerCard.gameObject.SetActive(assembly != null || UsesScreenTrays);
             _pcbWorldDrag.gameObject.SetActive(assembly != null);
             _pcbViewport.gameObject.SetActive(pcb && assembly != null);
             _pcbButton.interactable = _upperButton.interactable = assembly != null;

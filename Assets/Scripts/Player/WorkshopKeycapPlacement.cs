@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -39,7 +39,6 @@ namespace Game.Player
         [SerializeField] private Color _modeNormalOutlineColor = new Color32(148, 115, 82, 255);
         [SerializeField] private Color _modeSelectedTextColor = new Color32(255, 250, 240, 255);
         [SerializeField] private Color _modeNormalTextColor = new Color32(105, 75, 48, 255);
-        private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
         private readonly Dictionary<SwitchType, Texture2D> _switchPreviewTextures = new Dictionary<SwitchType, Texture2D>();
         private WorkshopKeycapDrawerTransition _keycapTray;
@@ -84,6 +83,20 @@ namespace Game.Player
         public Camera ReturnCamera => InputCamera;
         public IReadOnlyList<AssemblyDraggablePart> LooseParts => _looseParts;
 
+        /// <summary>현재 집은 외부 실물과 상위 category를 반환한다. 목록 아이콘·일괄 표시·유효한 자동 회수 예약은 제외하며 집기와 반환 상태는 변경하지 않는다.</summary>
+        public bool TryGetHeldReturnPart(out Transform part, out WorkshopDrawerCategory category)
+        {
+            part = null;
+            category = default;
+            if (!isActiveAndEnabled || !IsDragging || _isBulkDragging || IsInventoryScrolling
+                || _activePart == null || !_activePart.gameObject.activeInHierarchy
+                || !_looseParts.Contains(_activePart) || _entry.IsStructure
+                || (_extractedReturns.TryGetValue(_activePart, out int version) && version == _activePart.InteractionVersion)) return false;
+            part = _activePart.transform;
+            category = _entry.IsSwitch ? WorkshopDrawerCategory.Switches : WorkshopDrawerCategory.Keycaps;
+            return true;
+        }
+
         void Awake()
         {
             _drawerLayout = GetComponent<WorkshopVerticalCatalogLayout>();
@@ -111,7 +124,6 @@ namespace Game.Player
 
         void Update()
         {
-            if (_keycapTray != null) RefreshInventory();
             RefreshPlacementModes();
             if (!_pullers.InputAllowed || Mouse.current == null)
             {
@@ -144,7 +156,7 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// material과 definition에 대응하는 원본 재고 항목을 찾아 카드와 수량 표시를 연결한다.
+        /// material과 definition에 대응하는 원본 항목을 찾아 카드와 출고 입력을 연결한다.
         /// viewport를 반환 영역으로 저장하며 tray의 목록 드래그에서 선택한 배치 모드로 출고한다. 초기 수량은 유지한다.
         /// </summary>
         public void BindCard(KeyboardEditButton button, Material material, KeycapDefinition definition, RectTransform viewport, WorkshopKeycapDrawerTransition tray = null)
@@ -157,11 +169,10 @@ namespace Game.Player
             if (tray != null) button.enabled = false;
             button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, match, tray);
             _entryTextures[match] = button.GetComponentInChildren<RawImage>().texture;
-            BindQuantityLabel(button, match);
         }
 
         /// <summary>
-        /// type에 대응하는 원본 축 재고와 수량 표시를 button에 연결한다.
+        /// type에 대응하는 원본 축 항목과 출고 입력을 button에 연결한다.
         /// viewport를 반환 영역으로 저장하고 재고 카드 드래그와 배치 모드를 연결한다. 반환값은 없다.
         /// </summary>
         public void BindSwitchCard(KeyboardEditButton button, SwitchType type, RectTransform viewport, WorkshopKeycapDrawerTransition tray = null)
@@ -174,7 +185,6 @@ namespace Game.Player
                 _entryTextures[entry] = GetSwitchPreview(type);
                 if (tray != null) button.enabled = false;
                 button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry, tray);
-                BindQuantityLabel(button, entry);
                 return;
             }
             button.interactable = false;
@@ -212,39 +222,19 @@ namespace Game.Player
             return null;
         }
 
-        /// <summary>구조 부품 entry의 카드에 기존 수량·아이콘·스크롤 출고 입력을 연결한다. structureDrag만 실물 설치 경로를 담당하며 기존 키캡·스위치 재고는 변경하지 않는다.</summary>
+        /// <summary>구조 부품 entry의 카드에 기존 아이콘·스크롤 출고 입력을 연결한다. structureDrag만 실물 설치 경로를 담당하며 기존 키캡·스위치 재고는 변경하지 않는다.</summary>
         public void BindStructureCard(KeyboardEditButton button, AssemblyCatalogEntry entry, Texture texture,
             WorkshopKeycapDrawerTransition tray, WorkshopPcbCardDrag structureDrag)
         {
             button.enabled = false;
             button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry, tray, structureDrag);
             _entryTextures[entry] = texture;
-            BindQuantityLabel(button, entry);
         }
 
         /// <summary>entry의 기존 출고 아이콘만 texture로 갱신한다. 카드 재생성이나 수량·예약 초기화는 하지 않는다.</summary>
         public void SetInventoryTexture(AssemblyCatalogEntry entry, Texture texture)
         {
             _entryTextures[entry] = texture;
-        }
-
-        /// <summary>
-        /// button 오른쪽 위에 entry의 사용 가능 수량을 표시하는 Text를 생성한다.
-        /// 재고를 변경하지 않고 갱신 대상에 등록한다. 반환값은 없다.
-        /// </summary>
-        private void BindQuantityLabel(KeyboardEditButton button, AssemblyCatalogEntry entry)
-        {
-            Text quantity = new GameObject("Quantity", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
-            quantity.transform.SetParent(button.transform, false);
-            quantity.rectTransform.anchorMin = quantity.rectTransform.anchorMax = quantity.rectTransform.pivot = Vector2.one;
-            quantity.rectTransform.anchoredPosition = new Vector2(-8f, -8f);
-            quantity.rectTransform.sizeDelta = new Vector2(55f, 22f);
-            quantity.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            quantity.fontSize = 14;
-            quantity.alignment = TextAnchor.MiddleRight;
-            quantity.raycastTarget = false;
-            _quantityLabels[entry] = quantity;
-            RefreshInventory();
         }
 
         /// <summary>
@@ -451,13 +441,12 @@ namespace Game.Player
             {
                 parts[index].Part.gameObject.SetActive(false);
                 _ownedParts.Add(prepared[index]);
-                parts[index].Entry.StorePart(prepared[index], true);
+                parts[index].Entry.StorePart(prepared[index], false);
             }
-            RefreshInventory();
             return true;
         }
 
-        /// <summary>customization의 장착 부품을 확인해 즉시 재고로 반환한다. 준비에 실패하면 재고를 변경하지 않으며 성공 여부를 반환한다.</summary>
+        /// <summary>customization의 장착 부품 반환을 검증하고 준비된 완료 동작을 즉시 한 번 실행한다. 실패 시 실물을 보존하며 수량은 변경하지 않고 성공 여부를 반환한다.</summary>
         public bool TryReturnKeyboardInventory(KeyboardCustomization customization)
         {
             if (!TryPrepareKeyboardInventoryReturn(customization, out Action completeReturn)) return false;
@@ -473,7 +462,6 @@ namespace Game.Player
         {
             completeReturn = null;
             if (customization == null || IsDragging || _pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured) return false;
-            var returns = new List<AssemblyCatalogEntry>();
             for (int index = 0; index < customization.KeycapCount; index++)
             {
                 Transform keycapSlot = customization.GetKeycapSlotTransform(index);
@@ -484,7 +472,6 @@ namespace Game.Player
                 {
                     AssemblyCatalogEntry keycap = FindEntry(customization.GetKeycapMaterial(index), customization.GetKeycapDefinition(index));
                     if (keycap == null) return false;
-                    returns.Add(keycap);
                 }
                 if (!customization.IsPcbSwitchInstalled(index)) continue;
                 Transform switchPart = customization.GetSwitchSlotTransform(index);
@@ -493,12 +480,10 @@ namespace Game.Player
                 foreach (AssemblyCatalogEntry entry in _switchEntries)
                     if (entry.IsSwitch && entry.SwitchData.Type == type) { found = entry; break; }
                 if (found == null) return false;
-                returns.Add(found);
             }
 
             KeyboardAssemblyState assembly = customization.GetComponent<KeyboardAssemblyState>();
             AssemblyCatalogEntry lowerEntry = null;
-            var structureReturns = new List<AssemblyCatalogEntry>();
             var detachedStructures = new List<Transform>();
             if (assembly != null && assembly.Initialized)
             {
@@ -513,11 +498,11 @@ namespace Game.Player
                     ? rootPart.CatalogEntry : GetStructureEntry(assembly, overlay, AssemblyStructurePart.Lower);
                 if (lowerEntry == null) return false;
                 if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Upper,
-                    assembly.UpperInstalled, structureReturns, detachedStructures)) return false;
+                    assembly.UpperInstalled, detachedStructures)) return false;
                 if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Pcb,
-                    assembly.PcbPlaced || assembly.PcbLoose, structureReturns, detachedStructures)) return false;
+                    assembly.PcbPlaced || assembly.PcbLoose, detachedStructures)) return false;
                 if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Plate,
-                    assembly.PlateInstalled, structureReturns, detachedStructures)) return false;
+                    assembly.PlateInstalled, detachedStructures)) return false;
             }
             else return false;
 
@@ -526,17 +511,12 @@ namespace Game.Player
             {
                 if (returned) return;
                 returned = true;
-                lowerEntry.StorePart(null, true);
-                foreach (AssemblyCatalogEntry entry in returns) entry.StorePart(null, true);
-                foreach (AssemblyCatalogEntry entry in structureReturns) entry.StorePart(null, true);
                 foreach (Transform part in detachedStructures)
                 {
                     if (part == null) continue;
                     part.gameObject.SetActive(false);
                     Destroy(part.gameObject);
                 }
-                try { RefreshInventory(); }
-                catch (Exception exception) { Debug.LogError("키보드 해체 후 재고 표시 갱신에 실패했습니다. 재고 반환은 완료되었습니다. " + exception, customization); }
             };
             return true;
         }
@@ -550,9 +530,9 @@ namespace Game.Player
             return overlay != null ? overlay.GetStructureEntry(kind, assembly.GetStructureMaterial(kind)) : null;
         }
 
-        /// <summary>kind의 실제 활성 부품을 찾아 기존 재고 항목에 추가한다. 외부에 분리된 부품은 반환 확정 후 제거 목록에 둔다.</summary>
+        /// <summary>kind의 실제 활성 부품에 대응하는 카탈로그 항목을 검사한다. 외부에 분리된 부품은 반환 확정 후 제거 목록에 둔다.</summary>
         private static bool AddStructureReturn(KeyboardAssemblyState assembly, KeyboardEditOverlayUI overlay,
-            AssemblyStructurePart kind, bool installed, List<AssemblyCatalogEntry> returns, List<Transform> detached)
+            AssemblyStructurePart kind, bool installed, List<Transform> detached)
         {
             IReadOnlyList<Transform> parts = assembly.GetStructureParts(kind);
             bool hasPhysicalPart = installed;
@@ -561,7 +541,6 @@ namespace Game.Player
             if (!hasPhysicalPart) return true;
             AssemblyCatalogEntry entry = GetStructureEntry(assembly, overlay, kind);
             if (entry == null) return kind == AssemblyStructurePart.Plate;
-            returns.Add(entry);
             Transform root = assembly.transform.root;
             foreach (Transform part in parts)
                 if (part != null && part.gameObject.activeSelf && !part.IsChildOf(root)) detached.Add(part);
@@ -569,14 +548,13 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// entry의 키캡 또는 축을 point에서 드래그하며 한 개 배치에서는 재고 한 개를 예약한다.
-        /// 일괄 배치에서는 표시용 실물만 준비하고 재고가 없으면 시작하지 않는다. 반환값은 없다.
+        /// entry의 등록된 키캡 또는 축을 수량 제한 없이 point에서 드래그한다.
+        /// 일괄 배치는 표시용 실물만 준비하며 실물 추적과 입력 점유를 유지한다. 반환값은 없다.
         /// </summary>
         public void BeginInventoryDrag(AssemblyCatalogEntry entry, Vector2 point)
         {
             if (!CanBeginInventoryDrag(entry) || !Mouse.current.leftButton.isPressed) return;
             bool bulk = _bulkPlacement;
-            if (!bulk && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
             _fromInventory = true;
@@ -595,7 +573,6 @@ namespace Game.Player
                     entry.IsSwitch ? "Switch" : "Keycap", GetEntryLogId(entry),
                     interactionId: _bulkInteractionId, actionSource: "BulkPlacement");
             BeginWorldDrag(_activePart, point);
-            RefreshInventory();
             Game.Logging.CustomizationTelemetry.Emit(customization, "InventoryPartPicked",
                 entry.IsSwitch ? "Switch" : "Keycap", GetEntryLogId(entry),
                 keycapKind: entry.IsSwitch ? "" : entry.IsArtisan ? "Artisan" : "Regular");
@@ -760,7 +737,7 @@ namespace Game.Player
 
         /// <summary>
         /// start와 end 사이 경로의 빈 호환 슬롯에 원본 일괄 배치 방식으로 키캡을 설치한다.
-        /// 방문한 슬롯과 UI 뒤는 제외하고 성공할 때만 재고를 소모하며 재고 소진 시 드래그를 종료한다.
+        /// 방문한 슬롯과 UI 뒤는 제외하며 재고 개수와 관계없이 각 슬롯의 기존 설치 조건을 검사한다.
         /// </summary>
         private void InstallAlongBulkPath(Vector2 start, Vector2 end)
         {
@@ -781,7 +758,6 @@ namespace Game.Player
                     _bulkCandidates.Add(new KeyValuePair<float, int>(progress, index));
             }
             _bulkCandidates.Sort(CompareBulkCandidates);
-            bool changed = false;
             foreach (KeyValuePair<float, int> candidate in _bulkCandidates)
             {
                 Vector2 point = start + direction * candidate.Key;
@@ -792,22 +768,15 @@ namespace Game.Player
                     && !obstruction.transform.IsChildOf(customization.transform)) continue;
                 int index = candidate.Value;
                 if (!CanInstallEntry(index)) continue;
-                if (!_entry.TryReserve()) break;
                 _bulkAttemptCount++;
-                bool installed = false;
-                try { installed = InstallEntry(customization, index); }
-                finally { _entry.FinishReservation(installed); }
+                bool installed = InstallEntry(customization, index);
                 if (installed)
                 {
                     _bulkVisited.Add(index);
                     _bulkSuccessCount++;
-                    changed = true;
                     RecordInstallAttempt(customization, index, true, "BulkPlacement");
                 }
-                if (_entry.AvailableQuantity <= 0) break;
             }
-            if (changed) RefreshInventory();
-            if (_entry.AvailableQuantity <= 0) EndBulkPlacement(false, "InventoryDepleted");
         }
 
         /// <summary>
@@ -857,12 +826,11 @@ namespace Game.Player
             _hasPreviousBulkPosition = false;
             _bulkVisited.Clear();
             _dragIcon.gameObject.SetActive(false);
-            RefreshInventory();
         }
 
         /// <summary>
         /// point의 반환 영역과 슬롯 조건에 따라 재고 반환, 설치 또는 물리 낙하를 확정한다.
-        /// 왼쪽 버튼이 실제 해제된 경우에만 확정하며 UI 출고 예약은 월드 출고 시 소모한다. 반환값은 없다.
+        /// 왼쪽 버튼이 실제 해제된 경우에만 확정하며 출고 실물의 보관·설치·낙하를 처리한다. 반환값은 없다.
         /// </summary>
         public void EndDrag(Vector2 point)
         {
@@ -870,12 +838,12 @@ namespace Game.Player
             if (!_pullers.InputAllowed) { CancelDrag(); return; }
             if (Mouse.current == null || Mouse.current.leftButton.isPressed) return;
             if (_isBulkDragging) { EndBulkPlacement(); return; }
+            Transform cabinetReturn = _keycapTray != null && _activePart.CatalogEntry == _entry
+                && _keycapTray.CanReturnHeldPart(_activePart.transform) ? _activePart.transform : null;
             _previewRenderer.Hide();
-            if (IsInReturnArea(point))
+            if (cabinetReturn != null || IsInReturnArea(point))
             {
-                _looseParts.Remove(_activePart);
-                _entry.StorePart(_activePart, !_fromInventory);
-                if (_fromInventory) _entry.FinishReservation(false);
+                ReturnLoosePart(_activePart);
                 _dragOriginPart = null;
             }
             else if (_dragOriginPart != null && !_entry.IsSwitch)
@@ -889,7 +857,6 @@ namespace Game.Player
                 KeyboardCustomization customization = EditingKeyboard.GetComponent<KeyboardCustomization>();
                 int index = FindInstallSlot(point);
                 bool installed = InstallEntry(customization, index);
-                if (_fromInventory) _entry.FinishReservation(true);
                 if (index >= 0) RecordInstallAttempt(customization, index, installed, "InventoryDrag");
                 if (installed)
                 {
@@ -907,7 +874,7 @@ namespace Game.Player
             _activePart = null;
             _fromInventory = false;
             _dragIcon.gameObject.SetActive(false);
-            RefreshInventory();
+            if (cabinetReturn != null) _keycapTray.CompletePartReturn(cabinetReturn);
         }
 
         /// <summary>
@@ -1021,8 +988,8 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// 현재 UI 출고 예약을 취소하거나 월드 부품의 집기 전 상태를 복원한다.
-        /// 확정 설치와 소모 재고는 유지하며 드래그 참조를 비운다. 반환값은 없다.
+        /// 현재 UI 출고 실물을 보관하거나 월드 부품의 집기 전 상태를 복원한다.
+        /// 확정 설치와 실물 소유는 유지하며 드래그 참조를 비운다. 반환값은 없다.
         /// </summary>
         public void CancelDrag()
         {
@@ -1035,7 +1002,6 @@ namespace Game.Player
             {
                 _looseParts.Remove(_activePart);
                 _entry.StorePart(_activePart, false);
-                _entry.FinishReservation(false);
             }
             else if (_dragOriginPart != null)
             {
@@ -1053,7 +1019,6 @@ namespace Game.Player
             _activePart = null;
             _fromInventory = false;
             _dragIcon.gameObject.SetActive(false);
-            RefreshInventory();
         }
 
         /// <summary>point의 설치 레이와 가림 검사를 수행해 슬롯 인덱스를 반환한다. 설치 확정과 안내가 같은 대상을 조회한다.</summary>
@@ -1081,12 +1046,13 @@ namespace Game.Player
             return customization.CanInstallKeycapFromInventory(index, material, _entry.KeycapDefinition);
         }
 
-        /// <summary>현재 카드의 entry가 출고 가능한지 반환한다. 배치 입력과 같은 수량 및 드래그 조건만 읽는다.</summary>
+        /// <summary>현재 카드의 entry가 출고 가능한지 반환한다. 등록된 원본과 기존 입력 및 드래그 조건만 읽고 수량은 검사하지 않는다.</summary>
         public bool CanBeginInventoryDrag(AssemblyCatalogEntry entry)
         {
             return _pullers.InputAllowed && !_pullers.IsPcbDragging && !_pullers.IsScrewPointerCaptured && !IsInventoryScrolling
                 && (_keycapTray == null || (_keycapTray.CanInteractWithTray && _keycapTray.IsCategoryOpen(entry.IsSwitch ? WorkshopDrawerCategory.Switches : WorkshopDrawerCategory.Keycaps)))
-                && Mouse.current != null && !IsDragging && entry.AvailableQuantity > 0
+                && Mouse.current != null && !IsDragging && entry != null && entry.Prefab != null
+                && (entry.IsSwitch ? System.Array.IndexOf(_switchEntries, entry) : System.Array.IndexOf(_keycapEntries, entry)) >= 0
                 && (_drawerLayout == null || !_drawerLayout.IsTransitioning);
         }
 
@@ -1107,7 +1073,7 @@ namespace Game.Player
             state.Add("마우스 이동", "부품 이동");
             if (_isBulkDragging)
             {
-                if (!_pullers.IsPointerOverUI(point) && _entry.AvailableQuantity > 0 && CanInstallEntry(FindInstallSlot(point)))
+                if (!_pullers.IsPointerOverUI(point) && CanInstallEntry(FindInstallSlot(point)))
                     state.Add("좌클릭 유지", "키캡·스위치 연속 설치");
                 state.Add("좌클릭 놓기", "연속 배치 종료");
             }
@@ -1214,7 +1180,7 @@ namespace Game.Player
 
         /// <summary>
         /// part가 version 이후 조작되지 않았으면 원본과 동일하게 2초 뒤 재고로 반환한다.
-        /// deltaTime으로 시간을 누적하고 보관 상태와 수량 표시를 갱신한다.
+        /// deltaTime으로 시간을 누적하고 유효한 회수 예약의 실물을 보관 상태로 변경한다.
         /// </summary>
         private IEnumerator ReturnExtractedPart(AssemblyDraggablePart part, int version)
         {
@@ -1253,14 +1219,13 @@ namespace Game.Player
 
         /// <summary>
         /// 등록된 자유 파츠 part를 한 번만 재고로 반환한다.
-        /// 실물을 보관하고 수량 표시를 갱신하며 반환값은 없다.
+        /// 실물을 비활성 보관하고 회수 예약을 정리하며 수량은 변경하지 않는다.
         /// </summary>
         public void ReturnLoosePart(AssemblyDraggablePart part)
         {
             if (!_looseParts.Remove(part)) return;
             _extractedReturns.Remove(part);
-            part.CatalogEntry.StorePart(part, true);
-            RefreshInventory();
+            part.CatalogEntry.StorePart(part, false);
         }
 
         /// <summary>
@@ -1303,24 +1268,6 @@ namespace Game.Player
         public bool CanAnimateReturn(AssemblyCatalogEntry entry)
         {
             return IsEditing && (_keycapTray == null || (_keycapTray.IsCategoryOpen(entry.IsSwitch ? WorkshopDrawerCategory.Switches : WorkshopDrawerCategory.Keycaps) && _keycapTray.TryGetReturnDestination(out _)));
-        }
-
-        /// <summary>
-        /// 각 원본 재고 항목의 사용 가능한 수량을 카드에 표시한다.
-        /// 예약과 소모 수량을 읽으며 새 트레이의 키캡 카드는 재고가 없으면 숨기고 복구되면 다시 표시한다.
-        /// </summary>
-        private void RefreshInventory()
-        {
-            foreach (var label in _quantityLabels)
-            {
-                if (label.Value == null) continue;
-                string quantity = "×" + label.Key.AvailableQuantity;
-                if (label.Value.text != quantity) label.Value.text = quantity;
-                if (_keycapTray == null) continue;
-                GameObject card = label.Value.transform.parent.gameObject;
-                bool visible = label.Key.AvailableQuantity > 0;
-                if (card.activeSelf != visible) card.SetActive(visible);
-            }
         }
 
         void OnDisable()

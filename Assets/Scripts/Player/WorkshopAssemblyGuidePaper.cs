@@ -30,6 +30,7 @@ namespace Game.Player
         public bool IsHeld => _held;
         public bool IsReading => _reading;
         public bool IsStored => _stored;
+        public bool IsReturnHoldActive => _held && !_stored && !_reading && !_awaitPressAfterReading;
 
         /// <summary>
         /// pointer가 종이 위에 있을 때 읽기를 시작하고 이미 읽는 중이면 이전 자세로 돌아간다.
@@ -111,6 +112,12 @@ namespace Game.Player
                 }
                 if (!mouse.leftButton.isPressed)
                 {
+                    if (_toolTray != null && _toolTray.CanReturnHeldPart(transform))
+                    {
+                        StoreInTray();
+                        _toolTray.CompletePartReturn(transform);
+                        return true;
+                    }
                     if (_toolTray != null && _toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools)
                         && _toolTray.ContainsReturnPoint(pointer)) StoreInTray();
                     else PlaceOnSurface();

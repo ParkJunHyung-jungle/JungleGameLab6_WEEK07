@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -71,6 +71,21 @@ namespace Game.Player
         public bool CanCreateLowerHousing => _workshopView.CanCreateLowerHousing;
         public GameObject LowerHousingPreviewPrefab => _workshopView.LowerHousingPreviewPrefab;
         public bool CanIssueLowerHousing => _workshopView != null && _workshopView.IsWorkbenchEmpty && IsEditing;
+
+        /// <summary>현재 실제로 집은 도구의 Transform을 반환한다. 읽기·재입력 대기·망치 타격은 제외하고 풀러는 기존 편집 대상과 출고 목록 조건을 유지한다.</summary>
+        public bool TryGetHeldReturnTool(out Transform tool)
+        {
+            tool = null;
+            if (!isActiveAndEnabled || !EditingPointerAllowed || _hammerStrikePending) return false;
+            if (_guidePaper != null && _guidePaper.isActiveAndEnabled && _guidePaper.IsReturnHoldActive) tool = _guidePaper.transform;
+            else if (_hammer != null && _hammer.isActiveAndEnabled && _hammer.IsHeld && !_hammer.IsStored) tool = _hammer.transform;
+            else if (InputAllowed)
+            {
+                if (_keycapPuller.IsSelected && _deployedTools.Contains(_keycapPuller)) tool = _keycapPuller.ToolTransform;
+                else if (_switchPuller.IsSelected && _deployedTools.Contains(_switchPuller)) tool = _switchPuller.ToolTransform;
+            }
+            return tool != null && tool.gameObject.activeInHierarchy;
+        }
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
 
@@ -95,13 +110,13 @@ namespace Game.Player
 
         /// <summary>
         /// 일반 시점의 우클릭으로 종이를 읽거나 이전 자세로 되돌린다.
-        /// 현재 가상 커서와 UI 가림 상태를 사용하며 종이 입력을 처리했는지 반환한다.
+        /// 일반 중앙 조준 또는 집중 자유 포인터 좌표와 UI 가림 상태를 사용하며 종이 입력을 처리했는지 반환한다.
         /// </summary>
         public bool TryToggleGuideReading()
         {
             if (_guidePaper == null || Mouse.current == null || !Application.isFocused
-                || !InGameCursor.CanProcessVirtualPointer) return false;
-            Vector2 pointer = InGameCursor.Position;
+                || !InGameCursor.CanProcessPointer) return false;
+            Vector2 pointer = InGameCursor.GetWorldPosition(_camera);
             return _guidePaper.TryToggleReading(pointer, IsPointerOverUI(pointer));
         }
 
@@ -109,6 +124,12 @@ namespace Game.Player
         public bool TryPlaceLowerHousing(Rigidbody body, Ray ray)
         {
             return _workshopView.TryPlaceInventoryKeyboard(body, ray);
+        }
+
+        /// <summary>keyboard의 하단부 보관 완료를 기존 작업 뷰에 전달한다. 해당 실물이 편집 대상이었다면 빈 작업대 참조로 갱신하며 집기와 재고는 변경하지 않는다.</summary>
+        public void RefreshStoredKeyboard(KeyboardInputController keyboard)
+        {
+            _workshopView.RefreshStoredKeyboard(keyboard);
         }
 
         /// <summary>tray와 도구 카드를 풀러·종이·망치 출고에 연결한다. C# 누름 이벤트를 구독하며 반환값은 없다.</summary>
@@ -283,11 +304,20 @@ namespace Game.Player
                 TryRemoveClickedPart(ray);
         }
 
-        /// <summary>tool의 출고 상태로 월드 집기와 즉시 사용을 연결한다. pointer가 도구 서랍 안인 해제 입력에는 보관하고 그 외에는 현재 위치 아래에 내려놓는다.</summary>
+        /// <summary>tool의 출고 상태로 월드 집기와 즉시 사용을 연결한다. 해제 입력은 수납장 반납을 먼저 검사하고 기존 pointer의 도구함 반환·표면 배치를 유지한다.</summary>
         private bool ProcessDeployedTool(AssemblyFullerTool tool, Ray ray, Vector2 pointer)
         {
             if (_toolTray != null && !tool.IsSelected && !_deployedTools.Contains(tool)) return false;
             if (!tool.IsSelected) tool.SetContext(this, true, false, true);
+            if (tool.IsSelected && _toolTray != null && _toolTray.CanReturnHeldPart(tool.ToolTransform))
+            {
+                Transform returned = tool.ToolTransform;
+                tool.ReturnToOrigin();
+                _deployedTools.Remove(tool);
+                RefreshToolVisibility();
+                _toolTray.CompletePartReturn(returned);
+                return true;
+            }
             bool store = tool.IsSelected && Mouse.current.leftButton.wasReleasedThisFrame && _toolTray != null
                 && _toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools) && _toolTray.ContainsReturnPoint(pointer);
             bool handled = tool.ProcessPointer(ray, pointer, Mouse.current);

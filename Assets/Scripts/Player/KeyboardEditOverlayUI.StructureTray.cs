@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,7 +35,7 @@ namespace Game.Player
             return null;
         }
 
-        /// <summary>기존 구조 부품 처리기에 상부·PCB·하부의 출고 카드를 연결한다. 새 재질 항목만 100개로 생성하며 키캡·스위치 수량과 기존 원본 에셋은 유지한다.</summary>
+        /// <summary>기존 구조 부품 처리기에 상부·PCB·하부의 출고 카드를 연결한다. 재질 항목과 실물 추적만 연결하며 초기 수량과 기존 원본 에셋은 출고를 제한하지 않는다.</summary>
         private void ConnectStructureTrays()
         {
             ConnectStructureTray(AssemblyStructurePart.Upper, WorkshopDrawerCategory.UpperHousing, _upperCard);
@@ -46,7 +46,7 @@ namespace Game.Player
             RefreshStructureTrayPreviews();
         }
 
-        /// <summary>kind의 기존 drag를 category 트레이에 연결하고 현재 카탈로그의 재질별 항목을 한 번 생성한다. 스크롤·아이콘·수량은 기존 카드 경로를 재사용한다.</summary>
+        /// <summary>kind의 기존 drag를 category 트레이에 연결하고 현재 카탈로그의 재질별 항목을 한 번 생성한다. 스크롤·아이콘은 기존 카드 경로를 재사용하며 수량 표시는 만들지 않는다.</summary>
         private void ConnectStructureTray(AssemblyStructurePart kind, WorkshopDrawerCategory category, WorkshopPcbCardDrag drag)
         {
             drag.transform.SetParent(_keycapTrayContent, false);
@@ -66,7 +66,7 @@ namespace Game.Player
                 if (material != null && !materials.Contains(material)) materials.Add(material);
             foreach (Material material in materials)
             {
-                AssemblyCatalogEntry entry = AssemblyCatalogEntry.CreateStructure(kind, material, 100);
+                AssemblyCatalogEntry entry = AssemblyCatalogEntry.CreateStructure(kind, material, 0);
                 KeyboardEditButton button = CreatePickerItemButton(content, kind + "_" + (material != null ? material.name : "PCB"),
                     buttons.Count, material != null ? KeyboardPartDisplayNames.MaterialName(material) : "기판", out Image background, out Text indicator);
                 indicator.gameObject.SetActive(false);
@@ -96,7 +96,7 @@ namespace Game.Player
                 && ContainsPointer(panel, point);
         }
 
-        /// <summary>현재 보강판 카드에 재질별 수량과 기존 출고·반환 처리기를 연결한다. 최초 수량은 다른 구조 부품처럼 100개이며 목록 재생성 시 수량과 타건 효과 메뉴를 유지한다.</summary>
+        /// <summary>현재 보강판 카드에 재질 항목과 기존 출고·반환 처리기를 연결한다. 수량 제한 없이 실물 보관 참조와 타건 효과 메뉴를 유지한다.</summary>
         private void ConnectPlateTray()
         {
             if (!_structureTraysReady || _plateViewport == null) return;
@@ -108,7 +108,7 @@ namespace Game.Player
                 Material material = _plateMaterialButtonMaterials[index];
                 if (!_plateInventory.TryGetValue(material, out AssemblyCatalogEntry entry))
                 {
-                    entry = AssemblyCatalogEntry.CreateStructure(AssemblyStructurePart.Plate, material, 100);
+                    entry = AssemblyCatalogEntry.CreateStructure(AssemblyStructurePart.Plate, material, 0);
                     _plateInventory.Add(material, entry);
                 }
                 _keycapPlacement.BindStructureCard(button, entry, button.GetComponentInChildren<RawImage>().texture,

@@ -52,7 +52,7 @@ namespace Game.Player
             return true;
         }
 
-        /// <summary>mouse와 ray로 망치 집기, 이동, 놓기를 처리한다. 놓을 때 tryStrike가 타격을 승인하면 도구함으로 복귀시키고 입력 점유 여부를 반환한다.</summary>
+        /// <summary>mouse와 ray로 망치 집기·이동·놓기를 처리한다. tray의 수납장 반납을 타격보다 먼저 검사하고 기존 tryStrike·표면 배치를 유지하며 입력 점유 여부를 반환한다.</summary>
         public bool ProcessPointer(Mouse mouse, Ray ray, Vector2 pointer, bool pointerOverUi,
             WorkshopKeycapDrawerTransition tray, Func<Ray, bool> tryStrike)
         {
@@ -62,6 +62,12 @@ namespace Game.Player
                 if (mouse.leftButton.isPressed)
                 {
                     MoveWithPointer(ray);
+                    return true;
+                }
+                if (tray != null && tray.CanReturnHeldPart(transform))
+                {
+                    StoreInTray();
+                    tray.CompletePartReturn(transform);
                     return true;
                 }
                 if (tray != null && tray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools)

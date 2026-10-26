@@ -330,25 +330,18 @@ namespace Game.Player
             if (Mouse.current.leftButton.isPressed) return;
             if (!Mouse.current.leftButton.wasReleasedThisFrame) { CancelDrag(); return; }
             KeyboardEditOverlayUI overlay = _overlay;
+            if (TryReturnToCabinet()) return;
             bool returnedToTray = overlay != null && (_kind == AssemblyStructurePart.Upper
                 ? _stockTray != null && _stockTray.IsPointerOverOpenTrayViewport(point)
                 : _stockEnabled ? overlay.IsInStructureTray(point, _kind) : overlay.IsInAssemblyReturnArea(point));
             if (returnedToTray)
             {
-                if (_kind == AssemblyStructurePart.Pcb && !overlay.TryReturnPcbBundle(_assembly))
+                if (!TryStoreHeldStructure("InventoryReturn"))
                 {
                     RecordStructureEvent("PartReturned", false, "InventoryReturn", "InventoryReturnFailed");
                     CancelDrag();
                     return;
                 }
-                FinishWorldDrag();
-                _assembly.ReturnStructureInventory(_kind);
-                if (_kind == AssemblyStructurePart.Pcb) _assembly.ReleasePcbParts();
-                if (_kind == AssemblyStructurePart.Pcb) _assembly.ReturnPcbToInventory();
-                else if (_kind == AssemblyStructurePart.Lower) _assembly.ReturnLowerToInventory();
-                else _assembly.RestoreStructurePose(_kind);
-                if (_wasInstalled) RecordStructureEvent("PartRemoveAttempted", true, "InventoryReturn");
-                RecordStructureEvent("PartReturned", true, "InventoryReturn");
                 return;
             }
             if (_pullers.IsPointerOverUI(point)) { CancelDrag(); return; }

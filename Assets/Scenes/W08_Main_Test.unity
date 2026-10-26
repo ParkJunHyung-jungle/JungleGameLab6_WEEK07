@@ -4660,7 +4660,7 @@ PrefabInstance:
     - target: {fileID: 1593946316452770175, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
       propertyPath: _content
       value: 
-      objectReference: {fileID: 11400000, guid: 9cee647c745975c41a5738e3ba652a62, type: 2}
+      objectReference: {fileID: 11400000, guid: c5f75ba135f94a60a3ede2a20cdc2b3f, type: 2}
     - target: {fileID: 2347408700237247188, guid: 0b0c264abac7b264c937d03c3b7e8472, type: 3}
       propertyPath: m_Pivot.x
       value: 0

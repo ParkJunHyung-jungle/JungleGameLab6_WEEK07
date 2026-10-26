@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 using Game.Logging;
@@ -121,29 +120,29 @@ namespace Game.Tutorials
             _drawerTransition = FindFirstObjectByType<WorkshopKeycapDrawerTransition>();
             _monitorManager = FindFirstObjectByType<MonitorMiniGameManager>();
             _monitorHolder = FindFirstObjectByType<MonitorKeyboardHolder>();
-            if (_drawerTransition != null) _drawerTransition.TrayStateChanged += HandleDrawerStateChanged;
-            if (_monitorManager != null) _monitorManager.GameChanged += HandleMonitorGameChanged;
-            if (_monitorHolder != null) _monitorHolder.KeyboardChanged += HandleMonitorKeyboardChanged;
-            KeyboardRequestRuntime.Changed += HandleRequestChanged;
+            // if (_drawerTransition != null) _drawerTransition.TrayStateChanged += HandleDrawerStateChanged;
+            // if (_monitorManager != null) _monitorManager.GameChanged += HandleMonitorGameChanged;
+            // if (_monitorHolder != null) _monitorHolder.KeyboardChanged += HandleMonitorKeyboardChanged;
+            // KeyboardRequestRuntime.Changed += HandleRequestChanged;
             _next.Clicked += HandleNext;
             _previous.Clicked += HandlePrevious;
             _close.Clicked += HandleClose;
             _help.Clicked += HandleHelp;
-            CustomizationTelemetry.Observed += HandleCustomization;
-            TournamentController.PlaytestShopStateChanged += HandleShop;
-            TournamentController.PlaytestShopAction += HandleShopAction;
-            PlaytestResearchSession.Observed += HandleResearch;
+            // CustomizationTelemetry.Observed += HandleCustomization;
+            // TournamentController.PlaytestShopStateChanged += HandleShop;
+            // TournamentController.PlaytestShopAction += HandleShopAction;
+            // PlaytestResearchSession.Observed += HandleResearch;
         }
 
         void Start()
         {
-            if (HasCard(TutorialTopic.AssemblyOrder))
-            {
-                Request(TutorialTopic.Welcome);
-                Request(TutorialTopic.Workbench);
-            }
-            else if (SceneManager.GetActiveScene().name == "WorkShop2") Request(TutorialTopic.Welcome);
-            else if (FindFirstObjectByType<TournamentController>() != null) Request(TutorialTopic.Battle);
+            // if (HasCard(TutorialTopic.AssemblyOrder))
+            // {
+                // Request(TutorialTopic.Welcome);
+                // Request(TutorialTopic.Workbench);
+            // }
+            // else if (SceneManager.GetActiveScene().name == "WorkShop2") Request(TutorialTopic.Welcome);
+            // else if (FindFirstObjectByType<TournamentController>() != null) Request(TutorialTopic.Battle);
         }
 
         void Update()
@@ -175,18 +174,18 @@ namespace Game.Tutorials
 
         void OnDisable()
         {
-            if (_drawerTransition != null) _drawerTransition.TrayStateChanged -= HandleDrawerStateChanged;
-            if (_monitorManager != null) _monitorManager.GameChanged -= HandleMonitorGameChanged;
-            if (_monitorHolder != null) _monitorHolder.KeyboardChanged -= HandleMonitorKeyboardChanged;
-            KeyboardRequestRuntime.Changed -= HandleRequestChanged;
+            // if (_drawerTransition != null) _drawerTransition.TrayStateChanged -= HandleDrawerStateChanged;
+            // if (_monitorManager != null) _monitorManager.GameChanged -= HandleMonitorGameChanged;
+            // if (_monitorHolder != null) _monitorHolder.KeyboardChanged -= HandleMonitorKeyboardChanged;
+            // KeyboardRequestRuntime.Changed -= HandleRequestChanged;
             _next.Clicked -= HandleNext;
             _previous.Clicked -= HandlePrevious;
             _close.Clicked -= HandleClose;
             _help.Clicked -= HandleHelp;
-            CustomizationTelemetry.Observed -= HandleCustomization;
-            TournamentController.PlaytestShopStateChanged -= HandleShop;
-            TournamentController.PlaytestShopAction -= HandleShopAction;
-            PlaytestResearchSession.Observed -= HandleResearch;
+            // CustomizationTelemetry.Observed -= HandleCustomization;
+            // TournamentController.PlaytestShopStateChanged -= HandleShop;
+            // TournamentController.PlaytestShopAction -= HandleShopAction;
+            // PlaytestResearchSession.Observed -= HandleResearch;
             if (_paused)
             {
                 PlaytestResearchSession.Emit("TutorialInterrupted", _title.text);
@@ -198,21 +197,22 @@ namespace Game.Tutorials
             if (_instance == this) _instance = null;
         }
 
-        /// <summary>topic이 미열람이면 완료 후 실행할 completed와 함께 예약한다. 기존 예약의 빈 콜백만 채우고 예약 여부를 반환한다.</summary>
+        /// <summary>topic과 completed를 받지만 자동 안내를 중단한 동안 예약 상태를 변경하지 않고 false를 반환한다.</summary>
         public static bool Request(TutorialTopic topic, Action completed = null)
         {
-            if (_instance == null || _seenTopics.Contains(topic)) return false;
-            if (_instance._scheduled.Add(topic))
-                _instance._pending.Enqueue(new PendingCard { Topic = topic, Completed = completed });
-            else if (completed != null)
-            {
-                if (_instance._current != null && _instance._current.Topic == topic)
-                    _instance._current.Completed ??= completed;
-                else
-                    foreach (PendingCard card in _instance._pending)
-                        if (card.Topic == topic) card.Completed ??= completed;
-            }
-            return true;
+            // if (_instance == null || _seenTopics.Contains(topic)) return false;
+            // if (_instance._scheduled.Add(topic))
+                // _instance._pending.Enqueue(new PendingCard { Topic = topic, Completed = completed });
+            // else if (completed != null)
+            // {
+                // if (_instance._current != null && _instance._current.Topic == topic)
+                    // _instance._current.Completed ??= completed;
+                // else
+                    // foreach (PendingCard card in _instance._pending)
+                        // if (card.Topic == topic) card.Completed ??= completed;
+            // }
+            // return true;
+            return false;
         }
 
         /// <summary>topic의 Inspector 안내 데이터를 찾아 반환한다. 등록되지 않은 항목은 구성 오류로 보고한다.</summary>

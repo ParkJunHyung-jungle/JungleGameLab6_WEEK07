@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4af3e482865c49747941e483722a6cd8, type: 3}
+  m_Name: Renewal
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Tutorials.TutorialContent
+  _cards:
+  - _topic: 1
+    _title: "작업 시작하기"
+    _body: "하부 하우징을 작업대 배치 영역에 끌어다 놓으세요.\n고정된 하우징을 한 번 클릭하면 작업 모드로 들어갑니다."
+    _controls: "<b>[Q / E]</b> 시점 전환   <b>[Esc]</b> 작업 모드 나가기\n<b>[F10]</b> 도움말"
+  - _topic: 29
+    _title: "조립 순서"
+    _body: "하부 하우징 → PCB → 나사 6개 → 보강판\n→ 스위치 → 상단부 → 키캡 순서로 조립하세요.\nPCB 나사 6개를 모두 조여야 스위치를 설치할 수 있습니다."
+    _controls: "<b>[PCB 서랍 열기 → 나사 좌클릭]</b> 조이기·풀기\n주황색은 미체결, 초록색은 체결 상태입니다."
+  - _topic: 17
+    _title: "부품 꺼내 설치하기"
+    _body: "작업 모드에서 서랍을 클릭해 열고, 부품 카드를 설치할 자리에 끌어다 놓으세요.\n키캡은 스위치가 있는 빈 자리에 설치합니다."
+    _controls: "<b>[휠]</b> 목록 이동   <b>[카드 드래그]</b> 설치\n<b>[닫기 버튼 / 열린 서랍 클릭]</b> 서랍 닫기"
+  - _topic: 18
+    _title: "부품 분리하기"
+    _body: "키캡·스위치는 풀러로 분리하면 잠시 뒤 자동 회수됩니다. 스위치는 위의 키캡부터 제거하세요.\n구조 부품은 해당 서랍을 열고 드래그해 분리한 뒤, 열린 서랍에 놓으면 반납됩니다."
+    _controls: "<b>[분리 순서]</b> 상단부·키캡 → 보강판\n→ 나사 6개 해제 → PCB"
+  - _topic: 6
+    _title: "스위치·키캡 연속 설치"
+    _body: "서랍에서 일괄 배치를 선택한 뒤 부품 카드를 누른 채 키보드 위로 움직이세요.\n지나가는 빈 자리에 설치되며, 버튼을 놓으면 종료됩니다."
+    _controls: "<b>[좌클릭 유지 + 이동]</b> 연속 설치\n스위치는 PCB 나사 체결 후, 키캡은 스위치 위에 설치하세요."
+  - _topic: 34
+    _title: "모니터 사용하기"
+    _body: "모니터 앞에 키보드를 설치하세요.\nQ/E로 모니터 시점으로 이동한 뒤 화면을 클릭하세요."
+    _controls: "<b>[아이콘 더블클릭]</b> 앱 실행\n<b>[Esc]</b> 모니터 조작 종료"
+  - _topic: 33
+    _title: "의뢰 수락부터 배송까지"
+    _body: "메일 앱에서 고객과 메일을 선택해 요구사항을 읽고 의뢰를 수락하세요.\n완성한 키보드를 배송 트레이에 올리고, 단말기에서 고객·의뢰를 확인해 발송하세요.\n검수 결과는 고객의 결과 메일에서 확인합니다."
+    _controls: "<b>[Q / E]</b> 배송 시점 이동\n발송한 키보드는 돌려받을 수 없습니다."

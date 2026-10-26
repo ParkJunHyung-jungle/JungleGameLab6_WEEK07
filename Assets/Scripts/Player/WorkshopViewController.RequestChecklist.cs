@@ -249,6 +249,15 @@ namespace Game.Player
                 lines.Add("<color=#FFD27A>요구 조건 연결을 확인할 수 없습니다</color>");
 
             KeyboardRequestDefinition definition = request.Definition;
+            if (definition.RequiresCompleteAssembly)
+            {
+                bool glass = definition.RequiresGlassSurfaces;
+                lines.Add(FormatRequestChecklistLine(glass ? "하부 하우징: 유리 재질"
+                    : "하부 하우징: 설치", selectedInspection != null && !selectedInspection.MissingLower
+                        && (!glass || !selectedInspection.IncorrectLowerMaterial)));
+                lines.Add(FormatRequestChecklistLine("PCB: 설치", selectedInspection != null && !selectedInspection.MissingPcb));
+                lines.Add(FormatRequestChecklistLine("보강판: 설치", selectedInspection != null && !selectedInspection.MissingPlate));
+            }
             if (definition.RequiresAllRequiredSwitchSlots)
             {
                 string switchName = definition.RequiredSwitchType switch
@@ -264,18 +273,13 @@ namespace Game.Player
             if (definition.RequiresCompleteAssembly)
             {
                 bool glass = definition.RequiresGlassSurfaces;
+                lines.Add(FormatRequestChecklistLine(glass ? "상부 하우징: 유리 재질"
+                    : "상부 하우징: 설치", selectedInspection != null && !selectedInspection.MissingUpper
+                        && (!glass || !selectedInspection.IncorrectUpperMaterial)));
                 lines.Add(FormatRequestChecklistLine(glass ? "키캡: 전체 유리 재질"
                     : "키캡: 전체 필수 슬롯 설치",
                     selectedInspection != null && selectedInspection.MissingKeycaps == 0
                         && (!glass || selectedInspection.IncorrectGlassKeycaps == 0)));
-                lines.Add(FormatRequestChecklistLine(glass ? "상부 하우징: 유리 재질"
-                    : "상부 하우징: 설치", selectedInspection != null && !selectedInspection.MissingUpper
-                        && (!glass || !selectedInspection.IncorrectUpperMaterial)));
-                lines.Add(FormatRequestChecklistLine(glass ? "하부 하우징: 유리 재질"
-                    : "하부 하우징: 설치", selectedInspection != null && !selectedInspection.MissingLower
-                        && (!glass || !selectedInspection.IncorrectLowerMaterial)));
-                lines.Add(FormatRequestChecklistLine("PCB: 설치", selectedInspection != null && !selectedInspection.MissingPcb));
-                lines.Add(FormatRequestChecklistLine("보강판: 설치", selectedInspection != null && !selectedInspection.MissingPlate));
             }
             if (!definition.RequiresAllRequiredSwitchSlots && !definition.RequiresCompleteAssembly
                 && !definition.RequiresGlassSurfaces)

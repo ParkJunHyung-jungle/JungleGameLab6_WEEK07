@@ -102,7 +102,7 @@ namespace Game.Player
             AssemblyFullerTool tool = item.ExtractsSwitches ? _switchPuller : _keycapPuller;
             if (_deployedTools.Contains(tool)) return;
             tool.ToolTransform.gameObject.SetActive(true);
-            tool.SetContext(this, true, false);
+            tool.SetContext(this, true, false, true);
             if (tool.BeginTrayHold(_camera.ScreenPointToRay(InGameCursor.Position))) _deployedTools.Add(tool);
             RefreshToolVisibility();
         }
@@ -214,11 +214,11 @@ namespace Game.Player
                 TryRemoveClickedPart(ray);
         }
 
-        /// <summary>tool의 출고 상태로 월드 집기와 사용 중 복귀 아웃라인을 연결한다. pointer가 도구 서랍 안인 해제 입력에는 실물을 보관하고 그 외에는 기존 위치로 돌려놓는다.</summary>
+        /// <summary>tool의 출고 상태로 월드 집기와 즉시 사용을 연결한다. pointer가 도구 서랍 안인 해제 입력에는 보관하고 그 외에는 현재 위치 아래에 내려놓는다.</summary>
         private bool ProcessDeployedTool(AssemblyFullerTool tool, Ray ray, Vector2 pointer)
         {
             if (_toolTray != null && !tool.IsSelected && !_deployedTools.Contains(tool)) return false;
-            if (!tool.IsSelected) tool.SetContext(this, true, _toolTray != null || _showToolOutlines);
+            if (!tool.IsSelected) tool.SetContext(this, true, false, true);
             bool store = tool.IsSelected && Mouse.current.leftButton.wasReleasedThisFrame && _toolTray != null
                 && _toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools) && _toolTray.ContainsReturnPoint(pointer);
             bool handled = tool.ProcessPointer(ray, pointer, Mouse.current);

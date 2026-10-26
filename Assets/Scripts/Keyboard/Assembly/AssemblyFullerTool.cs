@@ -18,7 +18,7 @@ namespace KeyboardModeling.Assembly
         private IKeyboardPullerContext _context;
         private bool _followCameraPlane;
         private bool _showReturnOutline = true;
-        private bool _trayTransport;
+        private bool _placeOnRelease;
         private IKeyboardPullerContext Context => _context ?? _dragInput;
         public bool IsSelected => _selected;
         public bool ExtractsSwitches => _extractSwitches;
@@ -27,21 +27,20 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// context를 도구 입력과 분리 동작의 대상으로 연결한다.
-        /// followCameraPlane으로 운반 평면을, showReturnOutline으로 복귀 외형 표시를 정하며 반환값은 없다.
+        /// followCameraPlane으로 운반 평면을, showReturnOutline으로 표시를, placeOnRelease로 해제 시 아래 표면 배치를 정하며 반환값은 없다.
         /// </summary>
-        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false, bool showReturnOutline = true)
+        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false, bool showReturnOutline = true, bool placeOnRelease = false)
         {
             _context = context;
             _followCameraPlane = followCameraPlane;
             _showReturnOutline = showReturnOutline;
+            _placeOnRelease = placeOnRelease;
         }
 
         /// <summary>트레이에서 누른 ray로 기존 실물 풀러 집기를 시작한다. 공통 입력이 허용되고 미선택 상태이면 기존 자세 저장·추적 경로를 실행한 결과를 반환한다.</summary>
         public bool BeginTrayHold(Ray ray)
         {
             if (!Context.InputAllowed || !isActiveAndEnabled || _selected || !SelectFuller(ray)) return false;
-            _trayTransport = true;
-            ResetHold();
             return true;
         }
 
@@ -118,13 +117,8 @@ namespace KeyboardModeling.Assembly
 
             if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
             {
+                if (_placeOnRelease && !overUI) UpdateToolPose(ray);
                 RecordUserPutDown();
-                return true;
-            }
-
-            if (_trayTransport)
-            {
-                UpdateToolPose(ray);
                 return true;
             }
 
@@ -389,13 +383,43 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 사용자가 놓은 도구의 ToolPutDown 이벤트를 기록한 뒤 원래 위치로 돌려놓는다.
+        /// 사용자가 놓은 도구의 ToolPutDown 이벤트를 기록하고 설정에 따라 바로 아래 표면 또는 원래 위치에 둔다.
         /// 현재 도구 종류와 집을 때 만든 interactionId를 사용해 같은 작업으로 묶는다.
         /// </summary>
         private void RecordUserPutDown()
         {
             Context.RecordToolEvent("ToolPutDown", _extractSwitches ? "SwitchPuller" : "KeycapRemover", _interactionId);
+            if (_placeOnRelease) PlaceBelowCurrentPosition();
             ReturnToOrigin();
+        }
+
+        /// <summary>현재 풀러의 바닥 범위 아래 가장 높은 표면에 내려놓을 자세를 저장한다. 도구 충돌체를 제외한 상자 투사로 키 사이 침투를 막고 원래 회전의 메시 바닥을 맞추며 표면이 없으면 이전 높이를 사용한다.</summary>
+        private void PlaceBelowCurrentPosition()
+        {
+            _fuller.rotation = _originRotation;
+            Bounds bounds = new Bounds(_fuller.position, Vector3.zero);
+            bool found = false;
+            foreach (MeshRenderer renderer in _fuller.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (!renderer.enabled) continue;
+                if (!found) { bounds = renderer.bounds; found = true; }
+                else bounds.Encapsulate(renderer.bounds);
+            }
+            Physics.SyncTransforms();
+            Vector3 start = new Vector3(bounds.center.x, bounds.max.y + 1f, bounds.center.z);
+            Vector3 footprint = new Vector3(Mathf.Max(0.001f, bounds.extents.x), 0.001f,
+                Mathf.Max(0.001f, bounds.extents.z));
+            float surfaceHeight = float.NegativeInfinity;
+            foreach (RaycastHit hit in Physics.BoxCastAll(start, footprint, Vector3.down, Quaternion.identity,
+                Context.InputCamera.farClipPlane, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (Context.IsToolCollider(hit.collider) || hit.normal.y < 0.5f) continue;
+                surfaceHeight = Mathf.Max(surfaceHeight, hit.point.y);
+            }
+            Vector3 position = _fuller.position;
+            position.y = float.IsNegativeInfinity(surfaceHeight) ? _originPosition.y
+                : position.y + surfaceHeight + 0.003f - bounds.min.y;
+            _originPosition = position;
         }
 
         /// <summary>
@@ -418,7 +442,6 @@ namespace KeyboardModeling.Assembly
             if (!_selected)
                 return;
             _selected = false;
-            _trayTransport = false;
             HeldToolChanged?.Invoke(null);
             _fuller.SetPositionAndRotation(_originPosition, _originRotation);
             for (int index = 0; index < _bodies.Length; index++)

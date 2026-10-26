@@ -63,8 +63,7 @@ namespace Game.Player
                     _stockKeyboard = entry.TakeStoredPart();
                     if (_stockKeyboard == null)
                     {
-                        Transform origin = _assembly != null ? _assembly.transform : _pullers.transform;
-                        if (!_pullers.TryCreateLowerHousing(origin.position, origin.rotation, out GameObject root))
+                        if (!_pullers.TryCreateLowerHousing(out GameObject root))
                         {
                             entry.FinishReservation(false);
                             _stockEntry = null;

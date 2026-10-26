@@ -137,7 +137,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 3e7bfabfa1999224ba9d77cbe0feff07, type: 2}
+  - {fileID: 2100000, guid: c8b9a474c4aa2c94ea91dcbb809bd8ef, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -155,6 +155,7 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -185,10 +186,10 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9000}
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.008, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.001, y: 0.001, z: 0.001}
   m_ConstrainProportionsScale: 0
-  m_Children: 
+  m_Children:
   - {fileID: 13000}
   - {fileID: 16000}
   - {fileID: 19000}
@@ -248,7 +249,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 12000}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 372, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -300,7 +301,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: "\ud0a4\ubcf4\ub4dc \uc870\ub9bd \uc548\ub0b4"
+  m_Text: "\uD0A4\uBCF4\uB4DC \uC870\uB9BD \uC548\uB0B4"
 --- !u!1 &15001
 GameObject:
   m_ObjectHideFlags: 0
@@ -327,7 +328,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 15001}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -18, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -379,7 +380,12 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: "1. \ud558\ub2e8\ubd80\ub97c \uc900\ube44\ud569\ub2c8\ub2e4.\n\n2. PCB\ub97c \ub193\uace0 \ub098\uc0ac 6\uac1c\ub97c \uc870\uc785\ub2c8\ub2e4.\n\n3. \ubcf4\uac15\ud310\uc744 \uc62c\ub9bd\ub2c8\ub2e4.\n\n4. \uc2a4\uc704\uce58\ub97c \ub07c\uc6c1\ub2c8\ub2e4.\n\n5. \uc0c1\ubd80 \ud558\uc6b0\uc9d5\uc744 \ub36e\uc2b5\ub2c8\ub2e4.\n\n6. \ud0a4\ucea1\uc744 \ub07c\uc6c1\ub2c8\ub2e4."
+  m_Text: "1. \uD558\uB2E8\uBD80\uB97C \uC900\uBE44\uD569\uB2C8\uB2E4.\n\n2. PCB\uB97C
+    \uD558\uB2E8\uBD80 \uC704\uC5D0 \uB193\uACE0 \uB098\uC0AC 6\uAC1C\uB97C \uC870\uC785\uB2C8\uB2E4.\n\n3.
+    \uBCF4\uAC15\uD310\uC744 PCB\uC704\uC5D0 \uC62C\uB9BD\uB2C8\uB2E4.\n\n4. \uC2A4\uC704\uCE58\uB97C 
+    PCB\uC5D0 \uB07C\uC6C1\uB2C8\uB2E4.\n\n5. \uC0C1\uBD80 \uD558\uC6B0\uC9D5\uC744
+    \uB36E\uC2B5\uB2C8\uB2E4.\n\n6. \uD0A4\uCEA1\uC744 \uC2A4\uC704\uCE58\uC5D0 \uB07C\uC6C1\uB2C8\uB2E4.\n\n7.
+    \uC644\uC131!"
 --- !u!1 &18001
 GameObject:
   m_ObjectHideFlags: 0
@@ -406,7 +412,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 18001}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -388, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -458,4 +464,5 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: "\ub3c4\uad6c\ud568\uc5d0 \ub123\uc73c\uc138\uc694."
+  m_Text: "\uB2E4 \uC77D\uC5C8\uC73C\uBA74, \uC774 \uC124\uBA85\uC11C\uB97C \uB3C4\uAD6C\uD568\uC5D0
+    \uB123\uC73C\uC138\uC694."

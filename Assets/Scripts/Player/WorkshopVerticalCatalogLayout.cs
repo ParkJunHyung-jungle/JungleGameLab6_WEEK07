@@ -508,7 +508,7 @@ namespace Game.Player
             clip.anchorMin = Vector2.zero;
             clip.anchorMax = Vector2.one;
             clip.offsetMin = new Vector2(12f, 12f);
-            float topInset = panel.name == "PlateViewport" ? 48f
+            float topInset = panel.name == "PlateViewport" ? 60f
                 : panel.Find("KeycapPlacementModes") != null ? 60f : 12f;
             clip.offsetMax = new Vector2(-24f, -topInset);
             scroll.viewport = clip;

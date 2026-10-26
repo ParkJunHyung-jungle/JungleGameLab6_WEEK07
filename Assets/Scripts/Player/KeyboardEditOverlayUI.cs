@@ -699,7 +699,7 @@ namespace Game.Player
                     _plateMaterialButtons[index],
                     _plateMaterialCardBackgrounds[index],
                     _plateMaterialSelectionIndicators[index],
-                    _plateMaterialButtonMaterials[index] == _plateCustomization.PlateMaterial);
+                    !UsesScreenTrays && _plateMaterialButtonMaterials[index] == _plateCustomization.PlateMaterial);
             }
 
             for (int index = 0; index < _plateEffectSelectionIndicators.Count; index++)
@@ -1398,7 +1398,9 @@ namespace Game.Player
         {
             for (int index = 0; index < _switchSoundButtons.Count; index++)
             {
-                bool isSelected = _selectedSwitchSound == _switchSoundTypes[index];
+                // 스위치 카드 선택 강조는 사용하지 않는다.
+                // bool isSelected = _selectedSwitchSound == _switchSoundTypes[index];
+                bool isSelected = false;
                 SetPickerItemSelection(
                     _switchSoundButtons[index],
                     _switchSoundCardBackgrounds[index],
@@ -1726,10 +1728,10 @@ namespace Game.Player
                     _previewButtons[index],
                     _previewCardBackgrounds[index],
                     _selectionIndicators[index],
-                    _selectedKeycapDefinition != null
-                        ? _previewDefinitions[index] == _selectedKeycapDefinition
-                        : (_previewDefinitions[index] == null || _previewDefinitions[index].ShellMesh == null)
-                            && _previewMaterials[index] == _selectedMaterial);
+                    // 키캡 카드 선택 강조는 사용하지 않는다.
+                    // _selectedKeycapDefinition != null ? _previewDefinitions[index] == _selectedKeycapDefinition
+                    //     : (_previewDefinitions[index] == null || _previewDefinitions[index].ShellMesh == null) && _previewMaterials[index] == _selectedMaterial
+                    false);
             }
         }
 
@@ -1784,6 +1786,11 @@ namespace Game.Player
         /// </summary>
         private void CreatePlatePicker()
         {
+            if (_plateTrayTabs != null)
+            {
+                Destroy(_plateTrayTabs.gameObject);
+                _plateTrayTabs = null;
+            }
             if (_plateViewport != null)
             {
                 Destroy(_plateViewport.gameObject);
@@ -2112,8 +2119,10 @@ namespace Game.Player
             ScrollRect scrollRect = _plateViewport.GetComponent<ScrollRect>();
             scrollRect.content = activeContent;
             scrollRect.horizontalNormalizedPosition = 0f;
+            if (UsesScreenTrays) scrollRect.verticalNormalizedPosition = 1f;
             SetPlatePickerTabSelection(_plateMaterialTabButton, section == PlatePickerSection.Material);
             SetPlatePickerTabSelection(_plateEffectTabButton, section == PlatePickerSection.Effect);
+            ResetPlateTrayScroll();
         }
 
         /// <summary>
@@ -2122,6 +2131,15 @@ namespace Game.Player
         /// </summary>
         private void SetPlatePickerTabSelection(KeyboardEditButton button, bool isSelected)
         {
+            if (UsesScreenTrays)
+            {
+                GetComponent<WorkshopKeycapPlacement>().ApplyPlacementModeButtonStyle(button, isSelected);
+                Text label = button.GetComponentInChildren<Text>();
+                label.font = _pickerFont;
+                label.rectTransform.offsetMin = Vector2.zero;
+                label.rectTransform.offsetMax = Vector2.zero;
+                return;
+            }
             Image background = button.GetComponent<Image>();
             background.color = isSelected ? _pickerSelectedCardColor : _pickerCardColor;
             ColorBlock colors = button.colors;
@@ -2307,6 +2325,7 @@ namespace Game.Player
             {
                 _plateViewport.gameObject.SetActive(_pickerMode == PickerMode.Plate);
             }
+            if (_plateTrayTabs != null) _plateTrayTabs.gameObject.SetActive(_pickerMode == PickerMode.Plate);
             if (_pickerMode != PickerMode.Keycap)
                 _keycapUI.Close();
             if (_pickerMode != PickerMode.Photo)

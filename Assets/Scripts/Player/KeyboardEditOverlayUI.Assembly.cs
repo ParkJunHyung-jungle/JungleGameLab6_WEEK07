@@ -228,27 +228,13 @@ namespace Game.Player
             if (assembly == null) return;
             if (_catalogLayout == null) _assemblyActions.sizeDelta = new Vector2(250f, 100f);
             _assemblyStatus.text = _pickerMode == PickerMode.CaseMaterial
-                ? assembly.CanRemoveLower ? "빈 하단부 · 좌클릭 드래그로 분리 가능"
-                    : assembly.LowerInstalled ? "하단부 분리: PCB·보강판·상단부·축·키캡 제거 필요"
-                    : assembly.LowerLoose ? "바닥의 하단부를 집어 정위치에 놓기"
-                    : "하단부 목록에서 드래그해 정위치에 놓기"
+                ? assembly.LowerInstalled && assembly.gameObject.activeInHierarchy ? "하부 하우징 설치됨"
+                    : assembly.LowerLoose && assembly.gameObject.activeInHierarchy ? "하부 하우징 미설치 · 분리됨"
+                    : "하부 하우징 미설치"
                 : pcb
-                ? $"{(assembly.PcbComplete ? "PCB 조립 완료" : assembly.PcbPlaced ? "PCB 배치됨" : "PCB 미설치")} · 나사 {assembly.ScrewCount}/6\n"
-                    + (assembly.PcbPlaced && (assembly.UpperInstalled || assembly.PlateInstalled)
-                        ? "상단부·보강판 제거 후 나사 조작"
-                        : assembly.PcbComplete ? "고정된 나사 클릭으로 풀기" : assembly.PcbPlaced
-                        ? assembly.CanRemovePcb ? "나사 클릭으로 체결 · PCB 드래그로 분리" : "나사 클릭: 미고정은 체결 · 고정은 풀기"
-                        : assembly.PcbLoose ? "바닥의 PCB를 집어 하단부에 놓기"
-                        : assembly.CanInstallPcb ? "하단부 위로 PCB 드래그 배치" : "하단부 설치 필요")
-                : plate ? $"보강판 {(assembly.PlateInstalled ? "설치됨" : "미설치")}\n"
-                    + (assembly.CanRemovePlate ? "좌클릭 드래그로 분리 가능"
-                        : assembly.PlateInstalled ? "상단부·키캡 제거 후 분리 가능"
-                        : assembly.CanInstallPlate ? "재질 카드를 드래그해 설치 가능" : "PCB 나사 완료·상단부·키캡 상태 확인")
-                : $"상단부 {(assembly.UpperInstalled ? "설치됨" : "미설치")}\n"
-                    + (assembly.CanRemoveUpper ? "좌클릭 드래그로 분리 가능"
-                        : assembly.CanInstallUpper ? "재질 카드를 드래그해 설치 가능" : "하단부 설치 후 배치 가능");
-            if (UsesScreenTrays && _pickerMode == PickerMode.CaseMaterial)
-                _assemblyStatus.text = "하부 하우징 출고 · 새 키보드 생성\n기존 운반·작업대·장식장 배치 사용";
+                ? $"{(assembly.PcbComplete ? "PCB 조립 완료" : assembly.PcbPlaced ? "PCB 배치됨" : "PCB 미설치")}\n나사 고정 {assembly.ScrewCount}/6"
+                : plate ? $"보강판 {(assembly.PlateInstalled ? "설치됨" : "미설치")}"
+                : $"상단부 {(assembly.UpperInstalled ? "설치됨" : "미설치")}";
             if (upper || _pickerMode == PickerMode.CaseMaterial) RefreshCaseMaterialSelection();
         }
 

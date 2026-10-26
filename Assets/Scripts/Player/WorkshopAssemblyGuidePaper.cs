@@ -6,6 +6,8 @@ namespace Game.Player
     [RequireComponent(typeof(BoxCollider))]
     public sealed class WorkshopAssemblyGuidePaper : MonoBehaviour
     {
+        private const float READING_CANVAS_SURFACE_OFFSET = 0.02f;
+
         [Header("Reading")]
         [SerializeField] private RectTransform _guideCanvas;
         [SerializeField, Min(0.1f)] private float _readingDistance = 0.9f;
@@ -17,6 +19,7 @@ namespace Game.Player
         private Vector3 _readingPosition;
         private Quaternion _readingRotation;
         private Quaternion _canvasRotationBeforeReading;
+        private Vector3 _canvasPositionBeforeReading;
         private Vector3 _canvasScaleBeforeReading;
         private Vector3 _holdOriginPosition;
         private Quaternion _holdOriginRotation;
@@ -182,7 +185,7 @@ namespace Game.Player
 
         /// <summary>
         /// 현재 종이와 Canvas의 자세를 저장하고 카메라 앞 읽기 위치에 고정한다.
-        /// camera의 방향과 _readingDistance를 사용하며 글자를 앞면으로 돌리고 충돌체를 끈다.
+        /// camera의 방향과 _readingDistance를 사용하며 글자를 종이 앞면으로 띄우고 충돌체를 끈다.
         /// </summary>
         private void EnterReading()
         {
@@ -190,12 +193,14 @@ namespace Game.Player
             _readingPosition = transform.position;
             _readingRotation = transform.rotation;
             _canvasRotationBeforeReading = _guideCanvas.localRotation;
+            _canvasPositionBeforeReading = _guideCanvas.localPosition;
             _canvasScaleBeforeReading = _guideCanvas.localScale;
             _reading = true;
             _hitCollider.enabled = false;
             transform.SetParent(_camera.transform, false);
             transform.localPosition = new Vector3(0f, 0f, _readingDistance);
             transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+            _guideCanvas.localPosition = _canvasPositionBeforeReading + Vector3.up * READING_CANVAS_SURFACE_OFFSET;
             _guideCanvas.localRotation = Quaternion.Euler(-90f, 0f, 180f);
             _guideCanvas.localScale = new Vector3(-_canvasScaleBeforeReading.x,
                 _canvasScaleBeforeReading.y, _canvasScaleBeforeReading.z);
@@ -203,12 +208,13 @@ namespace Game.Player
 
         /// <summary>
         /// 확대 전 종이와 Canvas의 자세를 복원하고 읽기 상태를 끝낸다.
-        /// 저장된 집기 상태를 유지하며 마우스 왼쪽 버튼을 놓았다면 다음 누름을 기다린다.
+        /// Canvas 위치와 저장된 집기 상태를 복원하며 마우스 왼쪽 버튼을 놓았다면 다음 누름을 기다린다.
         /// </summary>
         private void ExitReading()
         {
             transform.SetParent(_readingParent, true);
             transform.SetPositionAndRotation(_readingPosition, _readingRotation);
+            _guideCanvas.localPosition = _canvasPositionBeforeReading;
             _guideCanvas.localRotation = _canvasRotationBeforeReading;
             _guideCanvas.localScale = _canvasScaleBeforeReading;
             _reading = false;

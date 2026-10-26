@@ -10,6 +10,7 @@ using Game.Player;
 
 namespace Game.Workshop
 {
+    [DefaultExecutionOrder(300)]
     [RequireComponent(typeof(WorkbenchKeyboardHolder))]
     public sealed class WorkshopDeliveryTray : MonoBehaviour
     {
@@ -30,6 +31,7 @@ namespace Game.Workshop
         [SerializeField] private Material _outlineMaterial;
         [SerializeField] private Shader _depthShader;
         private WorkshopKeyboardPlacementPreview _carryOutline;
+        private WorkshopKeyboardDragController _keyboardDrag;
         private bool _keyboardHeld;
 
         [Header("Delivery Terminal")]
@@ -61,7 +63,7 @@ namespace Game.Workshop
         private string _backLabelBeforeExternal;
 
         public bool IsSending => _sending;
-        public static bool IsInputBlocked => _confirmationOpen;
+        public static bool IsInputBlocked => _confirmationOpen || WorkShop2KeyboardReturnController.IsEnding;
 
         /// <summary>
         /// 새 게임 실행에서 배송 확인 창의 입력 차단 상태를 초기화한다.
@@ -81,7 +83,8 @@ namespace Game.Workshop
             _confirmation.SetActive(false);
             _confirmLabel = _confirm.GetComponentInChildren<Text>(true);
             _backLabel = _back.GetComponentInChildren<Text>(true);
-            InitializeCarryOutline(eventCamera);
+            _keyboardDrag = FindFirstObjectByType<WorkshopKeyboardDragController>();
+            InitializeCarryOutline();
             Refresh();
         }
 
@@ -98,7 +101,9 @@ namespace Game.Workshop
 
         void LateUpdate()
         {
-            if (_keyboardHeld && !_sending && !_modalOpen && !_confirmationOpen && _holder.KeyboardBody == null)
+            bool carryingKeyboard = _keyboardHeld || (_keyboardDrag != null && _keyboardDrag.IsDragging);
+            if (carryingKeyboard && _holder.isActiveAndEnabled && !_sending && !_modalOpen
+                && !_confirmationOpen && _holder.KeyboardBody == null)
                 _carryOutline?.Show(new Pose(transform.position, transform.rotation));
         }
 
@@ -152,15 +157,15 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 트레이 설정 또는 eventCamera의 기존 키보드 배치 설정으로 외곽선 표시기를 준비한다.
+        /// 트레이 설정 또는 기존 키보드 운반 컨트롤러의 배치 설정으로 외곽선 표시기를 준비한다.
         /// 렌더러 참조가 없으면 직계 자식의 실제 외형만 수집하여 중첩된 글씨와 UI를 제외한다.
         /// </summary>
-        private void InitializeCarryOutline(Camera eventCamera)
+        private void InitializeCarryOutline()
         {
             if (_outlineMaterial != null && _depthShader != null && _outputCamera != null)
                 _carryOutline = new WorkshopKeyboardPlacementPreview(_outlineMaterial, _depthShader, _outputCamera);
-            else if (eventCamera != null && eventCamera.TryGetComponent(out WorkshopKeyboardDragController keyboardDrag))
-                _carryOutline = keyboardDrag.CreatePlacementPreview();
+            else if (_keyboardDrag != null)
+                _carryOutline = _keyboardDrag.CreatePlacementPreview();
             if (_carryOutline == null)
             {
                 Debug.LogWarning("배송 트레이 외곽선에 사용할 키보드 배치 설정이 없습니다.", this);
@@ -200,7 +205,7 @@ namespace Game.Workshop
                 : excludedKeyboard ? "시작 지급 키보드는 의뢰에 제출할 수 없습니다."
                 : keyboard == null ? "키보드를 트레이에 올려 주세요."
                 : target == null ? "메일에서 의뢰를 수락해 주세요."
-                : !available ? "의뢰 결과를 확인해 주세요." : "배송 대기";
+                : !available ? "발송 처리 중입니다." : "배송 대기";
             if (target != null) _status.text += "\n" + GetCustomerLabel(target);
             if (!string.IsNullOrEmpty(_notice)) _status.text += "\n" + _notice;
             _send.interactable = available && !_sending && !_modalOpen && keyboard != null && !excludedKeyboard;
@@ -229,7 +234,7 @@ namespace Game.Workshop
         private void HandleSend(KeyboardEditButton button)
         {
             KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
-            if (_sending || _modalOpen || _holder.KeyboardBody == null
+            if (IsInputBlocked || _sending || _modalOpen || _holder.KeyboardBody == null
                 || IsExcludedFromRequests(_holder.KeyboardBody) || target == null
                 || target.Phase != KeyboardRequestPhase.InProgress || Time.timeScale <= 0f
                 || Game.Tutorials.FirstEncounterTutorial.IsBlocking || !CanPointAtSendButton()) return;
@@ -244,7 +249,7 @@ namespace Game.Workshop
         /// <summary>body와 결과 콜백으로 기존 확인 팝업을 연다. 같은 입력 차단·커서·시간 복원 경로를 사용하고 버튼 결과만 호출자에게 전달한다.</summary>
         public bool TryOpenDismantleConfirmation(Action<bool> result)
         {
-            if (_modalOpen || _confirmationOpen || _sending || Time.timeScale <= 0f || result == null) return false;
+            if (_modalOpen || IsInputBlocked || _sending || Time.timeScale <= 0f || result == null) return false;
             _externalConfirmation = true;
             _externalConfirmationResult = result;
             _confirmLabelBeforeExternal = _confirmLabel != null ? _confirmLabel.text : null;
@@ -325,7 +330,8 @@ namespace Game.Workshop
         private bool IsConfirmationValid()
         {
             KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
-            return !_sending && _confirmedKeyboard != null && _holder.KeyboardBody == _confirmedKeyboard
+            return !WorkShop2KeyboardReturnController.IsEnding && !_sending
+                && _confirmedKeyboard != null && _holder.KeyboardBody == _confirmedKeyboard
                 && !IsExcludedFromRequests(_confirmedKeyboard)
                 && _confirmedKeyboard.transform.parent == _holder.transform && target != null
                 && target.Definition.RequestId == _confirmedRequestId && target.Phase == KeyboardRequestPhase.InProgress;

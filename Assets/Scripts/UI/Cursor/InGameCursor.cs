@@ -217,6 +217,12 @@ public sealed class InGameCursor : MonoBehaviour
         return new DialogScope(_instance);
     }
 
+    /// <summary>현재 포인터 조작을 기존 취소 Action으로 정리한다. 커서 좌표는 유지하고 모든 버튼 해제를 기다린다.</summary>
+    public static void CancelCurrentInteraction()
+    {
+        if (_instance != null) _instance.Rearm();
+    }
+
     /// <summary>UI 전용 장치의 위치와 버튼 및 휠만 읽는 UI 액션을 생성한다. 카메라 및 전투 액션은 수정하지 않는다.</summary>
     private void BuildActions()
     {

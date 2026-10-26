@@ -3,6 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 using Game.Player;
 using Game.Session;
@@ -16,6 +19,10 @@ namespace Game.Workshop
     [RequireComponent(typeof(BoxCollider))]
     public sealed class WorkShop2KeyboardReturnController : MonoBehaviour
     {
+        private static readonly string[] ENDING_REQUEST_IDS =
+            { "keyboard.all-red.001", "keyboard.sans-glass.003", "keyboard.any.002" };
+        public static bool IsEnding { get; private set; }
+
         [Header("References")]
         [SerializeField] private Transform _actor;
         [SerializeField] private Vector3 _hiddenPosition = new Vector3(-3.19f, -9f, 8.25f);
@@ -65,6 +72,26 @@ namespace Game.Workshop
         private readonly HashSet<Rigidbody> _queuedKeyboards = new HashSet<Rigidbody>();
         private readonly Dictionary<Rigidbody, List<Renderer>> _hiddenRenderers = new Dictionary<Rigidbody, List<Renderer>>();
         private bool _sequenceRunning;
+
+        [Header("Ending")]
+        [SerializeField, Min(0.01f)] private float _endingFadeDuration = 1.2f;
+        private Canvas _endingCanvas;
+        private CanvasGroup _endingGroup;
+        private Text _endingText;
+        private EventSystem _endingEventSystem;
+        private bool _endingRequested;
+        private bool _endingStartedHere;
+        private float _endingPreviousTimeScale;
+        private readonly List<Canvas> _endingHiddenCanvases = new List<Canvas>();
+        private readonly List<InputAction> _endingPausedActions = new List<InputAction>();
+        private readonly List<Behaviour> _endingDisabledInputs = new List<Behaviour>();
+
+        /// <summary>새 게임 실행에서 엔딩 입력 차단 상태를 초기화한다. 이전 실행의 정적 엔딩 상태는 저장하지 않는다.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEnding()
+        {
+            IsEnding = false;
+        }
 
         void Awake()
         {
@@ -121,6 +148,7 @@ namespace Game.Workshop
         void OnDisable()
         {
             StopAllCoroutines();
+            RestoreEndingInput();
             FinishDelivery(false);
             foreach (Rigidbody keyboard in _pendingKeyboards)
             {
@@ -143,6 +171,7 @@ namespace Game.Workshop
 
         void OnTriggerEnter(Collider other)
         {
+            if (IsEnding) return;
             if (other.CompareTag("Player"))
             {
                 ReturnPlayer();
@@ -160,7 +189,7 @@ namespace Game.Workshop
         /// </summary>
         public bool RequestReturn(Rigidbody keyboard)
         {
-            if (!isActiveAndEnabled || keyboard == null || !IsKeyboard(keyboard)) return false;
+            if (IsEnding || !isActiveAndEnabled || keyboard == null || !IsKeyboard(keyboard)) return false;
             if (_submissionBodies.Contains(keyboard) || KeyboardRequestRuntime.IsSubmittedOrProcessing(keyboard)) return false;
             if (!_queuedKeyboards.Add(keyboard)) return false;
 
@@ -197,7 +226,7 @@ namespace Game.Workshop
         public bool RequestDelivery(Rigidbody keyboard, string requestId, Action<bool> finished)
         {
             KeyboardPickupTarget pickup = keyboard != null ? keyboard.GetComponent<KeyboardPickupTarget>() : null;
-            if (!isActiveAndEnabled || _deliveryRequest != null || keyboard == null
+            if (IsEnding || !isActiveAndEnabled || _deliveryRequest != null || keyboard == null
                 || pickup == null || _queuedKeyboards.Contains(keyboard) || pickup.IsExcludedFromRequests
                 || KeyboardRequestRuntime.ActiveRequest?.Definition.RequestId != requestId) return false;
             if (_gameSession == null || _gameSession.Wallet == null)
@@ -256,12 +285,13 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 예약된 키보드의 실제 구성으로 기존 검수와 보상을 확정한 뒤 실물을 수거한다.
-        /// 검수 전에 삭제하지 않으며 설정 오류는 고객 실패로 기록하지 않고 조작 상태를 복원한다.
+        /// 예약된 키보드의 실제 구성으로 검수와 보상을 확정하고 일반 제출은 실물을 수거한다.
+        /// 세 의뢰가 모두 성공하면 마지막 실물을 유지하고 엔딩으로 전환하며 내부 오류는 고객 실패로 기록하지 않는다.
         /// </summary>
         private void CollectDelivery()
         {
             bool collected = false;
+            bool submissionCompleted = false;
             try
             {
                 if (_deliveryKeyboard == null) throw new InvalidOperationException("수거할 키보드가 없습니다.");
@@ -269,17 +299,29 @@ namespace Game.Workshop
                 KeyboardRequestInspection inspection = KeyboardRequestInspection.Inspect(
                     _deliveryKeyboard, assembly, _deliveryRequest.Definition);
                 List<GameObject> objects = CollectSubmissionObjects(assembly, _deliveryKeyboard);
-                try { KeyboardRequestRuntime.CompleteSubmission(_deliveryRequest, inspection, _gameSession.Wallet); }
+                if (inspection.Passed) EnsureEndingOverlay();
+                try
+                {
+                    KeyboardRequestRuntime.CompleteSubmission(_deliveryRequest, inspection, _gameSession.Wallet);
+                    submissionCompleted = true;
+                }
                 catch (Exception exception)
                 {
                     if (_deliveryRequest.Phase != KeyboardRequestPhase.AwaitingConfirmation) throw;
                     // 결과와 지급이 확정된 뒤 알림에서 발생한 오류는 재지급하지 않는다.
                     Debug.LogException(exception, this);
                 }
-                foreach (GameObject keyboard in objects)
+                if (AllEndingRequestsSucceeded())
                 {
-                    keyboard.SetActive(false);
-                    Destroy(keyboard);
+                    _endingRequested = true;
+                }
+                else
+                {
+                    foreach (GameObject keyboard in objects)
+                    {
+                        keyboard.SetActive(false);
+                        Destroy(keyboard);
+                    }
                 }
                 collected = true;
             }
@@ -287,16 +329,17 @@ namespace Game.Workshop
             {
                 Debug.LogError($"배송 내부 오류: 키보드와 의뢰를 보존합니다. {exception}", this);
             }
-            FinishDelivery(collected);
+            FinishDelivery(collected, submissionCompleted);
         }
 
         /// <summary>
         /// collected에 따라 수거 잠금을 해제하고 실패 시 저장한 물리와 Collider를 복원한다.
-        /// 예약과 임시 참조를 정리한 뒤 콜백을 한 번 알리며 보상과 검수 결과는 변경하지 않는다.
+        /// 예약과 임시 참조 및 콜백을 정리하고 submissionCompleted가 참인 정상 수거에서만 기존 의뢰 종료를 호출한다.
         /// </summary>
-        private void FinishDelivery(bool collected)
+        private void FinishDelivery(bool collected, bool submissionCompleted = false)
         {
             if (_deliveryRequest == null) return;
+            KeyboardRequestState deliveredRequest = _deliveryRequest;
             KeyboardRequestRuntime.CancelSubmission(_deliveryRequest);
             if (!collected && _deliveryAssembly != null) _deliveryAssembly.enabled = _deliveryAssemblyWasEnabled;
             _deliveryAssembly = null;
@@ -324,7 +367,21 @@ namespace Game.Workshop
             _deliveryCollisions.Clear();
             _deliveryColliders.Clear();
             try { finished?.Invoke(collected); }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                return;
+            }
+            if (!collected || !submissionCompleted) return;
+            try
+            {
+                if (!KeyboardRequestRuntime.TryClose(deliveredRequest.Definition.RequestId)
+                    && deliveredRequest.Phase != KeyboardRequestPhase.Closed)
+                    Debug.LogError("발송은 처리되었으나 의뢰 자동 종료에 실패했습니다. 결과 메일과 후속 의뢰 데이터 연결을 확인하세요.", this);
+            }
             catch (Exception exception) { Debug.LogException(exception, this); }
+            if (_endingRequested && deliveredRequest.Phase == KeyboardRequestPhase.Closed
+                && deliveredRequest.ResultMailSent) IsEnding = true;
         }
 
         /// <summary>
@@ -395,6 +452,12 @@ namespace Game.Workshop
                 {
                     if (actorAtVisitPosition) yield return WaitFor(_waitBeforeThrow);
                     CollectDelivery();
+                    if (IsEnding)
+                    {
+                        yield return PlayEnding();
+                        _sequenceRunning = false;
+                        yield break;
+                    }
                     yield return WaitFor(_waitAfterThrow);
                     yield return MoveActorTo(_hiddenPosition, true);
                     continue;
@@ -406,6 +469,146 @@ namespace Game.Workshop
                 yield return WaitFor(_waitAfterThrow);
                 _queuedKeyboards.Remove(keyboard);
             }
+        }
+
+        /// <summary>
+        /// 서로 다른 세 의뢰 ID의 실제 검수 성공과 보상 확정 기록이 모두 있는지 반환한다.
+        /// 종료 여부와 무관하게 보관된 결과를 읽으며 성공 횟수나 의뢰 상태는 변경하지 않는다.
+        /// </summary>
+        private static bool AllEndingRequestsSucceeded()
+        {
+            foreach (string requestId in ENDING_REQUEST_IDS)
+                if (!KeyboardRequestRuntime.Requests.TryGetValue(requestId, out KeyboardRequestState state)
+                    || state.Result != KeyboardRequestResult.Success || state.Inspection == null
+                    || !state.Inspection.Passed || !state.RewardPaid) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// 첫 성공 검수 전에 화면 최상단의 비활성 암전 Canvas와 중앙 문구를 준비한다.
+        /// 기존 화면을 변경하지 않으며 실제 표시는 세 의뢰의 성공이 확정된 뒤 시작한다.
+        /// </summary>
+        private void EnsureEndingOverlay()
+        {
+            if (_endingCanvas != null) return;
+            GameObject root = new GameObject("WorkshopEnding", typeof(RectTransform), typeof(Canvas),
+                typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
+            _endingCanvas = root.GetComponent<Canvas>();
+            _endingCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _endingCanvas.sortingOrder = short.MaxValue;
+            CanvasScaler scaler = root.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            _endingGroup = root.GetComponent<CanvasGroup>();
+            _endingGroup.alpha = 0f;
+            Image background = new GameObject("Black", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            background.transform.SetParent(root.transform, false);
+            background.rectTransform.anchorMin = Vector2.zero;
+            background.rectTransform.anchorMax = Vector2.one;
+            background.rectTransform.offsetMin = background.rectTransform.offsetMax = Vector2.zero;
+            background.color = Color.black;
+            _endingText = new GameObject("EndingText", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
+            _endingText.transform.SetParent(root.transform, false);
+            _endingText.rectTransform.anchorMin = new Vector2(0.06f, 0.35f);
+            _endingText.rectTransform.anchorMax = new Vector2(0.94f, 0.65f);
+            _endingText.rectTransform.offsetMin = _endingText.rectTransform.offsetMax = Vector2.zero;
+            _endingText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _endingText.fontSize = 50;
+            _endingText.fontStyle = FontStyle.Bold;
+            _endingText.alignment = TextAnchor.MiddleCenter;
+            _endingText.color = Color.white;
+            _endingText.raycastTarget = false;
+            _endingText.text = "에미넴에게 구출되었다";
+            _endingText.gameObject.SetActive(false);
+            root.SetActive(false);
+        }
+
+        /// <summary>
+        /// 기존 조작 취소와 입력 차단 뒤 마지막 수거를 암전 엔딩으로 진행한다.
+        /// 설정된 암전 시간과 기존 에미넴 퇴장을 사용하고 완전 암전 후 문구와 정지 화면을 유지한다.
+        /// </summary>
+        private IEnumerator PlayEnding()
+        {
+            if (!_endingRequested || _endingStartedHere) yield break;
+            _endingStartedHere = true;
+            _endingPreviousTimeScale = Time.timeScale;
+            Time.timeScale = 1f;
+            InGameCursor.CancelCurrentInteraction();
+            foreach (WorkshopViewController view in FindObjectsByType<WorkshopViewController>(FindObjectsSortMode.None))
+                view.CancelForEnding();
+            foreach (PlayerInteractionController interaction in FindObjectsByType<PlayerInteractionController>(FindObjectsSortMode.None))
+            {
+                if (!interaction.enabled) continue;
+                _endingDisabledInputs.Add(interaction);
+                interaction.enabled = false;
+            }
+            if (_playerMovement != null && _playerMovement.enabled)
+            {
+                _endingDisabledInputs.Add(_playerMovement);
+                _playerMovement.enabled = false;
+            }
+            foreach (InputAction action in InputSystem.ListEnabledActions())
+            {
+                _endingPausedActions.Add(action);
+                action.Disable();
+            }
+            if (EventSystem.current != null && EventSystem.current.enabled)
+            {
+                _endingEventSystem = EventSystem.current;
+                _endingEventSystem.enabled = false;
+            }
+            foreach (Canvas canvas in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+            {
+                if (canvas == _endingCanvas || !canvas.enabled) continue;
+                _endingHiddenCanvases.Add(canvas);
+                canvas.enabled = false;
+            }
+            InGameCursor.Visible = false;
+            _endingCanvas.gameObject.SetActive(true);
+            _endingCanvas.enabled = true;
+            float elapsed = 0f;
+            while (elapsed < _endingFadeDuration)
+            {
+                Time.timeScale = 1f;
+                elapsed += Time.deltaTime;
+                _endingGroup.alpha = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _endingFadeDuration));
+                yield return null;
+            }
+            _endingGroup.alpha = 1f;
+            _endingText.gameObject.SetActive(true);
+            yield return MoveActorTo(_hiddenPosition, false);
+            Time.timeScale = 0f;
+        }
+
+        /// <summary>
+        /// 엔딩을 실행한 컨트롤러가 종료될 때 보관한 시간과 입력 및 Canvas 상태를 복원한다.
+        /// 현재 실행의 정적 차단을 해제하며 의뢰 결과와 보상은 변경하지 않는다.
+        /// </summary>
+        private void RestoreEndingInput()
+        {
+            if (!_endingRequested) return;
+            IsEnding = false;
+            _endingRequested = false;
+            if (!_endingStartedHere) return;
+            _endingStartedHere = false;
+            Time.timeScale = _endingPreviousTimeScale;
+            if (_endingCanvas != null) _endingCanvas.gameObject.SetActive(false);
+            foreach (Canvas canvas in _endingHiddenCanvases)
+                if (canvas != null) canvas.enabled = true;
+            _endingHiddenCanvases.Clear();
+            if (_endingEventSystem != null) _endingEventSystem.enabled = true;
+            _endingEventSystem = null;
+            foreach (Behaviour behaviour in _endingDisabledInputs)
+                if (behaviour != null) behaviour.enabled = true;
+            _endingDisabledInputs.Clear();
+            foreach (InputAction action in _endingPausedActions) action.Enable();
+            _endingPausedActions.Clear();
+        }
+
+        void OnDestroy()
+        {
+            if (_endingCanvas != null) Destroy(_endingCanvas.gameObject);
         }
 
         /// <summary>

@@ -40,8 +40,6 @@ namespace Game.Player
         [SerializeField] private GameObject _requestActions;
         [SerializeField] private Text _activeRequestText;
         [SerializeField] private MonitorOSButton _acceptRequest;
-        [SerializeField] private MonitorOSButton _closeRequest;
-        private string _requestNotice;
 
         /// <summary>
         /// definition이 메일 앱 데이터인지 검사하여 실행 가능 여부를 반환한다.
@@ -65,7 +63,6 @@ namespace Game.Player
             _restoreMail.Clicked += HandleRestoreMail;
             KeyboardRequestRuntime.Changed += RefreshRequestUI;
             _acceptRequest.Clicked += HandleAcceptRequest;
-            _closeRequest.Clicked += HandleCloseRequest;
             RefreshInbox();
         }
 
@@ -136,10 +133,8 @@ namespace Game.Player
             _restoreMail.Clicked -= HandleRestoreMail;
             KeyboardRequestRuntime.Changed -= RefreshRequestUI;
             _acceptRequest.Clicked -= HandleAcceptRequest;
-            _closeRequest.Clicked -= HandleCloseRequest;
             ClearRows();
             _selectedMailId = null;
-            _requestNotice = null;
         }
 
         /// <summary>
@@ -266,7 +261,6 @@ namespace Game.Player
                 RefreshRequestUI();
                 return;
             }
-            _requestNotice = null;
             _subject.text = message.Subject;
             _sender.text = $"{message.Sender}  <{message.Address}>";
             _date.text = message.Date;
@@ -295,7 +289,7 @@ namespace Game.Player
 
         /// <summary>
         /// 런타임의 선택 메일과 단일 진행 의뢰 상태로 정보 및 버튼만 갱신한다.
-        /// 목록과 메일 본문 및 선택 ID는 유지하며 완료 버튼에서는 보상을 지급하지 않는다.
+        /// 목록과 메일 본문 및 선택 ID는 유지하며 종료된 의뢰에는 조작 버튼을 표시하지 않는다.
         /// </summary>
         private void RefreshRequestUI()
         {
@@ -309,9 +303,10 @@ namespace Game.Player
             _activeRequestText.text = activeRequest == null ? "진행 의뢰: 없음"
                 : $"진행 의뢰: {activeRequest.Definition.DisplayName}";
             _requestInfo.gameObject.SetActive(state != null);
-            _requestActions.SetActive(state != null);
+            bool showActions = state != null && state.Phase == KeyboardRequestPhase.Unaccepted;
+            _requestActions.SetActive(showActions);
             RectTransform scrollRect = (RectTransform)_bodyScroll.transform;
-            scrollRect.offsetMin = new Vector2(scrollRect.offsetMin.x, state != null ? 106f : 44f);
+            scrollRect.offsetMin = new Vector2(scrollRect.offsetMin.x, showActions ? 106f : 44f);
             if (state == null)
             {
                 RestoreScrollPosition(_bodyScroll, bodyPosition);
@@ -323,7 +318,7 @@ namespace Game.Player
             {
                 KeyboardRequestPhase.Unaccepted => "미수락",
                 KeyboardRequestPhase.InProgress => "진행 중",
-                KeyboardRequestPhase.AwaitingConfirmation => "검수 결과 확인 대기",
+                KeyboardRequestPhase.AwaitingConfirmation => "발송 처리 중",
                 _ => "종료"
             };
             string result = state.Result switch
@@ -353,10 +348,8 @@ namespace Game.Player
                 + requirements + (definition.RequiresGlassSurfaces
                     ? "\n재질: 하단부 · 상단부 · 모든 필수 키캡은 유리 (PCB·보강판 제한 없음)"
                     : "\n재질과 키캡 디자인 제한 없음")
-                + $"\n성공 보상: {definition.RewardGold}골드" + failure
-                + (string.IsNullOrEmpty(_requestNotice) ? string.Empty : $"\n{_requestNotice}");
+                + $"\n성공 보상: {definition.RewardGold}골드" + failure;
             _acceptRequest.SetInteractable(state.Phase == KeyboardRequestPhase.Unaccepted && activeRequest == null);
-            _closeRequest.SetInteractable(state.Phase == KeyboardRequestPhase.AwaitingConfirmation);
             RestoreScrollPosition(_bodyScroll, bodyPosition);
         }
 
@@ -380,22 +373,6 @@ namespace Game.Player
         {
             KeyboardRequestState state = GetSelectedRequest();
             if (state != null) KeyboardRequestRuntime.TryAccept(state.Definition.RequestId);
-        }
-
-        /// <summary>
-        /// button 클릭으로 현재 의뢰의 결과 확인과 종료만 런타임에 요청한다.
-        /// 런타임이 종료 조건을 다시 검사하며 거부하면 안내를 표시하고 골드는 지급하지 않는다.
-        /// </summary>
-        private void HandleCloseRequest(MonitorOSButton button)
-        {
-            KeyboardRequestState state = GetSelectedRequest();
-            if (state == null) return;
-            _requestNotice = null;
-            if (!KeyboardRequestRuntime.TryClose(state.Definition.RequestId))
-            {
-                _requestNotice = "의뢰 완료 처리가 아직 준비되지 않았습니다.";
-                RefreshRequestUI();
-            }
         }
 
         /// <summary>

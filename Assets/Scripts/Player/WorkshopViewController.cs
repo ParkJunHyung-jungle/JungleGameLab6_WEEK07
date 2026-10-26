@@ -511,6 +511,16 @@ namespace Game.Player
             _inventoryGroup.blocksRaycasts = true;
         }
 
+        /// <summary>엔딩 진입 시 기존 취소 경로로 부품과 도구를 정리하고 키보드 운반 입력을 차단한다. 현재 카메라 자세와 장착 결과는 유지한다.</summary>
+        public void CancelForEnding()
+        {
+            _modeTransitionPending = false;
+            _monitorTransition = false;
+            if (_monitorFocused) _monitorInput.SetWorkshopFocus(false);
+            CloseAssembly();
+            _keyboardDrag.SetInputAllowed(false);
+        }
+
         /// <summary>
         /// 기존 Workshop 취소 경로로 부품 드래그와 두 도구를 정리한 뒤 목록을 닫고 인벤토리를 숨긴다.
         /// 현재 대상의 보강판 오디오 효과를 해제하고 제작 로그 회차를 마감하며 입력 상태를 복원하고 장착 결과와 재고는 유지한다.

@@ -5,6 +5,7 @@ using UnityEngine;
 
 using Game.Player;
 using KeyboardModeling;
+using KeyboardModeling.Assembly;
 
 namespace Game.Workshop
 {
@@ -132,6 +133,8 @@ namespace Game.Workshop
                         throw new InvalidOperationException($"복원할 진열대가 이미 점유되어 있습니다: {record.RackId}");
                     keyboard = Instantiate(prefab, record.Position, record.Rotation);
                     keyboard.transform.localScale = record.Scale;
+                    if (record.PrefabId == "keyboard-enhanced")
+                        keyboard.GetComponent<KeyboardAssemblyState>().CompleteInitialAssembly();
                     Rigidbody body = keyboard.GetComponent<Rigidbody>();
                     body.linearVelocity = Vector3.zero;
                     body.angularVelocity = Vector3.zero;

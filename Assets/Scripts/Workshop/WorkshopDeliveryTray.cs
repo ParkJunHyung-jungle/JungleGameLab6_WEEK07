@@ -39,10 +39,16 @@ namespace Game.Workshop
         private bool _modalOpen;
         private bool _closing;
         private bool _dispatchAfterClose;
+        private Action<bool> _externalConfirmationResult;
+        private bool _externalConfirmation;
         private int _closeFrame;
         private float _savedTimeScale;
         private CursorLockMode _savedCursorLock;
         private bool _savedCursorVisible;
+        private Text _confirmLabel;
+        private Text _backLabel;
+        private string _confirmLabelBeforeExternal;
+        private string _backLabelBeforeExternal;
 
         public bool IsSending => _sending;
         public static bool IsInputBlocked => _confirmationOpen;
@@ -60,6 +66,8 @@ namespace Game.Workshop
         void Awake()
         {
             _confirmation.SetActive(false);
+            _confirmLabel = _confirm.GetComponentInChildren<Text>(true);
+            _backLabel = _back.GetComponentInChildren<Text>(true);
             Refresh();
         }
 
@@ -99,9 +107,11 @@ namespace Game.Workshop
             _send.Clicked -= HandleSend;
             _confirm.Clicked -= HandleConfirm;
             _back.Clicked -= HandleBack;
+            Action<bool> externalResult = _externalConfirmation ? _externalConfirmationResult : null;
             if (_modalOpen) RestoreInput();
             _confirmation.SetActive(false);
             _panel.SetActive(false);
+            externalResult?.Invoke(false);
         }
 
         /// <summary>
@@ -146,6 +156,29 @@ namespace Game.Workshop
             _confirmedRequestId = target.Definition.RequestId;
             _confirmationBody.text = "진행 중인 의뢰로 키보드를 발송합니다.\n발송한 키보드는 돌려받을 수 없습니다.\n\n"
                 + GetCustomerLabel(target);
+            OpenConfirmation();
+            Refresh();
+        }
+
+        /// <summary>body와 결과 콜백으로 기존 확인 팝업을 연다. 같은 입력 차단·커서·시간 복원 경로를 사용하고 버튼 결과만 호출자에게 전달한다.</summary>
+        public bool TryOpenDismantleConfirmation(Action<bool> result)
+        {
+            if (_modalOpen || _confirmationOpen || _sending || Time.timeScale <= 0f || result == null) return false;
+            _externalConfirmation = true;
+            _externalConfirmationResult = result;
+            _confirmLabelBeforeExternal = _confirmLabel != null ? _confirmLabel.text : null;
+            _backLabelBeforeExternal = _backLabel != null ? _backLabel.text : null;
+            if (_confirmLabel != null) _confirmLabel.text = "해체·반환";
+            if (_backLabel != null) _backLabel.text = "뒤로";
+            _confirmationBody.text = "현재 키보드를 없애고 모든 부품을 인벤토리로 반환합니다.\n"
+                + "이 키보드의 커스터마이징은 사라지며, 의뢰 충족 상태가 다시 계산됩니다.";
+            OpenConfirmation();
+            return true;
+        }
+
+        /// <summary>확인 팝업의 시간·입력·커서 상태를 저장하고 UI 외 게임 입력을 차단한다. 활성 버튼과 팝업을 표시한다.</summary>
+        private void OpenConfirmation()
+        {
             _savedTimeScale = Time.timeScale;
             _savedCursorLock = InGameCursor.LockState;
             _savedCursorVisible = InGameCursor.Visible;
@@ -164,7 +197,6 @@ namespace Game.Workshop
             _back.interactable = true;
             _confirmation.SetActive(true);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
-            Refresh();
         }
 
         /// <summary>
@@ -188,6 +220,7 @@ namespace Game.Workshop
         private void HandleConfirm(KeyboardEditButton button)
         {
             if (!_modalOpen || _closing) return;
+            if (_externalConfirmation) { BeginClose(true); return; }
             bool valid = IsConfirmationValid();
             if (!valid) _notice = "키보드 또는 진행 의뢰가 바뀌었습니다. 다시 확인해 주세요.";
             BeginClose(valid);
@@ -245,9 +278,18 @@ namespace Game.Workshop
         /// </summary>
         private void FinishClose()
         {
+            bool external = _externalConfirmation;
+            Action<bool> externalResult = _externalConfirmationResult;
+            bool externalConfirmed = _dispatchAfterClose;
             bool dispatch = _dispatchAfterClose && IsConfirmationValid();
             _confirmation.SetActive(false);
             RestoreInput();
+            if (external)
+            {
+                externalResult?.Invoke(externalConfirmed);
+                Refresh();
+                return;
+            }
             if (dispatch)
             {
                 _sending = true;
@@ -273,6 +315,15 @@ namespace Game.Workshop
             _confirmationOpen = false;
             _closing = false;
             _dispatchAfterClose = false;
+            if (_externalConfirmation)
+            {
+                if (_confirmLabel != null) _confirmLabel.text = _confirmLabelBeforeExternal;
+                if (_backLabel != null) _backLabel.text = _backLabelBeforeExternal;
+                _confirmLabelBeforeExternal = null;
+                _backLabelBeforeExternal = null;
+                _externalConfirmation = false;
+                _externalConfirmationResult = null;
+            }
         }
 
         /// <summary>

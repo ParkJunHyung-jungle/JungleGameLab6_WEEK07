@@ -24,6 +24,14 @@ namespace Game.Player
             return null;
         }
 
+        /// <summary>kind과 material에 해당하는 기존 구조 재고 항목을 반환한다. 표시명은 비교하지 않으며 등록된 카탈로그가 없으면 null을 반환한다.</summary>
+        public AssemblyCatalogEntry GetStructureEntry(AssemblyStructurePart kind, Material material)
+        {
+            foreach (AssemblyCatalogEntry entry in _structurePreviews.Keys)
+                if (entry.StructureKind == kind && entry.StructureMaterial == material) return entry;
+            return null;
+        }
+
         /// <summary>기존 구조 부품 처리기에 상부·PCB·하부의 출고 카드를 연결한다. 새 재질 항목만 100개로 생성하며 키캡·스위치 수량과 기존 원본 에셋은 유지한다.</summary>
         private void ConnectStructureTrays()
         {
@@ -114,10 +122,11 @@ namespace Game.Player
             foreach (var preview in _structurePreviews)
             {
                 Texture2D texture = AssemblyCatalogPreview.RenderParts(assembly.GetStructureParts(preview.Key.StructureKind), preview.Key.StructureMaterial,
-                    preview.Key.StructureKind == AssemblyStructurePart.Pcb);
+                    preview.Key.StructureKind == AssemblyStructurePart.Pcb, true);
                 if (texture == null) continue;
                 _structurePreviewTextures.Add(texture);
                 preview.Value.texture = texture;
+                preview.Value.GetComponent<AspectRatioFitter>().aspectRatio = (float)texture.width / texture.height;
                 preview.Value.enabled = true;
                 _keycapPlacement.SetInventoryTexture(preview.Key, texture);
             }

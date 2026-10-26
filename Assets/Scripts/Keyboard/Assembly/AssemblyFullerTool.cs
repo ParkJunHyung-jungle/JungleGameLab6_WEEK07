@@ -13,11 +13,14 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private Transform _fuller;
         [SerializeField, Tooltip("도구 로컬 공간의 집게 끝 중심입니다.")] private Transform _gripPoint;
+        [SerializeField, Tooltip("집게 끝 Transform이 없을 때 사용할 도구 루트 기준 집기 지점입니다.")] private Vector3 _heldGripLocalPoint;
+        [SerializeField, Tooltip("활성화하면 지정한 도구 로컬 집기 지점을 사용합니다.")] private bool _useHeldGripLocalPoint;
         [SerializeField] private Vector3 _heldEulerAngles;
         [SerializeField, Tooltip("활성화하면 키캡 대신 스위치만 분리합니다.")] private bool _extractSwitches;
         private IKeyboardPullerContext _context;
         private bool _followCameraPlane;
         private bool _showReturnOutline = true;
+        private bool _placeOnRelease;
         private IKeyboardPullerContext Context => _context ?? _dragInput;
         public bool IsSelected => _selected;
         public bool ExtractsSwitches => _extractSwitches;
@@ -26,19 +29,21 @@ namespace KeyboardModeling.Assembly
 
         /// <summary>
         /// context를 도구 입력과 분리 동작의 대상으로 연결한다.
-        /// followCameraPlane으로 운반 평면을, showReturnOutline으로 복귀 외형 표시를 정하며 반환값은 없다.
+        /// followCameraPlane으로 운반 평면을, showReturnOutline으로 표시를, placeOnRelease로 해제 시 아래 표면 배치를 정하며 반환값은 없다.
         /// </summary>
-        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false, bool showReturnOutline = true)
+        public void SetContext(IKeyboardPullerContext context, bool followCameraPlane = false, bool showReturnOutline = true, bool placeOnRelease = false)
         {
             _context = context;
             _followCameraPlane = followCameraPlane;
             _showReturnOutline = showReturnOutline;
+            _placeOnRelease = placeOnRelease;
         }
 
         /// <summary>트레이에서 누른 ray로 기존 실물 풀러 집기를 시작한다. 공통 입력이 허용되고 미선택 상태이면 기존 자세 저장·추적 경로를 실행한 결과를 반환한다.</summary>
         public bool BeginTrayHold(Ray ray)
         {
-            return Context.InputAllowed && isActiveAndEnabled && !_selected && SelectFuller(ray);
+            if (!Context.InputAllowed || !isActiveAndEnabled || _selected || !SelectFuller(ray)) return false;
+            return true;
         }
 
         /// <summary>ray가 현재 도구에 가장 먼저 닿는지 반환한다. 선택 및 물리 상태는 변경하지 않는다.</summary>
@@ -114,6 +119,7 @@ namespace KeyboardModeling.Assembly
 
             if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
             {
+                if (_placeOnRelease && !overUI) UpdateToolPose(ray);
                 RecordUserPutDown();
                 return true;
             }
@@ -159,9 +165,12 @@ namespace KeyboardModeling.Assembly
             _followPlane = _followCameraPlane
                 ? new Plane(Context.InputCamera.transform.forward, bounds.center)
                 : new Plane(Vector3.up, new Vector3(0f, Context.DragWorldHeight, 0f));
-            _localGripPosition = _gripPoint != null
-                ? _fuller.InverseTransformPoint(_gripPoint.position)
-                : _fuller.InverseTransformPoint(bounds.center);
+            if (_gripPoint != null)
+                _localGripPosition = _fuller.InverseTransformPoint(_gripPoint.position);
+            else if (_useHeldGripLocalPoint)
+                _localGripPosition = _heldGripLocalPoint;
+            else
+                _localGripPosition = GetLocalVisualBounds().center;
             Context.CancelDrag();
             _originPosition = _fuller.position;
             _originRotation = _fuller.rotation;
@@ -196,6 +205,28 @@ namespace KeyboardModeling.Assembly
             ResetHold();
             _extracting = true;
             return true;
+        }
+
+        /// <summary>활성 메시 bounds를 도구 로컬 공간으로 모아 반환한다. 도구의 원래 자세는 바꾸지 않는다.</summary>
+        private Bounds GetLocalVisualBounds()
+        {
+            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+            bool found = false;
+            foreach (MeshRenderer renderer in _fuller.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (!renderer.enabled) continue;
+                Bounds rendererBounds = renderer.localBounds;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 sign = new Vector3((corner & 1) == 0 ? -1f : 1f,
+                        (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f);
+                    Vector3 point = _fuller.InverseTransformPoint(renderer.transform.TransformPoint(
+                        rendererBounds.center + Vector3.Scale(rendererBounds.extents, sign)));
+                    if (found) bounds.Encapsulate(point);
+                    else { bounds = new Bounds(point, Vector3.zero); found = true; }
+                }
+            }
+            return bounds;
         }
 
         /// <summary>
@@ -379,13 +410,43 @@ namespace KeyboardModeling.Assembly
         }
 
         /// <summary>
-        /// 사용자가 놓은 도구의 ToolPutDown 이벤트를 기록한 뒤 원래 위치로 돌려놓는다.
+        /// 사용자가 놓은 도구의 ToolPutDown 이벤트를 기록하고 설정에 따라 바로 아래 표면 또는 원래 위치에 둔다.
         /// 현재 도구 종류와 집을 때 만든 interactionId를 사용해 같은 작업으로 묶는다.
         /// </summary>
         private void RecordUserPutDown()
         {
             Context.RecordToolEvent("ToolPutDown", _extractSwitches ? "SwitchPuller" : "KeycapRemover", _interactionId);
+            if (_placeOnRelease) PlaceBelowCurrentPosition();
             ReturnToOrigin();
+        }
+
+        /// <summary>현재 풀러의 바닥 범위 아래 가장 높은 표면에 내려놓을 자세를 저장한다. 도구 충돌체를 제외한 상자 투사로 키 사이 침투를 막고 원래 회전의 메시 바닥을 맞추며 표면이 없으면 이전 높이를 사용한다.</summary>
+        private void PlaceBelowCurrentPosition()
+        {
+            _fuller.rotation = _originRotation;
+            Bounds bounds = new Bounds(_fuller.position, Vector3.zero);
+            bool found = false;
+            foreach (MeshRenderer renderer in _fuller.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (!renderer.enabled) continue;
+                if (!found) { bounds = renderer.bounds; found = true; }
+                else bounds.Encapsulate(renderer.bounds);
+            }
+            Physics.SyncTransforms();
+            Vector3 start = new Vector3(bounds.center.x, bounds.max.y + 1f, bounds.center.z);
+            Vector3 footprint = new Vector3(Mathf.Max(0.001f, bounds.extents.x), 0.001f,
+                Mathf.Max(0.001f, bounds.extents.z));
+            float surfaceHeight = float.NegativeInfinity;
+            foreach (RaycastHit hit in Physics.BoxCastAll(start, footprint, Vector3.down, Quaternion.identity,
+                Context.InputCamera.farClipPlane, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (Context.IsToolCollider(hit.collider) || hit.normal.y < 0.5f) continue;
+                surfaceHeight = Mathf.Max(surfaceHeight, hit.point.y);
+            }
+            Vector3 position = _fuller.position;
+            position.y = float.IsNegativeInfinity(surfaceHeight) ? _originPosition.y
+                : position.y + surfaceHeight + 0.003f - bounds.min.y;
+            _originPosition = position;
         }
 
         /// <summary>

@@ -10,17 +10,17 @@ namespace KeyboardModeling.Assembly
         private const int PREVIEW_LAYER = 31;
         private const int TEXTURE_SIZE = 128;
 
-        /// <summary>parts의 메시와 shellMaterial로 카탈로그 텍스처를 반환한다. pcbBoardOnly가 참이면 기판만 재질을 대체하며 원본과 활성 상태는 유지하고 메시가 없으면 null을 반환한다.</summary>
-        public static Texture2D RenderParts(IReadOnlyList<Transform> parts, Material shellMaterial = null, bool pcbBoardOnly = false)
+        /// <summary>parts와 shellMaterial로 카탈로그 이미지를 반환한다. pcbBoardOnly는 기판만 재질을 대체하고 widePreview는 판류의 여백과 비율을 맞춘다. 원본은 유지하며 메시가 없으면 null을 반환한다.</summary>
+        public static Texture2D RenderParts(IReadOnlyList<Transform> parts, Material shellMaterial = null, bool pcbBoardOnly = false, bool widePreview = false)
         {
-            return Render(null, null, parts, shellMaterial, pcbBoardOnly);
+            return Render(null, null, parts, shellMaterial, pcbBoardOnly, widePreview);
         }
 
         /// <summary>
         /// mesh와 materials를 격리된 미리보기에서 렌더링하여 아이콘 텍스처를 반환한다.
-        /// parts가 있으면 각 원본 메시를 표시하며 pcbBoardOnly로 shellMaterial의 대상을 기판으로 제한한다. 원본 에셋과 씬 배치는 유지하며 호출자가 반환 텍스처를 해제한다.
+        /// parts의 메시와 pcbBoardOnly의 재질 범위를 사용하며 widePreview는 투영 경계에 맞춰 판류 이미지를 확대한다. 원본 에셋과 씬 배치는 유지하며 호출자가 반환 텍스처를 해제한다.
         /// </summary>
-        public static Texture2D Render(Mesh mesh, Material[] materials, IReadOnlyList<Transform> parts = null, Material shellMaterial = null, bool pcbBoardOnly = false)
+        public static Texture2D Render(Mesh mesh, Material[] materials, IReadOnlyList<Transform> parts = null, Material shellMaterial = null, bool pcbBoardOnly = false, bool widePreview = false)
         {
             GameObject stage = new GameObject("AssemblyCatalogPreviewStage");
             stage.hideFlags = HideFlags.HideAndDontSave;
@@ -73,7 +73,23 @@ namespace KeyboardModeling.Assembly
             camera.farClipPlane = distance + radius * 2f + 1f;
             camera.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 1.8f;
 
-            RenderTexture target = new RenderTexture(TEXTURE_SIZE, TEXTURE_SIZE, 16, RenderTextureFormat.ARGB32);
+            int textureWidth = TEXTURE_SIZE;
+            if (widePreview)
+            {
+                Vector2 projected = Vector2.zero;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 offset = Vector3.Scale(bounds.extents, new Vector3(
+                        (corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1));
+                    projected.x = Mathf.Max(projected.x, Mathf.Abs(Vector3.Dot(offset, camera.transform.right)));
+                    projected.y = Mathf.Max(projected.y, Mathf.Abs(Vector3.Dot(offset, camera.transform.up)));
+                }
+                textureWidth = Mathf.RoundToInt(TEXTURE_SIZE * Mathf.Clamp(projected.x / Mathf.Max(0.001f, projected.y), 1f, 2f));
+                camera.aspect = (float)textureWidth / TEXTURE_SIZE;
+                camera.orthographicSize = Mathf.Max(0.001f, Mathf.Max(projected.y, projected.x / camera.aspect) * 1.08f);
+            }
+
+            RenderTexture target = new RenderTexture(textureWidth, TEXTURE_SIZE, 16, RenderTextureFormat.ARGB32);
             RenderTexture previous = RenderTexture.active;
             try
             {
@@ -81,8 +97,8 @@ namespace KeyboardModeling.Assembly
                 camera.targetTexture = target;
                 camera.Render();
                 RenderTexture.active = target;
-                Texture2D texture = new Texture2D(TEXTURE_SIZE, TEXTURE_SIZE, TextureFormat.RGBA32, false);
-                texture.ReadPixels(new Rect(0f, 0f, TEXTURE_SIZE, TEXTURE_SIZE), 0, 0);
+                Texture2D texture = new Texture2D(textureWidth, TEXTURE_SIZE, TextureFormat.RGBA32, false);
+                texture.ReadPixels(new Rect(0f, 0f, textureWidth, TEXTURE_SIZE), 0, 0);
                 texture.Apply(false, true);
                 return texture;
             }

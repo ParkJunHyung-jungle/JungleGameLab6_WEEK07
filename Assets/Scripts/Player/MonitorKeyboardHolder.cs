@@ -3,6 +3,7 @@
 using UnityEngine;
 
 using KeyboardModeling;
+using KeyboardModeling.Assembly;
 
 namespace Game.Player
 {
@@ -13,6 +14,7 @@ namespace Game.Player
         [SerializeField] private Transform _monitorFocusTarget;
 
         [Header("Keyboard")]
+        [SerializeField] private GameObject _initialKeyboardPrefab;
         private Rigidbody _keyboardBody;
 
         /// <summary>
@@ -28,6 +30,19 @@ namespace Game.Player
         public Rigidbody KeyboardBody => _keyboardBody;
 
         public event Action<bool> KeyboardChanged;
+
+        void Start()
+        {
+            if (_initialKeyboardPrefab == null || _keyboardBody != null) return;
+            GameObject keyboard = Instantiate(_initialKeyboardPrefab, transform.position, transform.rotation);
+            keyboard.GetComponent<KeyboardAssemblyState>().CompleteInitialAssembly();
+            KeyboardPickupTarget pickup = keyboard.GetComponent<KeyboardPickupTarget>();
+            pickup.SetSourcePrefab(_initialKeyboardPrefab);
+            Rigidbody body = keyboard.GetComponent<Rigidbody>();
+            Vector3 centerOffset = Quaternion.Inverse(body.rotation)
+                * body.transform.TransformVector(pickup.GetVisualCenterLocalPosition(body.transform));
+            if (!TryPlaceKeyboard(body, centerOffset)) Destroy(keyboard);
+        }
 
         /// <summary>
         /// 본체 시각 중심 오프셋으로 기존 모니터 Holder의 최종 배치 자세를 반환한다.

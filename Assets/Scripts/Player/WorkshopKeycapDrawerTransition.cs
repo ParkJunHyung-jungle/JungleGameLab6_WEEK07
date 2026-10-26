@@ -22,7 +22,8 @@ namespace Game.Player
         [SerializeField] private RectTransform _trayRoot;
         [SerializeField] private CanvasGroup _trayGroup;
         [SerializeField] private KeyboardEditButton _closeButton;
-        [SerializeField, Range(0.1f, 1f)] private float _minimumTrayScale = 0.1f;
+        [SerializeField, Range(0.1f, 2f)] private float _minimumTrayScale = 0.1f;
+        [SerializeField, Range(0.1f, 2f)] private float _maximumTrayScale = 1f;
 
         [Header("Transition")]
         [SerializeField, Min(0.01f)] private float _pullDistance = 0.13f;
@@ -60,6 +61,13 @@ namespace Game.Player
         public bool IsTrayOpen => _state == DrawerState.Open;
         public WorkshopDrawerCategory Category => _category;
         public bool IsTrayVisible => _trayGroup.alpha > 0f;
+
+        /// <summary>point가 완전히 열린 트레이의 현재 목록 안인지 반환한다. 가상 커서 화면 좌표만 사용하며 서랍 상태는 유지한다.</summary>
+        public bool ContainsReturnPoint(Vector2 point)
+        {
+            return IsTrayOpen && _catalogScroll != null && RectTransformUtility.RectangleContainsScreenPoint(
+                _catalogScroll.viewport, point, _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera);
+        }
 
         /// <summary>
         /// 완전히 열린 트레이의 고정 Viewport 중앙을 화면 좌표 destination으로 반환한다.
@@ -145,6 +153,30 @@ namespace Game.Player
                     WorkshopDrawerCategory.Pcb => "PCB",
                     _ => "하부 하우징"
                 };
+        }
+
+        /// <summary>font를 트레이 전체 텍스트에 적용하고 제목·버튼·본문·보조 정보의 크기와 굵기를 통일한다. 중첩 패널 배율을 보정하며 입력값과 색상은 유지한다.</summary>
+        public void ApplyTypography(Font font)
+        {
+            foreach (Text label in _trayRoot.GetComponentsInChildren<Text>(true))
+            {
+                bool title = label.name == "CategoryLabel";
+                bool quantity = label.name == "Quantity" || label.name == "SelectedIndicator";
+                bool caption = quantity || label.text.Contains(" · ") || label.text.Contains("\n");
+                bool button = label.GetComponentInParent<KeyboardEditButton>() != null;
+                bool section = label.text == "LED 전원" || label.text == "LED 색상"
+                    || label.text == "LED 패턴" || label.text == "밝기 / 강도" || label.text == "애니메이션 속도";
+                int size = title ? 22 : caption ? 14 : button || section ? 18 : 16;
+                float scale = _trayRoot.InverseTransformVector(label.transform.TransformVector(Vector3.up)).magnitude;
+                int localSize = Mathf.Max(1, Mathf.RoundToInt(size / Mathf.Max(0.01f, scale)));
+                label.font = font;
+                label.fontStyle = title || !caption && (button || section) ? FontStyle.Bold : FontStyle.Normal;
+                label.fontSize = localSize;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = Mathf.Max(1, Mathf.RoundToInt(localSize * 0.85f));
+                label.resizeTextMaxSize = localSize;
+                label.lineSpacing = 1f;
+            }
         }
 
         /// <summary>category의 닫힌 실제 서랍과 독립 목록을 연결하고 열기를 시작한다. 이전 서랍은 닫힌 상태여야 한다.</summary>
@@ -376,7 +408,7 @@ namespace Game.Player
                         if (screen.z > _outputCamera.nearClipPlane) available = Mathf.Min(available, screen.x / _canvas.scaleFactor - 16f);
                     }
                 }
-            float maximumScale = Mathf.Max(0.1f, Mathf.Min(1f,
+            float maximumScale = Mathf.Max(0.1f, Mathf.Min(_maximumTrayScale,
                 (canvasRect.rect.width - _trayHome.x - 16f) / _trayRoot.rect.width,
                 (canvasRect.rect.height - _trayHome.y - 100f) / _trayRoot.rect.height));
             float fit = Mathf.Min(maximumScale, (available - _trayHome.x) / _trayRoot.rect.width,

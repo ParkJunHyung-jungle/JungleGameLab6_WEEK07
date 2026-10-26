@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -32,6 +32,7 @@ namespace Game.Player
         [SerializeField] private AssemblyCatalogEntry[] _switchEntries = new AssemblyCatalogEntry[0];
         private readonly Dictionary<AssemblyCatalogEntry, Text> _quantityLabels = new Dictionary<AssemblyCatalogEntry, Text>();
         private readonly Dictionary<AssemblyCatalogEntry, Texture> _entryTextures = new Dictionary<AssemblyCatalogEntry, Texture>();
+        private readonly Dictionary<SwitchType, Texture2D> _switchPreviewTextures = new Dictionary<SwitchType, Texture2D>();
         private WorkshopKeycapDrawerTransition _keycapTray;
         private WorkshopKeycapCardDrag _inventoryScrollOwner;
         private RectTransform _trayPlacementModes;
@@ -153,12 +154,45 @@ namespace Game.Player
             foreach (AssemblyCatalogEntry entry in _switchEntries)
             {
                 if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
+                _entryTextures[entry] = GetSwitchPreview(type);
                 if (tray != null) button.enabled = false;
                 button.gameObject.AddComponent<WorkshopKeycapCardDrag>().Initialize(this, entry, tray);
                 BindQuantityLabel(button, entry);
                 return;
             }
             button.interactable = false;
+        }
+
+        /// <summary>type의 출고 프리팹과 축 재질을 격리된 모델에 적용해 썸네일을 반환한다. 생성한 이미지는 재사용하며 원본 모델·재질·재고는 변경하지 않는다.</summary>
+        public Texture2D GetSwitchPreview(SwitchType type)
+        {
+            if (_switchPreviewTextures.TryGetValue(type, out Texture2D texture)) return texture;
+            foreach (AssemblyCatalogEntry entry in _switchEntries)
+            {
+                if (!entry.IsSwitch || entry.SwitchData.Type != type) continue;
+                GameObject stage = new GameObject("SwitchCardPreview");
+                stage.hideFlags = HideFlags.HideAndDontSave;
+                stage.SetActive(false);
+                try
+                {
+                    GameObject model = Instantiate(entry.Prefab.gameObject, stage.transform, false);
+                    foreach (MeshRenderer renderer in model.GetComponentsInChildren<MeshRenderer>(true))
+                    {
+                        Material material = renderer.name == "Switch_TopHousing" ? entry.SwitchData.TopHousingMaterial
+                            : renderer.name == "Switch_BottomHousing" ? entry.SwitchData.BottomHousingMaterial
+                            : renderer.name.StartsWith("MX_Stem") ? entry.SwitchData.StemMaterial : null;
+                        if (material != null) renderer.sharedMaterial = material;
+                    }
+                    texture = AssemblyCatalogPreview.RenderParts(new[] { model.transform });
+                    _switchPreviewTextures[type] = texture;
+                    return texture;
+                }
+                finally
+                {
+                    Destroy(stage);
+                }
+            }
+            return null;
         }
 
         /// <summary>구조 부품 entry의 카드에 기존 수량·아이콘·스크롤 출고 입력을 연결한다. structureDrag만 실물 설치 경로를 담당하며 기존 키캡·스위치 재고는 변경하지 않는다.</summary>
@@ -215,7 +249,7 @@ namespace Game.Player
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = true;
             _singlePlacementButtons.Add(CreatePlacementButton(row, "한 개 배치", font));
-            _bulkPlacementButtons.Add(CreatePlacementButton(row, "일괄 배치", font));
+            _bulkPlacementButtons.Add(CreatePlacementButton(row, "연속 배치", font));
             RefreshPlacementModes();
             return row;
         }
@@ -373,6 +407,94 @@ namespace Game.Player
             return true;
         }
 
+        /// <summary>customization에 실제 장착된 키캡·스위치와 구조 카탈로그 항목을 확인해 각 재고를 반환한다. 대상 상태를 먼저 검사하고 성공 후 수량과 카드 표시를 갱신한다.</summary>
+        public bool TryReturnKeyboardInventory(KeyboardCustomization customization)
+        {
+            if (customization == null || IsDragging || _pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured) return false;
+            var returns = new List<AssemblyCatalogEntry>();
+            for (int index = 0; index < customization.KeycapCount; index++)
+            {
+                if (customization.IsPcbKeycapInstalled(index))
+                {
+                    AssemblyCatalogEntry keycap = FindEntry(customization.GetKeycapMaterial(index), customization.GetKeycapDefinition(index));
+                    if (keycap == null) return false;
+                    returns.Add(keycap);
+                }
+                if (!customization.IsPcbSwitchInstalled(index)) continue;
+                Transform switchPart = customization.GetSwitchSlotTransform(index);
+                SwitchType type = customization.GetInstalledSwitchType(switchPart.GetComponent<KeyboardSwitch>());
+                AssemblyCatalogEntry found = null;
+                foreach (AssemblyCatalogEntry entry in _switchEntries)
+                    if (entry.IsSwitch && entry.SwitchData.Type == type) { found = entry; break; }
+                if (found == null) return false;
+                returns.Add(found);
+            }
+
+            KeyboardAssemblyState assembly = customization.GetComponent<KeyboardAssemblyState>();
+            AssemblyCatalogEntry lowerEntry = null;
+            var structureReturns = new List<AssemblyCatalogEntry>();
+            var detachedStructures = new List<Transform>();
+            if (assembly != null && assembly.Initialized)
+            {
+                for (int index = 0; index < assembly.FixedScrews.Count; index++)
+                    if (assembly.IsScrewRunning(index)) return false;
+                KeyboardEditOverlayUI overlay = FindFirstObjectByType<KeyboardEditOverlayUI>();
+                AssemblyDraggablePart rootPart = customization.GetComponent<AssemblyDraggablePart>();
+                lowerEntry = rootPart != null && rootPart.CatalogEntry != null
+                    && rootPart.CatalogEntry.IsStructure
+                    && rootPart.CatalogEntry.StructureKind == AssemblyStructurePart.Lower
+                    && rootPart.CatalogEntry.StructureMaterial == assembly.GetStructureMaterial(AssemblyStructurePart.Lower)
+                    ? rootPart.CatalogEntry : GetStructureEntry(assembly, overlay, AssemblyStructurePart.Lower);
+                if (lowerEntry == null) return false;
+                if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Upper,
+                    assembly.UpperInstalled, structureReturns, detachedStructures)) return false;
+                if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Pcb,
+                    assembly.PcbPlaced || assembly.PcbLoose, structureReturns, detachedStructures)) return false;
+                if (!AddStructureReturn(assembly, overlay, AssemblyStructurePart.Plate,
+                    assembly.PlateInstalled, structureReturns, detachedStructures)) return false;
+            }
+            else return false;
+
+            lowerEntry.StorePart(null, true);
+            foreach (AssemblyCatalogEntry entry in returns) entry.StorePart(null, true);
+            foreach (AssemblyCatalogEntry entry in structureReturns) entry.StorePart(null, true);
+            foreach (Transform part in detachedStructures)
+            {
+                part.gameObject.SetActive(false);
+                Destroy(part.gameObject);
+            }
+            try { RefreshInventory(); }
+            catch (System.Exception exception) { Debug.LogError("키보드 해체 후 재고 표시 갱신에 실패했습니다. 재고 반환은 완료되었습니다. " + exception, customization); }
+            return true;
+        }
+
+        /// <summary>assembly의 kind별 재질과 기존 출고 기록으로 정확한 카탈로그 항목을 반환한다. 원본 기록을 우선 사용하고 없으면 overlay 카탈로그를 조회한다.</summary>
+        private static AssemblyCatalogEntry GetStructureEntry(KeyboardAssemblyState assembly, KeyboardEditOverlayUI overlay,
+            AssemblyStructurePart kind)
+        {
+            AssemblyCatalogEntry entry = assembly.GetStructureInventoryEntry(kind);
+            if (entry != null) return entry;
+            return overlay != null ? overlay.GetStructureEntry(kind, assembly.GetStructureMaterial(kind)) : null;
+        }
+
+        /// <summary>kind의 실제 활성 부품을 찾아 기존 재고 항목에 추가한다. 외부에 분리된 부품은 반환 확정 후 제거 목록에 둔다.</summary>
+        private static bool AddStructureReturn(KeyboardAssemblyState assembly, KeyboardEditOverlayUI overlay,
+            AssemblyStructurePart kind, bool installed, List<AssemblyCatalogEntry> returns, List<Transform> detached)
+        {
+            IReadOnlyList<Transform> parts = assembly.GetStructureParts(kind);
+            bool hasPhysicalPart = installed;
+            foreach (Transform part in parts)
+                if (part != null && part.gameObject.activeSelf) hasPhysicalPart = true;
+            if (!hasPhysicalPart) return true;
+            AssemblyCatalogEntry entry = GetStructureEntry(assembly, overlay, kind);
+            if (entry == null) return kind == AssemblyStructurePart.Plate;
+            returns.Add(entry);
+            Transform root = assembly.transform.root;
+            foreach (Transform part in parts)
+                if (part != null && part.gameObject.activeSelf && !part.IsChildOf(root)) detached.Add(part);
+            return true;
+        }
+
         /// <summary>
         /// entry의 키캡 또는 축을 point에서 드래그하며 한 개 배치에서는 재고 한 개를 예약한다.
         /// 일괄 배치에서는 표시용 실물만 준비하고 재고가 없으면 시작하지 않는다. 반환값은 없다.
@@ -384,6 +506,7 @@ namespace Game.Player
             if (!bulk && !entry.TryReserve()) return;
             _pullers.CancelDrag();
             _entry = entry;
+            GetComponent<KeyboardEditOverlayUI>().SelectInventoryCard(entry);
             _fromInventory = true;
             _isBulkDragging = bulk;
             _bulkInteractionId = _isBulkDragging ? System.Guid.NewGuid().ToString("N") : null;
@@ -470,14 +593,14 @@ namespace Game.Player
             _entry = part.CatalogEntry;
             part.BeginDrag();
             _dragPlane = new Plane(InputCamera.transform.forward, part.transform.position);
-            if (_entry.IsSwitch) PrepareSwitchClearance(part);
+            PrepareSwitchClearance(part);
             foreach (Collider collider in part.GetComponentsInChildren<Collider>()) collider.enabled = false;
             _previewRenderer.Show(part.transform);
             MoveDrag(point);
         }
 
         /// <summary>
-        /// part의 메시 크기와 편집 키보드의 현재 표면으로 스위치 이동의 최소 높이를 저장한다.
+        /// part의 메시 크기와 편집 키보드의 현재 표면으로 키캡과 스위치 이동의 최소 높이를 저장한다.
         /// 키보드의 위쪽 방향을 사용하며 슬롯 위치와 부품 크기는 변경하지 않는다.
         /// </summary>
         private void PrepareSwitchClearance(AssemblyDraggablePart part)
@@ -527,9 +650,7 @@ namespace Game.Player
             if (entry == null) return;
             _entryTextures.TryGetValue(entry, out Texture texture);
             _dragIcon.texture = texture != null ? texture : Texture2D.whiteTexture;
-            _dragIcon.color = entry.IsSwitch && entry.SwitchData.StemMaterial != null
-                && entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
-                ? entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
+            _dragIcon.color = Color.white;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, point, null, out Vector2 local);
             _dragIcon.rectTransform.localPosition = local;
         }
@@ -551,7 +672,7 @@ namespace Game.Player
             if (_dragPlane.Raycast(ray, out float distance))
             {
                 Vector3 position = ray.GetPoint(distance);
-                if (_entry.IsSwitch && _switchClearancePlane.GetDistanceToPoint(position) < 0f
+                if (_switchClearancePlane.GetDistanceToPoint(position) < 0f
                     && _switchClearancePlane.Raycast(ray, out float clearanceDistance))
                     position = ray.GetPoint(clearanceDistance);
                 _activePart.transform.position = position;
@@ -738,17 +859,26 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// part가 customization의 PCB와 보강판 및 상단부와 다시 충돌하도록 준비한다.
-        /// 런타임 구조 부품에 필요한 충돌체를 만들고 분리 시 설정된 충돌 무시를 해제한다.
+        /// part가 customization의 실제 부품들과 다시 충돌하도록 준비한다.
+        /// PCB·보강판·상단부 충돌체를 준비하고 스위치·키캡을 포함한 충돌 무시를 해제하며 본체 집기용 충돌체는 제외한다.
         /// </summary>
         private void PrepareDetachedPartCollisions(AssemblyDraggablePart part, KeyboardCustomization customization)
         {
+            Rigidbody body = part.GetComponent<Rigidbody>();
+            if (!body.isKinematic) body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             if (!customization.TryGetComponent<KeyboardAssemblyState>(out var assembly) || !assembly.Initialized) return;
             Transform pcb = assembly.GetStructureParts(AssemblyStructurePart.Pcb)[0];
             EnableFailedDropCollision(pcb.Find("PCB_Board").GetComponent<MeshRenderer>(), part);
             EnableFailedDropCollision(customization.PlateRenderer, part);
             foreach (MeshRenderer upper in assembly.UpperRenderers)
                 EnableFailedDropCollision(upper, part, true);
+            foreach (Collider detached in part.GetComponentsInChildren<Collider>())
+            foreach (Collider installed in customization.GetComponentsInChildren<Collider>())
+            {
+                if (!installed.enabled || installed.isTrigger || installed.transform == customization.transform
+                    || installed.transform.IsChildOf(part.transform)) continue;
+                Physics.IgnoreCollision(detached, installed, false);
+            }
         }
 
         /// <summary>
@@ -901,13 +1031,13 @@ namespace Game.Player
                 state.Add("좌클릭 드래그", "부품 집기");
                 return true;
             }
-            state.Title = _isBulkDragging ? "일괄 배치" : _entry.IsSwitch ? "스위치 드래그" : "키캡 드래그";
+            state.Title = _isBulkDragging ? "연속 배치" : _entry.IsSwitch ? "스위치 드래그" : "키캡 드래그";
             state.Add("마우스 이동", "부품 이동");
             if (_isBulkDragging)
             {
                 if (!_pullers.IsPointerOverUI(point) && _entry.AvailableQuantity > 0 && CanInstallEntry(FindInstallSlot(point)))
                     state.Add("좌클릭 유지", "키캡·스위치 연속 설치");
-                state.Add("좌클릭 놓기", "일괄 배치 종료");
+                state.Add("좌클릭 놓기", "연속 배치 종료");
             }
             else if (IsInReturnArea(point)) state.Add("좌클릭 놓기", "보관함에 넣기");
             else if (_dragOriginPart != null) state.Add("좌클릭 놓기", "부품 내려놓기");
@@ -996,6 +1126,10 @@ namespace Game.Player
                 return;
             }
             part.DropWithPhysics();
+            PrepareDetachedPartCollisions(part, EditingKeyboard.GetComponent<KeyboardCustomization>());
+            PrepareSwitchClearance(part);
+            float clearance = _switchClearancePlane.GetDistanceToPoint(part.transform.position);
+            if (clearance < 0f) part.transform.position -= _switchClearancePlane.normal * clearance;
             Rigidbody body = part.GetComponent<Rigidbody>();
             body.linearVelocity = velocity;
             body.angularVelocity = angularVelocity;
@@ -1067,9 +1201,7 @@ namespace Game.Player
             icon.name = "BoundaryReturnIcon";
             _entryTextures.TryGetValue(entry, out Texture texture);
             icon.texture = texture != null ? texture : Texture2D.whiteTexture;
-            icon.color = entry.IsSwitch && entry.SwitchData.StemMaterial != null
-                && entry.SwitchData.StemMaterial.HasProperty("_BaseColor")
-                ? entry.SwitchData.StemMaterial.GetColor("_BaseColor") : Color.white;
+            icon.color = Color.white;
             icon.gameObject.SetActive(true);
             return icon;
         }
@@ -1126,6 +1258,7 @@ namespace Game.Player
         void OnApplicationFocus(bool focused) { if (!focused) CancelDrag(); }
         void OnDestroy()
         {
+            foreach (Texture2D texture in _switchPreviewTextures.Values) if (texture != null) Destroy(texture);
             foreach (KeyboardEditButton button in _singlePlacementButtons) button.Clicked -= HandlePlacementModeClicked;
             foreach (KeyboardEditButton button in _bulkPlacementButtons) button.Clicked -= HandlePlacementModeClicked;
             if (_dragIcon != null) Destroy(_dragIcon.gameObject);

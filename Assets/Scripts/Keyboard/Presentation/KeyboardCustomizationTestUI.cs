@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -40,6 +40,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
 
     [Header("Embedded Photo Panel")]
     private float _wheelZoomSensitivity = 0.03f;
+    private bool _trayStyle;
     private RectTransform _embeddedParentRect;
     private RectTransform _embeddedPanelRect;
     private RectTransform _embeddedViewportRect;
@@ -339,6 +340,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
     /// </summary>
     public RectTransform EmbedControls(RectTransform parent, float width)
     {
+        _trayStyle = true;
         GameObject frame = _customizationPanel;
         bool visible = frame.activeSelf;
         _catalogWidth = width;
@@ -354,6 +356,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             label.resizeTextForBestFit = false;
         }
         ConfigureAssemblyPhotoLayout();
+        ApplyPhotoTrayStyle();
         _customizationPanel = _embeddedContentRect.gameObject;
         _embeddedPanelRect = null;
         _embeddedViewportRect = null;
@@ -361,6 +364,31 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         Destroy(frame);
         _customizationPanel.SetActive(visible);
         return _embeddedContentRect;
+    }
+
+    /// <summary>작업 트레이의 기존 이미지 편집 요소에 갈색 카드와 진한 글자 스타일을 적용한다. 사진 미리보기와 입력 이벤트는 유지하며 원본 독립 편집 화면에는 적용하지 않는다.</summary>
+    private void ApplyPhotoTrayStyle()
+    {
+        foreach (Image image in _embeddedContentRect.GetComponentsInChildren<Image>(true))
+        {
+            if (image.color.a < 0.1f) continue;
+            image.color = image.GetComponent<KeyboardCustomizationTestButton>() != null
+                ? new Color32(214, 186, 154, 255) : new Color32(225, 204, 176, 255);
+            if (image.GetComponent<KeyboardCustomizationTestButton>() != null)
+            {
+                Outline border = image.gameObject.AddComponent<Outline>();
+                border.effectColor = new Color32(148, 115, 82, 255);
+                border.effectDistance = new Vector2(1.5f, -1.5f);
+            }
+        }
+        foreach (Text label in _embeddedContentRect.GetComponentsInChildren<Text>(true))
+        {
+            label.color = new Color32(53, 35, 24, 255);
+            label.fontSize = Mathf.Max(16, label.fontSize);
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 14;
+            label.resizeTextMaxSize = label.fontSize;
+        }
     }
 
     /// <summary>
@@ -533,7 +561,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         _pathToggleLabel.fontStyle = FontStyle.Normal;
         _path = Field(content, "C:\\Images\\my-keyboard.png", 16f, 352f, 326f);
         _path.gameObject.SetActive(false);
-        _path.GetComponent<Image>().color = new Color(0.05f, 0.08f, 0.12f);
+        _path.GetComponent<Image>().color = _trayStyle ? new Color32(225, 204, 176, 255) : new Color(0.05f, 0.08f, 0.12f);
         _path.textComponent.color = new Color(0.89f, 0.94f, 0.96f);
         _path.onEndEdit.AddListener(HandleImagePathEdited);
         _formatNoteRect = AddEmbeddedLabel(content, "FormatNote", "최대 32MB · 이미지 한 변 8,192px 이하 · PNG/JPG만 지원", 16f, 354f, 326f, 28f, 9,
@@ -778,6 +806,12 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             _targetBackgrounds[index].color = selected
                 ? new Color(0.08f, 0.24f, 0.25f)
                 : new Color(0.06f, 0.1f, 0.14f);
+            if (_trayStyle)
+            {
+                _targetBackgrounds[index].color = selected ? new Color32(92, 58, 33, 255) : new Color32(214, 186, 154, 255);
+                _targetLabels[index].color = selected ? new Color32(255, 250, 240, 255) : new Color32(53, 35, 24, 255);
+                _targetLabels[index].fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
+            }
             string[] labels = { "전체 키캡", "케이스", "키캡 한 개" };
             _targetLabels[index].text = labels[index];
         }
@@ -809,6 +843,11 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             ? new Color(0.23f, 0.85f, 0.77f)
             : new Color(0.19f, 0.39f, 0.37f);
         _applyText.color = canApply ? new Color(0.03f, 0.19f, 0.18f) : new Color(0.72f, 0.84f, 0.81f);
+        if (_trayStyle)
+        {
+            _applyBackground.color = canApply ? new Color32(92, 58, 33, 255) : new Color32(214, 186, 154, 255);
+            _applyText.color = canApply ? new Color32(255, 250, 240, 255) : new Color32(105, 75, 48, 255);
+        }
         _applyText.text = keyTarget
             ? "키캡 " + (_index.text.Length > 0 ? _index.text : "?") + "번에 이미지 적용"
             : _selectedTarget == ImageTarget.Case ? "키보드 케이스에 이미지 적용" : "전체 키캡에 이미지 적용";
@@ -947,6 +986,9 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             : "미리보기 중 · 아직 적용되지 않음";
         _imageStateLabel.color = applied ? new Color32(59, 217, 196, 255)
             : previewed ? new Color32(255, 200, 96, 255) : new Color32(140, 155, 170, 255);
+        if (_trayStyle)
+            _imageStateLabel.color = applied ? new Color32(35, 86, 53, 255)
+                : previewed ? new Color32(116, 65, 20, 255) : new Color32(80, 56, 37, 255);
     }
 
     /// <summary>현재 이미지와 크롭 입력 상태를 조회해 state에 실행 가능한 이동 및 확대 조작을 추가한다. 이미지를 변경하지 않고 표시 여부를 반환한다.</summary>
@@ -1260,13 +1302,13 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
             && !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
         {
             ClearEmbeddedPreview();
-            _path.GetComponent<Image>().color = new Color(0.3f, 0.12f, 0.15f);
+            _path.GetComponent<Image>().color = _trayStyle ? new Color32(236, 185, 171, 255) : new Color(0.3f, 0.12f, 0.15f);
             _message.text = "파일 경로는 PNG 또는 JPG 이미지여야 합니다.";
             RefreshEmbeddedPanel();
             return;
         }
 
-        _path.GetComponent<Image>().color = new Color(0.05f, 0.08f, 0.12f);
+        _path.GetComponent<Image>().color = _trayStyle ? new Color32(225, 204, 176, 255) : new Color(0.05f, 0.08f, 0.12f);
         _path.text = selectedPath;
         ShowPreview();
     }
@@ -1347,7 +1389,7 @@ public sealed class KeyboardCustomizationTestUI : MonoBehaviour
         RefreshCropVisuals();
         _fileName.text = "파일을 선택해 주세요";
         _fileDimensions.text = "—";
-        _path.GetComponent<Image>().color = new Color(0.05f, 0.08f, 0.12f);
+        _path.GetComponent<Image>().color = _trayStyle ? new Color32(225, 204, 176, 255) : new Color(0.05f, 0.08f, 0.12f);
     }
 
     /// <summary>숫자 입력란의 index를 검사해 개별 키 사진 적용을 실행하고 오류를 표시한다. 반환값은 없다.</summary>

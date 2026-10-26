@@ -12,6 +12,21 @@ namespace Game.Player
         private KeyboardEditButton _photoTrayTab;
         private bool _photoTraySelected;
 
+        /// <summary>host의 상하 스크롤바를 기존 부품 목록과 같은 스프라이트와 색상으로 생성해 반환한다. 이동 영역 배경만 투명하게 하고 스크롤 값과 편집 항목은 변경하지 않는다.</summary>
+        public Scrollbar CreateTrayEditorScrollbar(RectTransform host)
+        {
+            Scrollbar bar = CreateHorizontalScrollbar(host, "Editor");
+            RectTransform track = (RectTransform)bar.transform;
+            track.anchorMin = Vector2.right;
+            track.anchorMax = Vector2.one;
+            track.pivot = Vector2.right;
+            track.offsetMin = new Vector2(-10f, 2f);
+            track.offsetMax = new Vector2(0f, -12f);
+            track.GetComponent<Image>().color = Color.clear;
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            return bar;
+        }
+
         /// <summary>현재 LED·사진 패널을 기존 목록 이전 함수로 트레이 안에 배치한다. 원래 컨트롤과 편집 이벤트를 재사용하며 닫힌 상태로 연결한다.</summary>
         private void ConnectEditorTray()
         {

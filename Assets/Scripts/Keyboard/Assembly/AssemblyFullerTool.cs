@@ -13,6 +13,8 @@ namespace KeyboardModeling.Assembly
         [SerializeField] private AssemblyDragInput _dragInput;
         [SerializeField] private Transform _fuller;
         [SerializeField, Tooltip("도구 로컬 공간의 집게 끝 중심입니다.")] private Transform _gripPoint;
+        [SerializeField, Tooltip("집게 끝 Transform이 없을 때 사용할 도구 루트 기준 집기 지점입니다.")] private Vector3 _heldGripLocalPoint;
+        [SerializeField, Tooltip("활성화하면 지정한 도구 로컬 집기 지점을 사용합니다.")] private bool _useHeldGripLocalPoint;
         [SerializeField] private Vector3 _heldEulerAngles;
         [SerializeField, Tooltip("활성화하면 키캡 대신 스위치만 분리합니다.")] private bool _extractSwitches;
         private IKeyboardPullerContext _context;
@@ -163,9 +165,12 @@ namespace KeyboardModeling.Assembly
             _followPlane = _followCameraPlane
                 ? new Plane(Context.InputCamera.transform.forward, bounds.center)
                 : new Plane(Vector3.up, new Vector3(0f, Context.DragWorldHeight, 0f));
-            _localGripPosition = _gripPoint != null
-                ? _fuller.InverseTransformPoint(_gripPoint.position)
-                : _fuller.InverseTransformPoint(bounds.center);
+            if (_gripPoint != null)
+                _localGripPosition = _fuller.InverseTransformPoint(_gripPoint.position);
+            else if (_useHeldGripLocalPoint)
+                _localGripPosition = _heldGripLocalPoint;
+            else
+                _localGripPosition = GetLocalVisualBounds().center;
             Context.CancelDrag();
             _originPosition = _fuller.position;
             _originRotation = _fuller.rotation;
@@ -200,6 +205,28 @@ namespace KeyboardModeling.Assembly
             ResetHold();
             _extracting = true;
             return true;
+        }
+
+        /// <summary>활성 메시 bounds를 도구 로컬 공간으로 모아 반환한다. 도구의 원래 자세는 바꾸지 않는다.</summary>
+        private Bounds GetLocalVisualBounds()
+        {
+            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+            bool found = false;
+            foreach (MeshRenderer renderer in _fuller.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (!renderer.enabled) continue;
+                Bounds rendererBounds = renderer.localBounds;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 sign = new Vector3((corner & 1) == 0 ? -1f : 1f,
+                        (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f);
+                    Vector3 point = _fuller.InverseTransformPoint(renderer.transform.TransformPoint(
+                        rendererBounds.center + Vector3.Scale(rendererBounds.extents, sign)));
+                    if (found) bounds.Encapsulate(point);
+                    else { bounds = new Bounds(point, Vector3.zero); found = true; }
+                }
+            }
+            return bounds;
         }
 
         /// <summary>

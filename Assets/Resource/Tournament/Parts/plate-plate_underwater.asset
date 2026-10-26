@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: plate-plate_underwater
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.PlateDefinition
   _id: plate-plate_underwater
-  _displayName: "UnderWater \uBCF4\uAC15\uD310"
+  _displayName: "\uc218\uc911 \ubcf4\uac15\ud310"
   _price: 60
   _quantity: 1
   _data: {fileID: 11400000, guid: 8f826efd0c3ec5941941d1e269490a42, type: 2}

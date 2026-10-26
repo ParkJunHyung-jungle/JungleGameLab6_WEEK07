@@ -291,18 +291,18 @@ namespace KeyboardModeling.Assembly
                 foreach (KeycapDefinition candidate in _keycapDefinitions)
                     if (candidate.ShellMesh == null && candidate.Material == material)
                         definition = candidate;
-                AddCard(category, definition != null ? definition.DisplayName : material.name, shell,
+                AddCard(category, KeyboardPartDisplayNames.KeycapName(definition, material), shell,
                     new[] { material }, FindKeycapEntry(material, definition));
             }
             foreach (KeycapDefinition definition in _keycapDefinitions)
                 if (definition.ShellMesh != null)
-                    AddCard(category, definition.DisplayName, definition.ShellMesh, definition.ModelMaterials,
+                    AddCard(category, KeyboardPartDisplayNames.KeycapName(definition, null), definition.ShellMesh, definition.ModelMaterials,
                         FindKeycapEntry(definition.Material, definition));
 
             category = AddCategory("스위치");
             Mesh switchMesh = FindMesh(_referenceKeyboardPrefab, "Switch_TopHousing");
             foreach (SwitchData data in _switchData)
-                AddCard(category, data.Type.ToString(), switchMesh, new[] { data.TopHousingMaterial },
+                AddCard(category, KeyboardPartDisplayNames.SwitchName(data.Type), switchMesh, new[] { data.TopHousingMaterial },
                     FindSwitchEntry(data));
 
             KeyboardCustomization keyboard = _referenceKeyboardPrefab.GetComponent<KeyboardCustomization>();
@@ -312,7 +312,7 @@ namespace KeyboardModeling.Assembly
                 _caseCategory = category;
                 Mesh caseMesh = keyboard.CaseRenderers[0].GetComponent<MeshFilter>().sharedMesh;
                 foreach (Material material in _keycapMaterials)
-                    AddCard(category, material.name, caseMesh, new[] { material });
+                    AddCard(category, KeyboardPartDisplayNames.MaterialName(material), caseMesh, new[] { material });
             }
             if (_keycapMaterials.Length > 0)
             {
@@ -320,7 +320,7 @@ namespace KeyboardModeling.Assembly
                 _plateCategory = category;
                 Mesh plateMesh = keyboard.PlateRenderer.GetComponent<MeshFilter>().sharedMesh;
                 foreach (Material material in _keycapMaterials)
-                    AddCard(category, material.name, plateMesh, new[] { material });
+                    AddCard(category, KeyboardPartDisplayNames.MaterialName(material), plateMesh, new[] { material });
             }
             if (_ledSettings != null)
             {

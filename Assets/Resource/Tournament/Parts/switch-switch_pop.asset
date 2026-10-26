@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: switch-switch_pop
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.SwitchDefinition
   _id: switch-switch_pop
-  _displayName: Pop
+  _displayName: "\ud31d\ucd95"
   _price: 60
   _quantity: 1
   _data: {fileID: 11400000, guid: e6749129210a24d4994d3ee244ab7cb4, type: 2}

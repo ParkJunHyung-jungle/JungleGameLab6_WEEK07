@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: plate-plate_golden
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.PlateDefinition
   _id: plate-plate_golden
-  _displayName: "Golden \uBCF4\uAC15\uD310"
+  _displayName: "\uae08\uc0c9 \ubcf4\uac15\ud310"
   _price: 60
   _quantity: 1
   _data: {fileID: 11400000, guid: 6c380f1e883926043b3dbecc9c980996, type: 2}

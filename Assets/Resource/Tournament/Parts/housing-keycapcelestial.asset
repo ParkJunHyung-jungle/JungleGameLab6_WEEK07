@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: housing-keycapcelestial
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.HousingDefinition
   _id: housing-keycapcelestial
-  _displayName: "\uCC9C\uCCB4 \uD558\uC6B0\uC9D5"
+  _displayName: "\uc6b0\uc8fc \ud558\uc6b0\uc9d5"
   _price: 60
   _quantity: 1
   _material: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}

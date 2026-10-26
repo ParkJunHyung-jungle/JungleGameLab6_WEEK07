@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: plate-plate_nomal
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.PlateDefinition
   _id: plate-plate_nomal
-  _displayName: "Nomal \uBCF4\uAC15\uD310"
+  _displayName: "\uae30\ubcf8 \ubcf4\uac15\ud310"
   _price: 60
   _quantity: 1
   _data: {fileID: 11400000, guid: 69e1e2a7db7be374d90eb2cfe4d82c16, type: 2}

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: plate-plate_rainbow
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.PlateDefinition
   _id: plate-plate_rainbow
-  _displayName: "Rainbow \uBCF4\uAC15\uD310"
+  _displayName: "\ubb34\uc9c0\uac1c \ubcf4\uac15\ud310"
   _price: 60
   _quantity: 1
   _data: {fileID: 11400000, guid: bd31123c656224b4eb33cd51b321d11a, type: 2}

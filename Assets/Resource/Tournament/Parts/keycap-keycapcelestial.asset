@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: keycap-keycapcelestial
   m_EditorClassIdentifier: Assembly-CSharp::Game.Tournament.KeycapDefinition
   _id: keycap-keycapcelestial
-  _displayName: "\uCC9C\uCCB4 \uD0A4\uCEA1"
+  _displayName: "\uc6b0\uc8fc \ud0a4\ucea1"
   _price: 50
   _quantity: 3
   _material: {fileID: 2100000, guid: 49c3ca8fd4e59c34ea8d550486382ebb, type: 2}

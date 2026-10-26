@@ -181,14 +181,14 @@ namespace Game.Player
             SetPlatePickerTabSelection(_plateEffectTabButton, _platePickerSection == PlatePickerSection.Effect);
         }
 
-        /// <summary>현재 작업대의 실제 구조 메시와 각 항목의 원본 재질로 독립 썸네일을 갱신한다. 원본 부품 재질·재고는 변경하지 않으며 같은 모델의 이미지는 재사용한다.</summary>
+        /// <summary>작업대 실물 또는 자판기의 조립 원본과 각 항목 재질로 썸네일을 갱신한다. 빈 작업대에서도 원본 메시를 읽으며 실물 생성과 재고·조립 변경 없이 같은 모델의 이미지를 재사용한다.</summary>
         private void RefreshStructureTrayPreviews()
         {
             if (!_structureTraysReady) return;
             KeyboardAssemblyState assembly = _plateCustomization != null ? _plateCustomization.GetComponent<KeyboardAssemblyState>() : null;
-            if (assembly == _structurePreviewSource && _structurePreviewTextures.Count > 0) return;
             GameObject sourcePrefab = assembly != null && assembly.TryGetComponent(out KeyboardPickupTarget pickup)
-                ? pickup.SourcePrefab : null;
+                ? pickup.SourcePrefab : _pullerController.KeyboardDispenser.GetPreviewPrefab();
+            if (assembly == _structurePreviewSource && sourcePrefab == _structurePreviewPrefab && _structurePreviewTextures.Count > 0) return;
             if (sourcePrefab != null && sourcePrefab == _structurePreviewPrefab && _structurePreviewTextures.Count > 0)
             {
                 _structurePreviewSource = assembly;
@@ -198,10 +198,12 @@ namespace Game.Player
             DestroyPreviewTextures(_structurePreviewTextures);
             _structurePreviewSource = assembly;
             _structurePreviewPrefab = sourcePrefab;
-            if (assembly == null || !assembly.Initialized) return;
+            KeyboardAssemblyState previewAssembly = assembly != null ? assembly
+                : sourcePrefab != null ? sourcePrefab.GetComponent<KeyboardAssemblyState>() : null;
+            if (previewAssembly == null) return;
             foreach (var preview in _structurePreviews)
             {
-                Texture2D texture = AssemblyCatalogPreview.RenderParts(assembly.GetStructureParts(preview.Key.StructureKind), preview.Key.StructureMaterial,
+                Texture2D texture = AssemblyCatalogPreview.RenderParts(previewAssembly.GetStructurePreviewParts(preview.Key.StructureKind), preview.Key.StructureMaterial,
                     preview.Key.StructureKind == AssemblyStructurePart.Pcb, true);
                 if (texture == null) continue;
                 _structurePreviewTextures.Add(texture);

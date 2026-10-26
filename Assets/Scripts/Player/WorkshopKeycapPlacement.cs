@@ -114,6 +114,7 @@ namespace Game.Player
             RefreshPlacementModes();
             if (!_pullers.InputAllowed || Mouse.current == null)
             {
+                if (_pullers.EditingPointerAllowed && Mouse.current != null && !IsDragging && IsInventoryScrolling) return;
                 CancelDrag();
                 return;
             }

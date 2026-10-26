@@ -47,15 +47,17 @@ namespace Game.Player
         public KeyboardInputController EditingKeyboard => _workshopView != null ? _workshopView.EditingKeyboard
             : _interaction != null ? _interaction.EditingKeyboard : null;
 
-        public bool InputAllowed => IsEditing && EditingKeyboard != null && !_drawerTransitionLocked
+        public bool EditingPointerAllowed => IsEditing && !_drawerTransitionLocked
             && !(Game.Tutorials.FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked)
             && !PlaytestResearchSession.IsUploadConfirmationOpen
             && InGameCursor.CanProcessVirtualPointer;
+        public bool InputAllowed => EditingPointerAllowed && EditingKeyboard != null;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
             || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling));
         public bool IsPcbDragging => _pcbDragging;
         public bool IsScrewPointerCaptured => _screwPointerCaptured;
         public KeyboardDispenser KeyboardDispenser => _workshopView.KeyboardDispenser;
+        public bool CanIssueLowerHousing => _workshopView != null && _workshopView.IsWorkbenchEmpty && IsEditing;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
 
@@ -204,7 +206,8 @@ namespace Game.Player
                 if (target != null) target.GetComponent<KeyboardCustomization>().PrepareSwitchRemovalTargets();
                 UpdateDragHeight();
             }
-            if (!InputAllowed || Mouse.current == null) { CancelDrag(); return; }
+            if (!EditingPointerAllowed || Mouse.current == null) { CancelDrag(); return; }
+            if (EditingKeyboard == null) return;
             if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling)) return;
             Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);

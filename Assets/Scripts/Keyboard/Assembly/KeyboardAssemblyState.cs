@@ -434,6 +434,19 @@ namespace KeyboardModeling.Assembly
         /// <summary>kind에 해당하는 기존 구조 부품 실물을 반환한다. 참조만 제공하며 설치 상태는 변경하지 않는다.</summary>
         public IReadOnlyList<Transform> GetStructureParts(AssemblyStructurePart kind) => _structureParts[(int)kind];
 
+        /// <summary>kind의 썸네일용 부품 참조를 반환한다. 초기화된 실물은 기존 목록을 사용하고 원본 Prefab은 직렬화된 참조만 읽어 조립·활성 상태를 변경하지 않는다.</summary>
+        public IReadOnlyList<Transform> GetStructurePreviewParts(AssemblyStructurePart kind)
+        {
+            if (_initialized) return GetStructureParts(kind);
+            return kind switch
+            {
+                AssemblyStructurePart.Pcb => new[] { _pcb },
+                AssemblyStructurePart.Plate => new[] { _customization.PlateRenderer.transform },
+                AssemblyStructurePart.Lower => new[] { _customization.CaseRenderers[0].transform },
+                _ => Array.ConvertAll(_upperRenderers, renderer => renderer.transform)
+            };
+        }
+
         /// <summary>kind의 현재 공통 설치 조건을 반환한다. 스위치와 키캡의 기존 설치 상태는 검사에만 사용한다.</summary>
         public bool CanInstallStructure(AssemblyStructurePart kind)
         {

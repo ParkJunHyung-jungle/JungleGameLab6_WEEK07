@@ -163,7 +163,8 @@ namespace Game.Player
         private bool CanProcessInput()
         {
             return _workshopView.IsKeyboardEditing && _workshopView.CanShowControlHints
-                && _pullers.isActiveAndEnabled && _pullers.InputAllowed && !_pullers.IsManipulatingPart;
+                && InGameCursor.CanProcessVirtualPointer
+                && _pullers.isActiveAndEnabled && !_pullers.IsManipulatingPart;
         }
 
         /// <summary>

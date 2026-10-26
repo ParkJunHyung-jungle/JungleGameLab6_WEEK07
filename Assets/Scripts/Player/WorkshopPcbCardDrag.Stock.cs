@@ -20,6 +20,8 @@ namespace Game.Player
         private IReadOnlyList<Transform> _stockParts;
         private AssemblyDraggablePart _stockKeyboard;
         private Transform _stockOriginParent;
+        private bool StockInputAllowed => _kind == AssemblyStructurePart.Lower
+            ? _pullers.EditingPointerAllowed : _pullers.InputAllowed;
 
         /// <summary>tray를 기존 구조 부품 드래그의 출고 입력으로 연결한다. 별도 드래그 처리기를 만들지 않고 기존 컨트롤러의 카메라·물리·복원 경로를 사용한다.</summary>
         public void ConnectStockTray(WorkshopKeycapDrawerTransition tray)
@@ -31,10 +33,10 @@ namespace Game.Player
         /// <summary>entry의 수량과 현재 서랍·부품 점유로 출고 가능 여부를 반환한다. 하부는 새 키보드 생성 경로를, 상부·PCB는 기존 설치 조건을 사용한다.</summary>
         public bool CanBeginStockDrag(AssemblyCatalogEntry entry)
         {
-            if (!_stockEnabled || !_selected || !_stockTray.CanInteractWithTray || !_pullers.InputAllowed
+            if (!_stockEnabled || !_selected || !_stockTray.CanInteractWithTray || !StockInputAllowed
                 || _pullers.IsManipulatingPart || entry.AvailableQuantity <= 0 || entry.StructureKind != _kind) return false;
-            if (_kind == AssemblyStructurePart.Lower) return _pullers.KeyboardDispenser.CanIssueLowerHousing
-                && (entry.HasStoredPart || _pullers.KeyboardDispenser.CanDispense);
+            if (_kind == AssemblyStructurePart.Lower) return _pullers.CanIssueLowerHousing
+                && (entry.HasStoredPart || _pullers.KeyboardDispenser.CanCreateKeyboard);
             return _assembly != null && _assembly.CanInstallStructure(_kind)
                 && _assembly.GetStructureInventoryEntry(_kind) == null
                 && (_kind != AssemblyStructurePart.Pcb || !_assembly.PcbLoose);
@@ -51,7 +53,7 @@ namespace Game.Player
                 if (_kind == AssemblyStructurePart.Lower)
                 {
                     _stockOriginParent = null;
-                    if (!_pullers.KeyboardDispenser.CanIssueLowerHousing)
+                    if (!_pullers.CanIssueLowerHousing)
                     {
                         entry.FinishReservation(false);
                         _stockEntry = null;
@@ -62,7 +64,7 @@ namespace Game.Player
                     if (_stockKeyboard == null)
                     {
                         Transform origin = _assembly != null ? _assembly.transform : _pullers.transform;
-                        if (!_pullers.KeyboardDispenser.TryCreateKeyboard(origin.position, origin.rotation, out GameObject root))
+                        if (!_pullers.KeyboardDispenser.TryCreateKeyboard(origin.position, origin.rotation, out GameObject root, respectSceneLimit: false))
                         {
                             entry.FinishReservation(false);
                             _stockEntry = null;
@@ -144,7 +146,7 @@ namespace Game.Player
                 if (_kind == AssemblyStructurePart.Lower) TryPickIssuedKeyboard();
                 return _stockDragging;
             }
-            if (!_pullers.InputAllowed || Mouse.current == null || Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (!StockInputAllowed || Mouse.current == null || Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 CancelStockDrag();
                 return true;
@@ -258,7 +260,7 @@ namespace Game.Player
         /// <summary>열린 하부 서랍에서 작업대·바닥의 빈 하우징을 point 입력으로 집는다. 기존 실물과 재질 항목을 연결하고 조립된 본체는 거부하며 재고는 반환 확정까지 유지한다.</summary>
         private void TryPickIssuedKeyboard()
         {
-            if (!_selected || !_stockTray.CanInteractWithTray || !_pullers.InputAllowed || _pullers.IsManipulatingPart || Mouse.current == null
+            if (!_selected || !_stockTray.CanInteractWithTray || !StockInputAllowed || _pullers.IsManipulatingPart || Mouse.current == null
                 || !Mouse.current.leftButton.wasPressedThisFrame || _pullers.IsPointerOverUI(InGameCursor.Position)) return;
             Ray ray = _pullers.InputCamera.ScreenPointToRay(InGameCursor.Position);
             if (!Physics.Raycast(ray, out RaycastHit hit, _pullers.InputCamera.farClipPlane, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return;

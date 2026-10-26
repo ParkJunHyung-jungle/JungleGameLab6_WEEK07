@@ -29,6 +29,8 @@ namespace Game.Workshop
         [SerializeField] private Text _status;
         [SerializeField] private KeyboardEditButton _send;
         private readonly List<RaycastResult> _pointerHits = new List<RaycastResult>();
+        private GraphicRaycaster _terminalRaycaster;
+        private WorkshopViewController _workshopView;
 
         [Header("Confirmation")]
         [SerializeField] private GameObject _confirmation;
@@ -65,6 +67,9 @@ namespace Game.Workshop
 
         void Awake()
         {
+            _terminalRaycaster = _send.GetComponentInParent<GraphicRaycaster>();
+            Camera eventCamera = _terminalRaycaster.eventCamera;
+            _workshopView = eventCamera != null ? eventCamera.GetComponent<WorkshopViewController>() : null;
             _confirmation.SetActive(false);
             _confirmLabel = _confirm.GetComponentInChildren<Text>(true);
             _backLabel = _back.GetComponentInChildren<Text>(true);
@@ -82,6 +87,14 @@ namespace Game.Workshop
 
         void Update()
         {
+            if (InGameCursor.IsWorldAim && _workshopView != null && _workshopView.CanClickGeneralUI
+                && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame
+                && _send.IsActive() && _send.IsInteractable() && CanPointAtSendButton())
+                _send.OnPointerClick(new PointerEventData(EventSystem.current)
+                {
+                    button = PointerEventData.InputButton.Left,
+                    position = InGameCursor.GetWorldPosition(_terminalRaycaster.eventCamera)
+                });
             if (_modalOpen)
             {
                 Time.timeScale = 0f;
@@ -210,14 +223,16 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 기존 가상 커서 좌표로 UI Raycast를 수행하여 발송 버튼이 맨 앞의 클릭 대상인지 반환한다.
+        /// 중앙 조준 또는 기존 자유 포인터 좌표로 UI Raycast를 수행하여 발송 버튼이 맨 앞의 클릭 대상인지 반환한다.
         /// 월드 Canvas의 이벤트 카메라와 3D 가림 판정을 재사용하며 가려진 버튼의 탐색 입력도 거부한다.
         /// </summary>
         private bool CanPointAtSendButton()
         {
-            if (!InGameCursor.CanProcessVirtualPointer || EventSystem.current == null) return false;
+            if (!InGameCursor.CanProcessPointer || EventSystem.current == null
+                || !InGameCursor.IsWorldAim && !InGameCursor.CanProcessVirtualPointer) return false;
             _pointerHits.Clear();
-            var pointer = new PointerEventData(EventSystem.current) { position = InGameCursor.Position };
+            var pointer = new PointerEventData(EventSystem.current)
+                { position = InGameCursor.GetWorldPosition(_terminalRaycaster.eventCamera) };
             EventSystem.current.RaycastAll(pointer, _pointerHits);
             return _pointerHits.Count > 0
                 && ExecuteEvents.GetEventHandler<IPointerClickHandler>(_pointerHits[0].gameObject) == _send.gameObject;

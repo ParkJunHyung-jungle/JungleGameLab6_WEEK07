@@ -15,6 +15,8 @@ namespace Game.Player
         private WorkshopPcbCardDrag _structureDrag;
         private ScrollRect _scroll;
         private bool _scrolling;
+        private bool CardInputAllowed => _structureDrag != null && _entry.StructureKind == AssemblyStructurePart.Lower
+            ? _placement.Pullers.EditingPointerAllowed : _placement.Pullers.InputAllowed;
 
         /// <summary>
         /// placement와 entry를 카드의 드래그 대상으로 연결하며 tray가 있으면 목록 안에서는 스크롤을 사용한다.
@@ -78,7 +80,7 @@ namespace Game.Player
         public void OnDrag(PointerEventData eventData)
         {
             if (!_scrolling) return;
-            if (!_tray.IsTrayOpen || !_placement.Pullers.InputAllowed) { EndScroll(eventData); return; }
+            if (!_tray.IsTrayOpen || !CardInputAllowed) { EndScroll(eventData); return; }
             Vector2 point = InGameCursor.Position;
             if (RectTransformUtility.RectangleContainsScreenPoint(_scroll.viewport, point, eventData.pressEventCamera))
             {
@@ -97,7 +99,7 @@ namespace Game.Player
 
         void Update()
         {
-            if (_scrolling && (!_tray.IsTrayOpen || !_placement.Pullers.InputAllowed || Mouse.current == null || !Mouse.current.leftButton.isPressed))
+            if (_scrolling && (!_tray.IsTrayOpen || !CardInputAllowed || Mouse.current == null || !Mouse.current.leftButton.isPressed))
                 EndScroll(new PointerEventData(EventSystem.current));
         }
 

@@ -185,6 +185,11 @@ namespace Game.Player
                 return true;
             }
             bool installed = !IsObstructed(ray) && _assembly.TryPlaceStructure(_kind, ray);
+            if (!installed && _kind == AssemblyStructurePart.Upper)
+            {
+                CancelStockDrag();
+                return true;
+            }
             CommitStockReservation();
             FinishStockMotion();
             if (!installed)

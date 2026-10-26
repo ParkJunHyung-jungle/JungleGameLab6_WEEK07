@@ -15,7 +15,7 @@ namespace Game.Player
 {
     [DefaultExecutionOrder(150)]
     [DisallowMultipleComponent]
-    public sealed class WorkshopViewController : MonoBehaviour
+    public sealed partial class WorkshopViewController : MonoBehaviour
     {
         [Header("Cameras")]
         [SerializeField] private CinemachineBrain _brain;
@@ -91,6 +91,11 @@ namespace Game.Player
             _focusCamera.Priority = -1;
             if (_monitorFocusCamera != null) _monitorFocusCamera.Priority = -1;
             if (_monitorHolder != null) _monitorHolder.KeyboardChanged += HandleMonitorKeyboardChanged;
+            _workbenchHolder.KeyboardChanged += RefreshRequestChecklist;
+            KeyboardPickupTarget.RegistryChanged += RefreshRequestChecklist;
+            KeyboardRequestRuntime.Changed += RefreshRequestChecklist;
+            Game.Logging.CustomizationTelemetry.Observed += HandleChecklistCustomizationObserved;
+            if (_requestChecklistPanel != null) RefreshRequestChecklist();
             SelectView(0);
             ApplyCursor();
             _editOverlay.SwitchSoundSelected += HandleSwitchSoundSelected;
@@ -104,6 +109,8 @@ namespace Game.Player
         {
             _initialized = true;
             CloseAssembly();
+            InitializeRequestChecklist();
+            RefreshRequestChecklist();
         }
 
         void Update()
@@ -160,6 +167,7 @@ namespace Game.Player
 
         void LateUpdate()
         {
+            UpdateRequestChecklistOpacity();
             if (_monitorTransition)
             {
                 ICinemachineCamera monitorDestination = _monitorFocused ? _monitorFocusCamera : _monitorCamera;
@@ -502,6 +510,12 @@ namespace Game.Player
         void OnDisable()
         {
             if (_monitorHolder != null) _monitorHolder.KeyboardChanged -= HandleMonitorKeyboardChanged;
+            _workbenchHolder.KeyboardChanged -= RefreshRequestChecklist;
+            KeyboardPickupTarget.RegistryChanged -= RefreshRequestChecklist;
+            KeyboardRequestRuntime.Changed -= RefreshRequestChecklist;
+            Game.Logging.CustomizationTelemetry.Observed -= HandleChecklistCustomizationObserved;
+            if (_requestChecklistGroup != null) _requestChecklistGroup.alpha = 1f;
+            if (_requestChecklistPanel != null) _requestChecklistPanel.gameObject.SetActive(false);
             if (_monitorFocused) _monitorInput.SetWorkshopFocus(false);
             _monitorFocused = false;
             _monitorTransition = false;

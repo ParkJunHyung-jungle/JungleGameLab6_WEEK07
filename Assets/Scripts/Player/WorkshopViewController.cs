@@ -31,6 +31,7 @@ namespace Game.Player
         [SerializeField] private MonitorKeyboardHolder _monitorHolder;
         [SerializeField] private MonitorMiniGameInput _monitorInput;
         [SerializeField] private Collider _monitorScreen;
+        [SerializeField] private bool _startInMonitorFocus;
         private bool _monitorFocused;
         private bool _monitorTransition;
 
@@ -144,6 +145,8 @@ namespace Game.Player
             Game.Logging.CustomizationTelemetry.Observed += HandleChecklistCustomizationObserved;
             if (_requestChecklistPanel != null) RefreshRequestChecklist();
             SelectView(0);
+            if (!_initialized && _startInMonitorFocus)
+                BeginMonitorFocus();
             ApplyCursor();
             _editOverlay.SwitchSoundSelected += HandleSwitchSoundSelected;
             _editOverlay.CaseMaterialSelected += HandleCaseMaterialSelected;
@@ -200,11 +203,7 @@ namespace Game.Player
                 && !_keyboardDrag.IsDragging && _monitorHolder.KeyboardBody != null
                 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && IsMonitorScreenSelected())
             {
-                _monitorFocused = true;
-                _monitorTransition = true;
-                _keyboardDrag.SetInputAllowed(false);
-                _monitorFocusCamera.Priority = 2;
-                ApplyCursor();
+                BeginMonitorFocus();
                 return;
             }
             if (_lookCamera != null || Keyboard.current == null)
@@ -279,6 +278,19 @@ namespace Game.Player
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 if (hit.distance < screen.distance && !hit.transform.IsChildOf(_monitorScreen.transform)) return false;
             return true;
+        }
+
+        /// <summary>
+        /// 입력값 없이 모니터 집중 카메라를 활성화하고 집중 전환을 시작한다.
+        /// 본체 운반을 차단하고 자유 커서를 적용하며 모니터 입력 연결은 카메라 전환 완료 후 처리한다.
+        /// </summary>
+        private void BeginMonitorFocus()
+        {
+            _monitorFocused = true;
+            _monitorTransition = true;
+            _keyboardDrag.SetInputAllowed(false);
+            _monitorFocusCamera.Priority = 2;
+            ApplyCursor();
         }
 
         /// <summary>

@@ -233,6 +233,16 @@ namespace KeyboardModeling
             return false;
         }
 
+        /// <summary>
+        /// key에 연결된 축의 장착 상태를 반환한다.
+        /// 기존 스위치 바인딩과 활성 상태를 조회하며 입력 및 전투 상태는 변경하지 않는다.
+        /// </summary>
+        public bool IsSwitchInstalled(Key key)
+        {
+            return TryGetSwitch(key, out KeyboardSwitch keyboardSwitch)
+                && keyboardSwitch.gameObject.activeInHierarchy;
+        }
+
         /// <summary>토너먼트의 완파 대상을 A~Z로 제한하며 기존 씬의 대상 설정은 변경하지 않는다.</summary>
         public void UseAlphabetDestructionKeys() { _alphabetKeysRequired = true; }
 

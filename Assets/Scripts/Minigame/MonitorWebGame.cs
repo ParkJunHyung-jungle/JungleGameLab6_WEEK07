@@ -140,12 +140,12 @@ namespace Game.Player
             _keysUp.Clear();
             foreach (var key in Keyboard.current.allKeys)
             {
-                if (!key.wasPressedThisFrame && !key.wasReleasedThisFrame) continue;
                 WindowsKey browserKey;
                 try { browserKey = key.keyCode.UnityKeyToWindowKey(); }
                 catch (ArgumentOutOfRangeException) { continue; }
-                if (key.wasPressedThisFrame && _heldKeys.Add(browserKey)) _keysDown.Add(browserKey);
-                if (key.wasReleasedThisFrame && _heldKeys.Remove(browserKey)) _keysUp.Add(browserKey);
+                bool allowed = _input.CanReceiveKey(key.keyCode);
+                if (key.wasPressedThisFrame && allowed && _heldKeys.Add(browserKey)) _keysDown.Add(browserKey);
+                if ((!allowed || !key.isPressed) && _heldKeys.Remove(browserKey)) _keysUp.Add(browserKey);
             }
             if (_keysDown.Count > 0 || _keysUp.Count > 0 || _textInput.Length > 0)
             {

@@ -417,6 +417,7 @@ MonoBehaviour:
   - Master
   Banks:
   - Ambient
+  - Music
   - SFX
   - UI
   BanksToLoad: []

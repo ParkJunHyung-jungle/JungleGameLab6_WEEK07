@@ -399,6 +399,24 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>
+    /// eventInstance를 관리 목록에서 제거하고 필요하면 재생을 정지한 뒤 해제한다.
+    /// stopPlayback이 참이면 즉시 정지하며, FMOD 실패 여부를 기록하고 등록 상태를 해제한다.
+    /// </summary>
+    public void ReleaseEventInstance(EventInstance eventInstance, bool stopPlayback)
+    {
+        if (!eventInstances.Remove(eventInstance) || !eventInstance.isValid()) return;
+        if (stopPlayback)
+        {
+            FMOD.RESULT stopResult = eventInstance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
+            if (stopResult != FMOD.RESULT.OK)
+                Debug.LogWarning($"[FMOD] 관리 이벤트 정지 실패: {stopResult}.", this);
+        }
+        FMOD.RESULT releaseResult = eventInstance.release();
+        if (releaseResult != FMOD.RESULT.OK)
+            Debug.LogWarning($"[FMOD] 관리 이벤트 해제 실패: {releaseResult}.", this);
+    }
+
+    /// <summary>
     /// 보관된 모든 이벤트의 재생을 중단하고 인스턴스를 해제한다.
     /// 입력과 반환값 없이 관리자에서 생성한 인스턴스 목록을 비운다.
     /// </summary>

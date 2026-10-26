@@ -61,6 +61,7 @@ namespace Game.Player
         public bool CanCreateLowerHousing => _lowerHousingPrefab != null || _dispenser != null && _dispenser.CanCreateKeyboard;
         public GameObject LowerHousingPreviewPrefab => _lowerHousingPrefab != null ? _lowerHousingPrefab
             : _dispenser != null ? _dispenser.GetPreviewPrefab() : null;
+        public Camera OutputCamera => _monitorOutputCamera;
         public bool IsKeyboardEditing => _isFocused && !_modeTransitionPending && !_brain.IsBlending;
         public KeyboardInputController EditingKeyboard { get; private set; }
         public bool IsWorkbenchEmpty => _workbenchHolder.KeyboardBody == null;
@@ -119,6 +120,19 @@ namespace Game.Player
             return _lookCamera != null
                 ? _brain.ActiveVirtualCamera == (ICinemachineCamera)_lookCamera.Camera && _lookCamera.CurrentReference == reference
                 : _brain.ActiveVirtualCamera == (ICinemachineCamera)reference;
+        }
+
+        /// <summary>
+        /// pointer에서 라디오 월드 입력이 다른 작업실 조작과 겹치지 않는지 확인한다.
+        /// 가상 커서, UI 차단, 카메라 전환, 키보드 운반 및 부품·풀러 점유 상태를 사용하여 허용 여부를 반환한다.
+        /// </summary>
+        public bool CanUseRadio(Vector2 pointer)
+        {
+            return CanShowControlHints && InGameCursor.CanProcessVirtualPointer
+                && !_modeTransitionPending && !_monitorFocused && !_monitorTransition
+                && _viewSwitchingAllowed && !_keyboardDrag.IsDragging
+                && !_pullers.IsManipulatingPart && !_pullers.IsPointerOverUI(pointer)
+                && !_pullers.ConsumesPointer();
         }
 
         /// <summary>body를 ray가 가리키는 빈 작업대에 장착한 결과를 반환한다. 성공하면 기존 편집 연결을 종료하고 새 실물을 연결하며 카메라와 재고는 유지한다.</summary>

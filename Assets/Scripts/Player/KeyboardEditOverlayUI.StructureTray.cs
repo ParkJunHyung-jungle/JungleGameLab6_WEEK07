@@ -114,10 +114,11 @@ namespace Game.Player
             foreach (var preview in _structurePreviews)
             {
                 Texture2D texture = AssemblyCatalogPreview.RenderParts(assembly.GetStructureParts(preview.Key.StructureKind), preview.Key.StructureMaterial,
-                    preview.Key.StructureKind == AssemblyStructurePart.Pcb);
+                    preview.Key.StructureKind == AssemblyStructurePart.Pcb, true);
                 if (texture == null) continue;
                 _structurePreviewTextures.Add(texture);
                 preview.Value.texture = texture;
+                preview.Value.GetComponent<AspectRatioFitter>().aspectRatio = (float)texture.width / texture.height;
                 preview.Value.enabled = true;
                 _keycapPlacement.SetInventoryTexture(preview.Key, texture);
             }

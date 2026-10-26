@@ -295,6 +295,7 @@ namespace Game.Player
             DestroyPreviewTextures(_casePreviewTextures);
             DestroyPreviewTextures(_platePreviewTextures);
             DestroyPreviewTextures(_structurePreviewTextures);
+            DestroyPreviewTextures(_toolPreviewTextures);
         }
 
         /// <summary>
@@ -337,6 +338,19 @@ namespace Game.Player
         {
             _selectedSwitchSound = type;
             RefreshSwitchSoundSelection();
+        }
+
+        /// <summary>entry에 대응하는 키캡 또는 스위치 카드의 선택 강조를 갱신한다. 출고 항목의 재질·정의·축 타입만 읽으며 실제 설치와 사운드 및 재고는 변경하지 않는다.</summary>
+        public void SelectInventoryCard(AssemblyCatalogEntry entry)
+        {
+            if (entry.IsSwitch)
+            {
+                SetSelectedSwitchSound(entry.SwitchData.Type);
+                return;
+            }
+            _selectedMaterial = entry.KeycapMaterial;
+            _selectedKeycapDefinition = entry.KeycapDefinition;
+            RefreshSelectionIndicators();
         }
 
         /// <summary>
@@ -1048,6 +1062,15 @@ namespace Game.Player
             IReadOnlyList<KeycapDefinition> definitions = null)
         {
             Texture2D[] previews = new Texture2D[materials.Count];
+            if (UsesScreenTrays && (previewName == "Plate" || previewName == "Case"))
+            {
+                for (int index = 0; index < materials.Count; index++)
+                {
+                    previews[index] = AssemblyCatalogPreview.Render(previewMesh, new[] { materials[index] }, widePreview: true);
+                    textures.Add(previews[index]);
+                }
+                return previews;
+            }
             GameObject previewStage = new GameObject(previewName + "MaterialPreviewStage");
             previewStage.hideFlags = HideFlags.HideAndDontSave;
 

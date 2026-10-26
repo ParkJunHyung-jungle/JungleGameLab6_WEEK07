@@ -60,6 +60,13 @@ namespace Game.Player
         public WorkshopDrawerCategory Category => _category;
         public bool IsTrayVisible => _trayGroup.alpha > 0f;
 
+        /// <summary>point가 완전히 열린 트레이의 현재 목록 안인지 반환한다. 가상 커서 화면 좌표만 사용하며 서랍 상태는 유지한다.</summary>
+        public bool ContainsReturnPoint(Vector2 point)
+        {
+            return IsTrayOpen && _catalogScroll != null && RectTransformUtility.RectangleContainsScreenPoint(
+                _catalogScroll.viewport, point, _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera);
+        }
+
         /// <summary>
         /// 완전히 열린 트레이의 고정 Viewport 중앙을 화면 좌표 destination으로 반환한다.
         /// 카드와 스크롤 위치는 사용하지 않으며 집중 종료·전환·숨김 또는 화면 밖이면 false를 반환한다.

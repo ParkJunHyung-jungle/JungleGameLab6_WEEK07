@@ -215,7 +215,7 @@ namespace Game.Player
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = true;
             _singlePlacementButtons.Add(CreatePlacementButton(row, "한 개 배치", font));
-            _bulkPlacementButtons.Add(CreatePlacementButton(row, "일괄 배치", font));
+            _bulkPlacementButtons.Add(CreatePlacementButton(row, "연속 배치", font));
             RefreshPlacementModes();
             return row;
         }
@@ -901,13 +901,13 @@ namespace Game.Player
                 state.Add("좌클릭 드래그", "부품 집기");
                 return true;
             }
-            state.Title = _isBulkDragging ? "일괄 배치" : _entry.IsSwitch ? "스위치 드래그" : "키캡 드래그";
+            state.Title = _isBulkDragging ? "연속 배치" : _entry.IsSwitch ? "스위치 드래그" : "키캡 드래그";
             state.Add("마우스 이동", "부품 이동");
             if (_isBulkDragging)
             {
                 if (!_pullers.IsPointerOverUI(point) && _entry.AvailableQuantity > 0 && CanInstallEntry(FindInstallSlot(point)))
                     state.Add("좌클릭 유지", "키캡·스위치 연속 설치");
-                state.Add("좌클릭 놓기", "일괄 배치 종료");
+                state.Add("좌클릭 놓기", "연속 배치 종료");
             }
             else if (IsInReturnArea(point)) state.Add("좌클릭 놓기", "보관함에 넣기");
             else if (_dragOriginPart != null) state.Add("좌클릭 놓기", "부품 내려놓기");

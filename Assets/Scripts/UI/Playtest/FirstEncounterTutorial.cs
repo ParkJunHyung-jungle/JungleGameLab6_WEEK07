@@ -25,7 +25,7 @@ namespace Game.Tutorials
         ScrewAssembly = 27, UpperCaseEditing = 28, AssemblyOrder = 29,
         WorkbenchPlaced = 30,
         ToolDrawer = 31, MailInbox = 32, RequestDelivery = 33, MonitorUse = 34,
-        RequestResult = 35,
+        RequestResult = 35, Hammer = 36,
 
         // 전투 안내는 기존 값을 유지한다.
         Battle = 8, Replenishment = 9, Shop = 10, KeycapPurchase = 11, Unlock = 12,

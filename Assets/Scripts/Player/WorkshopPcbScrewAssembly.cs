@@ -15,6 +15,7 @@ namespace Game.Player
         [Header("Screw Position Markers")]
         [SerializeField, Min(0.01f)] private float _markerScale = 1.6f;
         [SerializeField, Min(1f)] private float _markerThickness = 4f;
+        [SerializeField, Min(0f)] private float _markerBorderWidth = 3f;
         [SerializeField, Min(0f)] private float _hitPadding = 0.08f;
         [SerializeField] private Color _looseColor = new Color(1f, 0.65f, 0.2f, 0.8f);
         [SerializeField] private Color _fixedColor = new Color(0.3f, 1f, 0.45f, 0.8f);
@@ -25,8 +26,10 @@ namespace Game.Player
         private Material _outlineMaterial;
         private Shader _depthShader;
         private Material _markerMaterial;
+        private Material _markerBorderMaterial;
         private readonly List<WorkshopKeyboardPlacementPreview> _outlines = new List<WorkshopKeyboardPlacementPreview>();
         private MaterialPropertyBlock _markerProperties;
+        private MaterialPropertyBlock _borderProperties;
         private readonly List<MeshCollider> _blockers = new List<MeshCollider>();
         private bool _selected;
         private bool _captured;
@@ -35,6 +38,7 @@ namespace Game.Player
         public void Initialize(WorkshopKeyboardPullerController pullers, Material outlineMaterial, Shader depthShader)
         {
             _markerProperties = new MaterialPropertyBlock();
+            _borderProperties = new MaterialPropertyBlock();
             _pullers = pullers;
             _outlineMaterial = outlineMaterial;
             _depthShader = depthShader;
@@ -45,6 +49,11 @@ namespace Game.Player
         {
             if (shader == null) return;
             _markerMaterial = new Material(shader);
+            _markerMaterial.renderQueue = (int)RenderQueue.Overlay + 1;
+            _markerMaterial.SetFloat("_BorderWidth", 0f);
+            _markerBorderMaterial = new Material(shader);
+            _markerBorderMaterial.renderQueue = (int)RenderQueue.Overlay;
+            _markerBorderMaterial.SetColor("_Color", Color.black);
             _markerScale = scale;
             _markerThickness = thickness;
             _hitPadding = padding;
@@ -139,10 +148,16 @@ namespace Game.Player
                 Ray ray = new Ray(_pullers.InputCamera.transform.position, direction);
                 if (IsBlocked(ray, direction.magnitude)) continue;
                 _markerProperties.SetColor("_Color", _assembly.FixedScrews[index] ? _fixedColor : _looseColor);
+                _borderProperties.SetVector("_MarkerCenter", new Vector4(center.x, center.y, center.z, 1f));
+                _borderProperties.SetFloat("_BorderWidth", _markerBorderWidth);
                 Mesh mesh = screw.GetComponent<MeshFilter>().sharedMesh;
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+                {
+                    Graphics.DrawMesh(mesh, matrix, _markerBorderMaterial, 2, _pullers.InputCamera, submesh,
+                        _borderProperties, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
                     Graphics.DrawMesh(mesh, matrix, _markerMaterial, 2, _pullers.InputCamera, submesh,
                         _markerProperties, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
+                }
             }
         }
 
@@ -225,6 +240,11 @@ namespace Game.Player
                 if (blocker != null) blocker.enabled = false;
         }
 
-        void OnDestroy() { ClearGeometry(); if (_markerMaterial != null) Destroy(_markerMaterial); }
+        void OnDestroy()
+        {
+            ClearGeometry();
+            if (_markerMaterial != null) Destroy(_markerMaterial);
+            if (_markerBorderMaterial != null) Destroy(_markerBorderMaterial);
+        }
     }
 }

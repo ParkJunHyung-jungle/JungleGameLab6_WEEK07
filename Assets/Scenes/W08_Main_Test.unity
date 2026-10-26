@@ -3464,7 +3464,7 @@ PrefabInstance:
     - target: {fileID: 8295343963888643263, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
       propertyPath: _initialKeyboardPrefab
       value: 
-      objectReference: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+      objectReference: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
     - target: {fileID: 9162336399170649921, guid: 966ea6be83a8f3e40b0a50f6a77304fe, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0.422
@@ -8157,7 +8157,7 @@ PrefabInstance:
     - target: {fileID: 7477760555368289054, guid: 289b1a5b1b3fa294d93162692cfb4493, type: 3}
       propertyPath: '_keyboardPrefabs.Array.data[0]'
       value: 
-      objectReference: {fileID: 7000000000000000700, guid: 30087ed49ad14114872755a667a20ccd, type: 3}
+      objectReference: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -14223,9 +14223,9 @@ MonoBehaviour:
   - _id: keyboard-customize
     _prefab: {fileID: 5648102524883158503, guid: f5b5770352c706c46827af4de924c16d, type: 3}
   - _id: keyboard-workshop-assembly
-    _prefab: {fileID: 7000000000000000700, guid: 30087ed49ad14114872755a667a20ccd, type: 3}
+    _prefab: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
   - _id: keyboard-enhanced
-    _prefab: {fileID: 5648102524883158503, guid: b32d760f64f14d5c986e457bd952d555, type: 3}
+    _prefab: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
   _coverPrefab: {fileID: 1766723292100208528, guid: fc9017d00bcc36443801679d2e63891f, type: 3}
   _floorColliders:
   - {fileID: 9900990104}

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -20,7 +21,10 @@ namespace Game.Player
         [SerializeField] private AssemblyFullerTool _keycapPuller;
         [SerializeField] private AssemblyFullerTool _switchPuller;
         [SerializeField] private WorkshopAssemblyGuidePaper _guidePaper;
+        [SerializeField] private WorkshopHammerTool _hammerPrefab;
         [SerializeField] private WorkshopKeycapPlacement _keycapPlacement;
+        private WorkshopHammerTool _hammer;
+        private bool _hammerStrikePending;
 
         [Header("Hover Outline")]
         [SerializeField] private bool _showToolOutlines = true;
@@ -55,10 +59,13 @@ namespace Game.Player
         public bool InputAllowed => EditingPointerAllowed && EditingKeyboard != null;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
             || (_guidePaper != null && (_guidePaper.IsHeld || _guidePaper.IsReading))
+            || (_hammer != null && _hammer.IsHeld) || _hammerStrikePending
             || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling));
         public bool IsPcbDragging => _pcbDragging;
         public bool IsScrewPointerCaptured => _screwPointerCaptured;
         public bool HasGuidePaper => _guidePaper != null;
+        public bool HasHammer => _hammerPrefab != null;
+        public Sprite HammerIcon => _hammerPrefab != null ? _hammerPrefab.Icon : null;
         public bool IsGuideReading => _guidePaper != null && _guidePaper.IsReading;
         public KeyboardDispenser KeyboardDispenser => _workshopView.KeyboardDispenser;
         public bool CanCreateLowerHousing => _workshopView.CanCreateLowerHousing;
@@ -104,7 +111,7 @@ namespace Game.Player
             return _workshopView.TryPlaceInventoryKeyboard(body, ray);
         }
 
-        /// <summary>tray와 두 items를 기존 실물 풀러에 연결한다. C# 누름 이벤트를 구독하며 기존 작업대의 직접 접근은 숨긴다.</summary>
+        /// <summary>tray와 도구 카드를 풀러·종이·망치 출고에 연결한다. C# 누름 이벤트를 구독하며 반환값은 없다.</summary>
         public void ConnectToolTray(WorkshopKeycapDrawerTransition tray, WorkshopPullerTrayItem[] items)
         {
             SetToolTraySubscriptions(false);
@@ -126,7 +133,7 @@ namespace Game.Player
             }
         }
 
-        /// <summary>item에 대응하는 기존 풀러를 누른 동안 선택한다. 열린 도구 트레이와 공통 조작 점유를 확인하고 기존 집기 경로만 호출한다.</summary>
+        /// <summary>item에 대응하는 풀러·종이·망치를 도구함에서 꺼낸다. 열린 트레이와 공통 입력 점유를 확인하며 도구 상태를 변경한다.</summary>
         private void HandleToolTrayPressed(WorkshopPullerTrayItem item)
         {
             if (!EditingPointerAllowed || IsManipulatingPart || !_toolTray.CanInteractWithTray
@@ -135,6 +142,11 @@ namespace Game.Player
             if (item.IsGuidePaper)
             {
                 _guidePaper.BeginFromTray(_camera, _camera.ScreenPointToRay(InGameCursor.Position));
+                return;
+            }
+            if (item.IsHammer)
+            {
+                _hammer.BeginTrayHold(_camera.ScreenPointToRay(InGameCursor.Position));
                 return;
             }
             if (!InputAllowed) return;
@@ -173,17 +185,23 @@ namespace Game.Player
         }
 
         /// <summary>
-        /// collider가 W08의 키캡 풀러나 스위치 풀러 또는 해당 복귀 표시에 속하는지 반환한다.
+        /// collider가 W08의 풀러·망치 또는 해당 복귀 표시에 속하는지 반환한다.
         /// 도구와 입력 상태는 변경하지 않는다.
         /// </summary>
         public bool IsToolCollider(Collider collider)
         {
-            return _keycapPuller.OwnsCollider(collider) || _switchPuller.OwnsCollider(collider);
+            return _keycapPuller.OwnsCollider(collider) || _switchPuller.OwnsCollider(collider)
+                || (_hammer != null && _hammer.OwnsCollider(collider));
         }
 
         void Awake()
         {
             if (_guidePaper != null) _guidePaper.Initialize(_camera, null);
+            if (_hammerPrefab != null)
+            {
+                _hammer = Instantiate(_hammerPrefab);
+                _hammer.Initialize(_camera);
+            }
             _keycapPuller.SetContext(this, true, _showToolOutlines);
             _switchPuller.SetContext(this, true, _showToolOutlines);
             if (_showToolOutlines && _hoverOutlineMaterial != null && _hoverDepthShader != null)
@@ -252,6 +270,10 @@ namespace Game.Player
             Vector2 pointer = InGameCursor.Position;
             if (_guidePaper != null && (_guidePaper.IsHeld || _guidePaper.IsReading || !IsManipulatingPart)
                 && _guidePaper.ProcessPointer(Mouse.current, pointer, IsPointerOverUI(pointer))) return;
+            if (_hammer != null && (_hammer.IsHeld || !IsManipulatingPart)
+                && _hammer.ProcessPointer(Mouse.current, _camera.ScreenPointToRay(pointer), pointer,
+                    IsPointerOverUI(pointer), _toolTray, TryStrikeWithHammer)) return;
+            if (_hammerStrikePending) return;
             if (EditingKeyboard == null) return;
             if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling)) return;
             Ray ray = _camera.ScreenPointToRay(pointer);
@@ -271,6 +293,79 @@ namespace Game.Player
             bool handled = tool.ProcessPointer(ray, pointer, Mouse.current);
             if (store && !tool.IsSelected) _deployedTools.Remove(tool);
             return handled;
+        }
+
+        /// <summary>ray가 가리킨 작업대 키보드의 재고 반환을 예약하고 기존 망치 타격·키캡 파동·본체 파괴를 시작한다. 승인 여부를 반환한다.</summary>
+        private bool TryStrikeWithHammer(Ray ray)
+        {
+            if (!InputAllowed || _hammerStrikePending) return false;
+            KeyboardInputController keyboard = EditingKeyboard;
+            Rigidbody body = keyboard.GetComponent<Rigidbody>();
+            WorkbenchKeyboardHolder holder = keyboard.GetComponentInParent<WorkbenchKeyboardHolder>();
+            if (body == null || holder == null || holder.KeyboardBody != body) return false;
+            RaycastHit targetHit = default;
+            float targetDistance = float.PositiveInfinity;
+            float obstructionDistance = float.PositiveInfinity;
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, _camera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider.transform.IsChildOf(keyboard.transform))
+                {
+                    if (hit.distance < targetDistance) { targetHit = hit; targetDistance = hit.distance; }
+                }
+                else obstructionDistance = Mathf.Min(obstructionDistance, hit.distance);
+            }
+            if (targetDistance >= obstructionDistance) return false;
+
+            KeyboardDestruction destruction = keyboard.GetComponent<KeyboardDestruction>();
+            KeyboardFeedbackManager feedback = keyboard.GetComponent<KeyboardFeedbackManager>();
+            KeyboardCustomization customization = keyboard.GetComponent<KeyboardCustomization>();
+            if (destruction == null || feedback == null || customization == null
+                || !_keycapPlacement.TryPrepareKeyboardInventoryReturn(customization, out Action completeReturn)
+                || !destruction.BeginWorkshopHammerBreak()) return false;
+
+            var keycaps = new List<KeycapHealth>();
+            var positions = new List<Vector2>();
+            int targetIndex = -1;
+            float nearest = float.PositiveInfinity;
+            for (int index = 0; index < customization.KeycapCount; index++)
+            {
+                if (!customization.IsPcbKeycapInstalled(index)) continue;
+                KeycapHealth health = customization.GetKeycapSlotTransform(index).GetComponent<KeycapHealth>();
+                if (health == null) continue;
+                float distance = (health.transform.position - targetHit.point).sqrMagnitude;
+                if (distance < nearest) { nearest = distance; targetIndex = keycaps.Count; }
+                keycaps.Add(health);
+                Vector3 local = keyboard.transform.InverseTransformPoint(health.transform.position);
+                positions.Add(new Vector2(local.x, local.z));
+            }
+
+            _hammerStrikePending = true;
+            Action onFinished = null;
+            onFinished = () =>
+            {
+                destruction.Finished -= onFinished;
+                completeReturn();
+                _workshopView.RemoveDestroyedWorkbenchKeyboard(body);
+                _hammerStrikePending = false;
+            };
+            destruction.Finished += onFinished;
+            KeycapHealth[] installedKeycaps = keycaps.ToArray();
+            Vector2[] installedPositions = positions.ToArray();
+            feedback.PlayHammerStrike(targetIndex >= 0 ? installedKeycaps[targetIndex].transform : keyboard.transform, () =>
+            {
+                if (destruction == null) return;
+                if (targetIndex < 0) { destruction.CompleteWorkshopHammerBreak(); return; }
+                feedback.PlayHammerShockwave(keyboard, installedKeycaps, installedPositions, targetIndex,
+                    health =>
+                    {
+                        if (health == null || health.CurrentHP <= 0) return;
+                        health.ClearStatuses();
+                        health.TakeDamage(health.CurrentHP);
+                    },
+                    requireInput: false, onFinished: destruction.CompleteWorkshopHammerBreak);
+            });
+            return true;
         }
 
         /// <summary>
@@ -378,10 +473,17 @@ namespace Game.Player
                 || _keycapPuller.IsPointerOverTool(ray) || _switchPuller.IsPointerOverTool(ray);
         }
 
-        /// <summary>state에 현재 풀러 사용과 실제 제거 대상의 조작을 추가한다. 기존 도구 가림 검사와 키보드 분리 조건을 읽는다.</summary>
+        /// <summary>state에 현재 망치·풀러 사용과 실제 제거 대상의 조작을 추가한다. 도구 상태와 키보드 분리 조건을 읽는다.</summary>
         public bool CollectControlHints(WorkshopControlHintState state)
         {
             if (!InputAllowed || (_keycapPlacement != null && _keycapPlacement.IsDragging)) return false;
+            if (_hammer != null && _hammer.IsHeld)
+            {
+                state.Title = "망치";
+                state.Add("좌클릭 놓기", "키보드 타격");
+                state.Add("도구함에 놓기", "망치 보관");
+                return true;
+            }
             Vector2 pointer = InGameCursor.Position;
             AssemblyFullerTool selected = _keycapPuller.IsSelected ? _keycapPuller : _switchPuller.IsSelected ? _switchPuller : null;
             Ray ray = _camera.ScreenPointToRay(pointer);
@@ -428,6 +530,7 @@ namespace Game.Player
         public void CancelDrag()
         {
             if (_guidePaper != null) _guidePaper.CancelInteraction();
+            if (_hammer != null) _hammer.CancelInteraction();
             if (_keycapPlacement != null) _keycapPlacement.CancelDrag();
             _keycapPuller.ReturnToOrigin();
             _switchPuller.ReturnToOrigin();
@@ -576,6 +679,7 @@ namespace Game.Player
 
         void OnDestroy()
         {
+            if (_hammer != null) Destroy(_hammer.gameObject);
             _keycapHoverPreview?.Dispose();
             _switchHoverPreview?.Dispose();
             foreach (GameObject fragment in _fragments) if (fragment != null) Destroy(fragment);

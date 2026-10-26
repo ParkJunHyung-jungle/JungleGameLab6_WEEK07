@@ -104,6 +104,17 @@ namespace Game.Player
             OpenAssembly();
             return true;
         }
+
+        /// <summary>body의 작업대 점유를 해제하고 완파 후 편집 UI를 빈 작업대 상태로 갱신한다. 현재 작업 대상이 아니면 UI는 유지한다.</summary>
+        public void RemoveDestroyedWorkbenchKeyboard(Rigidbody body)
+        {
+            if (body == null || _workbenchHolder.KeyboardBody != body) return;
+            bool wasEditing = EditingKeyboard == body.GetComponent<KeyboardInputController>();
+            _workbenchHolder.ReleaseKeyboard(body);
+            if (!wasEditing) return;
+            CloseAssembly();
+            OpenAssembly();
+        }
         public bool CanShowControlHints => isActiveAndEnabled && Application.isFocused && !_brain.IsBlending
             && !(FirstEncounterTutorial.IsBlocking || Game.Workshop.WorkshopDeliveryTray.IsInputBlocked) && !PlaytestResearchSession.IsUploadConfirmationOpen;
 

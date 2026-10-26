@@ -35,28 +35,36 @@ namespace Game.Player
             ConnectStructureTrays();
         }
 
-        /// <summary>기존 트레이 틀에 두 풀러와 조립 안내 종이 카드를 만든다. 실제 도구와 입력은 pullerController에 C# 이벤트로 연결한다.</summary>
+        /// <summary>기존 트레이 틀에 풀러·조립 안내 종이·망치 카드를 만든다. 실제 도구 입력은 pullerController에 C# 이벤트로 연결한다.</summary>
         private void ConnectToolTray()
         {
-            int itemCount = _pullerController.HasGuidePaper ? 3 : 2;
+            bool hasGuide = _pullerController.HasGuidePaper;
+            bool hasHammer = _pullerController.HasHammer;
+            int itemCount = 2 + (hasGuide ? 1 : 0) + (hasHammer ? 1 : 0);
             RectTransform panel = CreateScrollViewport("Tools", itemCount, out RectTransform content);
             panel.SetParent(_keycapTrayContent, false);
             var buttons = new System.Collections.Generic.List<KeyboardEditButton>();
             var items = new WorkshopPullerTrayItem[itemCount];
             for (int index = 0; index < items.Length; index++)
             {
-                string name = index == 0 ? "KeycapPuller" : index == 1 ? "SwitchPuller" : "AssemblyGuidePaper";
-                string label = index == 0 ? "키캡 Puller" : index == 1 ? "스위치 Puller" : "조립 안내서";
+                bool isGuide = hasGuide && index == 2;
+                bool isHammer = hasHammer && index == (hasGuide ? 3 : 2);
+                string name = index == 0 ? "KeycapPuller" : index == 1 ? "SwitchPuller"
+                    : isGuide ? "AssemblyGuidePaper" : "WorkshopHammer";
+                string label = index == 0 ? "키캡 Puller" : index == 1 ? "스위치 Puller"
+                    : isGuide ? "조립 안내서" : "망치";
                 KeyboardEditButton button = CreatePickerItemButton(content, name,
                     index, label, out Image background, out Text indicator);
                 indicator.gameObject.SetActive(false);
                 items[index] = button.gameObject.AddComponent<WorkshopPullerTrayItem>();
-                if (index == 2) items[index].InitializeGuidePaper();
+                if (isGuide) items[index].InitializeGuidePaper();
+                else if (isHammer) items[index].InitializeHammer();
                 else items[index].Initialize(index == 1);
                 buttons.Add(button);
-                Texture2D texture = index == 2 ? _pullerController.CreateGuidePreview()
+                Texture2D texture = isHammer ? _pullerController.HammerIcon.texture
+                    : isGuide ? _pullerController.CreateGuidePreview()
                     : _pullerController.CreateToolPreview(index == 1);
-                _toolPreviewTextures.Add(texture);
+                if (!isHammer) _toolPreviewTextures.Add(texture);
                 CreateMaterialPreviewImage(button.transform, "ToolPreview", texture, new Vector2(96f, 88f), 14f);
             }
             ConnectTrayCatalog(panel, content, buttons, WorkshopDrawerCategory.ScrewsTools, out _toolTrayGrid, out _toolTrayViewport);

@@ -26,6 +26,7 @@ public sealed class KeyboardDestruction : MonoBehaviour
     private int _remainingKeycaps;
     private int _requiredBrokenCount;
     private int _remainingThreshold;
+    private bool _workshopHammerPending;
 
     public bool IsBroken { get; private set; }
 
@@ -103,6 +104,30 @@ public sealed class KeyboardDestruction : MonoBehaviour
 
     /// <summary>count개 파괴 시 키보드를 파괴하도록 지정하며 초기화 전 파괴 필요 수량을 저장한다.</summary>
     public void ConfigureRequiredBrokenCount(int count) { _requiredBrokenCount = Mathf.Max(1, count); }
+
+    /// <summary>작업대 망치의 파동이 끝날 때까지 자동 완파를 보류한다. 이미 파괴된 키보드는 거부하며 보류 시작 여부를 반환한다.</summary>
+    public bool BeginWorkshopHammerBreak()
+    {
+        if (IsBroken || _workshopHammerPending) return false;
+        _workshopHammerPending = true;
+        return true;
+    }
+
+    /// <summary>망치 파동 종료 시 보류한 키보드 완파와 기존 파편 연출을 시작한다. 보류 상태를 해제하며 반환값은 없다.</summary>
+    public void CompleteWorkshopHammerBreak()
+    {
+        if (!_workshopHammerPending || IsBroken) return;
+        _workshopHammerPending = false;
+        StartBreaking();
+    }
+
+    /// <summary>망치 타격 중단 시 자동 완파 보류를 해제한다. 현재 키캡 체력을 기준으로 추적을 갱신하며 반환값은 없다.</summary>
+    public void CancelWorkshopHammerBreak()
+    {
+        if (!_workshopHammerPending) return;
+        _workshopHammerPending = false;
+        RefreshKeycapTracking();
+    }
 
     /// <summary>
     /// 복구 후 추적 대상 키캡의 현재 체력을 사용해 남은 수량과 파괴 이벤트 구독을 갱신한다.
@@ -189,11 +214,17 @@ public sealed class KeyboardDestruction : MonoBehaviour
         health.Broken -= OnKeycapBroken;
         _remainingKeycaps--;
 
-        if (_remainingKeycaps > _remainingThreshold || IsBroken)
+        if (_remainingKeycaps > _remainingThreshold || IsBroken || _workshopHammerPending)
         {
             return;
         }
 
+        StartBreaking();
+    }
+
+    /// <summary>현재 키보드를 파괴 상태로 전환하고 기존 파편 프레젠터를 시작한다. Breaking과 완료 콜백 상태를 갱신하며 반환값은 없다.</summary>
+    private void StartBreaking()
+    {
         IsBroken = true;
         _onBreaking?.Invoke();
         Breaking?.Invoke();

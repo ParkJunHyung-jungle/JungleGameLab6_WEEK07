@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -456,14 +457,30 @@ namespace Game.Player
             return true;
         }
 
-        /// <summary>customization에 실제 장착된 키캡·스위치와 구조 카탈로그 항목을 확인해 각 재고를 반환한다. 대상 상태를 먼저 검사하고 성공 후 수량과 카드 표시를 갱신한다.</summary>
+        /// <summary>customization의 장착 부품을 확인해 즉시 재고로 반환한다. 준비에 실패하면 재고를 변경하지 않으며 성공 여부를 반환한다.</summary>
         public bool TryReturnKeyboardInventory(KeyboardCustomization customization)
         {
+            if (!TryPrepareKeyboardInventoryReturn(customization, out Action completeReturn)) return false;
+            completeReturn();
+            return true;
+        }
+
+        /// <summary>
+        /// customization의 현재 장착 부품을 기록해 나중에 한 번만 반환할 동작을 준비한다.
+        /// 키캡 파손 전의 설치 상태와 카탈로그 항목을 사용하며 실패 시 재고를 변경하지 않고 false를 반환한다.
+        /// </summary>
+        public bool TryPrepareKeyboardInventoryReturn(KeyboardCustomization customization, out Action completeReturn)
+        {
+            completeReturn = null;
             if (customization == null || IsDragging || _pullers.IsPcbDragging || _pullers.IsScrewPointerCaptured) return false;
             var returns = new List<AssemblyCatalogEntry>();
             for (int index = 0; index < customization.KeycapCount; index++)
             {
-                if (customization.IsPcbKeycapInstalled(index))
+                Transform keycapSlot = customization.GetKeycapSlotTransform(index);
+                KeycapHealth health = keycapSlot != null ? keycapSlot.GetComponent<KeycapHealth>() : null;
+                bool brokenInPlace = keycapSlot != null && keycapSlot.gameObject.activeSelf
+                    && health != null && health.CurrentHP == 0;
+                if (customization.IsPcbKeycapInstalled(index) || brokenInPlace)
                 {
                     AssemblyCatalogEntry keycap = FindEntry(customization.GetKeycapMaterial(index), customization.GetKeycapDefinition(index));
                     if (keycap == null) return false;
@@ -504,16 +521,23 @@ namespace Game.Player
             }
             else return false;
 
-            lowerEntry.StorePart(null, true);
-            foreach (AssemblyCatalogEntry entry in returns) entry.StorePart(null, true);
-            foreach (AssemblyCatalogEntry entry in structureReturns) entry.StorePart(null, true);
-            foreach (Transform part in detachedStructures)
+            bool returned = false;
+            completeReturn = () =>
             {
-                part.gameObject.SetActive(false);
-                Destroy(part.gameObject);
-            }
-            try { RefreshInventory(); }
-            catch (System.Exception exception) { Debug.LogError("키보드 해체 후 재고 표시 갱신에 실패했습니다. 재고 반환은 완료되었습니다. " + exception, customization); }
+                if (returned) return;
+                returned = true;
+                lowerEntry.StorePart(null, true);
+                foreach (AssemblyCatalogEntry entry in returns) entry.StorePart(null, true);
+                foreach (AssemblyCatalogEntry entry in structureReturns) entry.StorePart(null, true);
+                foreach (Transform part in detachedStructures)
+                {
+                    if (part == null) continue;
+                    part.gameObject.SetActive(false);
+                    Destroy(part.gameObject);
+                }
+                try { RefreshInventory(); }
+                catch (Exception exception) { Debug.LogError("키보드 해체 후 재고 표시 갱신에 실패했습니다. 재고 반환은 완료되었습니다. " + exception, customization); }
+            };
             return true;
         }
 

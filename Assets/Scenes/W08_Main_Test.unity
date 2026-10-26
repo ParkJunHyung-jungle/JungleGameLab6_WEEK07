@@ -2346,6 +2346,7 @@ MonoBehaviour:
   _keycapPuller: {fileID: 989276903}
   _switchPuller: {fileID: 686529946}
   _guidePaper: {fileID: 953055013}
+  _hammerPrefab: {fileID: 6463443326323173553, guid: b01d3688e1676564b949c005e01454b8, type: 3}
   _keycapPlacement: {fileID: 2019032720}
   _showToolOutlines: 0
   _hoverOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
@@ -3959,6 +3960,15 @@ PrefabInstance:
     - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: c8b9a474c4aa2c94ea91dcbb809bd8ef, type: 2}
+    - target: {fileID: 21000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
+      propertyPath: m_Text
+      value: "\uB2E4 \uC77D\uC5C8\uC73C\uBA74, \uC774 \uC124\uBA85\uC11C\uB97C \uB3C4\uAD6C\uD568\uC5D0
+        \uB123\uC73C\uC138\uC694."
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

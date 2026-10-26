@@ -35,22 +35,27 @@ namespace Game.Player
             ConnectStructureTrays();
         }
 
-        /// <summary>기존 트레이 틀에 두 풀러 접근 카드를 만든다. 실제 도구와 입력은 기존 pullerController에 C# 이벤트로 연결하고 나사 기능은 생성하지 않는다.</summary>
+        /// <summary>기존 트레이 틀에 두 풀러와 조립 안내 종이 카드를 만든다. 실제 도구와 입력은 pullerController에 C# 이벤트로 연결한다.</summary>
         private void ConnectToolTray()
         {
-            RectTransform panel = CreateScrollViewport("Tools", 2, out RectTransform content);
+            int itemCount = _pullerController.HasGuidePaper ? 3 : 2;
+            RectTransform panel = CreateScrollViewport("Tools", itemCount, out RectTransform content);
             panel.SetParent(_keycapTrayContent, false);
             var buttons = new System.Collections.Generic.List<KeyboardEditButton>();
-            var items = new WorkshopPullerTrayItem[2];
+            var items = new WorkshopPullerTrayItem[itemCount];
             for (int index = 0; index < items.Length; index++)
             {
-                KeyboardEditButton button = CreatePickerItemButton(content, index == 0 ? "KeycapPuller" : "SwitchPuller",
-                    index, index == 0 ? "키캡 풀러" : "스위치 풀러", out Image background, out Text indicator);
+                string name = index == 0 ? "KeycapPuller" : index == 1 ? "SwitchPuller" : "AssemblyGuidePaper";
+                string label = index == 0 ? "키캡 Puller" : index == 1 ? "스위치 Puller" : "조립 안내서";
+                KeyboardEditButton button = CreatePickerItemButton(content, name,
+                    index, label, out Image background, out Text indicator);
                 indicator.gameObject.SetActive(false);
                 items[index] = button.gameObject.AddComponent<WorkshopPullerTrayItem>();
-                items[index].Initialize(index == 1);
+                if (index == 2) items[index].InitializeGuidePaper();
+                else items[index].Initialize(index == 1);
                 buttons.Add(button);
-                Texture2D texture = _pullerController.CreateToolPreview(index == 1);
+                Texture2D texture = index == 2 ? _pullerController.CreateGuidePreview()
+                    : _pullerController.CreateToolPreview(index == 1);
                 _toolPreviewTextures.Add(texture);
                 CreateMaterialPreviewImage(button.transform, "ToolPreview", texture, new Vector2(96f, 88f), 14f);
             }

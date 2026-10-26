@@ -2345,6 +2345,7 @@ MonoBehaviour:
   _camera: {fileID: 4985256}
   _keycapPuller: {fileID: 989276903}
   _switchPuller: {fileID: 686529946}
+  _guidePaper: {fileID: 953055013}
   _keycapPlacement: {fileID: 2019032720}
   _showToolOutlines: 0
   _hoverOutlineMaterial: {fileID: 2100000, guid: 37ecbef07fd74154d89192bb5fadb9c4, type: 2}
@@ -3919,47 +3920,43 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 5648102524883158503, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
-      propertyPath: m_Name
-      value: Keyboard_Enhanced_LED
-      objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalPosition.x
       value: 5.519
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0.023
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalPosition.z
       value: 1.531
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalRotation.w
       value: 0.7071068
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalRotation.y
       value: 0.7071068
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
+      value: 90
       objectReference: {fileID: 0}
-    - target: {fileID: 6484209102016570918, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+    - target: {fileID: 2000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
@@ -3967,7 +3964,18 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: a1f9a36827df4ac785deab34f36e116c, type: 3}
+  m_SourcePrefab: {fileID: 100100000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
+--- !u!114 &953055013 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4000, guid: 4f9b3e1781ac4d6795a37cd1cb563290, type: 3}
+  m_PrefabInstance: {fileID: 953055012}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6bc9a42fe3174a6284c1e7239f607d85, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Player.WorkshopAssemblyGuidePaper
 --- !u!1 &971817263
 GameObject:
   m_ObjectHideFlags: 0

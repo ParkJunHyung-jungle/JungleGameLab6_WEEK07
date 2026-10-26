@@ -19,6 +19,7 @@ namespace Game.Player
         [SerializeField] private Camera _camera;
         [SerializeField] private AssemblyFullerTool _keycapPuller;
         [SerializeField] private AssemblyFullerTool _switchPuller;
+        [SerializeField] private WorkshopAssemblyGuidePaper _guidePaper;
         [SerializeField] private WorkshopKeycapPlacement _keycapPlacement;
 
         [Header("Hover Outline")]
@@ -53,9 +54,12 @@ namespace Game.Player
             && InGameCursor.CanProcessVirtualPointer;
         public bool InputAllowed => EditingPointerAllowed && EditingKeyboard != null;
         public bool IsManipulatingPart => _keycapPuller.IsSelected || _switchPuller.IsSelected
+            || (_guidePaper != null && (_guidePaper.IsHeld || _guidePaper.IsReading))
             || _pcbDragging || _screwPointerCaptured || (_keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling));
         public bool IsPcbDragging => _pcbDragging;
         public bool IsScrewPointerCaptured => _screwPointerCaptured;
+        public bool HasGuidePaper => _guidePaper != null;
+        public bool IsGuideReading => _guidePaper != null && _guidePaper.IsReading;
         public KeyboardDispenser KeyboardDispenser => _workshopView.KeyboardDispenser;
         public bool CanCreateLowerHousing => _workshopView.CanCreateLowerHousing;
         public GameObject LowerHousingPreviewPrefab => _workshopView.LowerHousingPreviewPrefab;
@@ -76,6 +80,24 @@ namespace Game.Player
             return AssemblyCatalogPreview.RenderParts(new[] { tool.ToolTransform });
         }
 
+        /// <summary>조립 안내 종이의 실물 메시로 도구함 카드 이미지를 만든다. 종이의 보관 및 집기 상태는 유지하며 미리보기 Texture2D를 반환한다.</summary>
+        public Texture2D CreateGuidePreview()
+        {
+            return AssemblyCatalogPreview.RenderParts(new[] { _guidePaper.transform });
+        }
+
+        /// <summary>
+        /// 일반 시점의 우클릭으로 종이를 읽거나 이전 자세로 되돌린다.
+        /// 현재 가상 커서와 UI 가림 상태를 사용하며 종이 입력을 처리했는지 반환한다.
+        /// </summary>
+        public bool TryToggleGuideReading()
+        {
+            if (_guidePaper == null || Mouse.current == null || !Application.isFocused
+                || !InGameCursor.CanProcessVirtualPointer) return false;
+            Vector2 pointer = InGameCursor.Position;
+            return _guidePaper.TryToggleReading(pointer, IsPointerOverUI(pointer));
+        }
+
         /// <summary>body를 ray가 가리키는 작업대에 배치하고 편집 대상으로 연결한 결과를 반환한다. 기존 작업대 판정과 설치 경로를 사용하며 재고는 변경하지 않는다.</summary>
         public bool TryPlaceLowerHousing(Rigidbody body, Ray ray)
         {
@@ -88,6 +110,7 @@ namespace Game.Player
             SetToolTraySubscriptions(false);
             _toolTray = tray;
             _toolItems = items;
+            if (_guidePaper != null) _guidePaper.Initialize(_camera, tray);
             if (isActiveAndEnabled) SetToolTraySubscriptions(true);
             RefreshToolVisibility();
         }
@@ -106,9 +129,15 @@ namespace Game.Player
         /// <summary>item에 대응하는 기존 풀러를 누른 동안 선택한다. 열린 도구 트레이와 공통 조작 점유를 확인하고 기존 집기 경로만 호출한다.</summary>
         private void HandleToolTrayPressed(WorkshopPullerTrayItem item)
         {
-            if (!InputAllowed || IsManipulatingPart || !_toolTray.CanInteractWithTray
+            if (!EditingPointerAllowed || IsManipulatingPart || !_toolTray.CanInteractWithTray
                 || !_toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools)
                 || Mouse.current == null || !Mouse.current.leftButton.isPressed) return;
+            if (item.IsGuidePaper)
+            {
+                _guidePaper.BeginFromTray(_camera, _camera.ScreenPointToRay(InGameCursor.Position));
+                return;
+            }
+            if (!InputAllowed) return;
             AssemblyFullerTool tool = item.ExtractsSwitches ? _switchPuller : _keycapPuller;
             if (_deployedTools.Contains(tool)) return;
             tool.ToolTransform.gameObject.SetActive(true);
@@ -154,6 +183,7 @@ namespace Game.Player
 
         void Awake()
         {
+            if (_guidePaper != null) _guidePaper.Initialize(_camera, null);
             _keycapPuller.SetContext(this, true, _showToolOutlines);
             _switchPuller.SetContext(this, true, _showToolOutlines);
             if (_showToolOutlines && _hoverOutlineMaterial != null && _hoverDepthShader != null)
@@ -214,10 +244,16 @@ namespace Game.Player
                 if (target != null) target.GetComponent<KeyboardCustomization>().PrepareSwitchRemovalTargets();
                 UpdateDragHeight();
             }
-            if (!EditingPointerAllowed || Mouse.current == null) { CancelDrag(); return; }
+            if (!EditingPointerAllowed || Mouse.current == null)
+            {
+                if (!IsGuideReading) CancelDrag();
+                return;
+            }
+            Vector2 pointer = InGameCursor.Position;
+            if (_guidePaper != null && (_guidePaper.IsHeld || _guidePaper.IsReading || !IsManipulatingPart)
+                && _guidePaper.ProcessPointer(Mouse.current, pointer, IsPointerOverUI(pointer))) return;
             if (EditingKeyboard == null) return;
             if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling)) return;
-            Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);
             if (ProcessDeployedTool(_keycapPuller, ray, pointer)) return;
             if (ProcessDeployedTool(_switchPuller, ray, pointer)) return;
@@ -391,6 +427,7 @@ namespace Game.Player
         /// <summary>선택 중인 두 풀러를 원래 자리로 되돌린다. 이미 제거된 파츠와 키보드 상태는 유지한다.</summary>
         public void CancelDrag()
         {
+            if (_guidePaper != null) _guidePaper.CancelInteraction();
             if (_keycapPlacement != null) _keycapPlacement.CancelDrag();
             _keycapPuller.ReturnToOrigin();
             _switchPuller.ReturnToOrigin();

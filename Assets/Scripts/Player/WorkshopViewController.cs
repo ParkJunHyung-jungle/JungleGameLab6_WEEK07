@@ -169,6 +169,9 @@ namespace Game.Player
                     SetFocused(false);
                 return;
             }
+            if ((CanProcessGeneralInput || _pullers.IsGuideReading) && Mouse.current != null
+                && Mouse.current.rightButton.wasPressedThisFrame && _pullers.TryToggleGuideReading())
+                return;
             if (!CanProcessGeneralInput)
                 return;
 

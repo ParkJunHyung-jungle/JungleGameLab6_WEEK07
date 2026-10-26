@@ -102,7 +102,7 @@ namespace Game.Tutorials
 
         /// <summary>새 실행의 정적 참조와 열람 항목을 초기화한다. 입력값 없이 모든 첫 조우 안내를 다시 표시할 수 있게 한다.</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetRuntime()
+        internal static void ResetRuntime()
         {
             _instance = null;
             _resumeFrame = -1;

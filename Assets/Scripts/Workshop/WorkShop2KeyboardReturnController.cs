@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 using Game.Player;
@@ -81,6 +83,9 @@ namespace Game.Workshop
         private EventSystem _endingEventSystem;
         private bool _endingRequested;
         private bool _endingStartedHere;
+        private bool _endingExitRequested;
+        private KeyboardEditButton _endingRestartButton;
+        private KeyboardEditButton _endingQuitButton;
         private float _endingPreviousTimeScale;
         private readonly List<Canvas> _endingHiddenCanvases = new List<Canvas>();
         private readonly List<InputAction> _endingPausedActions = new List<InputAction>();
@@ -181,6 +186,11 @@ namespace Game.Workshop
             Rigidbody keyboard = other.attachedRigidbody;
             if (keyboard == null || keyboard.isKinematic || !IsKeyboard(keyboard)) return;
             RequestReturn(keyboard);
+        }
+
+        void LateUpdate()
+        {
+            if (_endingStartedHere) Time.timeScale = _sequenceRunning ? 1f : 0f;
         }
 
         /// <summary>
@@ -286,7 +296,7 @@ namespace Game.Workshop
 
         /// <summary>
         /// 예약된 키보드의 실제 구성으로 검수와 보상을 확정하고 일반 제출은 실물을 수거한다.
-        /// 세 의뢰가 모두 성공하면 마지막 실물을 유지하고 엔딩으로 전환하며 내부 오류는 고객 실패로 기록하지 않는다.
+        /// 세 의뢰가 모두 제출되면 마지막 실물을 유지하고 결과별 엔딩으로 전환하며 내부 오류는 고객 실패로 기록하지 않는다.
         /// </summary>
         private void CollectDelivery()
         {
@@ -299,7 +309,7 @@ namespace Game.Workshop
                 KeyboardRequestInspection inspection = KeyboardRequestInspection.Inspect(
                     _deliveryKeyboard, assembly, _deliveryRequest.Definition);
                 List<GameObject> objects = CollectSubmissionObjects(assembly, _deliveryKeyboard);
-                if (inspection.Passed) EnsureEndingOverlay();
+                EnsureEndingOverlay();
                 try
                 {
                     KeyboardRequestRuntime.CompleteSubmission(_deliveryRequest, inspection, _gameSession.Wallet);
@@ -308,12 +318,17 @@ namespace Game.Workshop
                 catch (Exception exception)
                 {
                     if (_deliveryRequest.Phase != KeyboardRequestPhase.AwaitingConfirmation) throw;
+                    submissionCompleted = true;
                     // 결과와 지급이 확정된 뒤 알림에서 발생한 오류는 재지급하지 않는다.
                     Debug.LogException(exception, this);
                 }
-                if (AllEndingRequestsSucceeded())
+                if (AllEndingRequestsSubmitted())
                 {
+                    _endingText.text = AllEndingRequestsSucceeded()
+                        ? "에미넴에게 구출되었다"
+                        : "당신은 완벽히 해내지 못했습니다";
                     _endingRequested = true;
+                    IsEnding = true;
                 }
                 else
                 {
@@ -334,7 +349,7 @@ namespace Game.Workshop
 
         /// <summary>
         /// collected에 따라 수거 잠금을 해제하고 실패 시 저장한 물리와 Collider를 복원한다.
-        /// 예약과 임시 참조 및 콜백을 정리하고 submissionCompleted가 참인 정상 수거에서만 기존 의뢰 종료를 호출한다.
+        /// 예약과 임시 참조 및 콜백을 정리하고 정상 제출의 의뢰 종료를 시도하며 엔딩은 콜백과 종료 결과에 종속시키지 않는다.
         /// </summary>
         private void FinishDelivery(bool collected, bool submissionCompleted = false)
         {
@@ -370,7 +385,6 @@ namespace Game.Workshop
             catch (Exception exception)
             {
                 Debug.LogException(exception, this);
-                return;
             }
             if (!collected || !submissionCompleted) return;
             try
@@ -380,8 +394,6 @@ namespace Game.Workshop
                     Debug.LogError("발송은 처리되었으나 의뢰 자동 종료에 실패했습니다. 결과 메일과 후속 의뢰 데이터 연결을 확인하세요.", this);
             }
             catch (Exception exception) { Debug.LogException(exception, this); }
-            if (_endingRequested && deliveredRequest.Phase == KeyboardRequestPhase.Closed
-                && deliveredRequest.ResultMailSent) IsEnding = true;
         }
 
         /// <summary>
@@ -472,6 +484,22 @@ namespace Game.Workshop
         }
 
         /// <summary>
+        /// 서로 다른 세 의뢰 ID에 실제 검수와 확정된 제출 결과가 모두 있는지 반환한다.
+        /// 저장된 단계와 성공 또는 실패 결과를 읽으며 수락과 제출 시도 및 내부 오류는 완료로 계산하지 않는다.
+        /// </summary>
+        private static bool AllEndingRequestsSubmitted()
+        {
+            foreach (string requestId in ENDING_REQUEST_IDS)
+            {
+                if (!KeyboardRequestRuntime.Requests.TryGetValue(requestId, out KeyboardRequestState state)
+                    || state.Inspection == null
+                    || (state.Phase != KeyboardRequestPhase.AwaitingConfirmation && state.Phase != KeyboardRequestPhase.Closed)
+                    || (state.Result != KeyboardRequestResult.Success && state.Result != KeyboardRequestResult.Failure)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// 서로 다른 세 의뢰 ID의 실제 검수 성공과 보상 확정 기록이 모두 있는지 반환한다.
         /// 종료 여부와 무관하게 보관된 결과를 읽으며 성공 횟수나 의뢰 상태는 변경하지 않는다.
         /// </summary>
@@ -485,8 +513,8 @@ namespace Game.Workshop
         }
 
         /// <summary>
-        /// 첫 성공 검수 전에 화면 최상단의 비활성 암전 Canvas와 중앙 문구를 준비한다.
-        /// 기존 화면을 변경하지 않으며 실제 표시는 세 의뢰의 성공이 확정된 뒤 시작한다.
+        /// 검수 결과 확정 전에 화면 최상단의 비활성 암전 Canvas와 중앙 문구를 준비한다.
+        /// 기존 화면을 변경하지 않으며 실제 문구와 표시는 세 의뢰의 제출이 확정된 뒤 결정한다.
         /// </summary>
         private void EnsureEndingOverlay()
         {
@@ -495,7 +523,7 @@ namespace Game.Workshop
                 typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
             _endingCanvas = root.GetComponent<Canvas>();
             _endingCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _endingCanvas.sortingOrder = short.MaxValue;
+            _endingCanvas.sortingOrder = short.MaxValue - 1;
             CanvasScaler scaler = root.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -521,7 +549,80 @@ namespace Game.Workshop
             _endingText.raycastTarget = false;
             _endingText.text = "에미넴에게 구출되었다";
             _endingText.gameObject.SetActive(false);
+            _endingRestartButton = CreateEndingButton(root.transform, "Restart", "다시시작", -190f);
+            _endingQuitButton = CreateEndingButton(root.transform, "Quit", "게임종료", 190f);
+            _endingRestartButton.Clicked += RestartFromEnding;
+            _endingQuitButton.Clicked += QuitFromEnding;
             root.SetActive(false);
+        }
+
+        /// <summary>
+        /// parent 아래에 name과 label 및 가로 위치를 사용해 엔딩 버튼을 만들고 반환한다.
+        /// 문구 아래에 읽기 쉬운 버튼을 배치하며 연출 완료 전까지 숨긴다.
+        /// </summary>
+        private KeyboardEditButton CreateEndingButton(Transform parent, string name, string label, float x)
+        {
+            GameObject root = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(KeyboardEditButton));
+            root.transform.SetParent(parent, false);
+            RectTransform rect = root.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.3f);
+            rect.sizeDelta = new Vector2(320f, 88f);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            Image image = root.GetComponent<Image>();
+            image.color = new Color(0.23f, 0.23f, 0.23f, 1f);
+            KeyboardEditButton button = root.GetComponent<KeyboardEditButton>();
+            button.targetGraphic = image;
+            Text text = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
+            text.transform.SetParent(root.transform, false);
+            text.rectTransform.anchorMin = Vector2.zero;
+            text.rectTransform.anchorMax = Vector2.one;
+            text.rectTransform.offsetMin = text.rectTransform.offsetMax = Vector2.zero;
+            text.font = _endingText.font;
+            text.fontSize = 32;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.text = label;
+            text.raycastTarget = false;
+            root.SetActive(false);
+            return button;
+        }
+
+        /// <summary>
+        /// 엔딩의 button 입력을 한 번만 받아 현재 작업실을 처음부터 다시 시작한다.
+        /// 시간과 입력을 복원하고 기존 초기화 함수로 의뢰와 지갑 및 복귀 기록을 제거한다.
+        /// </summary>
+        private void RestartFromEnding(KeyboardEditButton button)
+        {
+            if (!_endingStartedHere || _sequenceRunning || _endingExitRequested) return;
+            _endingExitRequested = true;
+            string scenePath = gameObject.scene.path;
+            RestoreEndingInput();
+            Time.timeScale = 1f;
+            KeyboardRequestRuntime.ResetSession();
+            GameSession.ResetWorkshopWallet();
+            TournamentKeyboardSession.ResetSession();
+            Game.Tutorials.FirstEncounterTutorial.ResetRuntime();
+#if UNITY_EDITOR
+            UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(scenePath,
+                new LoadSceneParameters(LoadSceneMode.Single));
+#else
+            SceneManager.LoadScene(scenePath);
+#endif
+        }
+
+        /// <summary>
+        /// 엔딩의 button 입력을 한 번만 받아 게임을 종료한다.
+        /// 에디터에서는 플레이 모드를 끝내고 빌드에서는 애플리케이션을 종료한다.
+        /// </summary>
+        private void QuitFromEnding(KeyboardEditButton button)
+        {
+            if (!_endingStartedHere || _sequenceRunning || _endingExitRequested) return;
+            _endingExitRequested = true;
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         /// <summary>
@@ -560,7 +661,7 @@ namespace Game.Workshop
             }
             foreach (Canvas canvas in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
             {
-                if (canvas == _endingCanvas || !canvas.enabled) continue;
+                if (canvas == _endingCanvas || !canvas.enabled || canvas.GetComponentInParent<InGameCursor>() != null) continue;
                 _endingHiddenCanvases.Add(canvas);
                 canvas.enabled = false;
             }
@@ -579,6 +680,23 @@ namespace Game.Workshop
             _endingText.gameObject.SetActive(true);
             yield return MoveActorTo(_hiddenPosition, false);
             Time.timeScale = 0f;
+            _endingRestartButton.gameObject.SetActive(true);
+            _endingQuitButton.gameObject.SetActive(true);
+            InGameCursor.LockState = CursorLockMode.None;
+            InGameCursor.Visible = true;
+            if (_endingEventSystem != null)
+            {
+                _endingEventSystem.enabled = true;
+                InputSystemUIInputModule module = _endingEventSystem.GetComponent<InputSystemUIInputModule>();
+                if (module != null)
+                {
+                    module.point?.action.Enable();
+                    module.leftClick?.action.Enable();
+                    module.move?.action.Enable();
+                    module.submit?.action.Enable();
+                }
+                _endingEventSystem.SetSelectedGameObject(_endingRestartButton.gameObject);
+            }
         }
 
         /// <summary>
@@ -608,6 +726,8 @@ namespace Game.Workshop
 
         void OnDestroy()
         {
+            if (_endingRestartButton != null) _endingRestartButton.Clicked -= RestartFromEnding;
+            if (_endingQuitButton != null) _endingQuitButton.Clicked -= QuitFromEnding;
             if (_endingCanvas != null) Destroy(_endingCanvas.gameObject);
         }
 

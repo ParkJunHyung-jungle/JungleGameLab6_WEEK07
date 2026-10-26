@@ -19,7 +19,7 @@ namespace Game.Tournament
         /// 입력과 반환값 없이 이전 실행의 선택과 현재 구성을 제거한다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession()
+        internal static void ResetSession()
         {
             WorkshopKeyboardMemory.Reset();
             _initialJson = null;

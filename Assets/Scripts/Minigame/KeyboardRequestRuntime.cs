@@ -76,7 +76,7 @@ namespace Game.Player
         /// 입력과 반환값 없이 도메인 재로드 설정과 무관하게 실행 상태를 초기화한다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession()
+        internal static void ResetSession()
         {
             _inbox.Clear();
             _receivedMailIds.Clear();

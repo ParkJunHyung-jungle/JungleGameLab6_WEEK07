@@ -49,7 +49,7 @@ namespace Game.Session
         /// 입력과 반환값 없이 이전 실행의 잔액을 제거하며 원본 세션 설정은 변경하지 않는다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetWorkshopWallet()
+        internal static void ResetWorkshopWallet()
         {
             _workshopWallet = null;
         }

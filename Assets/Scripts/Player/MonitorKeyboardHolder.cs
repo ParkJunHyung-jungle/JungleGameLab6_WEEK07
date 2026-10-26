@@ -38,6 +38,7 @@ namespace Game.Player
             keyboard.GetComponent<KeyboardAssemblyState>().CompleteInitialAssembly();
             KeyboardPickupTarget pickup = keyboard.GetComponent<KeyboardPickupTarget>();
             pickup.SetSourcePrefab(_initialKeyboardPrefab);
+            pickup.ExcludeFromRequests();
             Rigidbody body = keyboard.GetComponent<Rigidbody>();
             Vector3 centerOffset = Quaternion.Inverse(body.rotation)
                 * body.transform.TransformVector(pickup.GetVisualCenterLocalPosition(body.transform));

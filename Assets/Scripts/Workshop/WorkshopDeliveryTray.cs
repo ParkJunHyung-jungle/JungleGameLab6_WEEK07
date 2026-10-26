@@ -122,14 +122,23 @@ namespace Game.Workshop
         {
             _panel.SetActive(true);
             KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
+            Rigidbody keyboard = _holder.KeyboardBody;
             bool available = target != null && target.Phase == KeyboardRequestPhase.InProgress;
+            bool excludedKeyboard = IsExcludedFromRequests(keyboard);
             _status.text = _sending ? "수거 중"
-                : _holder.KeyboardBody == null ? "키보드를 트레이에 올려 주세요."
+                : excludedKeyboard ? "시작 지급 키보드는 의뢰에 제출할 수 없습니다."
+                : keyboard == null ? "키보드를 트레이에 올려 주세요."
                 : target == null ? "메일에서 의뢰를 수락해 주세요."
                 : !available ? "의뢰 결과를 확인해 주세요." : "배송 대기";
             if (target != null) _status.text += "\n" + GetCustomerLabel(target);
             if (!string.IsNullOrEmpty(_notice)) _status.text += "\n" + _notice;
-            _send.interactable = available && !_sending && !_modalOpen && _holder.KeyboardBody != null;
+            _send.interactable = available && !_sending && !_modalOpen && keyboard != null && !excludedKeyboard;
+        }
+
+        /// <summary>keyboard의 pickup 상태로 의뢰 제출 제외 여부를 반환한다. 트레이 소유권과 키보드 구성은 변경하지 않는다.</summary>
+        private static bool IsExcludedFromRequests(Rigidbody keyboard)
+        {
+            return keyboard != null && keyboard.GetComponent<KeyboardPickupTarget>()?.IsExcludedFromRequests == true;
         }
 
         /// <summary>
@@ -149,7 +158,8 @@ namespace Game.Workshop
         private void HandleSend(KeyboardEditButton button)
         {
             KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
-            if (_sending || _modalOpen || _holder.KeyboardBody == null || target == null
+            if (_sending || _modalOpen || _holder.KeyboardBody == null
+                || IsExcludedFromRequests(_holder.KeyboardBody) || target == null
                 || target.Phase != KeyboardRequestPhase.InProgress || Time.timeScale <= 0f
                 || Game.Tutorials.FirstEncounterTutorial.IsBlocking || !CanPointAtSendButton()) return;
             _confirmedKeyboard = _holder.KeyboardBody;
@@ -243,6 +253,7 @@ namespace Game.Workshop
         {
             KeyboardRequestState target = KeyboardRequestRuntime.ActiveRequest;
             return !_sending && _confirmedKeyboard != null && _holder.KeyboardBody == _confirmedKeyboard
+                && !IsExcludedFromRequests(_confirmedKeyboard)
                 && _confirmedKeyboard.transform.parent == _holder.transform && target != null
                 && target.Definition.RequestId == _confirmedRequestId && target.Phase == KeyboardRequestPhase.InProgress;
         }

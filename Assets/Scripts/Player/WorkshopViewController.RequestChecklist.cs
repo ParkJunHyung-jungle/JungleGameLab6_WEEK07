@@ -204,7 +204,7 @@ namespace Game.Player
             {
                 KeyboardPickupTarget pickup = targets[index];
                 if (pickup == null || !pickup.isActiveAndEnabled || !pickup.gameObject.activeInHierarchy
-                    || pickup.gameObject.scene != gameObject.scene)
+                    || pickup.gameObject.scene != gameObject.scene || pickup.IsExcludedFromRequests)
                     continue;
                 Rigidbody body = pickup.GetComponent<Rigidbody>();
                 if (body == null) continue;

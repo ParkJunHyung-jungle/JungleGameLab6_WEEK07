@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Game.Player
@@ -51,6 +52,7 @@ namespace Game.Player
         private WorkshopDrawerCategory _category;
         private WorkshopDrawerCategory? _nextCategory;
         private readonly Dictionary<WorkshopDrawerCategory, ScrollRect> _catalogs = new Dictionary<WorkshopDrawerCategory, ScrollRect>();
+        private readonly List<RaycastResult> _pointerRaycastResults = new List<RaycastResult>();
 
         public event Action<WorkshopDrawerCategory, bool> TrayStateChanged;
 
@@ -160,6 +162,20 @@ namespace Game.Player
         public bool IsCategoryOpen(WorkshopDrawerCategory category)
         {
             return IsTrayOpen && _category == category;
+        }
+
+        /// <summary>point가 현재 완전히 열린 서랍의 실제 목록 Viewport 안인지 반환한다. 닫힘·전환 중이거나 숨긴 UI는 반환 영역으로 보지 않는다.</summary>
+        public bool IsPointerOverOpenTrayViewport(Vector2 point)
+        {
+            if (!TryGetReturnDestination(out _) || EventSystem.current == null) return false;
+            Camera camera = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+            if (!RectTransformUtility.RectangleContainsScreenPoint(_catalogScroll.viewport, point, camera)) return false;
+            var pointer = new PointerEventData(EventSystem.current) { position = point };
+            _pointerRaycastResults.Clear();
+            EventSystem.current.RaycastAll(pointer, _pointerRaycastResults);
+            if (_pointerRaycastResults.Count == 0) return false;
+            Transform hit = _pointerRaycastResults[0].gameObject.transform;
+            return hit == _catalogScroll.viewport || hit.IsChildOf(_catalogScroll.viewport);
         }
 
         void OnEnable()

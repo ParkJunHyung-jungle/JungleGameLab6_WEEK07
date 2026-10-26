@@ -88,7 +88,7 @@ namespace Game.Workshop
                 if (entry.Prefab == null || entry.Prefab != pickup.SourcePrefab) continue;
                 return new WorkshopKeyboardRecord(entry.Id, rackId, body,
                     _storage.CaptureCustomization(body.GetComponent<KeyboardCustomization>()),
-                    body.GetComponentInChildren<KeyboardProtectionCover>());
+                    body.GetComponentInChildren<KeyboardProtectionCover>(), pickup.IsExcludedFromRequests);
             }
             throw new InvalidOperationException($"작업실 키보드의 생성 프리팹이 등록되지 않았습니다: {body.name}");
         }
@@ -145,6 +145,7 @@ namespace Game.Workshop
                     KeyboardPickupTarget pickup = keyboard.GetComponent<KeyboardPickupTarget>();
                     if (pickup == null) pickup = keyboard.AddComponent<KeyboardPickupTarget>();
                     pickup.SetSourcePrefab(prefab);
+                    if (record.IsExcludedFromRequests) pickup.ExcludeFromRequests();
                     _storage.ApplyCustomization(JsonUtility.FromJson<KeyboardCustomizationState>(record.CustomizationJson),
                         keyboard.GetComponent<KeyboardCustomization>());
                     RestoreCover(record, keyboard.transform);

@@ -16,13 +16,23 @@ namespace Game.Player
         private static readonly List<KeyboardPickupTarget> _activeTargets = new List<KeyboardPickupTarget>();
         [Header("Spawn Source")]
         private GameObject _sourcePrefab;
+        private bool _isExcludedFromRequests;
         private readonly Dictionary<Collider, Vector3> _supportNormals = new Dictionary<Collider, Vector3>();
         public GameObject SourcePrefab => _sourcePrefab;
+        public bool IsExcludedFromRequests => _isExcludedFromRequests;
         public static IReadOnlyList<KeyboardPickupTarget> ActiveTargets => _activeTargets;
         public static event Action RegistryChanged;
 
         /// <summary>prefab 자산을 생성 출처로 보관한다. 씬 인스턴스가 제거되어도 같은 키보드 종류를 찾는 데 사용한다.</summary>
         public void SetSourcePrefab(GameObject prefab) { _sourcePrefab = prefab; }
+
+        /// <summary>현재 키보드 인스턴스를 의뢰 검사와 제출에서 제외하고 등록 목록 변경을 알린다. 제외 상태는 이후 위치와 부품 변경에 영향받지 않는다.</summary>
+        public void ExcludeFromRequests()
+        {
+            if (_isExcludedFromRequests) return;
+            _isExcludedFromRequests = true;
+            RegistryChanged?.Invoke();
+        }
 
         /// <summary>
         /// 새 실행에서 키보드 목록과 관찰 구독을 초기화한다.

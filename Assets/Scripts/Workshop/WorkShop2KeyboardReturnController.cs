@@ -196,8 +196,9 @@ namespace Game.Workshop
         /// </summary>
         public bool RequestDelivery(Rigidbody keyboard, string requestId, Action<bool> finished)
         {
+            KeyboardPickupTarget pickup = keyboard != null ? keyboard.GetComponent<KeyboardPickupTarget>() : null;
             if (!isActiveAndEnabled || _deliveryRequest != null || keyboard == null
-                || keyboard.GetComponent<KeyboardPickupTarget>() == null || _queuedKeyboards.Contains(keyboard)
+                || pickup == null || _queuedKeyboards.Contains(keyboard) || pickup.IsExcludedFromRequests
                 || KeyboardRequestRuntime.ActiveRequest?.Definition.RequestId != requestId) return false;
             if (_gameSession == null || _gameSession.Wallet == null)
             {

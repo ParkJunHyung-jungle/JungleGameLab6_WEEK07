@@ -13,6 +13,7 @@ namespace Game.Workshop
         [SerializeField] private string _prefabId;
         [SerializeField] private string _rackId;
         [SerializeField] private string _customizationJson;
+        [SerializeField] private bool _isExcludedFromRequests;
         [SerializeField] private Vector3 _position;
         [SerializeField] private Quaternion _rotation;
         [SerializeField] private Vector3 _scale;
@@ -24,6 +25,7 @@ namespace Game.Workshop
         public string PrefabId => _prefabId;
         public string RackId => _rackId;
         public string CustomizationJson => _customizationJson;
+        public bool IsExcludedFromRequests => _isExcludedFromRequests;
         public Vector3 Position => _position;
         public Quaternion Rotation => _rotation;
         public Vector3 Scale => _scale;
@@ -32,13 +34,14 @@ namespace Game.Workshop
         public Quaternion CoverRotation => _coverRotation;
         public Vector3 CoverScale => _coverScale;
 
-        /// <summary>prefabId와 rackId 및 body의 자세와 state를 독립된 데이터로 복사한다. cover가 있으면 커버의 로컬 외형도 보관하며 씬 객체 참조는 저장하지 않는다.</summary>
+        /// <summary>prefabId와 rackId, body의 의뢰 제외 상태·자세·커스터마이징을 독립 데이터로 복사한다. cover가 있으면 커버의 로컬 외형도 보관하며 씬 객체 참조는 저장하지 않는다.</summary>
         public WorkshopKeyboardRecord(string prefabId, string rackId, Rigidbody body,
-            KeyboardCustomizationState state, KeyboardProtectionCover cover)
+            KeyboardCustomizationState state, KeyboardProtectionCover cover, bool isExcludedFromRequests)
         {
             _prefabId = prefabId;
             _rackId = rackId;
             _customizationJson = JsonUtility.ToJson(state);
+            _isExcludedFromRequests = isExcludedFromRequests;
             _position = body.position;
             _rotation = body.rotation;
             _scale = body.transform.lossyScale;

@@ -295,6 +295,7 @@ namespace Game.Player
             DestroyPreviewTextures(_casePreviewTextures);
             DestroyPreviewTextures(_platePreviewTextures);
             DestroyPreviewTextures(_structurePreviewTextures);
+            DestroyPreviewTextures(_toolPreviewTextures);
         }
 
         /// <summary>

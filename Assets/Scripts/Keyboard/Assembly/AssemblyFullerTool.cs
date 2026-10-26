@@ -18,6 +18,7 @@ namespace KeyboardModeling.Assembly
         private IKeyboardPullerContext _context;
         private bool _followCameraPlane;
         private bool _showReturnOutline = true;
+        private bool _trayTransport;
         private IKeyboardPullerContext Context => _context ?? _dragInput;
         public bool IsSelected => _selected;
         public bool ExtractsSwitches => _extractSwitches;
@@ -38,7 +39,10 @@ namespace KeyboardModeling.Assembly
         /// <summary>트레이에서 누른 ray로 기존 실물 풀러 집기를 시작한다. 공통 입력이 허용되고 미선택 상태이면 기존 자세 저장·추적 경로를 실행한 결과를 반환한다.</summary>
         public bool BeginTrayHold(Ray ray)
         {
-            return Context.InputAllowed && isActiveAndEnabled && !_selected && SelectFuller(ray);
+            if (!Context.InputAllowed || !isActiveAndEnabled || _selected || !SelectFuller(ray)) return false;
+            _trayTransport = true;
+            ResetHold();
+            return true;
         }
 
         /// <summary>ray가 현재 도구에 가장 먼저 닿는지 반환한다. 선택 및 물리 상태는 변경하지 않는다.</summary>
@@ -115,6 +119,12 @@ namespace KeyboardModeling.Assembly
             if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
             {
                 RecordUserPutDown();
+                return true;
+            }
+
+            if (_trayTransport)
+            {
+                UpdateToolPose(ray);
                 return true;
             }
 
@@ -408,6 +418,7 @@ namespace KeyboardModeling.Assembly
             if (!_selected)
                 return;
             _selected = false;
+            _trayTransport = false;
             HeldToolChanged?.Invoke(null);
             _fuller.SetPositionAndRotation(_originPosition, _originRotation);
             for (int index = 0; index < _bodies.Length; index++)

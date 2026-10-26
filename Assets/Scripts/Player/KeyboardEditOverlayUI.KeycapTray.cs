@@ -10,6 +10,7 @@ namespace Game.Player
         [SerializeField] private WorkshopKeycapDrawerTransition _keycapTrayTransition;
         private GridLayoutGroup _keycapTrayGrid;
         private RectTransform _keycapTrayViewport;
+        private readonly System.Collections.Generic.List<Texture2D> _toolPreviewTextures = new System.Collections.Generic.List<Texture2D>();
         private GridLayoutGroup _switchTrayGrid;
         private RectTransform _switchTrayViewport;
         private GridLayoutGroup _toolTrayGrid;
@@ -47,18 +48,9 @@ namespace Game.Player
                 items[index] = button.gameObject.AddComponent<WorkshopPullerTrayItem>();
                 items[index].Initialize(index == 1);
                 buttons.Add(button);
-                Text hint = new GameObject("HoldHint", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
-                hint.transform.SetParent(button.transform, false);
-                hint.rectTransform.anchorMin = Vector2.zero;
-                hint.rectTransform.anchorMax = Vector2.one;
-                hint.rectTransform.offsetMin = new Vector2(8f, 48f);
-                hint.rectTransform.offsetMax = new Vector2(-8f, -12f);
-                hint.font = _pickerFont;
-                hint.fontSize = 16;
-                hint.alignment = TextAnchor.MiddleCenter;
-                hint.color = _pickerSelectedColor;
-                hint.text = "누른 채 이동\n놓으면 복귀";
-                hint.raycastTarget = false;
+                Texture2D texture = _pullerController.CreateToolPreview(index == 1);
+                _toolPreviewTextures.Add(texture);
+                CreateMaterialPreviewImage(button.transform, "ToolPreview", texture, new Vector2(96f, 88f), 14f);
             }
             ConnectTrayCatalog(panel, content, buttons, WorkshopDrawerCategory.ScrewsTools, out _toolTrayGrid, out _toolTrayViewport);
             _pullerController.ConnectToolTray(_keycapTrayTransition, items);

@@ -40,6 +40,7 @@ namespace Game.Player
         private bool _drawerTransitionLocked;
         private WorkshopKeycapDrawerTransition _toolTray;
         private WorkshopPullerTrayItem[] _toolItems;
+        private readonly HashSet<AssemblyFullerTool> _deployedTools = new HashSet<AssemblyFullerTool>();
 
         public bool IsEditing => _workshopView != null ? _workshopView.IsKeyboardEditing
             : _interaction != null && _interaction.IsKeyboardEditing;
@@ -57,6 +58,13 @@ namespace Game.Player
         public KeyboardDispenser KeyboardDispenser => _workshopView.KeyboardDispenser;
         public Camera InputCamera => _camera;
         public float DragWorldHeight => _dragWorldHeight;
+
+        /// <summary>extractsSwitches에 해당하는 씬의 실제 풀러 모델을 카탈로그 이미지로 렌더링해 반환한다. 원본 자세와 활성 상태는 유지하며 호출자가 이미지 수명을 관리한다.</summary>
+        public Texture2D CreateToolPreview(bool extractsSwitches)
+        {
+            AssemblyFullerTool tool = extractsSwitches ? _switchPuller : _keycapPuller;
+            return AssemblyCatalogPreview.RenderParts(new[] { tool.ToolTransform });
+        }
 
         /// <summary>body를 ray가 가리키는 작업대에 배치하고 편집 대상으로 연결한 결과를 반환한다. 기존 작업대 판정과 설치 경로를 사용하며 재고는 변경하지 않는다.</summary>
         public bool TryPlaceLowerHousing(Rigidbody body, Ray ray)
@@ -92,17 +100,19 @@ namespace Game.Player
                 || !_toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools)
                 || Mouse.current == null || !Mouse.current.leftButton.isPressed) return;
             AssemblyFullerTool tool = item.ExtractsSwitches ? _switchPuller : _keycapPuller;
+            if (_deployedTools.Contains(tool)) return;
             tool.ToolTransform.gameObject.SetActive(true);
-            tool.BeginTrayHold(_camera.ScreenPointToRay(InGameCursor.Position));
+            tool.SetContext(this, true, false);
+            if (tool.BeginTrayHold(_camera.ScreenPointToRay(InGameCursor.Position))) _deployedTools.Add(tool);
             RefreshToolVisibility();
         }
 
-        /// <summary>트레이에 연결된 실물 풀러는 선택 중에만 표시한다. 미선택 도구의 기존 자세는 유지하고 월드 직접 접근을 차단한다.</summary>
+        /// <summary>트레이에서 꺼낸 풀러와 선택 중인 풀러를 표시한다. 배치된 실물은 원래 도구 위치에 남기며 서랍에 보관된 풀러만 숨긴다.</summary>
         private void RefreshToolVisibility()
         {
             if (_toolTray == null) return;
-            _keycapPuller.ToolTransform.gameObject.SetActive(_keycapPuller.IsSelected);
-            _switchPuller.ToolTransform.gameObject.SetActive(_switchPuller.IsSelected);
+            _keycapPuller.ToolTransform.gameObject.SetActive(_keycapPuller.IsSelected || _deployedTools.Contains(_keycapPuller));
+            _switchPuller.ToolTransform.gameObject.SetActive(_switchPuller.IsSelected || _deployedTools.Contains(_switchPuller));
         }
 
         /// <summary>locked로 서랍 전환 중 공통 부품·도구 입력을 차단한다. 재고와 장착 상태는 변경하지 않는다.</summary>
@@ -198,10 +208,22 @@ namespace Game.Player
             if (_pcbDragging || _screwPointerCaptured || _keycapPlacement != null && (_keycapPlacement.IsDragging || _keycapPlacement.IsInventoryScrolling)) return;
             Vector2 pointer = InGameCursor.Position;
             Ray ray = _camera.ScreenPointToRay(pointer);
-            if ((_toolTray == null || _keycapPuller.IsSelected) && _keycapPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
-            if ((_toolTray == null || _switchPuller.IsSelected) && _switchPuller.ProcessPointer(ray, pointer, Mouse.current)) return;
+            if (ProcessDeployedTool(_keycapPuller, ray, pointer)) return;
+            if (ProcessDeployedTool(_switchPuller, ray, pointer)) return;
             if (Mouse.current.leftButton.wasPressedThisFrame && !IsPointerOverUI(pointer))
                 TryRemoveClickedPart(ray);
+        }
+
+        /// <summary>tool의 출고 상태로 월드 집기와 사용 중 복귀 아웃라인을 연결한다. pointer가 도구 서랍 안인 해제 입력에는 실물을 보관하고 그 외에는 기존 위치로 돌려놓는다.</summary>
+        private bool ProcessDeployedTool(AssemblyFullerTool tool, Ray ray, Vector2 pointer)
+        {
+            if (_toolTray != null && !tool.IsSelected && !_deployedTools.Contains(tool)) return false;
+            if (!tool.IsSelected) tool.SetContext(this, true, _toolTray != null || _showToolOutlines);
+            bool store = tool.IsSelected && Mouse.current.leftButton.wasReleasedThisFrame && _toolTray != null
+                && _toolTray.IsCategoryOpen(WorkshopDrawerCategory.ScrewsTools) && _toolTray.ContainsReturnPoint(pointer);
+            bool handled = tool.ProcessPointer(ray, pointer, Mouse.current);
+            if (store && !tool.IsSelected) _deployedTools.Remove(tool);
+            return handled;
         }
 
         /// <summary>

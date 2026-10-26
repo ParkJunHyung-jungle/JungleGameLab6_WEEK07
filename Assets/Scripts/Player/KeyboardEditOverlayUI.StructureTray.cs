@@ -11,6 +11,7 @@ namespace Game.Player
     {
         private bool _structureTraysReady;
         private KeyboardAssemblyState _structurePreviewSource;
+        private GameObject _structurePreviewPrefab;
         private readonly Dictionary<AssemblyCatalogEntry, RawImage> _structurePreviews = new Dictionary<AssemblyCatalogEntry, RawImage>();
         private readonly Dictionary<AssemblyStructurePart, RectTransform> _structurePanels = new Dictionary<AssemblyStructurePart, RectTransform>();
         private readonly Dictionary<GridLayoutGroup, RectTransform> _structureGrids = new Dictionary<GridLayoutGroup, RectTransform>();
@@ -186,9 +187,17 @@ namespace Game.Player
             if (!_structureTraysReady) return;
             KeyboardAssemblyState assembly = _plateCustomization != null ? _plateCustomization.GetComponent<KeyboardAssemblyState>() : null;
             if (assembly == _structurePreviewSource && _structurePreviewTextures.Count > 0) return;
+            GameObject sourcePrefab = assembly != null && assembly.TryGetComponent(out KeyboardPickupTarget pickup)
+                ? pickup.SourcePrefab : null;
+            if (sourcePrefab != null && sourcePrefab == _structurePreviewPrefab && _structurePreviewTextures.Count > 0)
+            {
+                _structurePreviewSource = assembly;
+                return;
+            }
             foreach (RawImage image in _structurePreviews.Values) { image.texture = null; image.enabled = false; }
             DestroyPreviewTextures(_structurePreviewTextures);
             _structurePreviewSource = assembly;
+            _structurePreviewPrefab = sourcePrefab;
             if (assembly == null || !assembly.Initialized) return;
             foreach (var preview in _structurePreviews)
             {

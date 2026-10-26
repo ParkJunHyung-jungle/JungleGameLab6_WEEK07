@@ -21,13 +21,14 @@ public sealed class KeyboardDispenser : MonoBehaviour
     public bool CanDispense => CanIssueLowerHousing && _outputPoint != null && _keyboardPrefabs.Exists(prefab => prefab != null);
     public bool CanIssueLowerHousing => !_limitLowerHousingInScene || !HasActiveLowerHousing();
 
-    /// <summary>자판기와 같은 씬의 작업대·바닥에 활성 하단부가 있는지 반환한다. 보관된 비활성 실물과 진열대에 고정된 본체는 제외하며 조립 상태는 변경하지 않는다.</summary>
+    /// <summary>자판기와 같은 씬의 작업대·바닥에 활성 하단부가 있는지 반환한다. 보관된 비활성 실물과 진열대·모니터 거치대에 고정된 본체는 제외하며 조립 상태는 변경하지 않는다.</summary>
     private bool HasActiveLowerHousing()
     {
         foreach (KeyboardAssemblyState assembly in FindObjectsByType<KeyboardAssemblyState>(FindObjectsSortMode.None))
         {
             if (assembly.gameObject.scene != gameObject.scene
-                || assembly.GetComponentInParent<KeyboardWallRack>() != null) continue;
+                || assembly.GetComponentInParent<KeyboardWallRack>() != null
+                || assembly.GetComponentInParent<MonitorKeyboardHolder>() != null) continue;
             if (assembly.LowerInstalled || assembly.LowerLoose) return true;
         }
         return false;

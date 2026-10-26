@@ -361,6 +361,11 @@ namespace Game.Player
         {
             if (_caseCustomization == customization)
                 return;
+            if (UsesScreenTrays)
+            {
+                _caseCustomization = customization;
+                return;
+            }
             if (isActiveAndEnabled)
                 foreach (KeyboardEditButton button in _casePreviewButtons)
                     button.Clicked -= HandleCasePreviewClicked;
@@ -396,10 +401,23 @@ namespace Game.Player
             if (_plateCustomization == customization)
                 return;
 
+            bool reusePicker = UsesScreenTrays && _plateViewport != null && _plateCustomization != null
+                && customization != null && _plateCustomization.PlateRenderer != null && customization.PlateRenderer != null
+                && _plateCustomization.PlateRenderer.GetComponent<MeshFilter>().sharedMesh
+                    == customization.PlateRenderer.GetComponent<MeshFilter>().sharedMesh
+                && _plateEffects.Count == customization.AvailablePlateEffects.Count;
+            if (reusePicker)
+                for (int index = 0; index < _plateEffects.Count; index++)
+                    if (_plateEffects[index] != customization.AvailablePlateEffects[index]) { reusePicker = false; break; }
             _plateCustomization = customization;
             RefreshStructureTrayPreviews();
             if (!isActiveAndEnabled)
                 return;
+            if (reusePicker)
+            {
+                RefreshPlateSelection();
+                return;
+            }
 
             SetPlatePickerEventBindings(false);
             CreatePlatePicker();
